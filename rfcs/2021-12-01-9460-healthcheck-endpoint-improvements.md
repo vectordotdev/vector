@@ -46,7 +46,7 @@ should be a minor change and not negatively impact existing deployments.
 ## Rationale
 
 This improvement is low effort but greatly improves the experience of running
-Vector behind a load balancer or in a service discovery system. As we reccomend
+Vector behind a load balancer or in a service discovery system. As we recommend
 both of those options for production deployments there's very little reason not
 to implement this.
 
