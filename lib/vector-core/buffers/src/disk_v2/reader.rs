@@ -153,8 +153,10 @@ where
                 // so would fail if `usize` was larger than `u64`, meaning we at least will panic if
                 // Vector is running on a 128-bit CPU in the future, storing records that are larger
                 // than 2^64+1. :)
-                #[allow(clippy::cast_possible_truncation)]
-                return Ok(Some(u64::from_be_bytes(length) as usize));
+                let record_len = u64::from_be_bytes(length)
+                    .try_into()
+                    .expect("record length should never exceed usize");
+                return Ok(Some(record_len));
             }
 
             let buf = self.reader.fill_buf().await.context(Io)?;
