@@ -144,14 +144,16 @@ jobs:
         variant:
           - name: baseline
             tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}"
+            ref: master
           - name: comparison
             tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
+            ref: "${{ github.sha }}"
     steps:
       - uses: actions/checkout@v2.3.5
 
       - uses: actions/checkout@v2.3.5
         with:
-          ref: master
+          ref: ${{ matrix.variant.ref }}
           path: ${{ matrix.variant.name }}-vector
 
       - name: Set up Docker Buildx
