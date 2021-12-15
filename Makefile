@@ -306,7 +306,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -366,6 +366,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse stop
+endif
+
+.PHONY: test-integration-datadog-agent
+test-integration-datadog-agent: ## Runs Datadog Agent integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh datadog-agent stop
+	@scripts/setup_integration_env.sh datadog-agent start
+	sleep 5 # Many services are very slow... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib ::sources::datadog::tests::
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh datadog-agent stop
 endif
 
 .PHONY: test-integration-docker-logs
