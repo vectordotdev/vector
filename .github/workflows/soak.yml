@@ -136,7 +136,7 @@ jobs:
         run: echo "$MATRIX_CONTEXT"
 
   build-image:
-    name: Build ${{ matrix.variant }} 'soak-vector' container
+    name: Build ${{ matrix.variant.name }} 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     needs: [compute-soak-meta]
     strategy:
@@ -189,7 +189,7 @@ jobs:
           cache-to: type=gha, scope=${{ github.workflow }}
 
   soak:
-    name: Soak (${{ matrix.target }}) - ${{ matrix.variant }} - replica ${{ matrix.replica }}
+    name: Soak (${{ matrix.target }}) - ${{ matrix.variant.name }} - replica ${{ matrix.replica }}
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image]
@@ -199,13 +199,13 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
-      - name: Run ${{ matrix.variant }} experiment
+      - name: Run ${{ matrix.variant.name }} experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
-                                  --variant ${{ matrix.variant }} \
+                                  --variant ${{ matrix.variant.name }} \
                                   --tag ${{ matrix.tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
@@ -216,8 +216,8 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-${{ matrix.variant }}
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/${{ matrix.variant }}.captures
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-${{ matrix.variant.name }}
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/${{ matrix.variant.name }}.captures
 
       - name: Clear up unused images
         run: |
