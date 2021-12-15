@@ -258,7 +258,6 @@ pub struct Writer<T> {
     config: DiskBufferConfig,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
-    unacked_bytes: u64,
     _t: PhantomData<T>,
 }
 
@@ -274,7 +273,6 @@ where
             config,
             writer: None,
             data_file_size: 0,
-            unacked_bytes: 0,
             _t: PhantomData,
         }
     }
@@ -282,8 +280,6 @@ where
     fn track_write(&mut self, record_size: u64) {
         self.data_file_size += record_size;
         self.ledger.track_write(record_size);
-
-        self.unacked_bytes += record_size;
     }
 
     fn can_write(&mut self) -> bool {
@@ -353,32 +349,10 @@ where
                 if ledger_next - 1 == last_id {
                     trace!("last record in file validated: next ID (ledger) = {}, last ID (written) = {}",
                         ledger_next, last_id);
-
-                    // We synchronize the acked buffer size to match the unacked buffer size,
-                    // because we know that either:
-                    // - they both already match, because we updated the acked buffer size
-                    // - they don't match, but we obviously flushed all records to disk, otherwise
-                    //   our last written record ID would not match what we expect from the given
-                    //   ledger data
-                    //
-                    // And if they don't match, our unacked buffer size would be the "correct"
-                    // buffer size, and it simply hadn't yet been updated to the ledger.
-                    self.ledger.state().use_unacked_total_buffer_size();
                     false
                 } else {
                     error!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
                         ledger_next, last_id);
-
-                    // We synchronize the unacked buffer size to match the acked buffer size,
-                    // because we know that:
-                    // - we're missing records that we thought we wrote
-                    // - the only practical difference between the acked/unacked values is that the
-                    //   acked happens when we call `Writer::flush`, so it is ostensibly correct
-                    // - the reader will open this file, and read up until this record, so its logic
-                    //   for handling read vs file size deltas will be consistent and should not
-                    //   contribute to overflow subtraction during normal adjustments to the total
-                    //   buffer size
-                    self.ledger.state().use_acked_total_buffer_size();
                     true
                 }
             }
@@ -407,8 +381,9 @@ where
             self.ledger.state().increment_writer_file_id();
 
             // SCREAM SCREAM I SHOULDN'T BE HERE
-            // comment this out when you write the test to make sure that we open the next file when
-            // writer validation fails
+            // This is definitely required to avoid stalls when write validation fails and we roll
+            // to the next data file.  We need to update our write validation tests to ensure that
+            // we make this call when we're instructed to skip to the next data file.
             self.ensure_ready_for_write().await?;
         }
 
@@ -422,9 +397,8 @@ where
         loop {
             // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
             // wait for the reader to signal that they've made some progress.
-            let total_buffer_size = self.ledger.state().get_total_buffer_size();
+            let total_buffer_size = self.ledger.get_total_buffer_size();
             let max_buffer_size = self.config.max_buffer_size;
-
             if total_buffer_size <= max_buffer_size {
                 break;
             }
@@ -543,41 +517,38 @@ where
                 },
             };
 
-            match file {
+            if let Some((data_file, data_file_size)) = file {
                 // We successfully opened the file and it can be written to.
-                Some((data_file, data_file_size)) => {
+                debug!(
+                    "opened data file '{:?}' (existing size: {} bytes)",
+                    data_file, data_file_size
+                );
+
+                // Make sure the file is flushed to disk, especially if we just created it.
+                data_file.sync_all().await?;
+
+                self.writer = Some(RecordWriter::new(data_file, self.config.max_record_size));
+                self.data_file_size = data_file_size;
+
+                // If we opened the "next" data file, we need to increment the current writer
+                // file ID now to signal that the writer has moved on.
+                if should_open_next {
+                    self.ledger.state().increment_writer_file_id();
+                    self.ledger.notify_writer_waiters();
+
                     debug!(
-                        "opened data file '{:?}' (existing size: {} bytes)",
-                        data_file, data_file_size
+                        "next data file was opened, writer now on file ID {}",
+                        self.ledger.get_current_writer_file_id()
                     );
-
-                    // Make sure the file is flushed to disk, especially if we just created it.
-                    data_file.sync_all().await?;
-
-                    self.writer = Some(RecordWriter::new(data_file, self.config.max_record_size));
-                    self.data_file_size = data_file_size;
-
-                    // If we opened the "next" data file, we need to increment the current writer
-                    // file ID now to signal that the writer has moved on.
-                    if should_open_next {
-                        self.ledger.state().increment_writer_file_id();
-                        self.ledger.notify_writer_waiters();
-
-                        debug!(
-                            "next data file was opened, writer now on file ID {}",
-                            self.ledger.get_current_writer_file_id()
-                        );
-                    }
-
-                    return Ok(());
                 }
-                // The file is still present and waiting for a reader to finish reading it in order
-                // to delete it.  Wait until the reader signals progress and try again.
-                None => {
-                    debug!("data file was at or over max data file size, waiting for reader");
-                    self.ledger.wait_for_reader().await
-                }
+
+                return Ok(());
             }
+
+            // The file is still present and waiting for a reader to finish reading it in order
+            // to delete it.  Wait until the reader signals progress and try again.
+            debug!("data file was at or over max data file size, waiting for reader");
+            self.ledger.wait_for_reader().await;
         }
     }
 
@@ -595,9 +566,6 @@ where
         self.ensure_ready_for_write().await.context(Io)?;
 
         // Grab the next record ID and attempt to write the record.
-        self.ledger
-            .state()
-            .increment_preflight_next_writer_record_id();
         let id = self.ledger.state().get_next_writer_record_id();
         let n = self
             .writer
@@ -605,15 +573,6 @@ where
             .expect("writer should exist after `ensure_ready_for_write`")
             .write_record(id, record)
             .await?;
-
-        if self.data_file_size == 0 {
-            debug!(
-                "first write to data file ID {}: record ID {}, {} bytes in size",
-                self.ledger.get_current_writer_file_id(),
-                id,
-                n
-            );
-        }
 
         // Since we succeeded in writing the record, increment the next record ID and metadata for
         // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
@@ -670,12 +629,7 @@ where
     /// variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
-        let unacked_bytes = self.unacked_bytes;
-        self.unacked_bytes = 0;
-
-        let result = self.flush_inner(false).await;
-        self.ledger.state().acked_increment_records(unacked_bytes);
-        result
+        self.flush_inner(false).await
     }
 }
 
@@ -692,7 +646,7 @@ impl<T> Writer<T> {
     #[instrument(skip(self), level = "trace")]
     pub fn close(&mut self) {
         if self.ledger.mark_writer_done() {
-            info!("closing");
+            debug!("writer marked as closed");
             self.ledger.notify_writer_waiters();
         }
     }
@@ -700,9 +654,6 @@ impl<T> Writer<T> {
 
 impl<T> Drop for Writer<T> {
     fn drop(&mut self) {
-        debug!("ledger state at writer drop: {:#?}", self.ledger.state());
-
-        info!("dropped writer");
         self.close();
     }
 }

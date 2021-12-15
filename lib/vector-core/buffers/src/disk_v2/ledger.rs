@@ -89,19 +89,9 @@ pub enum LedgerLoadCreateError {
 #[derive(Archive, Serialize, Debug)]
 #[archive_attr(derive(CheckBytes, Debug))]
 pub struct LedgerState {
-    /// Total number of records persisted in this buffer.
-    #[with(Atomic)]
-    total_records: AtomicU64,
-    /// Total size of all data files used by this buffer.
-    #[with(Atomic)]
-    total_buffer_size: AtomicU64,
-    #[with(Atomic)]
-    acked_total_buffer_size: AtomicU64,
     /// Next record ID to use when writing a record.
     #[with(Atomic)]
     writer_next_record_id: AtomicU64,
-    #[with(Atomic)]
-    writer_preflight_next_record_id: AtomicU64,
     /// The current data file ID being written to.
     #[with(Atomic)]
     writer_current_data_file_id: AtomicU16,
@@ -116,14 +106,10 @@ pub struct LedgerState {
 impl Default for LedgerState {
     fn default() -> Self {
         Self {
-            total_records: AtomicU64::new(0),
-            total_buffer_size: AtomicU64::new(0),
-            acked_total_buffer_size: AtomicU64::new(0),
             // First record written is always 1, so that our default of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
             writer_next_record_id: AtomicU64::new(1),
-            writer_preflight_next_record_id: AtomicU64::new(1),
             writer_current_data_file_id: AtomicU16::new(0),
             reader_current_data_file_id: AtomicU16::new(0),
             reader_last_record_id: AtomicU64::new(0),
@@ -132,105 +118,6 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn acked_increment_records(&self, record_size: u64) {
-        let last_total_buffer_size = self
-            .acked_total_buffer_size
-            .fetch_add(record_size, Ordering::AcqRel);
-        trace!(
-            "acked_total_buffer_size {}->{}",
-            last_total_buffer_size,
-            last_total_buffer_size + record_size
-        );
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn use_unacked_total_buffer_size(&self) {
-        let unacked = self.total_buffer_size.load(Ordering::Acquire);
-        self.acked_total_buffer_size
-            .store(unacked, Ordering::Release);
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn use_acked_total_buffer_size(&self) {
-        let acked = self.acked_total_buffer_size.load(Ordering::Acquire);
-        self.total_buffer_size.store(acked, Ordering::Release);
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn increment_records(&self, record_size: u64) {
-        let last_total_records = self.total_records.fetch_add(1, Ordering::AcqRel);
-        let last_total_buffer_size = self
-            .total_buffer_size
-            .fetch_add(record_size, Ordering::AcqRel);
-        trace!(
-            "total_records {}->{}, total_buffer_size {}->{}",
-            last_total_records,
-            last_total_records + 1,
-            last_total_buffer_size,
-            last_total_buffer_size + record_size
-        );
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn decrement_records(&self, record_len: u64, total_record_size: u64) {
-        let last_total_records = self.total_records.fetch_sub(record_len, Ordering::AcqRel);
-        let last_total_buffer_size = self
-            .total_buffer_size
-            .fetch_sub(total_record_size, Ordering::AcqRel);
-        self.acked_total_buffer_size
-            .fetch_sub(total_record_size, Ordering::AcqRel);
-        trace!(
-            "total_records {}->{}, total_buffer_size {}->{}",
-            last_total_records,
-            last_total_records - record_len,
-            last_total_buffer_size,
-            last_total_buffer_size - total_record_size
-        );
-
-        if (last_total_buffer_size - total_record_size) > u32::MAX as u64 {
-            error!("unexpected buffer size regression putting it over 4GB");
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            panic!();
-        }
-    }
-
-    /// Gets the total number of records in the buffer.
-    pub fn get_total_records(&self) -> u64 {
-        self.total_records.load(Ordering::Acquire)
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn decrement_total_records(&self, amount: u64) {
-        let last_total_records = self.total_records.fetch_sub(amount, Ordering::AcqRel);
-        trace!(
-            "total_records {}->{}",
-            last_total_records,
-            last_total_records - amount
-        );
-    }
-
-    /// Gets the total number of bytes for all records in the buffer.
-    ///
-    /// This number will often disagree with the size of files on disk, as data files are deleted
-    /// only after being read entirely, and are simply appended to when they are not yet full.  This
-    /// leads to behavior where writes and reads will change this value only by the size of the
-    /// records being written and read, while data files on disk will grow incrementally, and be
-    /// deleted in full.
-    pub fn get_total_buffer_size(&self) -> u64 {
-        self.total_buffer_size.load(Ordering::Acquire)
-    }
-
-    #[instrument(skip(self), level = "trace")]
-    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
-        let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
-        trace!(
-            "total_buffer_size {}->{}",
-            last_total_buffer_size,
-            last_total_buffer_size - amount
-        );
-    }
-
     fn get_current_writer_file_id(&self) -> u16 {
         self.writer_current_data_file_id.load(Ordering::Acquire)
     }
@@ -246,11 +133,6 @@ impl ArchivedLedgerState {
 
     pub(super) fn get_next_writer_record_id(&self) -> u64 {
         self.writer_next_record_id.load(Ordering::Acquire)
-    }
-
-    pub(super) fn increment_preflight_next_writer_record_id(&self) {
-        self.writer_preflight_next_record_id
-            .fetch_add(1, Ordering::AcqRel);
     }
 
     pub(super) fn increment_next_writer_record_id(&self) {
@@ -326,6 +208,8 @@ pub struct Ledger {
     ledger_lock: LockFile,
     // Ledger state.
     state: BackedArchive<MmapMut, LedgerState>,
+    // The total size, in bytes, of all unread records in the buffer.
+    total_buffer_size: AtomicU64,
     // Notifier for reader-related progress.
     reader_notify: Notify,
     // Notifier for writer-related progress.
@@ -353,6 +237,51 @@ impl Ledger {
     /// This is the information persisted to disk.
     pub fn state(&self) -> &ArchivedLedgerState {
         self.state.get_archive_ref()
+    }
+
+    /// Gets the total number of unread records in the buffer.
+    ///
+    /// This number is based on acknowledged reads only, which is to say that if 10 records are
+    /// written, and 8 of them have been read, but only 3 have been acked, then `get_total_records`
+    /// would return `7`.
+    pub fn get_total_records(&self) -> u64 {
+        let next_writer_id = self.state().get_next_writer_record_id();
+        let last_reader_id = self.state().get_last_reader_record_id();
+
+        next_writer_id.wrapping_sub(last_reader_id) - 1
+    }
+
+    /// Gets the total number of bytes for all unread records in the buffer.
+    ///
+    /// This number will often disagree with the size of files on disk, as data files are deleted
+    /// only after being read entirely, and are simply appended to when they are not yet full.  This
+    /// leads to behavior where writes and reads will change this value only by the size of the
+    /// records being written and read, while data files on disk will grow incrementally, and be
+    /// deleted in full.
+    pub(super) fn get_total_buffer_size(&self) -> u64 {
+        self.total_buffer_size.load(Ordering::Acquire)
+    }
+
+    /// Increments the total number of bytes for all unread records in the buffer.
+    pub(super) fn increment_total_buffer_size(&self, amount: u64) {
+        let last_total_buffer_size = self.total_buffer_size.fetch_add(amount, Ordering::AcqRel);
+        trace!(
+            "incremented total buffer size by {} bytes ({} -> {})",
+            amount,
+            last_total_buffer_size,
+            last_total_buffer_size + amount
+        );
+    }
+
+    /// Decrements the total number of bytes for all unread records in the buffer.
+    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
+        let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
+        trace!(
+            "decremented total buffer size by {} bytes ({} -> {})",
+            amount,
+            last_total_buffer_size,
+            last_total_buffer_size - amount
+        );
     }
 
     /// Gets the current reader file ID.
@@ -416,7 +345,7 @@ impl Ledger {
     ///
     /// This will only occur when a record is read, which may allow enough space (below the maximum
     /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
         self.reader_notify.notified().await;
     }
@@ -424,26 +353,26 @@ impl Ledger {
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_reader_waiters(&self) {
         self.reader_notify.notify_one();
     }
 
     /// Notifies all tasks waiting on progress by the writer.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
 
     /// Tracks the statistics of a successful write.
     pub fn track_write(&self, record_size: u64) {
-        self.state().increment_records(record_size);
+        self.increment_total_buffer_size(record_size);
 
         // A 4GB record should not be possible to write, at all.
         let record_size = record_size
@@ -455,8 +384,7 @@ impl Ledger {
 
     /// Tracks the statistics of multiple successful reads.
     pub fn track_reads(&self, record_len: u64, total_record_size: u64) {
-        self.state()
-            .decrement_records(record_len, total_record_size);
+        self.decrement_total_buffer_size(total_record_size);
 
         // If we're acknowledgeing 4GB of records at a time, then uh... something weird is going on.
         let total_record_size = total_record_size
@@ -499,7 +427,7 @@ impl Ledger {
         let last_unacked_reader_file_id_offset = self
             .unacked_reader_file_id_offset
             .fetch_add(1, Ordering::AcqRel);
-        trace!(
+        debug!(
             "bumping unacked reader file ID offset from {}",
             last_unacked_reader_file_id_offset
         );
@@ -544,7 +472,7 @@ impl Ledger {
                 }
             },
         );
-        trace!(message = "adjusted unacked reader file ID offset", ?result);
+        debug!(message = "adjusted unacked reader file ID offset", ?result);
     }
 
     /// Determines whether or not all files should be flushed/fsync'd to disk.
@@ -578,10 +506,14 @@ impl Ledger {
         self.state.get_backing_ref().flush()
     }
 
-    fn synchronize_buffer_usage(&self) {
-        let initial_buffer_events = self.state().get_total_records();
+    /// Synchronizes the record count and total size of the buffer with buffer usage data.
+    ///
+    /// This should not be called until both the reader and writer have been initialized via
+    /// [`Reader::seek_to_last_record`] and [`Writer::validate_last_write`], otherwise the values
+    /// will not be accurate.
+    pub fn synchronize_buffer_usage(&self) {
+        let initial_buffer_events = self.get_total_records();
         let initial_buffer_size = self
-            .state()
             .get_total_buffer_size()
             .try_into()
             .expect("buffer size greater than usize; is this a 32-bit platform?");
@@ -602,7 +534,7 @@ impl Ledger {
     /// If there is an error during either serialization of the new, default ledger state, or
     /// deserializing existing data in the ledger file, or generally during the underlying I/O
     /// operations, an error variant will be returned describing the error.
-    #[instrument(skip(usage_handle), level = "trace")]
+    #[instrument(skip_all, level = "trace")]
     pub(super) async fn load_or_create(
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,
@@ -610,21 +542,14 @@ impl Ledger {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir).await.context(Io)?;
 
-        debug!("created buffer data dir");
-
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
         let mut ledger_lock = LockFile::open(&ledger_lock_path).context(Io)?;
-
-        debug!("opening ledger lock file");
-
         if !ledger_lock.try_lock().context(Io)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
-
-        debug!("locked ledger lock file");
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = config.data_dir.join("buffer.db");
@@ -635,8 +560,6 @@ impl Ledger {
             .open(&ledger_path)
             .await
             .context(Io)?;
-
-        debug!("opened ledger file");
 
         // If we just created the ledger file, then we need to create the default ledger state, and
         // then serialize and write to the file, before trying to load it as a memory-mapped file.
@@ -663,15 +586,10 @@ impl Ledger {
             }
         }
 
-        debug!("opened ledger file");
-
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
         let ledger_handle = ledger_handle.into_std().await;
         let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle).context(Io)? };
-
-        debug!("loading ledger file via mmap");
-
         let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
             // Deserialized the ledger state without issue from an existing file.
             Ok(backed) => backed,
@@ -683,15 +601,14 @@ impl Ledger {
             }
         };
 
-        debug!("deserialized ledger state via mmap");
-
         // Create the ledger object, and synchronize the buffer statistics with the buffer usage
         // handle.  This handles making sure we account for the starting size of the buffer, and
         // what not.
-        let ledger = Ledger {
+        let mut ledger = Ledger {
             config,
             ledger_lock,
             state: ledger_state,
+            total_buffer_size: AtomicU64::new(0),
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
             writer_done: AtomicBool::new(false),
@@ -700,11 +617,56 @@ impl Ledger {
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
         };
-        ledger.synchronize_buffer_usage();
-
-        debug!("synchronized buffer usage data");
+        ledger.update_buffer_size().await?;
 
         Ok(ledger)
+    }
+
+    async fn update_buffer_size(&mut self) -> Result<(), LedgerLoadCreateError> {
+        // Under normal operation, the reader and writer maintain a consistent state within the
+        // ledger.  However, due to the nature of how we update the ledger, process crashes could
+        // lead to missed updates as we execute reads and writes as non-atomic units of execution:
+        // update a field, do the read/write, update some more fields depending on success or
+        // failure, etc.
+        //
+        // This is an issue because we depend on knowing the total buffer size (the total size of
+        // unread records, specifically) so that we can correctly limit writes when we've reached
+        // the configured maximum buffer size.
+        //
+        // While it's not terribly efficient, and I'd like to eventually formulate a better design,
+        // this approach is absolutely correct: get the file size of every data file on disk,
+        // and set the "total buffer size" to the sum of all of those file sizes.
+        //
+        // When the reader does any necessary seeking to get to the record it left off on, it will
+        // adjust the "total buffer size" downwards for each record it runs through, leaving "total
+        // buffer size" at the correct value.
+        let mut dat_reader = fs::read_dir(&self.config.data_dir).await.context(Io)?;
+
+        let mut total_buffer_size = 0;
+        while let Some(dir_entry) = dat_reader.next_entry().await.context(Io)? {
+            if let Some(file_name) = dir_entry.file_name().to_str() {
+                // I really _do_ want to only find files with a .dat extension, as that's what the
+                // code generates, and having them be .dAt or .Dat or whatever would indicate that
+                // the file is not related to our buffer.  If we had to cope with case-sensitivity
+                // of filenames from another program/OS, then it would be a different story.
+                #[allow(clippy::case_sensitive_file_extension_comparisons)]
+                if file_name.ends_with(".dat") {
+                    let file_size = dir_entry.metadata().await.context(Io)?;
+                    total_buffer_size += file_size.len();
+
+                    debug!(
+                        "found buffer data file '{}', {} bytes (total buffer size: {} bytes)",
+                        file_name,
+                        file_size.len(),
+                        total_buffer_size
+                    );
+                }
+            }
+        }
+
+        self.increment_total_buffer_size(total_buffer_size);
+
+        Ok(())
     }
 }
 

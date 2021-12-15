@@ -44,7 +44,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
 
             // Make sure we can open the buffer again without any errors.
             let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
-            assert_eq!(ledger.state().get_total_records(), 1);
+            assert_eq!(ledger.get_total_records(), 1);
 
             // TODO: add negative assertions to `tracing-fluent-assertions`
             assert!(!reset_called.try_assert());
@@ -53,8 +53,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
 
     let parent =
         trace_span!("last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stopped");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
@@ -253,8 +252,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
     });
 
     let parent = trace_span!("writer_stops_when_hitting_file_that_reader_is_still_on");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
@@ -347,12 +345,8 @@ async fn reader_still_works_when_record_id_wraps_around() {
 
 #[tokio::test]
 async fn reader_deletes_data_file_around_record_id_wraparound() {
-    // basically identical to above, but we want to show that the logic used for detecting if a
-    // deletion marker has been met is valid when we're checking it after the record id has wrapped
-    // around to 0, or past 0
-    todo!();
-
-    with_temp_dir(|dir| {
+    let assertion_registry = install_tracing_helpers();
+    let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
         async move {
@@ -386,11 +380,15 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // stating that we're close to having written 2^64 records already.
             drop(ledger);
 
-            let (mut writer, mut reader, acker, ledger) = create_default_buffer(data_dir).await;
+            let (mut writer, mut reader, acker, ledger) =
+                create_buffer_with_max_data_file_size(data_dir, 256).await;
+            let starting_writer_file_id = ledger.get_current_writer_file_id();
+            let next_writer_file_id = ledger.get_next_writer_file_id();
 
-            // Now we do two writes: one which uses u64::MAX, and another which will get the rolled
-            // over value and go back to 0.
-            let first_record_size = 14;
+            // Now we do three writes, which will have u64::MAX, 0, and 1 as the IDs.  This ensures
+            // that the data file will have at least three records, and a range of IDs that cross
+            // the wrapping threshold.
+            let first_record_size = 80;
             let first_bytes_written = writer
                 .write_record(SizedRecord(first_record_size))
                 .await
@@ -398,10 +396,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
             assert_eq!(0, ledger.state().get_next_writer_record_id());
 
-            writer.flush().await.expect("flush should not fail");
-            assert_buffer_records!(ledger, 1);
-
-            let second_record_size = 256;
+            let second_record_size = 82;
             let second_bytes_written = writer
                 .write_record(SizedRecord(second_record_size))
                 .await
@@ -409,31 +404,90 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
             assert_eq!(1, ledger.state().get_next_writer_record_id());
 
+            let third_record_size = 84;
+            let third_bytes_written = writer
+                .write_record(SizedRecord(third_record_size))
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(third_bytes_written, SizedRecord, third_record_size);
+            assert_eq!(2, ledger.state().get_next_writer_record_id());
+
             writer.flush().await.expect("flush should not fail");
-            assert_buffer_records!(ledger, 2);
+            assert_buffer_records!(ledger, 3);
+            assert_reader_writer_file_positions!(ledger, 0, starting_writer_file_id);
+
+            // Now our third write should have exceeded the data file, so this next write should hit
+            // a new data file:
+            let fourth_record_size = 86;
+            let fourth_bytes_written = writer
+                .write_record(SizedRecord(fourth_record_size))
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(fourth_bytes_written, SizedRecord, fourth_record_size);
+            assert_eq!(3, ledger.state().get_next_writer_record_id());
+
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_records!(ledger, 4);
+            assert_reader_writer_file_positions!(ledger, 0, next_writer_file_id);
 
             writer.close();
 
-            // Now we should be able to read both records without the reader getting angry.
+            // Now that we have our two data files, we want to read all the records back,
+            // acknowledge them, and assert that we deleted the first data file:
+            let deleted_data_file = assertion_registry
+                .build()
+                .with_name("delete_completed_data_file")
+                .with_parent_name("reader_deletes_data_file_around_record_id_wraparound")
+                .was_entered()
+                .finalize();
+
             let first_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
             assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
-            assert_buffer_records!(ledger, 2);
+            assert_buffer_records!(ledger, 4);
+            assert_reader_writer_file_positions!(ledger, 0, next_writer_file_id);
 
             acker.ack(1);
+            assert!(!deleted_data_file.try_assert());
 
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
             assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
+            assert_buffer_records!(ledger, 3);
+            assert_reader_writer_file_positions!(ledger, 0, next_writer_file_id);
+
+            acker.ack(1);
+            assert!(!deleted_data_file.try_assert());
+
+            let third_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(third_record_read, Some(SizedRecord(third_record_size)));
+            assert_eq!(0, ledger.state().get_last_reader_record_id());
+            assert_buffer_records!(ledger, 2);
+            assert_reader_writer_file_positions!(ledger, 0, next_writer_file_id);
+
+            acker.ack(1);
+            assert!(!deleted_data_file.try_assert());
+
+            // This read should be where we actually delete the file since we've acknowledged all of
+            // the reads from the first data file:
+            let fourth_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(fourth_record_read, Some(SizedRecord(fourth_record_size)));
+            assert_eq!(1, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 1);
+            assert_reader_writer_file_positions!(ledger, 1, next_writer_file_id);
+            assert!(deleted_data_file.try_assert());
 
             acker.ack(1);
 
+            // And now since we closed the writer and read all four records, we should be done:
             let final_read = reader.next().await.expect("read should not fail");
             assert_eq!(final_read, None);
-            assert_eq!(0, ledger.state().get_last_reader_record_id());
+            assert_eq!(2, ledger.state().get_last_reader_record_id());
+            assert_reader_writer_file_positions!(ledger, 1, next_writer_file_id);
             assert_buffer_is_empty!(ledger);
         }
-    })
-    .await;
+    });
+
+    let parent = trace_span!("reader_deletes_data_file_around_record_id_wraparound");
+    fut.instrument(parent).await;
 }

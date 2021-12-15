@@ -170,6 +170,8 @@ where
             .context(ReaderSeekFailed)?;
         debug!("ledger state after reader seek: {:?}", ledger.state());
 
+        ledger.synchronize_buffer_usage();
+
         let acker = create_disk_v2_acker(Arc::clone(&ledger));
 
         Ok((writer, reader, acker, ledger))

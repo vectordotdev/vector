@@ -262,6 +262,7 @@ pub struct Reader<T> {
     ready_to_read: bool,
     check_pending_deletions: bool,
     pending_deletions: Vec<DeletionMarker>,
+    // TODO: Switch this back to just the number of bytes, since we don't need the record IDs.
     pending_read_sizes: Vec<(u64, u64)>,
     _t: PhantomData<T>,
 }
@@ -287,18 +288,26 @@ where
     }
 
     fn track_read(&mut self, record_id: u64, record_size: u64) {
-        //trace!("tracking read for ID {}, with size of {} bytes", record_id, record_size);
-
-        // We always track the number of bytes we've read from the given file, because we need an
-        // accurate amount when we check in `roll_to_next_data_file` to see if we have to compensate
-        // for dropping a file that we didn't read to the end.
+        // Tracking reads involves two main aspects:
+        // - keeping track of the bytes we've read _in this current data file_
+        // - keeping track of the total buffer size overall
         //
-        // However, we _don't_ want to update the ledger if we're just seeking to our last known
-        // read position, because that already happened for all the records we're seeking past.
+        // When we roll over to the next data file, we need to check to see if we read the entire
+        // data file.  In some case, such as hitting a corrupted record, we'll skip the rest of the
+        // file.  Keeping track of all the bytes we read for the given data file allows us to
+        // compensate for skipped data file scenarios.
+        //
+        // After that, we need to make sure we're correctly updating the ledger.  If we're still
+        // initializing our reader (aka `seek_to_next_record` has not completed yet) then we need to
+        // directly update the ledger as we read, to ensure that the resulting "total buffer size"
+        // is accurate once the both the reader and writer have been created.  Otherwise, we only
+        // update the ledger once reads are acknowledged, which requires storing a pending read size.
         self.bytes_read += record_size;
 
         if self.ready_to_read {
             self.pending_read_sizes.push((record_id, record_size));
+        } else {
+            self.ledger.decrement_total_buffer_size(record_size);
         }
     }
 
@@ -324,7 +333,7 @@ where
                 metadata.len(),
                 marker.bytes_read
             );
-            self.ledger.state().decrement_total_buffer_size(size_delta);
+            self.ledger.decrement_total_buffer_size(size_delta);
         }
         drop(data_file);
 
@@ -411,19 +420,6 @@ where
                 .drain(..pending_acks)
                 .collect::<Vec<_>>();
             let total_bytes_read = acks.iter().map(|(_, n)| *n).sum();
-            let min_id = acks
-                .iter()
-                .map(|(id, _)| *id)
-                .min()
-                .expect("should never be none");
-            let max_id = acks
-                .iter()
-                .map(|(id, _)| *id)
-                .max()
-                .expect("should never be none");
-
-            //trace!("acknowledging record IDs {}-{} ({} total), for a total of {} bytes",
-            //    min_id, max_id, acks.len(), total_bytes_read);
 
             self.ledger.track_reads(acks.len() as u64, total_bytes_read);
 
@@ -452,7 +448,10 @@ where
         };
 
         if self.ready_to_read {
-            trace!("finished handling acknowledgements");
+            trace!(
+                "finished handling acknowledgements, total buffer size = {}",
+                self.ledger.get_total_buffer_size()
+            );
         }
         result
     }
@@ -563,9 +562,6 @@ where
                 "detected {} missing records ({} -> {}), adjusting...",
                 corrupted_records, previous_id, record_id
             );
-            self.ledger
-                .state()
-                .decrement_total_records(corrupted_records);
             emit(&EventsCorrupted {
                 count: corrupted_records,
             });
@@ -751,8 +747,7 @@ where
             if self.ready_to_read {
                 self.ledger.wait_for_writer().await;
 
-                if self.ledger.is_writer_done() && self.ledger.state().get_total_buffer_size() == 0
-                {
+                if self.ledger.is_writer_done() && self.ledger.get_total_buffer_size() == 0 {
                     // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
                     // `roll_to_next_data_file` -- versus total records, which needs a successful read
                     // to catch any inconsistencies in the record IDs.

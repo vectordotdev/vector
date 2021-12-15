@@ -61,7 +61,6 @@ async fn writer_error_when_record_is_over_the_limit() {
 #[tokio::test]
 async fn writer_waits_when_buffer_is_full() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -162,7 +161,7 @@ async fn writer_waits_when_buffer_is_full() {
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
             acker.ack(1);
-            while !deleted_first_data_file.try_assert() && !got_past_wait_for_waiter.try_assert() {
+            while !(deleted_first_data_file.try_assert() && got_past_wait_for_waiter.try_assert()) {
                 assert_pending!(second_record_read.poll());
             }
 
@@ -201,8 +200,7 @@ async fn writer_waits_when_buffer_is_full() {
     });
 
     let parent = trace_span!("writer_waits_when_buffer_is_full");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
@@ -324,13 +322,9 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
 
             let open_wait = Duration::from_secs(5);
             let second_buffer_open = create_buffer_with_max_data_file_size(data_dir, 100);
-            let (mut writer, mut reader, acker, ledger) =
-                match timeout(open_wait, second_buffer_open).await {
-                    Ok(result) => result,
-                    Err(_) => {
-                        panic!("failed to open buffer a second time in the expected timeframe")
-                    }
-                };
+            let (mut writer, mut reader, acker, ledger) = timeout(open_wait, second_buffer_open)
+                .await
+                .expect("failed to open buffer a second time in the expected timeframe");
             assert_buffer_size!(ledger, 1, first_bytes_written);
             assert_reader_writer_file_positions!(ledger, 0, 0);
 

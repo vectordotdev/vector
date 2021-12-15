@@ -8,7 +8,8 @@ use tokio::{
 use tracing::Instrument;
 
 use crate::{
-    assert_enough_bytes_written, assert_reader_writer_file_positions,
+    assert_enough_bytes_written, assert_file_does_not_exist_async, assert_file_exists_async,
+    assert_reader_writer_file_positions,
     disk_v2::{backed_archive::BackedArchive, record::Record, tests::SizedRecord, ReaderError},
 };
 
@@ -81,7 +82,9 @@ async fn reader_throws_error_when_record_length_delimiter_is_zero() {
 }
 
 #[tokio::test]
-async fn reader_throws_error_when_finished_file_has_truncated_record_data() {}
+async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
+    todo!();
+}
 
 #[tokio::test]
 async fn reader_throws_error_when_record_has_scrambled_archive_data() {
@@ -192,7 +195,6 @@ async fn reader_throws_error_when_record_has_decoding_error() {
 #[tokio::test]
 async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -208,6 +210,9 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a `SizedRecord` record that we can scramble.  Since it will be the last record
             // in the data file, the writer should detect this error when the buffer is recreated,
@@ -262,26 +267,23 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call.
-            let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
-
-            // update this test to make sure the writer rolls to the next data file when an error
-            // during last write validation is detected
-            todo!();
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
     let parent =
         trace_span!("writer_correctly_detects_when_last_record_has_scrambled_archive_data");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
 async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -295,6 +297,9 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a `SizedRecord` record that we can scramble.  Since it will be the last record
             // in the data file, the writer should detect this error when the buffer is recreated,
@@ -361,25 +366,22 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
                 .expect("flush should not fail");
             drop(backed_record);
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call.
-            let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
-
-            // update this test to make sure the writer rolls to the next data file when an error
-            // during last write validation is detected
-            todo!();
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
     let parent = trace_span!("writer_correctly_detects_when_last_record_has_invalid_checksum");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
 async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -393,6 +395,9 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a regular record so something is in the data file.
             let bytes_written = writer
@@ -412,26 +417,21 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
             }
 
             // Grab the current writer data file path, and then drop the writer/reader.
-            let expected_writer_file_id = ledger.get_next_writer_file_id();
             drop(writer);
             drop(ledger);
 
             // We should not have seen a call to `reset` yet.
             assert!(!writer_called_reset.try_assert());
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call, since the last
-            // record ID is too far behind what the ledger thinks it should be:
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
             let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
-            assert_reader_writer_file_positions!(ledger, 0, expected_writer_file_id);
-
-            // update this test to make sure the writer rolls to the next data file when an error
-            // during last write validation is detected
-            todo!();
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
     let parent = trace_span!("writer_correctly_detects_when_last_record_has_gap_in_record_id");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }

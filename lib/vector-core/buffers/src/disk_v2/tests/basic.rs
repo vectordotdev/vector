@@ -1,3 +1,5 @@
+use crate::assert_buffer_is_empty;
+
 use super::{create_default_buffer, with_temp_dir, SizedRecord};
 
 #[tokio::test]
@@ -8,9 +10,7 @@ async fn basic_read_write_loop() {
         async move {
             // Create a regular buffer, no customizations required.
             let (mut writer, mut reader, acker, ledger) = create_default_buffer(data_dir).await;
-
-            assert_eq!(ledger.state().get_total_records(), 0);
-            assert_eq!(ledger.state().get_total_buffer_size(), 0);
+            assert_buffer_is_empty!(ledger);
 
             let expected_items = (512..768)
                 .into_iter()
@@ -47,8 +47,7 @@ async fn basic_read_write_loop() {
             let actual_items = read_task.await.expect("read task should not panic");
 
             // All records should be consumed at this point.
-            assert_eq!(ledger.state().get_total_records(), 0);
-            assert_eq!(ledger.state().get_total_buffer_size(), 0);
+            assert_buffer_is_empty!(ledger);
 
             // Make sure we got the right items.
             assert_eq!(actual_items, expected_items);
