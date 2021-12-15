@@ -306,7 +306,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
+test-integration: test-integration-splunk test-integration-dnstap
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -536,18 +536,6 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
-endif
-
-.PHONY: test-integration-redis
-test-integration-redis: ## Runs Redis integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
-	@scripts/setup_integration_env.sh redis start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
 endif
 
 .PHONY: test-integration-splunk
