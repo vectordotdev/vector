@@ -432,7 +432,6 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 #[cfg(feature = "datadog-logs-integration-tests")]
 async fn to_real_v2_endpoint() {
     use crate::test_util::generate_lines_with_stream;
-    use vector_core::event::LogEvent;
 
     let config = indoc! {r#"
         default_api_key = "atoken"
