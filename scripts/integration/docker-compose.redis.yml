@@ -3,7 +3,7 @@ services:
     image: redis:6-alpine
     networks:
       - backend
-  
+
   runner:
     build:
       context: ${PWD}
@@ -22,6 +22,8 @@ services:
       - "--nocapture"
     depends_on:
       - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
     networks:
       - backend
     volumes:
