@@ -48,6 +48,7 @@ jobs:
             target = fs.readdirSync('soaks/tests')
 
             const matrix = {
+              replicas: [1, 2],
               target
             }
 
@@ -214,7 +215,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-baseline-image]
     strategy:
-      matrix: "${{ { replica: [1, 2], ...fromJson(needs.compute-test-plan.outputs.matrix) } }}"
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
@@ -250,7 +251,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-comparison-image]
     strategy:
-      matrix: "${{ { replica: [1, 2], ...fromJson(needs.compute-test-plan.outputs.matrix) } }}"
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
