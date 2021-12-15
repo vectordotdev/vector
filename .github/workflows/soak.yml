@@ -196,7 +196,7 @@ jobs:
     name: Soak (${{ matrix.target }}) - ${{ matrix.variant }} - replica ${{ matrix.replica }}
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-${{ matrix.variant}}-image]
+    needs: [compute-soak-meta, compute-test-plan, build-image]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
