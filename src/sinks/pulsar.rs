@@ -17,6 +17,7 @@ use std::{
     task::{Context, Poll},
 };
 use vector_core::buffers::Acker;
+use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -36,8 +37,17 @@ pub struct PulsarSinkConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthConfig {
-    name: String,  // "token"
-    token: String, // <jwt token>
+    name: Option<String>,  // "token"
+    token: Option<String>, // <jwt token>
+    oauth2: Option<OAuth2Config>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OAuth2Config {
+    issuer_url: String,
+    credentials_url: String,
+    audience: String,
+    scope: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -121,10 +131,19 @@ impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
-            builder = builder.with_auth(Authentication {
-                name: auth.name.clone(),
-                data: auth.token.as_bytes().to_vec(),
-            });
+            if auth.name.is_some() && auth.token.is_some() {
+                builder = builder.with_auth(Authentication {
+                    name: auth.name.as_ref().unwrap().clone(),
+                    data: auth.token.as_ref().unwrap().as_bytes().to_vec(),
+                });
+            } else if let Some(oauth2) = &auth.oauth2 {
+                builder = builder.with_auth_provider(OAuth2Authentication::client_credentials(OAuth2Params {
+                    issuer_url: oauth2.issuer_url.clone(),
+                    credentials_url: oauth2.credentials_url.clone(),
+                    audience: oauth2.audience.clone(),
+                    scope: oauth2.scope.clone(),
+                }));
+            }
         }
 
         if let Some(avro_schema) = &self.encoding.schema() {

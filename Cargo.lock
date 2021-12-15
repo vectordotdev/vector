@@ -1555,7 +1555,7 @@ dependencies = [
  "criterion-plot",
  "csv",
  "futures 0.3.18",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -1578,7 +1578,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d00996de9f2f7559f7f4dc286073197f83e92256a59ed395f9aac01fe717da57"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.3",
 ]
 
 [[package]]
@@ -1915,6 +1915,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "data-url"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a30bfce702bcfa94e906ef82421f2c0e61c076ad76030c16ee5d2e9a32fe193"
+dependencies = [
+ "matches",
+]
+
+[[package]]
 name = "datadog-filter"
 version = "0.1.0"
 dependencies = [
@@ -1932,13 +1941,13 @@ dependencies = [
  "chrono-tz",
  "derivative",
  "grok",
- "itertools",
+ "itertools 0.10.3",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
  "lookup",
  "onig",
- "ordered-float",
+ "ordered-float 2.8.0",
  "peeking_take_while 1.0.0",
  "percent-encoding",
  "regex",
@@ -1956,9 +1965,9 @@ dependencies = [
 name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
- "ordered-float",
+ "ordered-float 2.8.0",
  "pest",
  "pest_derive",
  "regex",
@@ -3509,6 +3518,15 @@ checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
 name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
@@ -3589,7 +3607,7 @@ dependencies = [
  "http",
  "percent-encoding",
  "serde",
- "serde-value",
+ "serde-value 0.7.0",
  "serde_json",
  "url",
 ]
@@ -3659,7 +3677,7 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools",
+ "itertools 0.10.3",
  "lalrpop-util",
  "petgraph 0.5.1",
  "pico-args",
@@ -4086,7 +4104,7 @@ dependencies = [
  "indexmap",
  "metrics",
  "num_cpus",
- "ordered-float",
+ "ordered-float 2.8.0",
  "parking_lot",
  "quanta",
  "radix_trie",
@@ -4347,7 +4365,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22877ad014bafa2f7dcfa5d556b0c7a52b0546cc98061a1ebef6d1834957b069"
 dependencies = [
  "indexmap",
- "itertools",
+ "itertools 0.10.3",
  "ndarray",
  "noisy_float",
  "num-integer",
@@ -4708,6 +4726,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "openidconnect"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d523cf32bdf7696f36bc4198a42c34b65f0227b97f2f501ebfbe016baa5bc52"
+dependencies = [
+ "base64 0.13.0",
+ "chrono",
+ "http",
+ "itertools 0.9.0",
+ "log",
+ "num-bigint 0.4.3",
+ "oauth2",
+ "rand 0.8.4",
+ "ring",
+ "serde",
+ "serde-value 0.6.0",
+ "serde_derive",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror",
+ "untrusted",
+ "url",
+]
+
+[[package]]
 name = "openssl"
 version = "0.10.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4748,6 +4791,15 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "ordered-float"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3305af35278dd29f46fcdd139e0b1fbfae2153f0e5928b39b035542dd31e37b7"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -5163,7 +5215,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95e5a7689e456ab905c22c2b48225bb921aba7c8dfa58440d68ba13f6222a715"
 dependencies = [
  "difflib",
- "itertools",
+ "itertools 0.10.3",
  "predicates-core",
 ]
 
@@ -5318,7 +5370,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lookup",
- "ordered-float",
+ "ordered-float 2.8.0",
  "proptest",
  "vrl-diagnostic",
  "vrl-parser",
@@ -5352,7 +5404,7 @@ checksum = "355f634b43cdd80724ee7848f95770e7e70eefa6dcf14fea676216573b8fd603"
 dependencies = [
  "bytes 1.1.0",
  "heck",
- "itertools",
+ "itertools 0.10.3",
  "log",
  "multimap",
  "petgraph 0.5.1",
@@ -5370,7 +5422,7 @@ checksum = "62941722fb675d463659e49c4f3fe1fe792ff24fe5bbaa9c08cd3b98a1c354f5"
 dependencies = [
  "bytes 1.1.0",
  "heck",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "log",
  "multimap",
@@ -5389,7 +5441,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.3",
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "syn 1.0.82",
@@ -5402,7 +5454,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9cc1a3263e07e0bf68e96268f37665207b49560d98739662cdfaae215c720fe"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.3",
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "syn 1.0.82",
@@ -5451,25 +5503,29 @@ dependencies = [
 [[package]]
 name = "pulsar"
 version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08be3034f3401142c05385eeb7099bf6b3e36b9491b45ee8e619124e60377409"
 dependencies = [
+ "async-trait",
  "bit-vec 0.6.3",
  "bytes 1.1.0",
  "chrono",
  "crc",
+ "data-url",
  "futures 0.3.18",
  "futures-io",
  "futures-timer",
  "log",
  "native-tls",
  "nom 7.1.0",
+ "oauth2",
+ "openidconnect",
  "pem",
- "prost 0.8.0",
- "prost-build 0.8.0",
- "prost-derive 0.8.0",
+ "prost 0.9.0",
+ "prost-build 0.9.0",
+ "prost-derive 0.9.0",
  "rand 0.8.4",
  "regex",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-native-tls",
  "tokio-util",
@@ -6527,11 +6583,21 @@ dependencies = [
 
 [[package]]
 name = "serde-value"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a65a7291a8a568adcae4c10a677ebcedbc6c9cec91c054dee2ce40b0e3290eb"
+dependencies = [
+ "ordered-float 1.1.1",
+ "serde",
+]
+
+[[package]]
+name = "serde-value"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
- "ordered-float",
+ "ordered-float 2.8.0",
  "serde",
 ]
 
@@ -8381,7 +8447,7 @@ dependencies = [
  "indoc",
  "infer 0.5.0",
  "inventory 0.1.11",
- "itertools",
+ "itertools 0.10.3",
  "k8s-openapi",
  "lazy_static",
  "libc",
@@ -8407,7 +8473,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "ordered-float",
+ "ordered-float 2.8.0",
  "percent-encoding",
  "pin-project 1.0.8",
  "portpicker",
@@ -8566,7 +8632,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "once_cell",
- "ordered-float",
+ "ordered-float 2.8.0",
  "pest",
  "pest_derive",
  "pin-project 1.0.8",
@@ -8618,7 +8684,7 @@ dependencies = [
  "bytes 1.1.0",
  "indoc",
  "lookup",
- "ordered-float",
+ "ordered-float 2.8.0",
  "shared",
  "thiserror",
  "vrl-compiler",
@@ -8658,7 +8724,7 @@ dependencies = [
  "indoc",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 2.8.0",
  "paste",
  "regex",
  "serde",
@@ -8685,7 +8751,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 2.8.0",
  "paste",
  "test-case",
  "thiserror",
