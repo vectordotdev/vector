@@ -250,7 +250,7 @@ async fn tap_handler(
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
                                 .await
                             {
                                 Ok(_) => {

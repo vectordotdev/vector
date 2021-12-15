@@ -188,6 +188,14 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn map_event_batch_stream(
+    stream: impl Stream<Item = Event>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = Event> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch))
+}
+
+// TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,

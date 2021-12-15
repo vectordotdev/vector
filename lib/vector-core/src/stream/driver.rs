@@ -605,7 +605,7 @@ mod tests {
         let input_total: usize = input_requests.iter().sum();
         let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
         let service = DelayService::new(10, Duration::from_millis(5), Duration::from_millis(150));
-        let (acker, counter) = Acker::new_for_testing();
+        let (acker, counter) = Acker::basic();
         let driver = Driver::new(input_stream, service, acker);
 
         // Now actually run the driver, consuming all of the input.

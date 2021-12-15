@@ -27,19 +27,19 @@ pub use running::RunningTopology;
 use std::{
     collections::HashMap,
     panic::AssertUnwindSafe,
-    pin::Pin,
     sync::{Arc, Mutex},
 };
 use tokio::sync::{mpsc, watch};
-use vector_core::buffers::{Acker, BufferInputCloner, BufferStream};
+use vector_core::buffers::{
+    topology::channel::{BufferReceiver, BufferSender},
+    Acker,
+};
 
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
-pub type EventStream = BufferStream<Event>;
-
 type BuiltBuffer = (
-    BufferInputCloner<Event>,
-    Arc<Mutex<Option<Pin<EventStream>>>>,
+    BufferSender<Event>,
+    Arc<Mutex<Option<BufferReceiver<Event>>>>,
     Acker,
 );
 

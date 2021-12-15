@@ -12,7 +12,11 @@ use fslock::LockFile;
 use memmap2::{MmapMut, MmapOptions};
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
+use tokio::{
+    fs::{self, OpenOptions},
+    io::AsyncWriteExt,
+    sync::Notify,
+};
 
 use super::{
     backed_archive::BackedArchive,
@@ -487,6 +491,9 @@ impl Ledger {
     pub(super) async fn load_or_create(
         config: DiskBufferConfig,
     ) -> Result<Ledger, LedgerLoadCreateError> {
+        // Create our containing directory if it doesn't already exist.
+        fs::create_dir_all(&config.data_dir).await.context(Io)?;
+
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.

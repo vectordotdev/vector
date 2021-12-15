@@ -12,7 +12,7 @@ extern {
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
         "extended identifier" => Token::ExtendedIdentifier(<&'input str>),
-        "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
+        "string literal" => Token::StringLiteral(<String>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
 
@@ -93,7 +93,7 @@ Literal: Value = {
 
 Integer: i64 = "integer literal";
 Float: NotNan<f64> = "float literal";
-String: String = "string literal" => <>.unescape();
+String: String = "string literal";
 ExtendedIdentifier: &'input str = "extended identifier";
 Identifier: &'input str = "identifier";
 Boolean: bool = { "true" => true, "false" => false };

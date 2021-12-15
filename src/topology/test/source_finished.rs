@@ -1,6 +1,7 @@
+use crate::sinks::util::encoding::StandardEncodings;
 use crate::{
     config::Config,
-    sinks::console::{ConsoleSinkConfig, Encoding, Target},
+    sinks::console::{ConsoleSinkConfig, Target},
     sources::demo_logs::DemoLogsConfig,
     test_util::start_topology,
 };
@@ -16,7 +17,7 @@ async fn sources_finished() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 

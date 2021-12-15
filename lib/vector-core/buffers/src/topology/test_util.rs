@@ -1,17 +1,16 @@
 use std::{error, fmt};
 
 use bytes::{Buf, BufMut};
-use tokio::sync::mpsc::Sender;
 
 use crate::{
-    bytes::{DecodeBytes, EncodeBytes},
-    topology::{
-        builder::IntoBuffer,
-        channel::{BufferReceiver, BufferSender},
-    },
-    Bufferable,
+    buffer_usage_data::BufferUsageHandle,
+    encoding::{DecodeBytes, EncodeBytes},
+    topology::channel::{BufferReceiver, BufferSender},
+    variant::MemoryV2Buffer,
+    Bufferable, WhenFull,
 };
-use crate::{MemoryBuffer, WhenFull};
+
+use super::builder::IntoBuffer;
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {
@@ -58,29 +57,40 @@ impl error::Error for BasicError {}
 /// If `mode` is set to `WhenFull::Overflow`, then the buffer will be set to overflow mode, with
 /// another in-memory channel buffer being used as the overflow buffer.  The overflow buffer will
 /// also use the same capacity as the outer buffer.
-pub fn build_buffer(
+pub async fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
 ) -> (BufferSender<u64>, BufferReceiver<u64>) {
     match mode {
         WhenFull::Block | WhenFull::DropNewest => {
-            let channel = MemoryBuffer::new(capacity);
-            let (sender, receiver) = channel.into_buffer_parts();
+            let usage_handle = BufferUsageHandle::noop();
+            let channel = Box::new(MemoryV2Buffer::new(capacity));
+            let (sender, receiver, _) = channel
+                .into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let sender = BufferSender::new(sender, mode);
             let receiver = BufferReceiver::new(receiver);
             (sender, receiver)
         }
         WhenFull::Overflow => {
+            let usage_handle = BufferUsageHandle::noop();
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
-            let overflow_channel = MemoryBuffer::new(capacity);
-            let (overflow_sender, overflow_receiver) = overflow_channel.into_buffer_parts();
+            let overflow_channel = Box::new(MemoryV2Buffer::new(capacity));
+            let (overflow_sender, overflow_receiver, _) = overflow_channel
+                .into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
             let overflow_receiver = BufferReceiver::new(overflow_receiver);
 
-            let base_channel = MemoryBuffer::new(capacity);
-            let (base_sender, base_receiver) = base_channel.into_buffer_parts();
+            let base_channel = Box::new(MemoryV2Buffer::new(capacity));
+            let (base_sender, base_receiver, _) = base_channel
+                .into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);
             let base_receiver = BufferReceiver::with_overflow(base_receiver, overflow_receiver);
 
@@ -90,12 +100,8 @@ pub fn build_buffer(
 }
 
 /// Gets the current capacity of the underlying base channel of the given sender.
-fn get_base_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> usize {
-    sender
-        .get_base_ref()
-        .get_ref()
-        .expect("channel should be live")
-        .capacity()
+fn get_base_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> Option<usize> {
+    sender.get_base_ref().capacity()
 }
 
 /// Gets the current capacity of the underlying overflow channel of the given sender..
@@ -104,8 +110,7 @@ fn get_base_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> usize {
 fn get_overflow_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> Option<usize> {
     sender
         .get_overflow_ref()
-        .and_then(|s| s.get_base_ref().get_ref())
-        .map(Sender::capacity)
+        .and_then(|s| s.get_base_ref().capacity())
 }
 
 /// Asserts the given sender's capacity, both for base and overflow, match the given values.
@@ -114,7 +119,7 @@ fn get_overflow_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> Opti
 #[allow(clippy::missing_panics_doc)]
 pub fn assert_current_send_capacity<T>(
     sender: &mut BufferSender<T>,
-    base_expected: usize,
+    base_expected: Option<usize>,
     overflow_expected: Option<usize>,
 ) where
     T: Bufferable,
