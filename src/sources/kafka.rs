@@ -180,7 +180,6 @@ async fn kafka_source(
         ));
         consumer
             .context()
-            .inner()
             .finalizer
             .set(Arc::clone(&finalizer))
             .unwrap_or_else(|_| unreachable!());
@@ -438,10 +437,11 @@ mod integration_test {
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
+        test_util::{collect_n, collect_ready, random_string},
         Pipeline,
     };
-    use chrono::{SubsecRound, Utc};
+    use chrono::{DateTime, SubsecRound, Utc};
+    use futures::stream::Stream;
     use rdkafka::{
         config::{ClientConfig, FromClientConfig},
         consumer::BaseConsumer,
@@ -451,7 +451,14 @@ mod integration_test {
         Offset, TopicPartitionList,
     };
     use std::time::Duration;
+    use stream_cancel::{Trigger, Tripwire};
+    use tokio::time::sleep;
     use vector_core::event::EventStatus;
+
+    const KEY: &str = "my key";
+    const TEXT: &str = "my message";
+    const HEADER_KEY: &str = "my header";
+    const HEADER_VALUE: &str = "my header value";
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
@@ -465,29 +472,26 @@ mod integration_test {
         client.create().expect("Producer creation error")
     }
 
-    async fn send_events(
-        topic: String,
-        count: usize,
-        key: &str,
-        text: &str,
-        timestamp: i64,
-        header_key: &str,
-        header_value: &str,
-    ) {
+    async fn send_events(topic: String, count: u64) -> DateTime<Utc> {
+        let now = Utc::now();
+        let timestamp = now.timestamp_millis();
+
         let producer: FutureProducer = client_config(None);
 
         for i in 0..count {
-            let text = format!("{} {}", text, i);
+            let text = format!("{} {}", TEXT, i);
             let record = FutureRecord::to(&topic)
                 .payload(&text)
-                .key(key)
+                .key(KEY)
                 .timestamp(timestamp)
-                .headers(OwnedHeaders::new().add(header_key, header_value));
+                .headers(OwnedHeaders::new().add(HEADER_KEY, HEADER_VALUE));
 
             if let Err(error) = producer.send(record, Timeout::Never).await {
                 panic!("Cannot send event to Kafka: {:?}", error);
             }
         }
+
+        now
     }
 
     #[tokio::test]
@@ -501,49 +505,17 @@ mod integration_test {
     }
 
     async fn consume_event(acknowledgements: bool) {
-        let topic = format!("test-topic-{}", random_string(10));
-        let group_id = format!("test-group-{}", random_string(10));
-        let now = Utc::now();
+        let (topic, group_id, config) = make_rand_config();
 
-        let config = make_config(&topic, &group_id);
+        let now = send_events(topic.clone(), 10).await;
 
-        send_events(
-            topic.clone(),
-            10,
-            "my key",
-            "my message",
-            now.timestamp_millis(),
-            "my header",
-            "my header value",
-        )
-        .await;
-
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
-        tokio::spawn(kafka_source(
-            create_consumer(&config).unwrap(),
-            config.key_field,
-            config.topic_key,
-            config.partition_key,
-            config.offset_key,
-            config.headers_key,
-            codecs::Decoder::default(),
-            shutdown,
-            tx,
-            acknowledgements,
-        ));
+        let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
         let events = collect_n(rx, 10).await;
         drop(trigger_shutdown);
         shutdown_done.await;
 
-        let client: BaseConsumer = client_config(Some(&group_id));
-        client.subscribe(&[&topic]).expect("Subscribing failed");
-
-        let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0);
-        let tpl = client
-            .committed_offsets(tpl, Duration::from_secs(1))
-            .expect("Getting committed offsets failed");
+        let tpl = fetch_tpl(&group_id, &topic);
         assert_eq!(
             tpl.find_partition(&topic, 0)
                 .expect("TPL is missing topic")
@@ -555,9 +527,9 @@ mod integration_test {
         for (i, event) in events.into_iter().enumerate() {
             assert_eq!(
                 event.as_log()[log_schema().message_key()],
-                format!("my message {}", i).into()
+                format!("{} {}", TEXT, i).into()
             );
-            assert_eq!(event.as_log()["message_key"], "my key".into());
+            assert_eq!(event.as_log()["message_key"], KEY.into());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "kafka".into()
@@ -570,8 +542,133 @@ mod integration_test {
             assert!(event.as_log().contains("partition"));
             assert!(event.as_log().contains("offset"));
             let mut expected_headers = BTreeMap::new();
-            expected_headers.insert("my header".to_string(), Value::from("my header value"));
+            expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
             assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
         }
+    }
+
+    fn make_rand_config() -> (String, String, KafkaSourceConfig) {
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        let config = make_config(&topic, &group_id);
+        (topic, group_id, config)
+    }
+
+    fn delay_pipeline(
+        id: usize,
+        delay: Duration,
+        status: EventStatus,
+    ) -> (Pipeline, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Pipeline::new_with_buffer(100, vec![]);
+        let recv = recv.then(move |mut event| async move {
+            eprintln!("{} {:?}", id, &event.as_log()["message"]);
+            sleep(delay).await;
+            let metadata = event.metadata_mut();
+            metadata.update_status(status);
+            metadata.update_sources();
+            event
+        });
+        (pipe, Box::pin(recv))
+    }
+
+    fn spawn_kafka(
+        tx: Pipeline,
+        config: KafkaSourceConfig,
+        acknowledgements: bool,
+    ) -> (Trigger, Tripwire) {
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+        tokio::spawn(kafka_source(
+            create_consumer(&config).unwrap(),
+            config.key_field,
+            config.topic_key,
+            config.partition_key,
+            config.offset_key,
+            config.headers_key,
+            codecs::Decoder::default(),
+            shutdown,
+            tx,
+            acknowledgements,
+        ));
+        (trigger_shutdown, shutdown_done)
+    }
+
+    fn fetch_tpl(group_id: &str, topic: &str) -> TopicPartitionList {
+        let client: BaseConsumer = client_config(Some(&group_id));
+        client.subscribe(&[topic]).expect("Subscribing failed");
+
+        let mut tpl = TopicPartitionList::new();
+        tpl.add_partition(topic, 0);
+        client
+            .committed_offsets(tpl, Duration::from_secs(1))
+            .expect("Getting committed offsets failed")
+    }
+
+    #[tokio::test]
+    async fn handles_rebalance() {
+        // The test plan here is to:
+        // - Set up one source instance, feeding into a pipeline that delays acks.
+        // - Wait a bit, and set up a second source instance. This should cause a rebalance.
+        // - Wait further until all events will have been pulled down.
+        // - Verify that all events are captured by the two sources, and that offsets are set right, etc.
+
+        let (topic, group_id, config) = make_rand_config();
+
+        let now = send_events(topic.clone(), 200).await;
+
+        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(100), EventStatus::Delivered);
+        let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
+        let events1 = tokio::spawn(collect_n(rx1, 100));
+
+        sleep(Duration::from_secs(2)).await;
+
+        let (tx, rx2) = delay_pipeline(2, Duration::from_millis(100), EventStatus::Delivered);
+        let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
+        let events2 = tokio::spawn(collect_n(rx2, 100));
+
+        sleep(Duration::from_secs(2)).await;
+
+        drop(trigger_shutdown1);
+        let events1 = events1.await.unwrap();
+        shutdown_done1.await;
+        dbg!(events1.len());
+
+        drop(trigger_shutdown2);
+        let events2 = events2.await.unwrap();
+        shutdown_done2.await;
+        dbg!(events2.len());
+
+        let tpl = fetch_tpl(&group_id, &topic);
+        dbg!(tpl.find_partition(&topic, 0).unwrap().offset());
+
+        /*
+        assert_eq!(
+            tpl.find_partition(&topic, 0)
+                .expect("TPL is missing topic")
+                .offset(),
+            Offset::from_raw(10)
+        );
+
+        assert_eq!(events.len(), 10);
+        for (i, event) in events.into_iter().enumerate() {
+            assert_eq!(
+                event.as_log()[log_schema().message_key()],
+                format!("{} {}", TEXT, i).into()
+            );
+            assert_eq!(event.as_log()["message_key"], KEY.into());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "kafka".into()
+            );
+            assert_eq!(
+                event.as_log()[log_schema().timestamp_key()],
+                now.trunc_subsecs(3).into()
+            );
+            assert_eq!(event.as_log()["topic"], topic.clone().into());
+            assert!(event.as_log().contains("partition"));
+            assert!(event.as_log().contains("offset"));
+            let mut expected_headers = BTreeMap::new();
+            expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
+            assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
+        }*/
     }
 }

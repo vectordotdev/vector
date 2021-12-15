@@ -300,7 +300,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -617,7 +617,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     let sender = tokio::spawn(future);
     let events = collect_n(stream, n).await;
