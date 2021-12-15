@@ -297,6 +297,7 @@ zstd = { version = "0.6", default-features = false, optional = true }
 tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
+bump-allocator = "0.1.2"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"

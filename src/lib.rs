@@ -22,9 +22,8 @@ extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
-#[cfg(feature = "tikv-jemallocator")]
 #[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static GLOBAL: bump_allocator::BumpPointer = bump_allocator::BumpPointer;
 
 #[macro_use]
 pub mod config;
