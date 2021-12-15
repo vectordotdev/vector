@@ -8453,7 +8453,7 @@ dependencies = [
  "avro-rs",
  "aws-config",
  "aws-sdk-sqs",
- "aws-types 0.2.0",
+ "aws-types 0.3.0",
  "azure_core",
  "azure_storage",
  "base64 0.13.0",
