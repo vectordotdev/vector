@@ -80,9 +80,10 @@ up() {
   # overwriting console output.
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
-    --set "global.vector.commonEnvKV.LOG=info"
-    --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
-    --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
+    --set "env[0].name=VECTOR_LOG"
+    --set "env[0].value=info"
+    --set "image.repository=$CONTAINER_IMAGE_REPOSITORY"
+    --set "image.tag=$CONTAINER_IMAGE_TAG"
   )
 
   set -x
@@ -91,8 +92,7 @@ up() {
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
     "$HELM_CHART" \
-    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART" \
-    --devel
+    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART"
   { set +x; } &>/dev/null
 }
 
