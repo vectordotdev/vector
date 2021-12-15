@@ -144,13 +144,19 @@ where
                     .expect("the slice is the length of a u64");
                 self.reader.consume(8);
 
-                // We don't actually allow records to be greater than 8MB, which fit will within a
-                // 32-bit value, and so there's no risk of having a u64 length delimiter exceed.
-                // This is also practically irrelevant because the lion's share of Vector usage is
-                // on 64-bit platforms, but we're stuck doing the usize/u64 conversion dance in many
-                // places.
-                #[allow(clippy::cast_possible_truncation)]
-                return Ok(Some(u64::from_be_bytes(length) as usize));
+                // By default, records cannot exceed 8MB in length, so whether our `usize` is a u32
+                // or u64, we're not going to overflow it.  While the maximum record size _can_ be
+                // changed, it's not currently exposed to users.  Even further, if it was exposed to
+                // users, it's currently a `usize`, so again, we know that we're not going to exceed
+                // 64-bit. And even further still, the writer fallibly attempts to get a `u64` of the
+                // record size based on the encoding buffer, which gives its length in `usize`, and
+                // so would fail if `usize` was larger than `u64`, meaning we at least will panic if
+                // Vector is running on a 128-bit CPU in the future, storing records that are larger
+                // than 2^64+1. :)
+                let record_len = u64::from_be_bytes(length)
+                    .try_into()
+                    .expect("record length should never exceed usize");
+                return Ok(Some(record_len));
             }
 
             let buf = self.reader.fill_buf().await.context(Io)?;

@@ -42,7 +42,7 @@ impl BufferTypeVisitor {
     {
         let mut kind: Option<BufferTypeKind> = None;
         let mut max_events: Option<usize> = None;
-        let mut max_size: Option<usize> = None;
+        let mut max_size: Option<u64> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
@@ -237,14 +237,14 @@ pub enum BufferType {
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
     #[serde(rename = "disk")]
     DiskV1 {
-        max_size: usize,
+        max_size: u64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
     #[serde(rename = "disk_v2")]
     DiskV2 {
-        max_size: usize,
+        max_size: u64,
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -290,6 +290,7 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
+                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }

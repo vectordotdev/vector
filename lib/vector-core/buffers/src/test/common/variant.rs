@@ -33,13 +33,13 @@ pub enum Variant {
         when_full: WhenFull,
     },
     DiskV1 {
-        max_size: usize,
+        max_size: u64,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
     },
     DiskV2 {
-        max_size: usize,
+        max_size: u64,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
@@ -125,8 +125,11 @@ impl Arbitrary for Variant {
         let idx = usize::arbitrary(g) % 4;
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
-        let max_events = NonZeroU16::arbitrary(g).get() as usize;
-        let max_size = max_events;
+        let max_events = NonZeroU16::arbitrary(g)
+            .get()
+            .try_into()
+            .expect("we don't support 16-bit platforms");
+        let max_size = u64::from(NonZeroU16::arbitrary(g).get());
         let when_full = WhenFull::arbitrary(g);
 
         match idx {

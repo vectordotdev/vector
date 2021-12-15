@@ -12,6 +12,7 @@ use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, Layer};
 use tracing_subscriber::{layer::SubscriberExt, Registry};
 
+use crate::buffer_usage_data::BufferUsageHandle;
 use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
 use crate::encoding::{DecodeBytes, EncodeBytes};
 use crate::{Acker, Bufferable};
@@ -164,7 +165,9 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    Buffer::from_config_inner(DiskBufferConfig::from_path(data_dir).build())
+    let config = DiskBufferConfig::from_path(data_dir).build();
+    let usage_handle = BufferUsageHandle::noop();
+    Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
 }
@@ -181,8 +184,9 @@ where
     // ensures it is a minimum size related to the data file size limit, etc.
     let mut config = DiskBufferConfig::from_path(data_dir).build();
     config.max_buffer_size = max_buffer_size;
+    let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config)
+    Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
 }
@@ -198,8 +202,9 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_record_size(max_record_size)
         .build();
+    let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config)
+    Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
 }
@@ -215,8 +220,9 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
         .build();
+    let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config)
+    Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
 }
