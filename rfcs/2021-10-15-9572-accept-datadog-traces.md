@@ -125,14 +125,12 @@ cost control and reduction, redacting PII, routing, and more.
 ### Implementation
 
 To keep vector-core as generic as possible, the first implementation will decode datadog traces as `LogEvent`, the
-resulting event will be deeper than usual but this should not be a problem. To keep track that those `LogEvent`s are
-traces, we could add a simple `Option<bool>` to the `EventMetadata` struct. However this may not be immediately
-required. While being naive this does not predates future vector evolution towards event traits by not adding a new
-concrete type into the `Event` enum.
+resulting event will be deeper than usual but this should not be a problem. In order to distinguish trace from log,
+the `Event` enum will get a new `Trace` variant that will wrap `LogEvent`.
 
 Upcoming [work][schema-rfc] on having the ability to validate a `LogEvent` against a schema would provide a
-nice way (with the performance question) of ensuring that a `datadog-traces` sinks would receive a properly structured
-`LogEvent`.
+nice way (with the performance question) of ensuring that a `datadog-traces` sinks would receive a properly
+structured `LogEvent`.
 
 Based on the aforementioned work the following source & sink addition would have to be done:
 
@@ -172,7 +170,7 @@ Vector, it shall ultimately support computing APM stats, even if the stats paylo
 
 * Using `LogEvent`s to represent traces implies that, until [schemas][schema-rfc] are available, the format a trace sink
   would expect cannot be simply expressed and the sink will have to implement various sanity checks to ensure that
-  received events are traces.
+  received events are properly structured.
 
 ## Prior Art
 
@@ -203,6 +201,7 @@ None.
 ## Plan Of Attack
 
 * [ ] Write a subsequent RFC discussing how APM stats will fit in Vector.
+* [ ] Introduce the new `Trace` variant in the `Event` enum.
 * [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event. It will re-organize the source to isolate generic code from data type specific code. APM stats will be dropped at this point.
 * [ ] Submit a PR introducing the `datadog_trace` that turns relevant `LogEvent` back into Datadog protobuf-encoded traces.
 * [ ] Do the APM stats work.
