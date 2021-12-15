@@ -2,6 +2,7 @@ use async_graphql::{
     connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result, SimpleObject,
 };
+use std::convert::Infallible;
 
 /// Base64 invalid states, used by `Base64Cursor`.
 pub enum Base64CursorError {
@@ -123,7 +124,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
     p: Params,
     default_page_size: usize,
 ) -> ConnectionResult<T> {
-    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _>(
+    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _, Infallible>(
         p.after,
         p.before,
         p.first,

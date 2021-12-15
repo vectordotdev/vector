@@ -1,19 +1,20 @@
 use crate::config::ComponentKey;
 use crate::event::Event;
-use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
+use futures::{channel::mpsc, stream::Fuse, Sink, Stream, StreamExt};
+use futures_util::SinkExt;
 use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
 };
 
-pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
+type GenericEventSink = Pin<Box<dyn Sink<Event, Error = ()> + Send>>;
 
 pub enum ControlMessage {
-    Add(ComponentKey, RouterSink),
+    Add(ComponentKey, GenericEventSink),
     Remove(ComponentKey),
     /// Will stop accepting events until Some with given id is replaced.
-    Replace(ComponentKey, Option<RouterSink>),
+    Replace(ComponentKey, Option<GenericEventSink>),
 }
 
 impl fmt::Debug for ControlMessage {
@@ -30,7 +31,7 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    sinks: Vec<(ComponentKey, Option<Pin<RouterSink>>)>,
+    sinks: Vec<(ComponentKey, Option<GenericEventSink>)>,
     i: usize,
     control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
@@ -51,14 +52,15 @@ impl Fanout {
     /// Add a new sink as an output.
     ///
     /// # Panics
+    ///
     /// Function will panic if a sink with the same ID is already present.
-    pub fn add(&mut self, id: ComponentKey, sink: RouterSink) {
+    pub fn add(&mut self, id: ComponentKey, sink: GenericEventSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
             "Duplicate output id in fanout"
         );
 
-        self.sinks.push((id, Some(sink.into())));
+        self.sinks.push((id, Some(sink)));
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -68,7 +70,7 @@ impl Fanout {
         let (_id, removed) = self.sinks.remove(i);
 
         if let Some(mut removed) = removed {
-            tokio::spawn(future::poll_fn(move |cx| removed.as_mut().poll_close(cx)));
+            tokio::spawn(async move { removed.close().await });
         }
 
         if self.i > i {
@@ -76,9 +78,9 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, id: &ComponentKey, sink: Option<RouterSink>) {
+    fn replace(&mut self, id: &ComponentKey, sink: Option<GenericEventSink>) {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == id) {
-            *existing = sink.map(Into::into);
+            *existing = sink;
         } else {
             panic!("Tried to replace a sink that's not already present");
         }
@@ -109,7 +111,10 @@ impl Fanout {
 
     fn poll_sinks<F>(&mut self, cx: &mut Context<'_>, poll: F) -> Poll<Result<(), ()>>
     where
-        F: Fn(&mut Pin<RouterSink>, &mut Context<'_>) -> Poll<Result<(), ()>>,
+        F: Fn(
+            Pin<&mut (dyn Sink<Event, Error = ()> + Send)>,
+            &mut Context<'_>,
+        ) -> Poll<Result<(), ()>>,
     {
         self.process_control_messages(cx);
 
@@ -118,7 +123,7 @@ impl Fanout {
         let mut i = 0;
         while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink {
-                match poll(sink, cx) {
+                match poll(sink.as_mut(), cx) {
                     Poll::Pending => poll_result = Poll::Pending,
                     Poll::Ready(Ok(())) => (),
                     Poll::Ready(Err(())) => {
@@ -185,11 +190,11 @@ impl Sink<Event> for Fanout {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
-        self.poll_sinks(cx, |sink, cx| sink.as_mut().poll_flush(cx))
+        self.poll_sinks(cx, |sink, cx| sink.poll_flush(cx))
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
-        self.poll_sinks(cx, |sink, cx| sink.as_mut().poll_close(cx))
+        self.poll_sinks(cx, |sink, cx| sink.poll_close(cx))
     }
 }
 
@@ -197,7 +202,14 @@ impl Sink<Event> for Fanout {
 mod tests {
     use super::{ControlMessage, Fanout};
     use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
-    use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
+    use buffers::{
+        topology::{
+            builder::TopologyBuilder,
+            channel::{BufferSender, SenderAdapter},
+        },
+        WhenFull,
+    };
+    use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
         task::{Context, Poll},
@@ -206,15 +218,13 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
-        let (tx_a, rx_a) = mpsc::unbounded();
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::unbounded();
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(4).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(4).await;
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -226,18 +236,15 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_notready() {
-        let (tx_a, rx_a) = mpsc::channel(1);
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(0);
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(1);
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(1).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(0).await;
+        let (tx_c, rx_c) = TopologyBuilder::memory(1).await;
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -257,24 +264,21 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_grow() {
-        let (tx_a, rx_a) = mpsc::unbounded();
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::unbounded();
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(4).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(4).await;
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_c, rx_c) = mpsc::unbounded();
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
-        fanout.add(ComponentKey::from("c"), tx_c);
+        let (tx_c, rx_c) = TopologyBuilder::memory(4).await;
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -285,15 +289,13 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink() {
-        let (tx_a, rx_a) = mpsc::unbounded();
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::unbounded();
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(4).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(4).await;
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
@@ -313,18 +315,15 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_after_notready() {
-        let (tx_a, rx_a) = mpsc::channel(1);
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(0);
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(1);
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(1).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(0).await;
+        let (tx_c, rx_c) = TopologyBuilder::memory(1).await;
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -348,18 +347,15 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_at_notready() {
-        let (tx_a, rx_a) = mpsc::channel(1);
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(0);
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(1);
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(1).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(0).await;
+        let (tx_c, rx_c) = TopologyBuilder::memory(1).await;
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -383,18 +379,15 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_before_notready() {
-        let (tx_a, rx_a) = mpsc::channel(1);
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(0);
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(1);
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+        let (tx_a, rx_a) = TopologyBuilder::memory(1).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(0).await;
+        let (tx_c, rx_c) = TopologyBuilder::memory(1).await;
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -429,24 +422,21 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_replace() {
-        let (tx_a1, rx_a1) = mpsc::unbounded();
-        let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::unbounded();
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+        let (tx_a1, rx_a1) = TopologyBuilder::memory(4).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(4).await;
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a1);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a1));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_a2, rx_a2) = mpsc::unbounded();
-        let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(&ComponentKey::from("a"), Some(tx_a2));
+        let (tx_a2, rx_a2) = TopologyBuilder::memory(4).await;
+        fanout.replace(&ComponentKey::from("a"), Some(Box::pin(tx_a2)));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -457,23 +447,20 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_wait() {
-        let (tx_a1, rx_a1) = mpsc::unbounded();
-        let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::unbounded();
-        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+        let (tx_a1, rx_a1) = TopologyBuilder::memory(4).await;
+        let (tx_b, rx_b) = TopologyBuilder::memory(4).await;
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a1);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a1));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_a2, rx_a2) = mpsc::unbounded();
-        let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
+        let (tx_a2, rx_a2) = TopologyBuilder::memory(4).await;
         fanout.replace(&ComponentKey::from("a"), None);
 
         futures::join!(
@@ -482,7 +469,7 @@ mod tests {
                 fanout_control
                     .send(ControlMessage::Replace(
                         ComponentKey::from("a"),
-                        Some(tx_a2),
+                        Some(Box::pin(tx_a2)),
                     ))
                     .await
                     .unwrap();
@@ -543,12 +530,13 @@ mod tests {
             let id = ComponentKey::from(format!("{}", i));
             if let Some(when) = *mode {
                 let tx = AlwaysErrors { when };
-                let tx = Box::new(tx.sink_map_err(|_| ()));
-                fanout.add(id, tx);
+                let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
+                let tx = BufferSender::new(tx, WhenFull::Block);
+
+                fanout.add(id, Box::pin(tx));
             } else {
-                let (tx, rx) = mpsc::channel(0);
-                let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
-                fanout.add(id, tx);
+                let (tx, rx) = TopologyBuilder::memory(0).await;
+                fanout.add(id, Box::pin(tx));
                 rx_channels.push(rx);
             }
         }
@@ -576,6 +564,7 @@ mod tests {
         Poll,
     }
 
+    #[derive(Clone)]
     struct AlwaysErrors {
         when: ErrorWhen,
     }

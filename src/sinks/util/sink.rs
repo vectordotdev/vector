@@ -664,7 +664,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_acking_sequential() {
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let mut batch_settings = BatchSettings::default();
@@ -687,7 +687,7 @@ mod tests {
         trace_init();
 
         // Services future will be spawned and work between `yield_now` calls.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|req: Vec<usize>| async move {
             let duration = match req[0] {
@@ -824,7 +824,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -859,7 +859,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_flushes_below_min_on_close() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -899,7 +899,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_expired_linger() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -946,7 +946,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -980,7 +980,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1044,7 +1044,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_submits_after_linger() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1088,7 +1088,7 @@ mod tests {
         // that we poll the service futures within the mock clock
         // context. This allows us to manually advance the time on the
         // "spawned" futures.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|req: u8| {
             if req == 3 {
@@ -1132,7 +1132,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_ordering_per_partition() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let mut delay = true;

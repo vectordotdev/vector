@@ -91,7 +91,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use snafu::{ResultExt, Snafu};
 
-mod acker;
+mod acknowledgements;
 mod backed_archive;
 mod common;
 mod ledger;
@@ -103,10 +103,9 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use crate::Bufferable;
+use crate::{Acker, Bufferable};
 
-use self::acker::Acker;
-use self::ledger::Ledger;
+use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
 
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
@@ -149,7 +148,6 @@ where
     ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
         let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
         let ledger = Arc::new(ledger);
-        let acker = Acker::from_ledger(&ledger);
 
         let mut writer = Writer::new(Arc::clone(&ledger));
         writer
@@ -162,6 +160,8 @@ where
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;
+
+        let acker = create_disk_v2_acker(Arc::clone(&ledger));
 
         Ok((writer, reader, acker, ledger))
     }

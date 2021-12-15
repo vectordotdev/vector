@@ -1,5 +1,5 @@
 use super::Key;
-use crate::{buffer_usage_data::BufferUsageData, Bufferable};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 use bytes::BytesMut;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
@@ -42,8 +42,8 @@ where
     pub(crate) current_size: Arc<AtomicUsize>,
     /// Buffer for internal use.
     pub(crate) slot: Option<T>,
-    /// Atomic structure for recording buffer metadata
-    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
+    /// Buffer usage data.
+    pub(crate) usage_handle: BufferUsageHandle,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
@@ -65,7 +65,7 @@ where
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
             slot: None,
-            buffer_usage_data: self.buffer_usage_data.clone(),
+            usage_handle: self.usage_handle.clone(),
         }
     }
 }
@@ -156,8 +156,9 @@ where
         if self.batch_size >= 100 {
             self.flush();
         }
-        self.buffer_usage_data
-            .increment_received_event_count_and_byte_size(1, event_size);
+
+        self.usage_handle
+            .increment_sent_event_count_and_byte_size(1, event_size);
 
         None
     }

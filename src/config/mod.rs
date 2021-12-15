@@ -277,14 +277,14 @@ impl<T> SinkOuter<T> {
         }
     }
 
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::Memory { .. } => {}
-                #[cfg(feature = "disk-buffer")]
-                BufferType::Disk { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
+                    resources.push(Resource::DiskBuffer(id.to_string()))
+                }
             }
         }
         resources
@@ -390,7 +390,7 @@ impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::Null,
+            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),

@@ -1,5 +1,5 @@
 use super::Key;
-use crate::{buffer_usage_data::BufferUsageData, bytes::DecodeBytes};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -10,7 +10,6 @@ use leveldb::database::{
     Database,
 };
 use std::collections::VecDeque;
-use std::fmt::Display;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -40,10 +39,7 @@ const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
 ///  0   `compacted_offset`    |        |
 ///                     `delete_offset` |
 ///                                `read_offset`
-pub struct Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+pub struct Reader<T> {
     /// Leveldb database.
     /// Shared with Writers.
     pub(crate) db: Arc<Database<Key>>,
@@ -80,19 +76,18 @@ where
     pub(crate) last_compaction: Instant,
     // Pending read from the LevelDB datasbase
     pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
+    // Buffer usage data.
+    pub(crate) usage_handle: BufferUsageHandle,
     pub(crate) phantom: PhantomData<T>,
-    /// Atomic structure for recording buffer metadata
-    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
-unsafe impl<T> Send for Reader<T> where T: Send + Sync + Unpin {}
+unsafe impl<T> Send for Reader<T> where T: Bufferable {}
 
 impl<T> Stream for Reader<T>
 where
-    T: Send + Sync + Unpin + DecodeBytes<T>,
-    <T as DecodeBytes<T>>::Error: Display,
+    T: Bufferable,
 {
     type Item = T;
 
@@ -154,15 +149,15 @@ where
         }
 
         if let Some((key, value)) = this.buffer.pop_front() {
-            this.unacked_sizes.push_back(value.len());
+            let bytes_read = value.len();
+            this.unacked_sizes.push_back(bytes_read);
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
-            let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
-                    this.buffer_usage_data
-                        .increment_sent_event_count_and_byte_size(1, byte_size);
+                    this.usage_handle
+                        .increment_sent_event_count_and_byte_size(1, bytes_read);
                     Poll::Ready(Some(event))
                 }
                 Err(error) => {
@@ -180,20 +175,14 @@ where
     }
 }
 
-impl<T> Drop for Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+impl<T> Drop for Reader<T> {
     fn drop(&mut self) {
         let unread_size = self.delete_acked();
         self.flush(unread_size);
     }
 }
 
-impl<T> Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+impl<T> Reader<T> {
     /// Returns number of bytes to be read.
     fn delete_acked(&mut self) -> usize {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);

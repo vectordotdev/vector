@@ -31,7 +31,7 @@ default-features = false
 features = ["clock", "serde"]
 
 [dependencies.dashmap]
-version = "4.0"
+version = "5.0"
 default-features = false
 features = []
 

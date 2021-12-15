@@ -1,0 +1,52 @@
+use std::error::Error;
+use std::path::PathBuf;
+
+use async_trait::async_trait;
+
+use crate::buffer_usage_data::BufferUsageHandle;
+use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
+use crate::{disk::open, topology::builder::IntoBuffer, Acker, Bufferable};
+
+pub struct DiskV1Buffer {
+    id: String,
+    data_dir: PathBuf,
+    max_size: usize,
+}
+
+impl DiskV1Buffer {
+    pub fn new(id: String, data_dir: PathBuf, max_size: usize) -> Self {
+        DiskV1Buffer {
+            id,
+            data_dir,
+            max_size,
+        }
+    }
+}
+
+#[async_trait]
+impl<T> IntoBuffer<T> for DiskV1Buffer
+where
+    T: Bufferable + Clone,
+{
+    async fn into_buffer_parts(
+        self: Box<Self>,
+        usage_handle: &BufferUsageHandle,
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
+    {
+        usage_handle.set_buffer_limits(Some(self.max_size), None);
+
+        // Create the actual buffer subcomponents.
+        let (writer, reader, acker) = open(
+            &self.data_dir,
+            &self.id,
+            self.max_size,
+            usage_handle.clone(),
+        )?;
+
+        Ok((
+            SenderAdapter::opaque(writer),
+            ReceiverAdapter::opaque(reader),
+            Some(acker),
+        ))
+    }
+}

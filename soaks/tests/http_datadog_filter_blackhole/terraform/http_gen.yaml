@@ -1,0 +1,15 @@
+worker_threads: 1
+prometheus_addr: "0.0.0.0:9090"
+
+targets:
+  vector:
+    headers: {}
+    target_uri: "http://vector:8282/"
+    bytes_per_second: "500 Mb"
+    parallel_connections: 10
+    method:
+      post:
+        maximum_prebuild_cache_size_bytes: "256 Mb"
+        variant:
+          static:
+            static_path: "/data/bootstrap.log"
