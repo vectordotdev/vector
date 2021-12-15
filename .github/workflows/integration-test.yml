@@ -56,41 +56,12 @@ jobs:
       fail-fast: false
       matrix:
        include:
-         - test: 'aws'
-         - test: 'azure'
-         - test: 'clickhouse'
-         - test: 'docker-logs'
-         - test: 'elasticsearch'
-         - test: 'eventstoredb_metrics'
-         - test: 'fluent'
-         - test: 'gcp'
-         - test: 'humio'
-         - test: 'influxdb'
-         - test: 'kafka'
-         - test: 'logstash'
-         - test: 'loki'
-         - test: 'mongodb_metrics'
-         - test: 'nginx'
-         - test: 'postgresql_metrics'
-         - test: 'prometheus'
-         - test: 'pulsar'
          - test: 'redis'
-         - test: 'splunk'
-         - test: 'dnstap'
     steps:
       - uses: actions/checkout@v2.4.0
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.7
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-${{ matrix.test }}
+      - run: docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml run runner
+      - run: docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml rm -fsv
+        if: ${{ always() }}
 
   test-integration-check:
     name: test-integration-check

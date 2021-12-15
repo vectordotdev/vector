@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:6-alpine
+    networks:
+      - backend
+  
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "redis-integration-tests"
+      - "--lib"
+      - "::redis::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - redis
+    networks:
+      - backend
+    volumes:
+      - ${PWD}:/code
+
+networks:
+  backend: {}
