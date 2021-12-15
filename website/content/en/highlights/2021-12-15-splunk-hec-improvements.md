@@ -7,7 +7,7 @@ pr_numbers: [10261, 10135]
 release: "0.19.0"
 hide_on_release_notes: false
 badges:
-  type: announcement
+  type: enhancement
 ---
 
 We're excited to share that we've made a couple improvements to Vector's support
