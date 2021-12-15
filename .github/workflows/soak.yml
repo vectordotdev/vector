@@ -112,11 +112,18 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            target = fs.readdirSync('soaks/tests')
+            target = fs.readdirSync('soaks/tests') // read names of directories in soaks/tests into an array
 
+            // Create the matrix that will be used as the strategy for soak test image builds and experiments
+            //
+            // Each field of this object has an array of elements that will be
+            // cartesian producted across the others to generate the full list of
+            // jobs to run. For example, the first job might have the values:
+            // { target: "fluent_remap_aws_firehose", replica: 1, variant: { name: "baseline", tag: "f0e229dab15e2cd554924d9db7731c8f8f030ec3-405f4a464db1ce386ba66ce7582a0d4e47c1d5d9"}
             const matrix = {
-              target,
-              replica: [1, 2],
+              target: target, // run each experiment
+              replica: [1, 2], // run twice
+              // run each experiment twice, once for the baseline, once for the comparison
               variant: [
                 {
                   name: "baseline",
@@ -129,6 +136,7 @@ jobs:
               ],
             }
 
+            // export this variable to be available to other github steps
             core.setOutput('matrix', matrix)
       - name: Dump matrix context
         env:
@@ -208,7 +216,7 @@ jobs:
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
                                   --variant ${{ matrix.variant.name }} \
-                                  --tag ${{ matrix.tag }} \
+                                  --tag ${{ matrix.variant.tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
