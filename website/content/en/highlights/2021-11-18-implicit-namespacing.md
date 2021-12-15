@@ -12,7 +12,7 @@ badges:
 
 We've released automatic namespacing for configuration files, which simplifies namespace configuration for your pipelines.
 
-As Vector continues to evolves, releasing more configuration-heavy functionality
+As Vector continues to evolve, releasing more configuration-heavy functionality
 such as an aggregator role and pipelines features, there's often a proliferation
 in the amount of configuration necessary to run Vector. The ability to organize
 Vector across multiple files was also lacking in any concrete recommendations
