@@ -118,7 +118,7 @@ cost control and reduction, redacting PII, routing, and more.
     `datadog_trace` sink
   * Datadog trace agent can be configured to send traces to any arbitrary endpoint using `apm_config.apm_dd_url` [config
     key]
-* This change is a pure addition to Vector, there will be no impact on existing feature
+* This change is a pure addition to Vector, there will be no impact on existing Datadog trace agent features
 
 [config key]: https://github.com/DataDog/datadog-agent/blob/34a5589/pkg/config/apm.go#L61-L87
 
