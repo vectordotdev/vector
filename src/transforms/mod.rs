@@ -42,6 +42,9 @@ pub mod lua;
 pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
+pub mod noop;
+#[cfg(feature = "transforms-pipelines")]
+pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
@@ -62,11 +65,14 @@ pub mod sample;
 pub mod split;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
+#[cfg(feature = "transforms-throttle")]
+pub mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
 pub use vector_core::transform::{
-    FallibleFunctionTransform, FunctionTransform, TaskTransform, Transform,
+    FunctionTransform, SyncTransform, TaskTransform, Transform, TransformOutputs,
+    TransformOutputsBuf,
 };
 
 #[derive(Debug, Snafu)]

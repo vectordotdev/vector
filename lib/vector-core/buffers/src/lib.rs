@@ -7,87 +7,44 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::must_use_candidate)]
 
 #[macro_use]
 extern crate tracing;
 
-mod acker;
-pub mod bytes;
-#[cfg(feature = "disk-buffer")]
-pub mod disk;
+mod acknowledgements;
+pub use acknowledgements::{Ackable, Acker};
+
+mod buffer_usage_data;
+
+mod config;
+pub use config::{BufferConfig, BufferType};
+
+pub mod encoding;
+
+pub(crate) mod disk;
+pub(crate) mod disk_v2;
+
+mod internal_events;
 #[cfg(test)]
 mod test;
-mod variant;
+pub mod topology;
 
-use crate::bytes::{DecodeBytes, EncodeBytes};
-pub use acker::{Ackable, Acker};
+pub(crate) mod variant;
+
+use crate::encoding::{DecodeBytes, EncodeBytes};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-pub use variant::*;
-
-/// Build a new buffer based on the passed `Variant`
-///
-/// # Errors
-///
-/// This function will fail only when creating a new disk buffer. Because of
-/// legacy reasons the error is not a type but a `String`.
-#[allow(clippy::needless_pass_by_value)]
-pub fn build<'a, T>(
-    variant: Variant,
-) -> Result<
-    (
-        BufferInputCloner<T>,
-        Box<dyn Stream<Item = T> + 'a + Unpin + Send>,
-        Acker,
-    ),
-    String,
->
-where
-    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
-{
-    match variant {
-        #[cfg(feature = "disk-buffer")]
-        Variant::Disk {
-            max_size,
-            when_full,
-            data_dir,
-            id,
-            ..
-        } => {
-            let buffer_dir = format!("{}_buffer", id);
-
-            let (tx, rx, acker) =
-                disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
-
-            let tx = BufferInputCloner::Disk(tx, when_full);
-            Ok((tx, rx, acker))
-        }
-        Variant::Memory {
-            max_events,
-            when_full,
-        } => {
-            let (tx, rx) = mpsc::channel(max_events);
-            let tx = BufferInputCloner::Memory(tx, when_full);
-            let rx = Box::new(rx);
-            Ok((tx, rx, Acker::Null))
-        }
-    }
-}
+use std::fmt::Debug;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum WhenFull {
     Block,
     DropNewest,
+    Overflow,
 }
 
 impl Default for WhenFull {
@@ -99,6 +56,9 @@ impl Default for WhenFull {
 #[cfg(test)]
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
+        // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
+        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
         } else {
@@ -107,103 +67,16 @@ impl Arbitrary for WhenFull {
     }
 }
 
-// Clippy warns that the `Disk` variant below is much larger than the
-// `Memory` variant (currently 233 vs 25 bytes) and recommends boxing
-// the large fields to reduce the total size.
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone)]
-pub enum BufferInputCloner<T>
-where
-    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+/// An item that can be buffered.
+///
+/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
+pub trait Bufferable:
+    ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Debug + Send + Sync + Unpin + Sized + 'static
 {
-    Memory(mpsc::Sender<T>, WhenFull),
-    #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer<T>, WhenFull),
 }
 
-impl<'a, T> BufferInputCloner<T>
-where
-    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
+// Blanket implementation for anything that is already bufferable.
+impl<T> Bufferable for T where
+    T: ByteSizeOf + EncodeBytes<T> + DecodeBytes<T> + Debug + Send + Sync + Unpin + Sized + 'static
 {
-    #[must_use]
-    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
-        match self {
-            BufferInputCloner::Memory(tx, when_full) => {
-                let inner = tx
-                    .clone()
-                    .sink_map_err(|error| error!(message = "Sender error.", %error));
-                if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
-                } else {
-                    Box::new(inner)
-                }
-            }
-
-            #[cfg(feature = "disk-buffer")]
-            BufferInputCloner::Disk(writer, when_full) => {
-                let inner: disk::Writer<T> = (*writer).clone();
-                if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
-                } else {
-                    Box::new(inner)
-                }
-            }
-        }
-    }
-}
-
-#[pin_project]
-pub struct DropWhenFull<S> {
-    #[pin]
-    inner: S,
-    drop: bool,
-}
-
-impl<S> DropWhenFull<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner, drop: false }
-    }
-}
-
-impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
-    type Error = S::Error;
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        match this.inner.poll_ready(cx) {
-            Poll::Ready(Ok(())) => {
-                *this.drop = false;
-                Poll::Ready(Ok(()))
-            }
-            Poll::Pending => {
-                *this.drop = true;
-                Poll::Ready(Ok(()))
-            }
-            error @ std::task::Poll::Ready(..) => error,
-        }
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        if self.drop {
-            debug!(
-                message = "Shedding load; dropping event.",
-                internal_log_rate_secs = 10
-            );
-            Ok(())
-        } else {
-            self.project().inner.start_send(item)
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
 }

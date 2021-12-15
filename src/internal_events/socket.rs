@@ -40,6 +40,7 @@ impl InternalEvent for SocketEventsReceived {
 
     fn emit_metrics(&self) {
         counter!("component_received_events_total", 1, "mode" => self.mode.as_str());
+        counter!("component_received_event_bytes_total", 1, "mode" => self.mode.as_str());
         counter!("events_in_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
@@ -66,7 +67,7 @@ impl InternalEvent for SocketEventsSent {
 #[derive(Debug)]
 pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
-    pub error: &'a crate::codecs::Error,
+    pub error: &'a crate::codecs::decoding::Error,
 }
 
 #[cfg(feature = "codecs")]

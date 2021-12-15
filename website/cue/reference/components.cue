@@ -153,11 +153,6 @@ components: {
 	// * `stream` - one event at a time
 	#EgressMethod: "batch" | "dynamic" | "expose" | "stream"
 
-	#EnvVars: #Schema & {[Type=string]: {
-		common:   true
-		required: false
-	}}
-
 	#Features: {
 		_args: {
 			egress_method: string
@@ -269,7 +264,8 @@ components: {
 	}
 
 	#FeaturesCodecs: {
-		enabled: bool
+		enabled:         bool
+		default_framing: string
 	}
 
 	#FeaturesEncoding: {
@@ -537,10 +533,17 @@ components: {
 		configuration: {
 			_acknowledgements: {
 				common:      true
-				description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
-				warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
-				required: false
-				type: bool: default: false
+				description: "Controls how acknowledgements are handled by this source."
+				required:    false
+				type: object: options: {
+					enabled: {
+						common:      true
+						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
+						warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+						required: false
+						type: bool: default: false
+					}
+				}
 			}
 
 			_tls_accept: {
@@ -571,7 +574,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -581,7 +583,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -591,7 +592,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
-							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -601,7 +601,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-							syntax: "literal"
 						}
 					}
 
@@ -626,7 +625,7 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming connections."
+				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
 					if Args.can_enable {
@@ -645,7 +644,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -655,7 +653,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -665,7 +662,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
-							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -675,7 +671,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-							syntax: "literal"
 						}
 					}
 
@@ -717,7 +712,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["http://foo.bar:3128"]
-							syntax: "literal"
 						}
 					}
 					https: {
@@ -727,7 +721,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["http://foo.bar:3128"]
-							syntax: "literal"
 						}
 					}
 					no_proxy: {
@@ -748,7 +741,6 @@ components: {
 							default: null
 							items: type: string: {
 								examples: ["localhost", ".foo.bar", "*"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -769,40 +761,32 @@ components: {
 					password: {
 						description: "The basic authentication password."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
-							syntax: "literal"
 						}
 					}
 					strategy: {
 						description: "The authentication strategy to use."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
-							syntax: "literal"
 						}
 					}
 					token: {
 						description: "The token to use for bearer authentication"
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
-							syntax: "literal"
 						}
 					}
 					user: {
 						description: "The basic authentication user name."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -812,26 +796,21 @@ components: {
 				common:      false
 				description: "Options for HTTP Basic Authentication."
 				required:    false
-				warnings: []
 				type: object: {
 					examples: []
 					options: {
 						username: {
 							description: "The basic authentication user name."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
-								syntax: "literal"
 							}
 						}
 						password: {
 							description: "The basic authentication password."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -847,60 +826,16 @@ components: {
 					indicate system local time.
 					"""
 				required:    false
-				warnings: []
 				type: string: {
 					default: "local"
 					examples: ["local", "America/NewYork", "EST5EDT"]
-					syntax: "literal"
 				}
 			}
 
 			_types: {
 				common:      true
-				description: """
-					Key/value pairs representing mapped log field names and types. This is used to
-					coerce log fields from strings into their proper types. The available types are
-					listed in the **Types** list below.
-
-					Timestamp coercions need to be prefaced with `timestamp|`, for example
-					`\"timestamp|%F\"`. Timestamp specifiers can use either of the following:
-
-					1. One of the built-in-formats listed in the **Timestamp Formats** table below.
-					2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
-					`chrono` library.
-
-					### Types
-
-					* `array`
-					* `bool`
-					* `bytes`
-					* `float`
-					* `int`
-					* `map`
-					* `null`
-					* `timestamp` (see the table below for formats)
-
-					### Timestamp Formats
-
-					Format | Description | Example
-					:------|:------------|:-------
-					`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
-					`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
-					`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
-					`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
-					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
-					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
-					`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
-					`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
-					`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
-					`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
-					`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
-					`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
-
-					**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
-					"""
+				description: _coercing_fields
 				required:    false
-				warnings: []
 
 				type: object: {
 					examples: [
@@ -933,7 +868,6 @@ components: {
 							"my-source-or-transform-id",
 							"prefix-*",
 						]
-						syntax: "literal"
 					}
 				}
 			}
@@ -946,7 +880,6 @@ components: {
 					enum: #Enum | *{
 						"\(Name)": "The type of this component."
 					}
-					syntax: "literal"
 				}
 			}
 		}
@@ -964,7 +897,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			_https_proxy: {
@@ -979,7 +911,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			_no_proxy: {
@@ -1004,7 +935,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
-					syntax: "literal"
 				}
 			}
 			if features.collect != _|_ {

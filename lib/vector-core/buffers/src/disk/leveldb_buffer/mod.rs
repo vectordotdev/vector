@@ -1,10 +1,13 @@
+mod acknowledgements;
 mod key;
 mod reader;
 mod writer;
 
+use self::acknowledgements::create_disk_v1_acker;
+
 use super::{DataDirError, Open};
-use crate::bytes::{DecodeBytes, EncodeBytes};
-use crate::Acker;
+use crate::buffer_usage_data::BufferUsageHandle;
+use crate::{Acker, Bufferable};
 use futures::task::AtomicWaker;
 use key::Key;
 use leveldb::database::{
@@ -15,7 +18,6 @@ use leveldb::database::{
 };
 pub use reader::Reader;
 use snafu::ResultExt;
-use std::fmt::Debug;
 use std::{
     collections::VecDeque,
     marker::PhantomData,
@@ -33,7 +35,7 @@ pub struct Buffer<T> {
     phantom: PhantomData<T>,
 }
 
-/// Read the byte size of the database
+/// Read the byte size and item size of the database
 ///
 /// There is a mismatch between leveldb's mechanism and vector's. While vector
 /// would prefer to keep as little in-memory as possible leveldb, being a
@@ -49,20 +51,24 @@ pub struct Buffer<T> {
 /// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
+fn db_initial_size(path: &Path) -> Result<(usize, u64), DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
     let db: Database<Key> = Database::open(path, options).with_context(|| Open {
         data_dir: path.parent().expect("always a parent"),
     })?;
-    Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
+    let mut item_size = 0;
+    let mut byte_size = 0;
+    for v in db.value_iter(ReadOptions::new()) {
+        item_size += 1;
+        byte_size += v.len();
+    }
+    Ok((byte_size, item_size))
 }
 
 impl<T> Buffer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     /// Build a new `DiskBuffer` rooted at `path`
     ///
@@ -74,13 +80,16 @@ where
     pub fn build(
         path: &Path,
         max_size: usize,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
         let max_size = max_size - max_uncompacted_size;
 
-        let initial_size = db_initial_size(path)?;
+        let (initial_byte_size, initial_item_size) = db_initial_size(path)?;
+        usage_handle
+            .increment_received_event_count_and_byte_size(initial_item_size, initial_byte_size);
 
         let mut options = Options::new();
         options.create_if_missing = true;
@@ -99,14 +108,14 @@ where
             tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
         }
 
-        let current_size = Arc::new(AtomicUsize::new(initial_size));
+        let current_size = Arc::new(AtomicUsize::new(initial_byte_size));
 
         let write_notifier = Arc::new(AtomicWaker::new());
 
         let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 
         let ack_counter = Arc::new(AtomicUsize::new(0));
-        let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
+        let acker = create_disk_v1_acker(&ack_counter, &write_notifier);
 
         let writer = Writer {
             db: Some(Arc::clone(&db)),
@@ -118,6 +127,7 @@ where
             max_size,
             current_size: Arc::clone(&current_size),
             slot: None,
+            usage_handle: usage_handle.clone(),
         };
 
         let mut reader = Reader {
@@ -136,6 +146,7 @@ where
             buffer: VecDeque::new(),
             last_compaction: Instant::now(),
             pending_read: None,
+            usage_handle,
             phantom: PhantomData,
         };
         // Compact on every start

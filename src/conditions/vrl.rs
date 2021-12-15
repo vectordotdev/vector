@@ -1,6 +1,6 @@
+use crate::emit;
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
@@ -45,6 +45,7 @@ impl ConditionConfig for VrlConfig {
             .filter(|f| f.identifier() != "del")
             .filter(|f| f.identifier() != "only_fields")
             .chain(enrichment::vrl_functions().into_iter())
+            .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
         let program = vrl::compile(

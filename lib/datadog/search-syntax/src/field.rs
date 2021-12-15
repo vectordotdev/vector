@@ -22,7 +22,7 @@ static RESERVED_ATTRIBUTES: &[&str] = &[
 ];
 
 /// Describes a field to search on.
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub enum Field {
     /// Default field (when tag/facet isn't provided)
     Default(String),

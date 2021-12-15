@@ -6,7 +6,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -48,7 +49,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
@@ -138,10 +139,7 @@ impl SinkConfig for HttpSinkConfig {
         config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
-        let batch = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config
             .request
             .tower
@@ -312,7 +310,7 @@ mod tests {
                 test::{build_test_server, build_test_server_generic, build_test_server_status},
             },
         },
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
     use bytes::{Buf, Bytes};
     use flate2::read::MultiGzDecoder;
@@ -353,6 +351,7 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
+        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,
@@ -579,14 +578,14 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
         let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -664,13 +663,11 @@ mod tests {
         let (in_addr, sink) = build_sink(extra_config).await;
 
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

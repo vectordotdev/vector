@@ -19,22 +19,12 @@ components: transforms: split: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(split._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = split(.message)
 			```
 			""",
@@ -47,38 +37,31 @@ components: transforms: split: {
 			common:      true
 			description: "If `true` the `field` will be dropped after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The field to apply the split on."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["timestamp", "level", "message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		separator: {
 			common:      true
 			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`](\(urls.unicode_whitespace))."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

@@ -46,7 +46,6 @@ components: sources: [Name=string]: {
 								halt_before:      "All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message."
 								halt_with:        "All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."
 							}
-							syntax: "literal"
 						}
 					}
 					start_pattern: {
@@ -80,16 +79,17 @@ components: sources: [Name=string]: {
 					type: object: options: {
 						method: {
 							description: "The framing method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: features.codecs.default_framing
 								enum: {
-									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between packets for UDP or between segments for TCP)."
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
 									length_delimited:    "Byte frames whose length is encoded in a header."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
-								syntax: "literal"
 							}
 						}
 						character_delimited: {
@@ -102,7 +102,6 @@ components: sources: [Name=string]: {
 									required:    true
 									type: string: {
 										examples: ["\n", "\t"]
-										syntax: "literal"
 									}
 								}
 								max_length: {
@@ -110,7 +109,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -128,7 +127,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -146,7 +145,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -162,14 +161,15 @@ components: sources: [Name=string]: {
 					type: object: options: {
 						codec: {
 							description: "The decoding method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: "bytes"
 								enum: {
 									bytes:  "Events containing the byte frame as-is."
 									json:   "Events being parsed from a JSON string."
 									syslog: "Events being parsed from a Syslog message."
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -191,7 +191,6 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: null
 								examples: ["utf-16le", "utf-16be"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -281,7 +280,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: [_values.local_host]
-						syntax: "literal"
 					}
 				}
 
@@ -290,7 +288,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						syntax: "literal"
 					}
 				}
 			}

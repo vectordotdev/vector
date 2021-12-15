@@ -1039,7 +1039,7 @@ impl TypeDef {
                                                     name == fieldname.as_str()
                                                 }) =>
                                             {
-                                                // Coalesced fields can also be Null if the coalesed value
+                                                // Coalesced fields can also be Null if the coalesced value
                                                 // goes down the other branch.
                                                 (field.clone(), kind.or_null())
                                             }

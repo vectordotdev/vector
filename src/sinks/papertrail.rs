@@ -1,12 +1,14 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
         Encoding, UriSerde,
     },
     tcp::TcpKeepaliveConfig,
+    template::Template,
     tls::TlsConfig,
 };
 use bytes::Bytes;
@@ -22,6 +24,7 @@ pub struct PapertrailConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
+    process: Option<Template>,
 }
 
 inventory::submit! {
@@ -62,10 +65,13 @@ impl SinkConfig for PapertrailConfig {
 
         let pid = std::process::id();
         let encoding = self.encoding.clone();
+        let process = self.process.clone();
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        sink_config.build(cx, move |event| Some(encode_event(event, pid, &encoding)))
+        sink_config.build(cx, move |event| {
+            Some(encode_event(event, pid, &process, &encoding))
+        })
     }
 
     fn input_type(&self) -> DataType {
@@ -77,17 +83,37 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Bytes {
+fn encode_event(
+    mut event: Event,
+    pid: u32,
+    process: &Option<Template>,
+    encoding: &EncodingConfig<Encoding>,
+) -> Bytes {
     let host = event
         .as_mut_log()
         .remove(log_schema().host_key())
         .map(|host| host.to_string_lossy());
 
+    let process = process
+        .as_ref()
+        .and_then(|t| {
+            t.render_string(&event)
+                .map_err(|error| {
+                    emit!(&TemplateRenderingFailed {
+                        error,
+                        field: Some("process"),
+                        drop_event: false,
+                    })
+                })
+                .ok()
+        })
+        .unwrap_or_else(|| String::from("vector"));
+
     let formatter = Formatter3164 {
         facility: Facility::LOG_USER,
         hostname: host,
-        process: "vector".into(),
-        pid: pid as i32,
+        process,
+        pid,
     };
 
     let mut s: Vec<u8> = Vec::new();
@@ -115,6 +141,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::TryFrom;
 
     #[test]
     fn generate_config() {
@@ -125,10 +152,12 @@ mod tests {
     fn encode_event_apply_rules() {
         let mut evt = Event::from("vector");
         evt.as_mut_log().insert("magic", "key");
+        evt.as_mut_log().insert("process", "foo");
 
         let bytes = encode_event(
             evt,
             0,
+            &Some(Template::try_from("{{ process }}").unwrap()),
             &EncodingConfig {
                 codec: Encoding::Json,
                 schema: None,
@@ -141,6 +170,9 @@ mod tests {
         let msg =
             bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);
         let value: serde_json::Value = serde_json::from_slice(&msg).unwrap();
-        assert!(!value.as_object().unwrap().contains_key("magic"));
+        let value = value.as_object().unwrap();
+
+        assert!(!value.contains_key("magic"));
+        assert_eq!(value.get("process").unwrap().as_str(), Some("foo"));
     }
 }

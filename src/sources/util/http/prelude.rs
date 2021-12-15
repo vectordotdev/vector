@@ -4,7 +4,7 @@ use super::{
     error::ErrorMessage,
 };
 use crate::{
-    config::SourceContext,
+    config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -12,7 +12,7 @@ use crate::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 use vector_core::ByteSizeOf;
 use warp::{
@@ -40,17 +40,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
-        let protocol = match &tls {
-            MaybeTlsSettings::Raw { .. } => "http",
-            MaybeTlsSettings::Tls { .. } => "https",
-        };
+        let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let out = cx.out;
-        let shutdown = cx.shutdown;
-        let acknowledgements = cx.acknowledgements;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -101,14 +96,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(&HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.iter().map(|event| event.size_of()).sum(),
+                                    byte_size: events.size_of(),
                                     http_path,
                                     protocol,
                                 });
                                 events
                             });
 
-                        handle_request(events, acknowledgements, out.clone())
+                        handle_request(events, acknowledgements.enabled, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -130,7 +125,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.map(|_| ()),
+                    cx.shutdown.map(|_| ()),
                 )
                 .await;
             Ok(())
@@ -155,13 +150,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = acknowledgements.then(|| {
-                let (batch, receiver) = BatchNotifier::new_with_receiver();
-                for event in &mut events {
-                    event.add_batch_notifier(Arc::clone(&batch));
-                }
-                receiver
-            });
+            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
             out.send_all(&mut futures::stream::iter(events).map(Ok))
                 .map_err(move |error: crate::pipeline::ClosedError| {
@@ -195,7 +184,7 @@ async fn handle_batch_status(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),
             ))),
-            BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+            BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 "Contents failed to deliver to sink".into(),
             ))),

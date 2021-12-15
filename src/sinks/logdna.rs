@@ -6,8 +6,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, UriSerde,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
+        RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateRenderingError},
 };
@@ -45,7 +45,7 @@ pub struct LogdnaConfig {
     default_env: Option<String>,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -81,10 +81,7 @@ impl SinkConfig for LogdnaConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
         let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = PartitionHttpSink::new(
@@ -296,7 +293,8 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
-        test_util::{next_addr, random_lines, trace_init},
+        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::{next_addr, random_lines},
     };
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
@@ -356,7 +354,7 @@ mod tests {
         Vec<Vec<String>>,
         mpsc::Receiver<(Parts, bytes::Bytes)>,
     ) {
-        trace_init();
+        components::init_test();
 
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
@@ -402,6 +400,9 @@ mod tests {
         drop(batch);
 
         sink.run(stream::iter(events)).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -411,7 +412,7 @@ mod tests {
     #[tokio::test]
     async fn smoke_fails() {
         let (_hosts, _partitions, mut rx) =
-            smoke_start(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+            smoke_start(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
         assert!(matches!(rx.try_next(), Err(mpsc::TryRecvError { .. })));
     }
 

@@ -113,9 +113,9 @@ fn log_operation_maintains_size() {
             match action {
                 Action::InsertFlat { key, value } => {
                     let new_value_sz = value.size_of();
-                    let old_value_sz = log_event.get_flat(&key).map_or(0, |x| x.size_of());
+                    let old_value_sz = log_event.get_flat(&key).map_or(0, ByteSizeOf::size_of);
                     if !log_event.contains(&key) {
-                        current_size += key.len();
+                        current_size += key.size_of();
                     }
                     log_event.insert_flat(&key, value);
                     current_size -= old_value_sz;

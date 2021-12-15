@@ -78,6 +78,7 @@ criterion_group!(
               parse_duration,
               parse_glog,
               parse_grok,
+              parse_groks,
               parse_key_value,
               parse_klog,
               parse_int,
@@ -110,6 +111,7 @@ criterion_group!(
               strip_ansi_escape_codes,
               strip_whitespace,
               tally,
+              tally_value,
               timestamp,
               to_bool,
               to_float,
@@ -443,7 +445,7 @@ bench_function! {
         want: Ok("42"),
     }
 
-    hexidecimal {
+    hexadecimal {
         args: func_args![value: 42, base: 16],
         want: Ok(value!("2a")),
     }
@@ -1284,6 +1286,32 @@ bench_function! {
 }
 
 bench_function! {
+    parse_groks => vrl_stdlib::ParseGroks;
+
+    simple {
+        args: func_args![
+            value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
+            patterns: Value::Array(vec![
+                "%{common_prefix} %{_status} %{_message}".into(),
+                "%{common_prefix} %{_message}".into(),
+                ]),
+            aliases: value!({
+                common_prefix: "%{_timestamp} %{_loglevel}",
+                _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
+                _loglevel: "%{LOGLEVEL:level}",
+                _status: "%{POSINT:status}",
+                _message: "%{GREEDYDATA:message}"
+            })
+        ],
+        want: Ok(Value::from(btreemap! {
+            "timestamp" => "2020-10-02T23:22:12.223222Z",
+            "level" => "info",
+            "message" => "hello world"
+        }))
+    }
+}
+
+bench_function! {
     parse_int => vrl_stdlib::ParseInt;
 
     decimal {
@@ -2045,6 +2073,18 @@ bench_function! {
             value: value!(["bar", "foo", "baz", "foo"]),
         ],
         want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+}
+
+bench_function! {
+    tally_value => vrl_stdlib::TallyValue;
+
+    default {
+        args: func_args![
+            array: value!(["bar", "foo", "baz", "foo"]),
+            value: "foo",
+        ],
+        want: Ok(value!(2)),
     }
 }
 

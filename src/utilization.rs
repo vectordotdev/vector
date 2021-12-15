@@ -1,5 +1,6 @@
-use crate::{buffers::EventStream, event::Event, stats};
+use crate::stats;
 use futures::{Stream, StreamExt};
+use futures_util::ready;
 use metrics::gauge;
 use pin_project::pin_project;
 use std::{pin::Pin, task::Context};
@@ -11,14 +12,28 @@ use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
 #[pin_project]
-struct Utilization {
+pub struct Utilization<S> {
     timer: Timer,
     intervals: IntervalStream,
-    inner: Pin<EventStream>,
+    inner: S,
 }
 
-impl Stream for Utilization {
-    type Item = Event;
+impl<S> Utilization<S> {
+    /// Consumes this wrapper and returns the inner stream.
+    ///
+    /// This can't be constant because destructors can't be run in a const context, and we're
+    /// discarding `IntervalStream`/`Timer` when we call this.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_inner(self) -> S {
+        self.inner
+    }
+}
+
+impl<S> Stream for Utilization<S>
+where
+    S: Stream + Unpin,
+{
+    type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // The goal of this function is to measure the time between when the
@@ -39,13 +54,11 @@ impl Stream for Utilization {
                     this.timer.report();
                     continue;
                 }
-                Poll::Pending => match this.inner.poll_next_unpin(cx) {
-                    pe @ Poll::Ready(_) => {
-                        this.timer.stop_wait();
-                        return pe;
-                    }
-                    Poll::Pending => return Poll::Pending,
-                },
+                Poll::Pending => {
+                    let result = ready!(this.inner.poll_next_unpin(cx));
+                    this.timer.stop_wait();
+                    return Poll::Ready(result);
+                }
             }
         }
     }
@@ -58,17 +71,15 @@ impl Stream for Utilization {
 /// and the rest of the time it is doing useful work. This is more true for
 /// sinks than transforms, which can be blocked by downstream components, but
 /// with knowledge of the config the data is still useful.
-pub fn wrap(inner: Pin<EventStream>) -> Pin<EventStream> {
-    let utilization = Utilization {
+pub fn wrap<S>(inner: S) -> Utilization<S> {
+    Utilization {
         timer: Timer::new(),
         intervals: IntervalStream::new(interval(Duration::from_secs(5))),
         inner,
-    };
-
-    Box::pin(utilization)
+    }
 }
 
-struct Timer {
+pub struct Timer {
     overall_start: Instant,
     span_start: Instant,
     waiting: bool,
@@ -85,7 +96,7 @@ struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
@@ -96,7 +107,7 @@ impl Timer {
     }
 
     /// Begin a new span representing time spent waiting
-    fn start_wait(&mut self) {
+    pub fn start_wait(&mut self) {
         if !self.waiting {
             self.end_span();
             self.waiting = true;
@@ -104,23 +115,26 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    fn stop_wait(&mut self) {
-        assert!(self.waiting);
-
-        self.end_span();
-        self.waiting = false;
+    pub fn stop_wait(&mut self) -> Instant {
+        if self.waiting {
+            let now = self.end_span();
+            self.waiting = false;
+            now
+        } else {
+            Instant::now()
+        }
     }
 
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    fn report(&mut self) {
+    pub fn report(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        self.end_span();
+        let now = self.end_span();
 
-        let total_duration = self.overall_start.elapsed();
+        let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
         let utilization = 1.0 - wait_ratio;
 
@@ -134,10 +148,11 @@ impl Timer {
         self.total_wait = Duration::new(0, 0);
     }
 
-    fn end_span(&mut self) {
+    fn end_span(&mut self) -> Instant {
         if self.waiting {
             self.total_wait += self.span_start.elapsed();
         }
         self.span_start = Instant::now();
+        self.span_start
     }
 }

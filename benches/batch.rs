@@ -3,13 +3,14 @@ use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
 use std::{convert::Infallible, time::Duration};
 use vector::{
-    buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-        BatchSink, Buffer, Compression, EncodedEvent, Partition, PartitionBatchSink,
+        BatchSink, Buffer, Compression, EncodedEvent, Merged, Partition, PartitionBatchSink,
+        SinkBatchSettings,
     },
     test_util::{random_lines, runtime},
 };
+use vector_core::buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -36,14 +37,14 @@ fn benchmark_batch(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let rt = runtime();
-                    let (acker, _) = Acker::new_for_testing();
-                    let batch = BatchSettings::default()
-                        .bytes(*batch_size)
-                        .events(num_events)
-                        .size;
+                    let (acker, _) = Acker::basic();
+                    let mut batch = BatchSettings::default();
+                    batch.size.bytes = *batch_size;
+                    batch.size.events = num_events;
+
                     let batch_sink = PartitionBatchSink::new(
                         tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                        PartitionedBuffer::new(batch, *compression),
+                        PartitionedBuffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                         acker,
                     )
@@ -55,7 +56,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(|item| Ok(EncodedEvent::new(item))),
+                        .map(|item| Ok(EncodedEvent::new(item, 0))),
                         batch_sink,
                     )
                 },
@@ -70,14 +71,14 @@ fn benchmark_batch(c: &mut Criterion) {
                 b.iter_batched(
                     || {
                         let rt = runtime();
-                        let (acker, _) = Acker::new_for_testing();
-                        let batch = BatchSettings::default()
-                            .bytes(*batch_size)
-                            .events(num_events)
-                            .size;
+                        let (acker, _) = Acker::basic();
+                        let mut batch = BatchSettings::default();
+                        batch.size.bytes = *batch_size;
+                        batch.size.events = num_events;
+
                         let batch_sink = BatchSink::new(
                             tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                            Buffer::new(batch, *compression),
+                            Buffer::new(batch.size, *compression),
                             Duration::from_secs(1),
                             acker,
                         )
@@ -85,7 +86,7 @@ fn benchmark_batch(c: &mut Criterion) {
 
                         (
                             rt,
-                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item))),
+                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item, 0))),
                             batch_sink,
                         )
                     },
@@ -135,11 +136,10 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        Buffer::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

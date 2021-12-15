@@ -18,8 +18,13 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
+
+#[cfg(feature = "tikv-jemallocator")]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
@@ -36,24 +41,24 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-pub mod buffers;
+#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+pub mod aws;
 #[cfg(feature = "codecs")]
 pub mod codecs;
+pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub mod kafka;
+pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;

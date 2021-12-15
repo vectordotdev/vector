@@ -76,6 +76,11 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+}}
+
 #Event: {
 	{log?: #LogEvent} |
 	{metric?: #MetricEvent}
@@ -318,7 +323,7 @@ _values: {
 	//
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
-	warnings: [...string]
+	warnings: [...string] | *[]
 
 	if !required {
 		// `common` specifes that the option is commonly used. It will bring the
@@ -336,20 +341,21 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":      bool
-	"aarch64-unknown-linux-musl":     bool
-	"armv7-unknown-linux-gnueabihf":  bool
-	"armv7-unknown-linux-musleabihf": bool
-	"x86_64-apple-darwin":            bool
-	"x86_64-pc-windows-msv":          bool
-	"x86_64-unknown-linux-gnu":       bool
-	"x86_64-unknown-linux-musl":      bool
+	"aarch64-unknown-linux-gnu":      bool | *true
+	"aarch64-unknown-linux-musl":     bool | *true
+	"armv7-unknown-linux-gnueabihf":  bool | *true
+	"armv7-unknown-linux-musleabihf": bool | *true
+	"x86_64-apple-darwin":            bool | *true
+	"x86_64-pc-windows-msv":          bool | *true
+	"x86_64-unknown-linux-gnu":       bool | *true
+	"x86_64-unknown-linux-musl":      bool | *true
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
 
 #Type: {
 	_args: {
+		name:     !=""
 		arrays:   true
 		required: bool
 	}
@@ -360,7 +366,66 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	{"array": #TypeArray & {_args: required: Args.required}} |
+	{"condition": #TypeCondition & {_args: required: Args.required}} |
 	#TypePrimitive
+}
+
+#TypeCondition: {
+	_args: {
+		required: bool
+	}
+	let Args = _args
+	required: Args.required
+
+	#Syntax: {
+		name:        !=""
+		description: !=""
+		example:     !=""
+	}
+
+	syntaxes: [#Syntax, ...#Syntax] & [
+			{
+			name:        "vrl"
+			description: """
+				A [Vector Remap Language](\(urls.vrl_reference)) (VRL) [Boolean
+				expression](\(urls.vrl_boolean_expression)).
+				"""
+			example:     #".status_code != 200 && !includes(["info", "debug"], .severity)"#
+		},
+		{
+			name:        "datadog_search"
+			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
+			example:     #"*stack"#
+		},
+	]
+
+	options: {
+		source: {
+			description: "The text of the condition. The syntax of the condition depends on the value of `type`."
+		}
+
+		type: {
+			description: """
+				The type of condition to supply. See **Available syntaxes** below for a list of available types for this
+				transform.
+				"""
+		}
+	}
+
+	shorthand_explainer: {
+		title:       "Shorthand for VRL"
+		description: """
+			If you opt for the [`vrl`](\(urls.vrl_reference)) syntax for this condition, you can set the condition
+			as a string via the `condition` parameter, without needing to specify both a `source` and a `type`. The
+			table below shows some examples:
+
+			Config format | Example
+			:-------------|:-------
+			[TOML](\(urls.toml)) | `condition = ".status == 200"`
+			[YAML](\(urls.yaml)) | `condition: .status == 200`
+			[JSON](\(urls.json)) | `"condition": ".status == 200"`
+			"""
+	}
 }
 
 #TypePrimitive: {
@@ -465,7 +530,7 @@ _values: {
 		]
 	}
 
-	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
 }
 
 #TypeTimestamp: {
@@ -502,7 +567,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines"
+#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines" | "concurrency"
 
 administration: _
 components:     _
@@ -512,3 +577,45 @@ glossary:       _
 process:        _
 releases:       _
 remap:          _
+
+// Reusable info
+_coercing_fields: """
+	Key/value pairs representing mapped log field names and types. This is used to
+	coerce log fields from strings into their proper types. The available types are
+	listed in the **Types** list below.
+
+	Timestamp coercions need to be prefaced with `timestamp|`, for example `\"timestamp|%F\"`.
+	Timestamp specifiers can use either of the following:
+
+	1. One of the built-in-formats listed in the **Timestamp Formats** table below.
+	2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+	   `chrono` library.
+
+	### Types
+
+	* `bool`
+	* `string`
+	* `float`
+	* `integer`
+	* `date`
+	* `timestamp` (see the table below for formats)
+
+	### Timestamp Formats
+
+	Format | Description | Example
+	:------|:------------|:-------
+	`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
+	`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
+	`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+	`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
+	`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+	`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
+	`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
+	`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
+	`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
+	`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
+	`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
+	`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
+
+	**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
+	"""

@@ -45,6 +45,7 @@ const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
 
+#[cfg(test)]
 pub mod components;
 pub mod stats;
 
@@ -187,17 +188,29 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn map_event_batch_stream(
+    stream: impl Stream<Item = Event>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = Event> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch))
+}
+
+// TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
 ) -> impl Stream<Item = Event> {
-    stream.map(move |log| {
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(batch),
-        }
-        .into()
-    })
+    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
+}
+
+pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
+    generator: Gen,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+) -> (Vec<String>, impl Stream<Item = Event>) {
+    let lines = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
+    (lines, stream)
 }
 
 pub fn random_lines_with_stream(
@@ -205,9 +218,21 @@ pub fn random_lines_with_stream(
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
-    let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
-    (lines, stream)
+    let generator = move |_| random_string(len);
+    generate_lines_with_stream(generator, count, batch)
+}
+
+pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
+    generator: Gen,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+) -> (Vec<Event>, impl Stream<Item = Event>) {
+    let events = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
@@ -217,6 +242,27 @@ pub fn random_events_with_stream(
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
     let events = (0..count)
         .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = Event>)
+where
+    F: Fn((usize, Event)) -> Event,
+{
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .enumerate()
+        .map(update_fn)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),

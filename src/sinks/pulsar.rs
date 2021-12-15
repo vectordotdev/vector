@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::PulsarEncodeEventFailed,
@@ -17,6 +16,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -431,7 +431,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
         events.map(Ok).forward(sink).await.unwrap();

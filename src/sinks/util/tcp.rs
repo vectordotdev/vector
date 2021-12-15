@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     dns,
     event::Event,
@@ -37,6 +36,7 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -255,10 +255,15 @@ impl StreamSink for TcpSink {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
+                let byte_size = event.size_of();
                 let finalizers = event.metadata_mut().take_finalizers();
                 encode_event(event)
-                    .map(|item| EncodedEvent { item, finalizers })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+                    .map(|item| EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
             })
             .peekable();
 

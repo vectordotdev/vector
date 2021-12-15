@@ -7,11 +7,11 @@ use crate::{
     sinks::{
         self,
         util::{
-            batch::{BatchConfig, BatchSettings},
+            batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -23,8 +23,19 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use std::task;
 use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PrometheusRemoteWriteDefaultBatchSettings;
+
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -45,7 +56,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -72,10 +83,7 @@ impl SinkConfig for RemoteWriteConfig {
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = BatchSettings::default()
-            .events(1_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
@@ -102,6 +110,7 @@ impl SinkConfig for RemoteWriteConfig {
 
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
+                    let byte_size = event.size_of();
                     stream::iter(normalizer.apply(event).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
@@ -116,7 +125,10 @@ impl SinkConfig for RemoteWriteConfig {
                                 .ok()
                         });
                         let key = PartitionKey { tenant_id };
-                        Ok(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
+                        Ok(EncodedEvent::new(
+                            PartitionInnerBuffer::new(event, key),
+                            byte_size,
+                        ))
                     }))
                 })
                 .sink_map_err(

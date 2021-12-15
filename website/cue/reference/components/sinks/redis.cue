@@ -55,17 +55,6 @@ components: sinks: redis: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -76,16 +65,13 @@ components: sinks: redis: {
 			description: "The Redis URL to connect to. The url _must_ take the form of `protocol://server:port/db` where the protocol can either be `redis` or `rediss` for connections secured via TLS."
 			groups: ["tcp"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["redis://127.0.0.1:6379/0"]
-				syntax: "literal"
 			}
 		}
 		key: {
 			description: "The Redis key to publish messages to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["syslog:{{ app }}", "vector"]
 				syntax: "template"
@@ -101,14 +87,12 @@ components: sinks: redis: {
 					list:    "Use the Redis `list` data type."
 					channel: "Use the Redis `channel` data type."
 				}
-				syntax: "literal"
 			}
 		}
 		list: {
 			common:      false
 			description: "Options for the Redis `list` data type."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -122,7 +106,6 @@ components: sinks: redis: {
 								lpush: "Use the `lpush` method to publish messages."
 								rpush: "Use the `rpush` method to publish messages."
 							}
-							syntax: "literal"
 						}
 					}
 				}
@@ -147,10 +130,12 @@ components: sinks: redis: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:        components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:       components.sources.internal_metrics.output.metrics.events_out_total
-		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
+		send_errors_total:                components.sources.internal_metrics.output.metrics.send_errors_total
+		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

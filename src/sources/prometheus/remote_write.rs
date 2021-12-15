@@ -1,8 +1,12 @@
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -25,6 +29,9 @@ struct PrometheusRemoteWriteConfig {
     tls: Option<TlsConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -37,6 +44,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -47,7 +55,15 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", true, &self.tls, &self.auth, cx)
+        source.run(
+            self.address,
+            "",
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -95,7 +111,7 @@ impl HttpSource for RemoteWriteSource {
         if header_map
             .get("Content-Encoding")
             .map(|header| header.as_ref())
-            != Some(b"snappy")
+            != Some(&b"snappy"[..])
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
@@ -111,6 +127,7 @@ mod test {
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, components},
+        tls::MaybeTlsSettings,
         Pipeline,
     };
     use chrono::{SubsecRound as _, Utc};
@@ -118,7 +135,7 @@ mod test {
     use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
     }
 
@@ -133,15 +150,18 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsConfig>) {
-        components::init();
+        components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
-        let proto = if tls.is_none() { "http" } else { "https" };
+        let proto = MaybeTlsSettings::from_config(&tls, true)
+            .unwrap()
+            .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {
             address,
             auth: None,
             tls: tls.clone(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let source = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(source);
@@ -228,11 +248,12 @@ mod integration_tests {
 
     #[tokio::test]
     async fn receive_something() {
-        components::init();
+        components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

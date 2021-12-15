@@ -19,22 +19,12 @@ components: transforms: coercer: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(coercer._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.bool = to_bool("false")
 			.float = to_float("1.0")
 			.int = to_int("1")
@@ -56,7 +46,6 @@ components: transforms: coercer: {
 			common:      false
 			description: "Set to `true` to drop all fields that are not specified in the `types` table. Make sure both `message` and `timestamp` are specified in the `types` table as their absence will cause the original message data to be dropped along with other extraneous fields."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		timezone: configuration._timezone

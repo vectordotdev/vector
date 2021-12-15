@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
     sinks::util::{
-        batch::{BatchConfig, BatchSettings},
+        batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{RetryAction, RetryLogic},
         sink::Response,
@@ -18,9 +18,13 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     convert::TryFrom,
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 inventory::submit! {
     SinkDescription::new::<RedisSinkConfig>("redis")
@@ -74,6 +78,15 @@ pub enum Encoding {
     Json,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RedisDefaultBatchSettings;
+
+impl SinkBatchSettings for RedisDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
@@ -85,7 +98,7 @@ pub struct RedisSinkConfig {
     url: String,
     key: String,
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<RedisDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
 }
@@ -152,10 +165,7 @@ impl RedisSinkConfig {
             DataTypeConfig::List => DataType::List(method.unwrap_or_default()),
         };
 
-        let batch = BatchSettings::default()
-            .events(1)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
 
         let buffer = VecBuffer::new(batch.size);
 
@@ -201,6 +211,12 @@ impl EncodedLength for RedisKvEntry {
     }
 }
 
+impl ByteSizeOf for RedisKvEntry {
+    fn allocated_bytes(&self) -> usize {
+        self.key.len() + self.value.len()
+    }
+}
+
 fn encode_event(
     mut event: Event,
     key: &Template,
@@ -217,6 +233,7 @@ fn encode_event(
         })
         .ok()?;
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let value = match encoding.codec() {
@@ -230,7 +247,7 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value });
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size);
     Some(event)
 }
 

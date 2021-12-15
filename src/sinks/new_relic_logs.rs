@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
@@ -5,7 +7,7 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfigWithDefault},
             http::RequestConfig,
-            BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            BatchConfig, Compression, TowerRequestConfig,
         },
     },
 };
@@ -13,6 +15,8 @@ use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+
+use super::util::SinkBatchSettings;
 
 // New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
 const MAX_PAYLOAD_SIZE: usize = 1_000_000_usize;
@@ -23,11 +27,6 @@ enum BuildError {
         "Missing authentication key, must provide either 'license_key' or 'insert_key'"
     ))]
     MissingAuthParam,
-    #[snafu(display(
-        "Too high batch max size. The value must be {} bytes or less",
-        MAX_PAYLOAD_SIZE
-    ))]
-    BatchMaxSize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -37,6 +36,15 @@ pub enum NewRelicLogsRegion {
     #[derivative(Default)]
     Us,
     Eu,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NewRelicLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
@@ -53,7 +61,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -133,22 +141,9 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let max_payload_size = self.batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
-        if max_payload_size > MAX_PAYLOAD_SIZE {
-            return Err(Box::new(BuildError::BatchMaxSize));
-        }
-        let batch = BatchConfig {
-            max_bytes: Some(max_payload_size),
-            max_events: None,
-            ..self.batch
-        };
+        let batch_settings = self.batch.validate()?.limit_max_bytes(MAX_PAYLOAD_SIZE)?;
 
-        let tower = TowerRequestConfig {
-            // The default throughput ceiling defaults are relatively
-            // conservative so we crank them up for New Relic.
-            concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
-            ..self.request
-        };
+        let tower = TowerRequestConfig { ..self.request };
 
         let request = RequestConfig { tower, headers };
 
@@ -159,7 +154,7 @@ impl NewRelicLogsConfig {
             headers: None,
             compression: self.compression,
             encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
-            batch,
+            batch: batch_settings.into(),
             request,
             tls: None,
         })
@@ -176,7 +171,7 @@ mod tests {
             encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
             test::build_test_server, Concurrency,
         },
-        test_util::next_addr,
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
     use bytes::Buf;
     use futures::{stream, StreamExt};
@@ -216,10 +211,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(
-            http_config.request.tower.concurrency,
-            Concurrency::Fixed(100)
-        );
+        assert_eq!(http_config.request.tower.concurrency, Concurrency::None);
         assert_eq!(
             http_config.request.tower.rate_limit_num,
             Some(RATE_LIMIT_NUM_DEFAULT)
@@ -335,14 +327,12 @@ mod tests {
 
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
-        let pump = sink.run(events);
 
-        tokio::spawn(server);
-
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

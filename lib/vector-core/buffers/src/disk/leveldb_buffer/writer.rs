@@ -1,5 +1,5 @@
 use super::Key;
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 use bytes::BytesMut;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
@@ -7,7 +7,6 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -18,9 +17,7 @@ use std::task::{Context, Poll, Waker};
 /// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     /// Leveldb database.
     /// Shared with Reader.
@@ -45,23 +42,17 @@ where
     pub(crate) current_size: Arc<AtomicUsize>,
     /// Buffer for internal use.
     pub(crate) slot: Option<T>,
+    /// Buffer usage data.
+    pub(crate) usage_handle: BufferUsageHandle,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
-unsafe impl<T> Send for Writer<T>
-where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
-{
-}
+unsafe impl<T> Send for Writer<T> where T: Bufferable {}
 
 impl<T> Clone for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn clone(&self) -> Self {
         Self {
@@ -74,15 +65,14 @@ where
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
             slot: None,
+            usage_handle: self.usage_handle.clone(),
         }
     }
 }
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     type Error = ();
 
@@ -141,9 +131,7 @@ where
 
 impl<T> Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn try_send(&mut self, event: T) -> Option<T> {
         let mut buffer: BytesMut = BytesMut::with_capacity(64);
@@ -169,6 +157,9 @@ where
             self.flush();
         }
 
+        self.usage_handle
+            .increment_sent_event_count_and_byte_size(1, event_size);
+
         None
     }
 
@@ -189,15 +180,14 @@ where
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
+
         self.write_notifier.wake();
     }
 }
 
 impl<T> Drop for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {

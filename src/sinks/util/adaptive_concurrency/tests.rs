@@ -1,4 +1,5 @@
-#![cfg(all(test, feature = "sources-generator"))]
+#![cfg(all(test, feature = "sources-demo_logs"))]
+#![allow(clippy::print_stderr)] //tests
 
 use super::controller::ControllerStatistics;
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    sources::generator::GeneratorConfig,
+    sources::demo_logs::DemoLogsConfig,
     test_util::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
@@ -153,18 +154,22 @@ struct TestConfig {
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
-        let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 1;
+        batch_settings.timeout = Duration::from_secs(9999);
+
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
             .batch_sink(
                 TestRetryLogic,
                 TestSink::new(self),
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )
-            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
+            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
@@ -407,9 +412,8 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let generator =
-        GeneratorConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
-    config.add_source("in", generator);
+    let demo_logs = DemoLogsConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+    config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;

@@ -28,7 +28,6 @@ use std::{
 };
 use tracing::{error, info};
 use vector::{
-    buffers::Acker,
     config::{
         DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
         TransformContext,
@@ -43,10 +42,20 @@ use vector::{
     transforms::{FunctionTransform, Transform},
     Pipeline,
 };
+use vector_core::buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
     let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
     let sink = MockSinkConfig::new(tx, true);
+    (rx, sink)
+}
+
+pub fn sink_with_data(
+    channel_size: usize,
+    data: &str,
+) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
+    let sink = MockSinkConfig::new_with_data(tx, true, data);
     (rx, sink)
 }
 
@@ -65,6 +74,12 @@ pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
 pub fn source() -> (Pipeline, MockSourceConfig) {
     let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
     let source = MockSourceConfig::new(rx);
+    (tx, source)
+}
+
+pub fn source_with_data(data: &str) -> (Pipeline, MockSourceConfig) {
+    let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
+    let source = MockSourceConfig::new_with_data(rx, data);
     (tx, source)
 }
 
@@ -114,6 +129,8 @@ pub struct MockSourceConfig {
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
     data_type: Option<DataType>,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
 }
 
 impl MockSourceConfig {
@@ -122,6 +139,16 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
             data_type: Some(DataType::Any),
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(receiver: mpsc::Receiver<Event>, data: &str) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+            data_type: Some(DataType::Any),
+            data: Some(data.into()),
         }
     }
 
@@ -133,6 +160,7 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
             data_type: Some(DataType::Any),
+            data: None,
         }
     }
 
@@ -223,6 +251,7 @@ impl FunctionTransform for MockTransform {
                     }
                     MetricValue::AggregatedHistogram { .. } => None,
                     MetricValue::AggregatedSummary { .. } => None,
+                    MetricValue::Sketch { .. } => None,
                     MetricValue::Set { .. } => {
                         let mut values = BTreeSet::new();
                         values.insert(self.suffix.clone());
@@ -287,6 +316,8 @@ where
     sink: Option<T>,
     #[serde(skip)]
     healthy: bool,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
 }
 
 impl<T> MockSinkConfig<T>
@@ -298,6 +329,15 @@ where
         Self {
             sink: Some(sink),
             healthy,
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(sink: T, healthy: bool, data: &str) -> Self {
+        Self {
+            sink: Some(sink),
+            healthy,
+            data: Some(data.into()),
         }
     }
 }

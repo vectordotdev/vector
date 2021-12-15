@@ -2,7 +2,7 @@ use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -211,7 +211,7 @@ impl vrl_core::Target for VrlTarget {
                     }))
                 } else {
                     log.remove(path, compact)
-                        .map(|val| val.map(|val| val.into()))
+                        .map(|val| val.map(Into::into))
                         .map_err(|err| err.to_string())
                 }
             }
@@ -246,6 +246,63 @@ impl vrl_core::Target for VrlTarget {
 
                 Ok(None)
             }
+        }
+    }
+
+    fn get_metadata(&self, key: &str) -> Result<Option<vrl_core::Value>, String> {
+        let metadata = match self {
+            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::Metric(metric) => metric.metadata(),
+        };
+
+        match key {
+            "datadog_api_key" => Ok(metadata
+                .datadog_api_key()
+                .as_ref()
+                .map(|api_key| vrl_core::Value::from(api_key.to_string()))),
+            "splunk_hec_token" => Ok(metadata
+                .splunk_hec_token()
+                .as_ref()
+                .map(|token| vrl_core::Value::from(token.to_string()))),
+            _ => Err(format!("key {} not available", key)),
+        }
+    }
+
+    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
+        let metadata = match self {
+            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::Metric(metric) => metric.metadata_mut(),
+        };
+
+        match key {
+            "datadog_api_key" => {
+                metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
+                Ok(())
+            }
+            "splunk_hec_token" => {
+                metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
+                Ok(())
+            }
+            _ => Err(format!("key {} not available", key)),
+        }
+    }
+
+    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
+        let metadata = match self {
+            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::Metric(metric) => metric.metadata_mut(),
+        };
+
+        match key {
+            "datadog_api_key" => {
+                metadata.set_datadog_api_key(None);
+                Ok(())
+            }
+            "splunk_hec_token" => {
+                metadata.set_splunk_hec_token(None);
+                Ok(())
+            }
+            _ => Err(format!("key {} not available", key)),
         }
     }
 }

@@ -6,7 +6,8 @@ use crate::{
     trace, unit_test, validate,
 };
 use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
+use once_cell::race::OnceNonZeroUsize;
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
@@ -20,6 +21,8 @@ use crate::{tap, top};
 
 #[cfg(windows)]
 use crate::service;
+
+pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
@@ -51,31 +54,36 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
-            "off" => "off".to_owned(),
-            #[cfg(feature = "tokio-console")]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                "runtime=trace".to_owned(),
-                "tokio=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-            #[cfg(not(feature = "tokio-console"))]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-        });
+        let level = std::env::var("VECTOR_LOG")
+            .or_else(|_| {
+                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+                std::env::var("LOG")
+            })
+            .unwrap_or_else(|_| match opts.log_level() {
+                "off" => "off".to_owned(),
+                #[cfg(feature = "tokio-console")]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    "runtime=trace".to_owned(),
+                    "tokio=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                ]
+                .join(","),
+                #[cfg(not(feature = "tokio-console"))]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                ]
+                .join(","),
+            });
 
         let root_opts = opts.root;
 
@@ -105,6 +113,9 @@ impl Application {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             } else {
+                WORKER_THREADS
+                    .set(NonZeroUsize::new(threads).expect("already checked"))
+                    .expect("double thread initialization");
                 rt_builder.worker_threads(threads);
             }
         }

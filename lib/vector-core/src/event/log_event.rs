@@ -2,8 +2,9 @@ use super::{
     finalization::{BatchNotifier, EventFinalizer},
     legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, Lookup, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
 };
+use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
 use bytes::Bytes;
 use chrono::Utc;
@@ -46,6 +47,12 @@ impl ByteSizeOf for LogEvent {
     }
 }
 
+impl Finalizable for LogEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata.take_finalizers()
+    }
+}
+
 impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
@@ -80,6 +87,11 @@ impl LogEvent {
         self
     }
 
+    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        self.metadata = self.metadata.with_batch_notifier_option(batch);
+        self
+    }
+
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.metadata.add_finalizer(finalizer);
     }
@@ -111,6 +123,14 @@ impl LogEvent {
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
         util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+    }
+
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+        let key = key.as_ref();
+        if !self.contains(key) {
+            self.insert(key, value);
+        }
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
@@ -149,19 +169,19 @@ impl LogEvent {
     /// pathing information in the key. It will insert over the top of any value
     /// that exists in the map already.
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
+    pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: Into<String> + Display,
         V: Into<Value> + Debug,
     {
-        self.as_map_mut().insert(key.into(), value.into());
+        self.as_map_mut().insert(key.into(), value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+    pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
+        if !self.as_map().contains_key(key) {
+            self.insert_flat(key, value);
         }
     }
 
@@ -262,6 +282,12 @@ impl LogEvent {
             }
         }
         self.metadata.merge(incoming.metadata);
+    }
+}
+
+impl MaybeAsLogMut for LogEvent {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        Some(self)
     }
 }
 
@@ -547,6 +573,107 @@ mod test {
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
+    }
+
+    #[test]
+    fn insert() {
+        let mut log = LogEvent::default();
+
+        let old = log.insert("foo", "foo");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+        assert_eq!(old, None);
+    }
+
+    #[test]
+    fn insert_existing() {
+        let mut log = LogEvent::default();
+        log.insert("foo", "foo");
+
+        let old = log.insert("foo", "bar");
+
+        assert_eq!(log.get("foo"), Some(&"bar".into()));
+        assert_eq!(old, Some("foo".into()));
+    }
+
+    #[test]
+    fn try_insert() {
+        let mut log = LogEvent::default();
+
+        log.try_insert("foo", "foo");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_existing() {
+        let mut log = LogEvent::default();
+        log.insert("foo", "foo");
+
+        log.try_insert("foo", "bar");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_dotted() {
+        let mut log = LogEvent::default();
+
+        log.try_insert("foo.bar", "foo");
+
+        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get_flat("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_existing_dotted() {
+        let mut log = LogEvent::default();
+        log.insert("foo.bar", "foo");
+
+        log.try_insert("foo.bar", "bar");
+
+        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get_flat("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_flat() {
+        let mut log = LogEvent::default();
+
+        log.try_insert_flat("foo", "foo");
+
+        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_flat_existing() {
+        let mut log = LogEvent::default();
+        log.insert_flat("foo", "foo");
+
+        log.try_insert_flat("foo", "bar");
+
+        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_flat_dotted() {
+        let mut log = LogEvent::default();
+
+        log.try_insert_flat("foo.bar", "foo");
+
+        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_flat_existing_dotted() {
+        let mut log = LogEvent::default();
+        log.insert_flat("foo.bar", "foo");
+
+        log.try_insert_flat("foo.bar", "bar");
+
+        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get("foo.bar"), None);
     }
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:

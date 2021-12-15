@@ -244,6 +244,8 @@ impl FrameHandler for DnstapFrameHandler {
 
 #[cfg(all(test, feature = "dnstap-integration-tests"))]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::*;
     use crate::{event::Value, test_util::trace_init, Pipeline};
     use futures::StreamExt;

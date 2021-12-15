@@ -1,3 +1,5 @@
+{{ $algoliaThemeCssUrl := printf "https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-%s" site.Params.search.algolia_autocomplete_theme }}
+@import url({{ $algoliaThemeCssUrl }})
 @import toc
 @import syntax
 
@@ -42,11 +44,14 @@ svg
 html
   &.dark
     svg
-      [fill="#000000"]
+      [fill="#000000"],
+      [fill="black"]
         fill: $dark-mode-gray
-      [stroke="#000000"]
+      [stroke="#000000"],
+      [stroke="black"]
         stroke: $dark-mode-gray
-      [stop-color="#000000"]
+      [stop-color="#000000"],
+      [stop-color="black"]
         stop-color: $dark-mode-gray
       [fill="#FFFFFF"],
       [fill="#FFF"]

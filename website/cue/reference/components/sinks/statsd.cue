@@ -54,16 +54,16 @@ components: sinks: statsd: {
 				A namespace will be prefixed to a metric's name.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}
 
 	telemetry: metrics: {
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

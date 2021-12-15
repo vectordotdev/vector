@@ -33,7 +33,7 @@ components: sinks: kafka: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "ndjson"]
 				}
 			}
 			request: enabled: false
@@ -56,11 +56,9 @@ components: sinks: kafka: {
 			common:      true
 			description: "The log field name or tags key to use for the topic key. If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent. Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["user_id"]
-				syntax: "literal"
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -68,7 +66,6 @@ components: sinks: kafka: {
 			common:      false
 			description: "Local message timeout."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 300000
 				examples: [150000, 450000]
@@ -79,7 +76,6 @@ components: sinks: kafka: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -87,40 +83,33 @@ components: sinks: kafka: {
 						common:      true
 						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
 						required:    false
-						warnings: []
 						type: bool: default: null
 					}
 					mechanism: {
 						common:      true
 						description: "The Kafka SASL/SCRAM mechanisms."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
-							syntax: "literal"
 						}
 					}
 					password: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication password."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["password"]
-							syntax: "literal"
 						}
 					}
 					username: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication username."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["username"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -130,21 +119,17 @@ components: sinks: kafka: {
 		topic: {
 			description: "The Kafka topic name to write events to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
-				syntax: "literal"
 			}
 		}
 		headers_key: {
 			common:      false
-			description: "The log field name to use for the Kafka headers. If ommited, no headers will be written."
+			description: "The log field name to use for the Kafka headers. If omitted, no headers will be written."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["headers"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -164,6 +149,9 @@ components: sinks: kafka: {
 	how_it_works: components._kafka.how_it_works
 
 	telemetry: metrics: {
+		component_sent_events_total:         components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:    components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		component_sent_bytes_total:          components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		events_discarded_total:              components.sources.internal_metrics.output.metrics.events_discarded_total
 		processing_errors_total:             components.sources.internal_metrics.output.metrics.processing_errors_total
 		kafka_queue_messages:                components.sources.internal_metrics.output.metrics.kafka_queue_messages

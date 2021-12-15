@@ -56,7 +56,7 @@ fn dedupe(c: &mut Criterion) {
         },
         // Measurement where ignore fields do not exist in the event.
         Param {
-            slug: "field_ignore_dne",
+            slug: "field_ignore_done",
             input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 cache: CacheConfig { num_events: 4 },
@@ -72,7 +72,7 @@ fn dedupe(c: &mut Criterion) {
         // Modification of previous where match fields do not exist in the
         // event.
         Param {
-            slug: "field_match_dne",
+            slug: "field_match_done",
             input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 cache: CacheConfig { num_events: 4 },

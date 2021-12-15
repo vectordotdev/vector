@@ -230,7 +230,7 @@ pub fn component_counter_metrics(
     })
 }
 
-/// Returns the throughput of a 'counter' metric, sampled over `interval` millseconds
+/// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
 /// and filtered by the provided `filter_fn`.
 pub fn counter_throughput(
     interval: i32,

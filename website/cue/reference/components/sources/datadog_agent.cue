@@ -6,8 +6,8 @@ components: sources: datadog_agent: {
 	title: "Datadog Agent"
 
 	description: """
-		Receives observability data from a Datadog Agent over HTTP or HTTPS. For now, this is limited to logs, but will
-		be expanded in the future to cover metrics and traces.
+		Receives observability data from a Datadog Agent over HTTP or HTTPS. For now, this is limited to logs and metrics
+		but will be expanded in the future cover traces.
 		"""
 
 	classes: {
@@ -21,7 +21,10 @@ components: sources: datadog_agent: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 		receive: {
 			from: {
 				service: services.datadog_agent
@@ -44,16 +47,6 @@ components: sources: datadog_agent: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -74,51 +67,53 @@ components: sources: datadog_agent: {
 		}
 	}
 
-	output: logs: line: {
-		description: "An individual event from a batch of events received through an HTTP POST request sent by a Datadog Agent."
-		fields: {
-			message: {
-				description: "The message field, containing the plain text message."
-				required:    true
-				type: string: {
-					examples: ["Hi from erlang"]
-					syntax: "literal"
+	output: {
+		logs: line: {
+			description: "An individual event from a batch of events received through an HTTP POST request sent by a Datadog Agent."
+			fields: {
+				message: {
+					description: "The message field, containing the plain text message."
+					required:    true
+					type: string: {
+						examples: ["Hi from erlang"]
+					}
+				}
+				status: {
+					description: "The status field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["info"]
+					}
+				}
+				timestamp: fields._current_timestamp
+				hostname:  fields._local_host
+				service: {
+					description: "The service field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["backend"]
+					}
+				}
+				ddsource: {
+					description: "The source field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["java"]
+					}
+				}
+				ddtags: {
+					description: "The coma separated tags list extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["env:prod,region:ap-east-1"]
+					}
 				}
 			}
-			status: {
-				description: "The status field extracted from the event."
-				required:    true
-				type: string: {
-					examples: ["info"]
-					syntax: "literal"
-				}
-			}
-			timestamp: fields._current_timestamp
-			hostname:  fields._local_host
-			service: {
-				description: "The service field extracted from the event."
-				required:    true
-				type: string: {
-					examples: ["backend"]
-					syntax: "literal"
-				}
-			}
-			ddsource: {
-				description: "The source field extracted from the event."
-				required:    true
-				type: string: {
-					examples: ["java"]
-					syntax: "literal"
-				}
-			}
-			ddtags: {
-				description: "The coma separated tags list extracted from the event."
-				required:    true
-				type: string: {
-					examples: ["env:prod,region:ap-east-1"]
-					syntax: "literal"
-				}
-			}
+		}
+		metrics: {
+			counter:      output._passthrough_counter
+			distribution: output._passthrough_distribution
+			gauge:        output._passthrough_gauge
 		}
 	}
 
@@ -138,5 +133,12 @@ components: sources: datadog_agent: {
 				```
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 	}
 }

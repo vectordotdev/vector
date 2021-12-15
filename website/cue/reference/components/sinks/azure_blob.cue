@@ -19,7 +19,7 @@ components: sinks: azure_blob: {
 			batch: {
 				enabled:      true
 				common:       true
-				max_bytes:    10485760
+				max_bytes:    10_000_000
 				timeout_secs: 300
 			}
 			compression: {
@@ -38,7 +38,6 @@ components: sinks: azure_blob: {
 			}
 			request: {
 				enabled:        true
-				concurrency:    50
 				rate_limit_num: 250
 				headers:        false
 			}
@@ -62,16 +61,6 @@ components: sinks: azure_blob: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -81,19 +70,15 @@ components: sinks: azure_blob: {
 		connection_string: {
 			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
-				syntax: "literal"
 			}
 		}
 		container_name: {
 			description: "The Azure Blob Storage Account container name."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-logs"]
-				syntax: "literal"
 			}
 		}
 		blob_prefix: {
@@ -101,7 +86,6 @@ components: sinks: azure_blob: {
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root azure storage \"folder\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "blob/%F/"
 				examples: ["date/%F/", "date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
@@ -113,7 +97,6 @@ components: sinks: azure_blob: {
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		blob_time_format: {
@@ -121,7 +104,6 @@ components: sinks: azure_blob: {
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "%s"
 				syntax:  "strftime"
@@ -175,10 +157,12 @@ components: sinks: azure_blob: {
 	}
 
 	telemetry: metrics: {
-		events_discarded_total:    components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
-		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
+		http_error_response_total:        components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:        components.sources.internal_metrics.output.metrics.http_request_errors_total
+		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
 	}
 }

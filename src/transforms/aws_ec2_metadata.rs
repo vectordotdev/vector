@@ -227,6 +227,7 @@ struct MetadataClient {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // deserialize all fields
 struct IdentityDocument {
     account_id: String,
     architecture: String,

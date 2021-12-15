@@ -17,6 +17,10 @@ pub struct EventMetadata {
     #[getset(get = "pub", set = "pub")]
     #[serde(default, skip)]
     datadog_api_key: Option<Arc<str>>,
+    /// Used to store the Splunk HEC auth token from sources to sinks
+    #[getset(get = "pub", set = "pub")]
+    #[serde(default, skip)]
+    splunk_hec_token: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 }
@@ -42,12 +46,24 @@ impl EventMetadata {
         self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
     }
 
+    /// Replace the finalizer with a new one created from the given optional batch notifier.
+    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        match batch {
+            Some(batch) => self.with_finalizer(EventFinalizer::new(Arc::clone(batch))),
+            None => self,
+        }
+    }
+
     /// Merge the other `EventMetadata` into this.
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
+    /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         if self.datadog_api_key.is_none() {
             self.datadog_api_key = other.datadog_api_key;
+        }
+        if self.splunk_hec_token.is_none() {
+            self.splunk_hec_token = other.splunk_hec_token;
         }
     }
 
@@ -69,6 +85,11 @@ impl EventMetadata {
     /// Swap the finalizers list with an empty list and return the original.
     pub fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+
+    /// Merges the given finalizers into the existing set of finalizers.
+    pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
     }
 }
 

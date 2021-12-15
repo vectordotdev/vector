@@ -21,7 +21,8 @@ releases: "0.15.0": {
 		* [`redis` sink](\(urls.vector_redis_sink)) for forwarding logs to [Redis](\(urls.redis)).
 		* [`eventstoredb_metrics` source](\(urls.vector_eventstoredb_metrics_source)) for collecting metrics from [EventStoreDB](\(urls.eventstoredb)).
 
-		It also contains a number of additional enhancements and bug fixes.  Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
+		It also contains a number of additional enhancements and bug fixes.  Check out the
+		[highlights](/releases/0.15.0#highlights) and [changelog](/releases/0.15.0#changelog) for more details.
 		"""
 
 	commits: [
@@ -50,7 +51,7 @@ releases: "0.15.0": {
 		{sha: "63afa786c247a0ae899aeacb75134f19b6b81b33", date: "2021-06-05 03:09:05 UTC", description: "Bump assert_cmd from 1.0.4 to 1.0.5", pr_number:                                             7748, scopes: ["deps"], type:                         "chore", breaking_change:       false, author: "dependabot[bot]", files_count:      2, insertions_count:    3, deletions_count:     3},
 		{sha: "97c922078e86e35c25ff8ba307656994bd35931f", date: "2021-06-05 06:25:32 UTC", description: "Ensure that tracing output is captured", pr_number:                                          7764, scopes: ["tests"], type:                        "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:        1, insertions_count:    13, deletions_count:    0},
 		{sha: "54fca793e567aaac365e8a0b121b802fac3eed85", date: "2021-06-05 07:05:17 UTC", description: "Move `VectorSink`, `StreamSink` into core", pr_number:                                       7762, scopes: ["dev"], type:                          "chore", breaking_change:       false, author: "Brian L. Troutwine", files_count:   6, insertions_count:    60, deletions_count:    43},
-		{sha: "ba230d4d49a6a7cce41bf149b6c31af631a22914", date: "2021-06-08 05:10:33 UTC", description: "Kubernetes recommanded labels and additional labels", pr_number:                             7687, scopes: ["helm platform"], type:                "enhancement", breaking_change: false, author: "Nicolas Lamirault", files_count:    11, insertions_count:   62, deletions_count:    0},
+		{sha: "ba230d4d49a6a7cce41bf149b6c31af631a22914", date: "2021-06-08 05:10:33 UTC", description: "Kubernetes recommended labels and additional labels", pr_number:                             7687, scopes: ["helm platform"], type:                "enhancement", breaking_change: false, author: "Nicolas Lamirault", files_count:    11, insertions_count:   62, deletions_count:    0},
 		{sha: "8efa3d1c0aa67a2e6d583980677c4c15406252d5", date: "2021-06-08 00:05:19 UTC", description: "Bump security-framework from 2.2.0 to 2.3.0", pr_number:                                     7770, scopes: ["deps"], type:                         "chore", breaking_change:       false, author: "dependabot[bot]", files_count:      2, insertions_count:    5, deletions_count:     5},
 		{sha: "b621929c3da74b25aebad9b3952fa7a2f47deb09", date: "2021-06-08 03:09:12 UTC", description: "Initial `dnstap` source", pr_number:                                                         6681, scopes: ["new source"], type:                   "feat", breaking_change:        false, author: "James Bai", files_count:            33, insertions_count:   7317, deletions_count:  24},
 		{sha: "48862bf25efa632ae27b0aa956c8fa5f58e8817e", date: "2021-06-08 02:53:53 UTC", description: "Pin kafka version due to missing zstd support in latest", pr_number:                         7779, scopes: ["tests"], type:                        "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:        1, insertions_count:    4, deletions_count:     2},

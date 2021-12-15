@@ -52,6 +52,10 @@ impl TransformConfig for MetricToLogConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "metric_to_log"
     }
@@ -352,7 +356,7 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].upper_limit"),
+                    String::from("aggregated_summary.quantiles[0].quantile"),
                     &Value::from(50.0)
                 ),
                 (
@@ -360,7 +364,7 @@ mod tests {
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    String::from("aggregated_summary.quantiles[1].quantile"),
                     &Value::from(90.0)
                 ),
                 (
