@@ -1,7 +1,7 @@
 # RFC  - 2021-11-03 - Ingest APM stats in `datadog-agent` source with consistent user experience
 
 Datadog traces support in the `datadog_agent` source was initially documented in this [RFC][trace-support-pr]. However, the
-Datadog `traceagent` submits more data than just traces. It also sends statistics ("APM Stats") about the running time of
+Datadog `trace-agent` submits more data than just traces. It also sends statistics ("APM Stats") about the running time of
 each instrumented resource (i.e. a given piece of code) that are aggregated over time (based on 100% of the traces
 received). Those APM stats are very important as they highlight code hot spots and ease aggregation. And, as a result, APM stats should be handled by Vector.
 
@@ -220,7 +220,7 @@ https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto#L
 ## Rationale
 
 * We should Keep valuable metrics relevant to end-user
-* Dropping APM stats would cause current user to loose some insight on execution time.
+* Dropping APM stats would cause current user to lose some insight on execution time.
 
 ## Drawbacks
 
