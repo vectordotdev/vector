@@ -1,3 +1,4 @@
+
 <p align="center">
   <strong>
     <a href="https://vector.dev/docs/setup/quickstart/">Quickstart<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
