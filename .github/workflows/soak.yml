@@ -119,11 +119,11 @@ jobs:
               replica: [1, 2],
               variant: [
                 {
-                  name: "baseline"
+                  name: "baseline",
                   tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}",
                 },
                 {
-                  name: "comparison"
+                  name: "comparison",
                   tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}",
                 },
               ],
