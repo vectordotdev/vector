@@ -59,6 +59,7 @@ jobs:
          - test: 'aws'
          - test: 'azure'
          - test: 'clickhouse'
+         - test: 'datadog-logs'
          - test: 'docker-logs'
          - test: 'elasticsearch'
          - test: 'eventstoredb_metrics'
