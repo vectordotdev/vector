@@ -367,11 +367,6 @@ impl Ledger {
     /// Tracks the statistics of a successful write.
     pub fn track_write(&self, record_size: u64) {
         self.state().increment_records(record_size);
-
-        // A 4GB record should not be possible to write, at all.
-        let record_size = record_size
-            .try_into()
-            .expect("record size didn't fit into usize; is this a 32-bit platform?");
         self.usage_handle
             .increment_received_event_count_and_byte_size(1, record_size);
     }
@@ -380,11 +375,6 @@ impl Ledger {
     pub fn track_reads(&self, record_len: u64, total_record_size: u64) {
         self.state()
             .decrement_records(record_len, total_record_size);
-
-        // If we're acknowledgeing 4GB of records at a time, then uh... something weird is going on.
-        let total_record_size = total_record_size
-            .try_into()
-            .expect("total record size didn't fit into usize; is this a 32-bit platform?");
         self.usage_handle
             .increment_sent_event_count_and_byte_size(record_len, total_record_size);
     }
@@ -496,11 +486,7 @@ impl Ledger {
 
     fn synchronize_buffer_usage(&self) {
         let initial_buffer_events = self.state().get_total_records();
-        let initial_buffer_size = self
-            .state()
-            .get_total_buffer_size()
-            .try_into()
-            .expect("buffer size greater than usize; is this a 32-bit platform?");
+        let initial_buffer_size = self.state().get_total_buffer_size();
         self.usage_handle
             .increment_received_event_count_and_byte_size(
                 initial_buffer_events,

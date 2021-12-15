@@ -130,7 +130,7 @@ impl<T: Bufferable> Stream for BufferReceiver<T> {
             .map(|result| match result {
                 StrategyResult::Primary(i) => {
                     if let Some(handle) = this.instrumentation {
-                        handle.increment_sent_event_count_and_byte_size(1, i.size_of());
+                        handle.increment_sent_event_count_and_byte_size(1, i.size_of() as u64);
                     }
                     Some(i)
                 }
