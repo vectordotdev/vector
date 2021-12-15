@@ -49,7 +49,7 @@ impl TransformRegistry {
     pub fn sink_purposes(&self) -> Vec<&field::Purpose> {
         self.sink_schemas
             .iter()
-            .flat_map(|s| s.purposes())
+            .flat_map(schema::Input::purposes)
             .collect()
     }
 

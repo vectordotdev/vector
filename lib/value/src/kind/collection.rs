@@ -51,9 +51,7 @@ impl<T: Ord> Collection<T> {
         // Append known fields in `other` that are unknown to `self`.
         self.known.append(&mut other.known);
     }
-}
 
-impl<T: Ord> Collection<T> {
     /// Create a collection kind of which the encapsulated values can be any kind.
     #[must_use]
     pub fn any() -> Self {
@@ -149,5 +147,114 @@ impl From<String> for Field {
 impl From<lookup::FieldBuf> for Field {
     fn from(field: lookup::FieldBuf) -> Self {
         Self(field.to_string().into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge() {
+        // (any) & (any) = (any)
+        let mut left = Collection::<()>::any();
+        let right = Collection::<()>::any();
+        left.merge(right);
+        assert_eq!(left, Collection::<()>::any());
+
+        // merge two separate known fields
+        let mut left: Collection<&str> = BTreeMap::from([("foo", Kind::null())]).into();
+        let right: Collection<&str> = BTreeMap::from([("bar", Kind::bytes())]).into();
+        left.merge(right);
+        assert_eq!(left, {
+            let mut want: Collection<&str> =
+                BTreeMap::from([("foo", Kind::null()), ("bar", Kind::bytes())]).into();
+            want.set_other(Kind::any());
+            want
+        });
+
+        // merge similarly named known field
+        let mut left: Collection<&str> = BTreeMap::from([("foo", Kind::null())]).into();
+        let right: Collection<&str> = BTreeMap::from([("foo", Kind::bytes())]).into();
+        left.merge(right);
+        assert_eq!(left, {
+            let mut want: Collection<&str> = BTreeMap::from([("foo", {
+                let mut kind = Kind::null();
+                kind.add_bytes();
+                kind
+            })])
+            .into();
+            want.set_other(Kind::any());
+            want
+        });
+
+        // merge nested fields
+        let inner = BTreeMap::from([("bar".into(), Kind::integer())]);
+        let mut left: Collection<&str> = BTreeMap::from([("foo", Kind::object(inner))]).into();
+        let right: Collection<&str> = BTreeMap::from([("bar", Kind::bytes())]).into();
+        left.merge(right);
+        assert_eq!(left, {
+            let inner = BTreeMap::from([("bar".into(), Kind::integer())]);
+            let mut want: Collection<&str> =
+                BTreeMap::from([("foo", Kind::object(inner)), ("bar", Kind::bytes())]).into();
+            want.set_other(Kind::any());
+            want
+        });
+
+        // merge "other" fields
+        let mut left: Collection<&str> = BTreeMap::from([("foo", Kind::boolean())]).into();
+        left.set_other(Kind::integer());
+        let mut right: Collection<&str> = BTreeMap::from([("bar", Kind::bytes())]).into();
+        right.set_other(Kind::timestamp());
+        left.merge(right);
+        assert_eq!(left, {
+            let mut want: Collection<&str> =
+                BTreeMap::from([("foo", Kind::boolean()), ("bar", Kind::bytes())]).into();
+            want.set_other({
+                let mut kind = Kind::integer();
+                kind.add_timestamp();
+                kind
+            });
+            want
+        });
+    }
+
+    #[test]
+    fn test_any() {
+        let v = Collection::<()>::any();
+
+        assert!(v.known().is_empty());
+        assert!(v.other().is_any());
+    }
+
+    #[test]
+    fn test_is_any() {
+        let v = Collection::<()>::any();
+        assert!(v.is_any());
+
+        let v: Collection<&str> = BTreeMap::from([("foo", Kind::any())]).into();
+        assert!(v.is_any());
+
+        let mut v: Collection<&str> = BTreeMap::from([("foo", Kind::any())]).into();
+        v.set_other(Kind::boolean());
+        assert!(!v.is_any());
+
+        let mut v: Collection<&str> = BTreeMap::from([("foo", Kind::integer())]).into();
+        v.set_other(Kind::any());
+        assert!(!v.is_any());
+
+        let mut v: Collection<&str> =
+            BTreeMap::from([("foo", Kind::any()), ("bar", Kind::boolean())]).into();
+        v.set_other(Kind::any());
+        assert!(!v.is_any());
+    }
+
+    #[test]
+    fn test_set_other() {
+        let mut v = Collection::<()>::any();
+        assert_eq!(v.other, Other::Any);
+
+        v.set_other(Kind::integer());
+        assert_eq!(v.other, Other::Exact(Box::new(Kind::integer())));
     }
 }

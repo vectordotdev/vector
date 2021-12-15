@@ -823,7 +823,7 @@ mod tests {
     fn test_nest_at_path() {
         // object
         let mut kind1 = Kind::integer();
-        kind1 = kind1.nest_at_path(LookupBuf::from_str(".foo.bar").unwrap());
+        kind1 = kind1.nest_at_path(&LookupBuf::from_str(".foo.bar").unwrap().to_lookup());
 
         let map1 = BTreeMap::from([("bar".into(), Kind::integer())]);
         let map2 = BTreeMap::from([("foo".into(), Kind::object(map1))]);
@@ -833,12 +833,48 @@ mod tests {
 
         // array
         let mut kind2 = Kind::boolean();
-        kind2 = kind2.nest_at_path(LookupBuf::from_str(".foo[2]").unwrap());
+        kind2 = kind2.nest_at_path(&LookupBuf::from_str(".foo[2]").unwrap().to_lookup());
 
         let map1 = BTreeMap::from([(2.into(), Kind::boolean())]);
         let map2 = BTreeMap::from([("foo".into(), Kind::array(map1))]);
         let valid2 = Kind::object(map2);
 
-        assert_eq!(kind2, valid2)
+        assert_eq!(kind2, valid2);
+    }
+
+    #[test]
+    fn test_merge() {
+        // (any) & (any) = (any)
+        let mut left = Kind::any();
+        let right = Kind::any();
+        let want = Kind::any();
+        left.merge(right);
+        assert_eq!(left, want);
+
+        // (any) & (null) = (any)
+        let mut left = Kind::any();
+        let right = Kind::null();
+        left.merge(right);
+        assert_eq!(left, want);
+
+        // (null) & (null) = (null)
+        let mut left = Kind::null();
+        let right = Kind::null();
+        left.merge(right);
+        assert_eq!(left, Kind::null());
+
+        // (null, timestamp) & (bytes, boolean) = (null, timestamp, bytes, boolean)
+        let mut left = Kind::null();
+        left.add_timestamp();
+        let mut right = Kind::bytes();
+        right.add_boolean();
+        left.merge(right);
+        assert_eq!(left, {
+            let mut want = Kind::null();
+            want.add_timestamp();
+            want.add_boolean();
+            want.add_bytes();
+            want
+        });
     }
 }
