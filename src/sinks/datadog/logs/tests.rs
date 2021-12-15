@@ -445,7 +445,7 @@ async fn to_real_v2_endpoint() {
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let generator = |index| format!("this is a log with index {}", index);
-    let (expected, events) = generate_lines_with_stream(generator, 10, Some(batch));
+    let (_, events) = generate_lines_with_stream(generator, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
