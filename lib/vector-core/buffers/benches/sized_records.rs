@@ -67,28 +67,28 @@ impl Drop for PathGuard {
     }
 }
 
-fn create_disk_v1_variant(_max_events: usize, max_size: usize) -> BufferType {
+fn create_disk_v1_variant(_max_events: usize, max_size: u64) -> BufferType {
     BufferType::DiskV1 {
         max_size,
         when_full: WhenFull::DropNewest,
     }
 }
 
-fn create_disk_v2_variant(_max_events: usize, max_size: usize) -> BufferType {
+fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     BufferType::DiskV2 {
         max_size,
         when_full: WhenFull::DropNewest,
     }
 }
 
-fn create_in_memory_v1_variant(max_events: usize, _max_size: usize) -> BufferType {
+fn create_in_memory_v1_variant(max_events: usize, _max_size: u64) -> BufferType {
     BufferType::MemoryV1 {
         max_events,
         when_full: WhenFull::DropNewest,
     }
 }
 
-fn create_in_memory_v2_variant(max_events: usize, _max_size: usize) -> BufferType {
+fn create_in_memory_v2_variant(max_events: usize, _max_size: u64) -> BufferType {
     BufferType::MemoryV2 {
         max_events,
         when_full: WhenFull::DropNewest,
@@ -101,7 +101,7 @@ macro_rules! experiment {
         group.sampling_mode(SamplingMode::Auto);
         init_instrumentation();
 
-        let max_events = 1_000;
+        let max_events: usize = 1_000;
         let mut data_dir = DataDir::new($id_slug);
         let rt = Runtime::new().unwrap();
 
@@ -110,7 +110,7 @@ macro_rules! experiment {
             // drops due to reuse of disk buffer's internals between
             // runs. Tempdir has low entropy compared to the number of
             // iterations we make in these benchmarks.
-            let max_size = 1_000_000 * max_events * mem::size_of::<crate::common::Message<$width>>();
+            let max_size = 1_000_000 * max_events as u64 * mem::size_of::<crate::common::Message<$width>>() as u64;
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(

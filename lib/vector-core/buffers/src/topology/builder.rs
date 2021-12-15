@@ -24,13 +24,13 @@ pub trait IntoBuffer<T> {
     /// When instrumentation is provided in this way, [`ByteSizeOf`] is used to calculate the size
     /// of the event going both into and out of the buffer.
     fn provides_instrumentation(&self) -> bool {
-        true
+        false
     }
 
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
     async fn into_buffer_parts(
         self: Box<Self>,
-        usage_handle: &BufferUsageHandle,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
 }
 
@@ -138,7 +138,7 @@ impl<T> TopologyBuilder<T> {
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver, acker) = stage
                 .untransformed
-                .into_buffer_parts(&usage_handle)
+                .into_buffer_parts(usage_handle.clone())
                 .await
                 .context(FailedToBuildStage { stage_idx })?;
 
@@ -214,7 +214,7 @@ where
 
         let memory_buffer = Box::new(MemoryV1Buffer::new(max_events));
         let (sender, receiver, _) = memory_buffer
-            .into_buffer_parts(&noop_usage_handle)
+            .into_buffer_parts(noop_usage_handle)
             .await
             .expect("should not fail to directly create a memory buffer");
 
