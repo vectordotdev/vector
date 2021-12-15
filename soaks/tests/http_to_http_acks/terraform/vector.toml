@@ -29,3 +29,4 @@ encoding = "text"
 healthcheck.enabled = false
 buffer.type = "memory"
 buffer.max_events = 50000 # buffer 50 payloads at a time
+request.concurrency = 100
