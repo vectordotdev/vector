@@ -83,7 +83,15 @@ async fn reader_throws_error_when_record_length_delimiter_is_zero() {
 
 #[tokio::test]
 async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
-    todo!();
+    // TODO: We really do want this test, which is the equivalent of saying:
+    // "do we correctly detect when a file has, say, the u64 'record length' delimiter but either no
+    // more data after that, or not enough data, and we know for sure the writer has moved on?"
+    //
+    // Right now, we _always_ assume the data is coming if we can at least read 8 bytes for the
+    // length delimiter... but the point in the code where that happens is oblivious to the
+    // higher-level reader/writer state, so making it possible to detect this condition will take a
+    // small chunk of redesign work, but is definitely one of the last major possible issues that
+    // the buffer reasonably has to handle.
 }
 
 #[tokio::test]

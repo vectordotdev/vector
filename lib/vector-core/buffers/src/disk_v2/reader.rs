@@ -135,7 +135,7 @@ where
         }
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn read_length_delimiter(&mut self) -> Result<Option<usize>, ReaderError<T>> {
         loop {
             if self.reader.buffer().len() >= 8 {
@@ -181,7 +181,7 @@ where
     ///
     /// Errors can occur during the I/O or deserialization stage.  If an error occurs during any of
     /// these stages, an appropriate error variant will be returned describing the error.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
         let record_len = if let Some(len) = self.read_length_delimiter().await? {
             len
@@ -262,8 +262,7 @@ pub struct Reader<T> {
     ready_to_read: bool,
     check_pending_deletions: bool,
     pending_deletions: Vec<DeletionMarker>,
-    // TODO: Switch this back to just the number of bytes, since we don't need the record IDs.
-    pending_read_sizes: Vec<(u64, u64)>,
+    pending_read_sizes: Vec<u64>,
     _t: PhantomData<T>,
 }
 
@@ -287,7 +286,7 @@ where
         }
     }
 
-    fn track_read(&mut self, record_id: u64, record_size: u64) {
+    fn track_read(&mut self, record_size: u64) {
         // Tracking reads involves two main aspects:
         // - keeping track of the bytes we've read _in this current data file_
         // - keeping track of the total buffer size overall
@@ -305,13 +304,13 @@ where
         self.bytes_read += record_size;
 
         if self.ready_to_read {
-            self.pending_read_sizes.push((record_id, record_size));
+            self.pending_read_sizes.push(record_size);
         } else {
             self.ledger.decrement_total_buffer_size(record_size);
         }
     }
 
-    #[instrument(skip_all, level = "debug")]
+    #[cfg_attr(test, instrument(skip_all, level = "debug"))]
     async fn delete_completed_data_file(&mut self, marker: DeletionMarker) -> io::Result<()> {
         debug!(message = "deleting completed data file", ?marker);
 
@@ -351,7 +350,7 @@ where
         Ok(())
     }
 
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn delete_completed_data_files(&mut self) -> io::Result<()> {
         // Figure out if any of the pending deletions we have are now ready.
         let ready_deletions = {
@@ -381,7 +380,7 @@ where
         Ok(())
     }
 
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn adjust_acknowledgement_state(&mut self, ack_offset: u64) -> io::Result<()> {
         // Track our new highest acknowledged record ID, and handle any pending deletions that now qualify.
         self.last_acked_record_id = self.last_acked_record_id.wrapping_add(ack_offset);
@@ -391,7 +390,7 @@ where
         self.delete_completed_data_files().await
     }
 
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
         //trace!("handling pending acknowledgements");
 
@@ -415,13 +414,12 @@ where
 
             // First, recognize all of the bytes read for the now-acknowledged records so we can
             // adjust the total buffer size correctly.
-            let acks = self
-                .pending_read_sizes
-                .drain(..pending_acks)
-                .collect::<Vec<_>>();
-            let total_bytes_read = acks.iter().map(|(_, n)| *n).sum();
+            let total_bytes_read = self.pending_read_sizes.drain(..pending_acks).sum();
+            let ack_count = pending_acks
+                .try_into()
+                .expect("number of pending acks should always fit into u64");
 
-            self.ledger.track_reads(acks.len() as u64, total_bytes_read);
+            self.ledger.track_reads(ack_count, total_bytes_read);
 
             // Notify any waiting writers that we've consumed a bunch of records/bytes, since they
             // might be waiting for the total buffer size to go down below the configured limit.
@@ -457,7 +455,7 @@ where
     }
 
     /// Switches the reader over to the next data file to read.
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     fn roll_to_next_data_file(&mut self) {
         // Store the pending deletion marker.
         let marker = DeletionMarker {
@@ -477,7 +475,7 @@ where
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
         // We have nothing to do if we already have a data file open.
         if self.reader.is_some() {
@@ -527,7 +525,7 @@ where
     /// As this method may potentially drive the "delete completed data files" logic, an I/O error
     /// could be encountered during that phase.  If an I/O error _is_ encountered, an error variant
     /// will be returned describing the error.
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn update_reader_last_record_id(&mut self, record_id: u64) -> io::Result<()> {
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
@@ -601,7 +599,7 @@ where
     ///
     /// If an error occurs during seeking to the next record, an error variant will be returned
     /// describing the error.
-    #[instrument(skip(self), level = "debug")]
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
         debug!("seek_to_next_record starting");
 
@@ -653,7 +651,7 @@ where
     ///
     /// If an error occurred while reading a record, an error variant will be returned describing
     /// the error.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let token = loop {
             // Handle any pending acknowledgements first.
@@ -681,26 +679,18 @@ where
                 // record, or we deseralized it and the checksum was invalid.  Either way, we're not
                 // sure the rest of the data file is even valid, so roll to the next file.
                 //
-                // TODO: Right now, we're following the previous logic of not knowing where to find
-                // the start of the next record, but since we're using a length-delimited framing
-                // now, we could conceivably try one more time and if _that_ fails, then we roll to
-                // the next data file.
+                // TODO: Explore the concept of putting a data file into a "one more attempt to read
+                // a valid record" state, almost like a semi-open circuit breaker.  There's a
+                // possibility that the length delimiter we got is valid, and all the data was
+                // written for the record, but the data was invalid... and that if we just kept
+                // reading, we might actually encounter a valid record.
                 //
-                // This really depends, I suppose, on what the likelihood is that we could have
-                // invalid data on disk that can be deserialized as the backing data for an archived
-                // record _and_ could also pass the checksum validation.  It seems incredibly
-                // unlikely, but then again, we would also be parsing the payload as something else
-                // at the next layer up,, so it would also have to be valid for _that_, which just
-                // seems exceedingly unlikely.
-                //
-                // We would, at least, need to add some checks to the length delimiter, etc, to
-                // detect clearly impossible situations i.e. lengths greater than our configured
-                // record size limit, etc.  If we got anything like that, the reader might just
-                // stall trying to read usize::MAX number of bytes, or whatever.
-                //
-                // As I type this all out, we're also theoretically vulnerable to that right now on
-                // the very first read, not just after encountering our first known-to-be-corrupted
-                // record.
+                // Theoretically, based on both the validation done by `rkyv` and the checksum, it
+                // should be incredibly incredibly unlikely to read a valid record after getting a
+                // corrupted record if there was missing data or more invalid data.  We use
+                // checksumming to assert errors within a given chunk of the payload, so one payload
+                // being corrupted doesn't always, in fact, mean that other records after it are
+                // corrupted too.
                 Err(e) => {
                     // Invalid checksums and deserialization failures can't really be acted upon by
                     // the caller, but they might be expecting a read-after-write behavior, so we
@@ -793,7 +783,7 @@ where
         self.update_reader_last_record_id(token.record_id())
             .await
             .context(Io)?;
-        self.track_read(token.record_id(), token.record_size() as u64);
+        self.track_read(token.record_size() as u64);
         let reader = self
             .reader
             .as_mut()

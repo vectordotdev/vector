@@ -149,7 +149,6 @@ impl BufferUsage {
                 loop {
                     interval.tick().await;
 
-                    // TODO: actually push the labels into the events!
                     for stage in &stages {
                         let max_size_bytes = match stage.max_size_bytes.load(Ordering::Relaxed) {
                             0 => None,

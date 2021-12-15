@@ -46,7 +46,8 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
             let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             assert_eq!(ledger.get_total_records(), 1);
 
-            // TODO: add negative assertions to `tracing-fluent-assertions`
+            // TODO: Rewrite this as a negative assertion (i.e. `was_not_entered`) once
+            // `tracing-fluent-assertions` adds support for them.
             assert!(!reset_called.try_assert());
         }
     });
@@ -343,6 +344,7 @@ async fn reader_still_works_when_record_id_wraps_around() {
     .await;
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn reader_deletes_data_file_around_record_id_wraparound() {
     let assertion_registry = install_tracing_helpers();

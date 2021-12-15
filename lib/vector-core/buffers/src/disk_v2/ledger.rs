@@ -534,7 +534,7 @@ impl Ledger {
     /// If there is an error during either serialization of the new, default ledger state, or
     /// deserializing existing data in the ledger file, or generally during the underlying I/O
     /// operations, an error variant will be returned describing the error.
-    #[instrument(skip_all, level = "trace")]
+    #[cfg_attr(test, instrument(skip_all, level = "trace"))]
     pub(super) async fn load_or_create(
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,

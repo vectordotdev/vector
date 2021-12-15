@@ -27,14 +27,17 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
+use vector_core::{buffers::BufferType, internal_event::EventsSent};
 use vector_core::{
-    buffers::topology::{
-        builder::TopologyBuilder,
-        channel::{BufferReceiver, BufferSender},
+    buffers::{
+        topology::{
+            builder::TopologyBuilder,
+            channel::{BufferReceiver, BufferSender},
+        },
+        WhenFull,
     },
     ByteSizeOf,
 };
-use vector_core::{buffers::BufferType, internal_event::EventsSent};
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
@@ -224,7 +227,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100).await;
+        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
