@@ -31,33 +31,6 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
-  compute-test-plan:
-    name: Compute soak test plan
-    runs-on: ubuntu-20.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-
-      - uses: actions/github-script@v5
-        id: set-matrix
-        with:
-          script: |
-            const fs = require('fs')
-            target = fs.readdirSync('soaks/tests')
-
-            const matrix = {
-              replicas: [1, 2],
-              target
-            }
-
-            core.setOutput('matrix', matrix)
-      - name: Dump matrix context
-        env:
-          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
-        run: echo "$MATRIX_CONTEXT"
-
   compute-soak-meta:
     name: Compute metadata for soaks
     runs-on: ubuntu-20.04
@@ -124,17 +97,72 @@ jobs:
           echo "::set-output name=SOAK_MEMORY::${SOAK_MEMORY}"
           echo "::set-output name=VECTOR_CPUS::${VECTOR_CPUS}"
 
-  build-baseline-image:
-    name: Build baseline 'soak-vector' container
+  compute-test-plan:
+    name: Compute soak test plan
+    runs-on: ubuntu-20.04
+    needs: [compute-soak-meta]
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - uses: actions/github-script@v5
+        id: set-matrix
+        with:
+          script: |
+            const fs = require('fs')
+            target = fs.readdirSync('soaks/tests') // read names of directories in soaks/tests into an array
+
+            // Create the matrix that will be used as the strategy for soak test image builds and experiments
+            //
+            // Each field of this object has an array of elements that will be
+            // cartesian producted across the others to generate the full list of
+            // jobs to run. For example, the first job might have the values:
+            // { target: "fluent_remap_aws_firehose", replica: 1, variant: { name: "baseline", tag: "f0e229dab15e2cd554924d9db7731c8f8f030ec3-405f4a464db1ce386ba66ce7582a0d4e47c1d5d9"}
+            const matrix = {
+              target: target, // run each experiment
+              replica: [1, 2], // run twice
+              // run each experiment twice, once for the baseline, once for the comparison
+              variant: [
+                {
+                  name: "baseline",
+                  tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}",
+                },
+                {
+                  name: "comparison",
+                  tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}",
+                },
+              ],
+            }
+
+            // export this variable to be available to other github steps
+            core.setOutput('matrix', matrix)
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
+  build-image:
+    name: Build ${{ matrix.variant.name }} 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     needs: [compute-soak-meta]
+    strategy:
+      matrix:
+        variant:
+          - name: baseline
+            tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}"
+            ref: master
+          - name: comparison
+            tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
+            ref: "${{ github.sha }}"
     steps:
       - uses: actions/checkout@v2.3.5
 
       - uses: actions/checkout@v2.3.5
         with:
-          ref: master
-          path: baseline-vector
+          ref: ${{ matrix.variant.ref }}
+          path: ${{ matrix.variant.name }}-vector
 
       - name: Set up Docker Buildx
         id: buildx
@@ -156,12 +184,12 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
+          tags: type=raw, value=${{ matrix.variant.tag }}
 
       - name: Build and push 'soak-vector' image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
-          context: baseline-vector/
+          context: ${{matrix.variant.name}}-vector/
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
@@ -170,64 +198,25 @@ jobs:
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
 
-  build-comparison-image:
-    name: Build comparison 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, general]
-    needs: [compute-soak-meta]
-    steps:
-      - uses: actions/checkout@v2.4.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
-        with:
-          flavor: |
-            latest=false
-            prefix=
-            suffix=
-          images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
-
-      - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          file: soaks/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha, scope=${{ github.workflow }}
-          cache-to: type=gha, scope=${{ github.workflow }}
-
-  soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
+  soak:
+    name: Soak (${{ matrix.target }}) - ${{ matrix.variant.name }} - replica ${{ matrix.replica }}
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-baseline-image]
+    needs: [compute-soak-meta, compute-test-plan, build-image]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
-      - name: Run baseline experiment
+      - name: Run ${{ matrix.variant.name }} experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
-                                  --variant "baseline" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
+                                  --variant ${{ matrix.variant.name }} \
+                                  --tag ${{ matrix.variant.tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
@@ -237,44 +226,8 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
-
-      - name: Clear up unused images
-        run: |
-          minikube delete --all --purge
-          docker system prune --all --volumes --force
-
-  soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
-    if: ${{ github.actor != 'dependabot[bot]' }}
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-comparison-image]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - name: Run comparison experiment
-        run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --local-image "false" \
-                                  --variant "comparison" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
-                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
-                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
-                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
-
-      - name: Upload timing captures
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-${{ matrix.variant.name }}
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/${{ matrix.variant.name }}.captures
 
       - name: Clear up unused images
         run: |
@@ -287,8 +240,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -343,8 +295,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
