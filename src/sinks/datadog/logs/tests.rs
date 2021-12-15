@@ -16,8 +16,7 @@ use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use std::sync::Arc;
-use vector_core::event::Event;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -427,4 +426,28 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     assert_eq!(parts.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
     assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
+}
+
+#[tokio::test]
+#[cfg(feature = "datadog-logs-integration-tests")]
+async fn to_real_v2_endpoint() {
+    use crate::test_util::generate_lines_with_stream;
+    use vector_core::event::LogEvent;
+
+    let config = indoc! {r#"
+        default_api_key = "atoken"
+        compression = "none"
+    "#};
+    let api_key = std::env::var("CI_TEST_DATADOG_API_KEY")
+        .expect("couldn't find the Datatog api key in environment variables");
+    let config = config.replace("atoken", &api_key);
+    let (config, cx) = load_sink::<DatadogLogsConfig>(config.as_str()).unwrap();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let generator = |index| format!("this is a log with index {}", index);
+    let (expected, events) = generate_lines_with_stream(generator, 10, Some(batch));
+
+    let _ = sink.run(events).await.unwrap();
+    assert_eq!(receiver.await, BatchStatus::Delivered);
 }
