@@ -7,12 +7,12 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
 use std::task::{Context, Poll, Waker};
+use std::{pin::Pin, sync::atomic::AtomicU64};
 
 /// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>
@@ -36,10 +36,10 @@ where
     /// Events in batch.
     pub(crate) batch_size: usize,
     /// Max size of unread events in bytes.
-    pub(crate) max_size: usize,
+    pub(crate) max_size: u64,
     /// Size of unread events in bytes.
     /// Shared with Reader.
-    pub(crate) current_size: Arc<AtomicUsize>,
+    pub(crate) current_size: Arc<AtomicU64>,
     /// Buffer for internal use.
     pub(crate) slot: Option<T>,
     /// Buffer usage data.
@@ -136,7 +136,7 @@ where
     fn try_send(&mut self, event: T) -> Option<T> {
         let mut buffer: BytesMut = BytesMut::with_capacity(64);
         T::encode(event, &mut buffer).unwrap();
-        let event_size = buffer.len();
+        let event_size = buffer.len() as u64;
 
         if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
             > self.max_size
@@ -196,7 +196,7 @@ where
             //
             // We can't be picky at the moment so we will allow
             // for the buffer to exceed configured limit.
-            self.max_size = usize::MAX;
+            self.max_size = u64::MAX;
             assert!(self.try_send(event).is_none());
         }
 

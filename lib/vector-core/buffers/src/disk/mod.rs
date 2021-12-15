@@ -38,7 +38,7 @@ pub enum DataDirError {
 pub fn open<T>(
     data_dir: &Path,
     name: &str,
-    max_size: usize,
+    max_size: u64,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, super::Acker), DataDirError>
 where

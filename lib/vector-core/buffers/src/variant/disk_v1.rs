@@ -10,11 +10,11 @@ use crate::{disk::open, topology::builder::IntoBuffer, Acker, Bufferable};
 pub struct DiskV1Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: usize,
+    max_size: u64,
 }
 
 impl DiskV1Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: usize) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
         DiskV1Buffer {
             id,
             data_dir,

@@ -1,4 +1,4 @@
-[target.'cfg(feature = "cargo-clippy")']
+[target.'cfg(all)']
 rustflags = [
   "-Dclippy::print_stdout",
   "-Dclippy::print_stderr",

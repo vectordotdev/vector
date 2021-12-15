@@ -134,7 +134,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features 
 # Metrics
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.8.0", default-features = false }
-metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
+metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 
 # AWS - Rusoto
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
@@ -166,7 +166,7 @@ tower-layer = { version = "0.3.1", default-features = false }
 # Serde
 serde = { version = "1.0.131", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.73", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.11.0", default-features = false, features = ["macros"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
@@ -185,8 +185,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
+async-graphql = { version = "3.0.15", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.15", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -255,12 +255,12 @@ maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-mongodb = { version = "2.0.2", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
-once_cell = { version = "1.8", default-features = false }
+once_cell = { version = "1.9", default-features = false }
 openssl = { version = "0.10.36", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
@@ -285,6 +285,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
 syslog = { version = "6.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
+tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
@@ -319,7 +320,7 @@ approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.111"
+libc = "0.2.112"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
@@ -384,7 +385,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = []
+unix = ["tikv-jemallocator"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]

@@ -1,8 +1,9 @@
 //! # Disk Buffer v2: Sequential File I/O Boogaloo.
 //!
-//! This disk buffer implementation is a reimplementation of the LevelDB-based disk buffer code that
-//! already exists, but seeks to increase performance and reliability, while reducing the amount of
-//! external code and hard-to-expose tunables.
+//! This disk buffer implementation is a replace from the LevelDB-based disk buffer implementation,
+//! referred internal to `disk` or `disk_v1`.  It focuses on avoiding external C/C++ dependencies,
+//! as well as optimizing itself for the job at hand to provide more consistent in both throughput
+//! and latency.
 //!
 //! ## Design constraints
 //!
@@ -147,28 +148,22 @@ where
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
-        debug!("loading ledger");
         let ledger = Ledger::load_or_create(config, usage_handle)
             .await
             .context(LedgerError)?;
         let ledger = Arc::new(ledger);
-        debug!("ledger state after loading: {:?}", ledger.state());
 
-        debug!("creating writer");
         let mut writer = Writer::new(Arc::clone(&ledger));
         writer
             .validate_last_write()
             .await
             .context(WriterSeekFailed)?;
-        debug!("ledger state after writer validate: {:?}", ledger.state());
 
-        debug!("creating reader");
         let mut reader = Reader::new(Arc::clone(&ledger));
         reader
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;
-        debug!("ledger state after reader seek: {:?}", ledger.state());
 
         ledger.synchronize_buffer_usage();
 

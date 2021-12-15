@@ -64,15 +64,15 @@ pub async fn build_buffer(
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
             let (overflow_sender, overflow_receiver) =
-                TopologyBuilder::memory(capacity, overflow_mode).await;
+                TopologyBuilder::memory_v2(capacity, overflow_mode).await;
             let (mut base_sender, mut base_receiver) =
-                TopologyBuilder::memory(capacity, WhenFull::Overflow).await;
+                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow).await;
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => TopologyBuilder::memory(capacity, m).await,
+        m => TopologyBuilder::memory_v2(capacity, m).await,
     }
 }
 

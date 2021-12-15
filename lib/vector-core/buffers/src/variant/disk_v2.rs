@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use futures::{ready, Stream};
-use pin_project::{pin_project, pinned_drop};
+use pin_project::pin_project;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
@@ -14,16 +14,14 @@ use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
 use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{topology::builder::IntoBuffer, Acker, Bufferable};
 
-//const MAX_BUFFERED_ITEMS: usize = 128;
-
 pub struct DiskV2Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: usize,
+    max_size: u64,
 }
 
 impl DiskV2Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: usize) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
         Self {
             id,
             data_dir,
@@ -68,7 +66,7 @@ where
     }
 }
 
-#[pin_project(PinnedDrop)]
+#[pin_project]
 struct WrappedReader<T> {
     #[pin]
     reader: Option<Reader<T>>,
@@ -105,13 +103,6 @@ where
                 Some(reader) => this.read_future.set(make_read_future(Some(reader))),
             }
         }
-    }
-}
-
-#[pinned_drop]
-impl<T> PinnedDrop for WrappedReader<T> {
-    fn drop(self: Pin<&mut Self>) {
-        info!("dropping diskv2 wrapped reader");
     }
 }
 

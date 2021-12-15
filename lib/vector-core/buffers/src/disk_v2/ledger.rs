@@ -373,11 +373,6 @@ impl Ledger {
     /// Tracks the statistics of a successful write.
     pub fn track_write(&self, record_size: u64) {
         self.increment_total_buffer_size(record_size);
-
-        // A 4GB record should not be possible to write, at all.
-        let record_size = record_size
-            .try_into()
-            .expect("record size didn't fit into usize; is this a 32-bit platform?");
         self.usage_handle
             .increment_received_event_count_and_byte_size(1, record_size);
     }
@@ -385,11 +380,6 @@ impl Ledger {
     /// Tracks the statistics of multiple successful reads.
     pub fn track_reads(&self, record_len: u64, total_record_size: u64) {
         self.decrement_total_buffer_size(total_record_size);
-
-        // If we're acknowledgeing 4GB of records at a time, then uh... something weird is going on.
-        let total_record_size = total_record_size
-            .try_into()
-            .expect("total record size didn't fit into usize; is this a 32-bit platform?");
         self.usage_handle
             .increment_sent_event_count_and_byte_size(record_len, total_record_size);
     }
@@ -676,6 +666,10 @@ impl fmt::Debug for Ledger {
             .field("config", &self.config)
             .field("ledger_lock", &self.ledger_lock)
             .field("state", &self.state.get_archive_ref())
+            .field(
+                "total_buffer_size",
+                &self.total_buffer_size.load(Ordering::Acquire),
+            )
             .field("reader_notify", &self.reader_notify)
             .field("writer_notify", &self.writer_notify)
             .field("pending_acks", &self.pending_acks.load(Ordering::Acquire))

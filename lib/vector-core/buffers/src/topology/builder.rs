@@ -229,6 +229,44 @@ where
 
         (sender, receiver)
     }
+
+    /// Creates a memory-only buffer topology using the in-memory v2 buffer.
+    ///
+    /// This is specifically required for the tests that occur under `buffers`, as we assert things
+    /// like channel capacity left, which cannot be done on in-memory v1 buffers as they use the
+    /// more abstract `Sink`-based adapters.
+    ///
+    /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
+    /// values, but cannot be configured to use overflow mode.  If overflow mode is selected, it
+    /// will be changed to blocking mode.
+    ///
+    /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
+    /// can simplifying needing to require callers to do all the boilerplate to create the builder,
+    /// create the stage, installing buffer usage metrics that aren't required, and so on.
+    #[cfg(test)]
+    pub async fn memory_v2(
+        max_events: usize,
+        when_full: WhenFull,
+    ) -> (BufferSender<T>, BufferReceiver<T>) {
+        use crate::variant::MemoryV2Buffer;
+
+        let noop_usage_handle = BufferUsageHandle::noop();
+
+        let memory_buffer = Box::new(MemoryV2Buffer::new(max_events));
+        let (sender, receiver, _) = memory_buffer
+            .into_buffer_parts(noop_usage_handle)
+            .await
+            .expect("should not fail to directly create a memory buffer");
+
+        let mode = match when_full {
+            WhenFull::Overflow => WhenFull::Block,
+            m => m,
+        };
+        let sender = BufferSender::new(sender, mode);
+        let receiver = BufferReceiver::new(receiver);
+
+        (sender, receiver)
+    }
 }
 
 impl<T> Default for TopologyBuilder<T> {

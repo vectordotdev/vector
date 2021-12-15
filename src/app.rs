@@ -71,6 +71,7 @@ impl Application {
                     "runtime=trace".to_owned(),
                     "tokio=trace".to_owned(),
                     format!("rdkafka={}", level),
+                    format!("buffers={}", level),
                 ]
                 .join(","),
                 #[cfg(not(feature = "tokio-console"))]
