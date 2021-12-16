@@ -55,7 +55,7 @@ where
     ) -> Self {
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
         let tx = if let Some(ack_client) = ack_client {
-            let (tx, rx) = mpsc::channel(max_pending_acks as usize);
+            let (tx, rx) = mpsc::channel(128);
             tokio::spawn(run_acknowledgements(
                 rx,
                 ack_client,
