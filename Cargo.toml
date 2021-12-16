@@ -117,7 +117,7 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 async-stream = "0.3.2"
 async-trait = "0.1.52"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.13.1", default-features = false, features = ["full"] }
+tokio = { version = "1.15.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -186,7 +186,7 @@ smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.16", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.15", default-features = false, optional = true }
+async-graphql-warp = { version = "3.0.16", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -327,7 +327,7 @@ pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.6", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.2.0"
-tokio = { version = "1.13.0", features = ["test-util"] }
+tokio = { version = "1.15.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }

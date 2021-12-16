@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.15"
+version = "3.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0206a350172ea34012150b35eccd13fd2e3bdfc923965a0ed1604a9796a4334f"
+checksum = "6c031456570311c9f6125620329363dba3c8ca369debae3a0b5e0b11705ec7d9"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -7410,11 +7410,10 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e992e41e0d2fb9f755b37446f20900f64446ef54874f40a60c78f021ac6144"
+checksum = "fbbf1c778ec206785635ce8ad57fe52b3009ae9e0c9f574a728f3049d3e55838"
 dependencies = [
- "autocfg",
  "bytes 1.1.0",
  "libc",
  "memchr",
@@ -7452,9 +7451,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9efc1aba077437943f7515666aa2b882dfabfbfdf89c819ea75a8d6e9eaba5e"
+checksum = "b557f72f448c511a979e2564e55d74e6c4432fc96ff4f6241bc6bded342643b7"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
