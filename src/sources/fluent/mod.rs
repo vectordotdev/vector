@@ -179,7 +179,6 @@ impl FluentDecoder {
     ) -> Result<(), DecodeError> {
         match message {
             FluentMessage::Message(tag, timestamp, record) => {
-                debug!("FluentD decoder: Message (1 event)");
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
@@ -192,7 +191,6 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
-                debug!("FluentD decoder: MessageWithOptions (1 event)");
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
@@ -205,7 +203,6 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::Forward(tag, entries) => {
-                debug!("FluentD decoder: Forward ({} events)", entries.len());
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -222,10 +219,6 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::ForwardWithOptions(tag, entries, options) => {
-                debug!(
-                    "FluentD decoder: ForwardWithOptions ({} events)",
-                    entries.len()
-                );
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -246,9 +239,7 @@ impl FluentDecoder {
 
                 let mut decoder = FluentEntryStreamDecoder;
 
-                let mut count = 0;
                 while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    count += 1;
                     self.unread_frames.push_back((
                         FluentFrame {
                             tag: tag.clone(),
@@ -259,7 +250,6 @@ impl FluentDecoder {
                         byte_size,
                     ));
                 }
-                debug!("FluentD decoder: PackedForward ({} events)", count);
                 Ok(())
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
@@ -279,9 +269,7 @@ impl FluentDecoder {
 
                 let mut decoder = FluentEntryStreamDecoder;
 
-                let mut count = 0;
                 while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    count += 1;
                     self.unread_frames.push_back((
                         FluentFrame {
                             tag: tag.clone(),
@@ -292,10 +280,6 @@ impl FluentDecoder {
                         byte_size,
                     ));
                 }
-                debug!(
-                    "FluentD decoder: PackedForwardWithOptions ({} events)",
-                    count
-                );
                 Ok(())
             }
             FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(()),
