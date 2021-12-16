@@ -370,6 +370,7 @@ endif
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
+	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh datadog-agent stop
 	@scripts/setup_integration_env.sh datadog-agent start
