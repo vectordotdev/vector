@@ -23,8 +23,9 @@ data_dir = "/var/lib/vector"
 [sinks.es_cluster]
   inputs       = ["apache_sample"]            # only take sampled data
   type         = "elasticsearch"
-  host         = "http://79.12.221.222:9200"   # local or external host
-  index        = "vector-%Y-%m-%d"             # daily indices
+  endpoint         = "http://79.12.221.222:9200"   # local or external host
+  [sinks.es_cluster.bulk]
+    index        = "vector-%Y-%m-%d"             # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
