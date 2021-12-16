@@ -39,23 +39,51 @@ mod size_limits;
 #[macro_export]
 macro_rules! assert_buffer_is_empty {
     ($ledger:expr) => {
-        assert_eq!($ledger.state().get_total_records(), 0);
-        assert_eq!($ledger.state().get_total_buffer_size(), 0);
+        assert_eq!(
+            $ledger.get_total_records(),
+            0,
+            "ledger should have 0 records, but had {}",
+            $ledger.get_total_records()
+        );
+        assert_eq!(
+            $ledger.get_total_buffer_size(),
+            0,
+            "ledger should have 0 bytes, but had {} bytes",
+            $ledger.get_total_buffer_size()
+        );
     };
 }
 
 #[macro_export]
 macro_rules! assert_buffer_records {
     ($ledger:expr, $record_count:expr) => {
-        assert_eq!($ledger.state().get_total_records(), $record_count as u64);
+        assert_eq!(
+            $ledger.get_total_records(),
+            $record_count as u64,
+            "ledger should have {} records, but had {}",
+            $record_count,
+            $ledger.get_total_records()
+        );
     };
 }
 
 #[macro_export]
 macro_rules! assert_buffer_size {
     ($ledger:expr, $record_count:expr, $buffer_size:expr) => {
-        assert_eq!($ledger.state().get_total_records(), $record_count as u64);
-        assert_eq!($ledger.state().get_total_buffer_size(), $buffer_size as u64);
+        assert_eq!(
+            $ledger.get_total_records(),
+            $record_count as u64,
+            "ledger should have {} records, but had {}",
+            $record_count,
+            $ledger.get_total_records()
+        );
+        assert_eq!(
+            $ledger.get_total_buffer_size(),
+            $buffer_size as u64,
+            "ledger should have {} bytes, but had {} bytes",
+            $buffer_size,
+            $ledger.get_total_buffer_size()
+        );
     };
 }
 
@@ -63,8 +91,16 @@ macro_rules! assert_buffer_size {
 macro_rules! assert_reader_writer_file_positions {
     ($ledger:expr, $reader:expr, $writer:expr) => {{
         let (reader, writer) = $ledger.get_current_reader_writer_file_id();
-        assert_eq!(reader, $reader as u16);
-        assert_eq!(writer, $writer as u16);
+        assert_eq!(
+            reader, $reader as u16,
+            "expected reader file ID of {}, got {} instead",
+            $reader, reader
+        );
+        assert_eq!(
+            writer, $writer as u16,
+            "expected writer file ID of {}, got {} instead",
+            $writer, writer
+        );
     }};
 }
 
@@ -75,6 +111,31 @@ macro_rules! assert_enough_bytes_written {
             $written >= $record_payload_size as usize + 8 + std::mem::size_of::<$record_type>()
         );
     };
+}
+
+#[macro_export]
+macro_rules! assert_file_does_not_exist_async {
+    ($file_path:expr) => {{
+        let result = tokio::fs::metadata($file_path).await;
+        assert!(result.is_err());
+        assert_eq!(
+            std::io::ErrorKind::NotFound,
+            result.expect_err("is_err() was true").kind(),
+            "got unexpected error kind"
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! assert_file_exists_async {
+    ($file_path:expr) => {{
+        let result = tokio::fs::metadata($file_path).await;
+        assert!(result.is_ok());
+        assert!(
+            result.expect("is_ok() was true").is_file(),
+            "path exists but is not file"
+        );
+    }};
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

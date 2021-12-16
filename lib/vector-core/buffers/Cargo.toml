@@ -9,7 +9,7 @@ publish = false
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
 bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
-crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
+crc32fast = { version = "1.2.1", default-features = false }
 crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }

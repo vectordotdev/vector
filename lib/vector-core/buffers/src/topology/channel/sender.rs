@@ -191,6 +191,19 @@ impl<T> BufferSender<T> {
         }
     }
 
+    /// Converts this sender into an overflowing sender using the given `BufferSender<T>`.
+    ///
+    /// Note: this resets the internal state of this sender, and so this should not be called except
+    /// when initially constructing `BufferSender<T>`.
+    #[cfg(test)]
+    pub fn switch_to_overflow(&mut self, overflow: BufferSender<T>) {
+        self.overflow = Some(Box::new(overflow));
+        self.when_full = WhenFull::Overflow;
+        self.state = SendState::Idle;
+        self.base_flush = false;
+        self.overflow_flush = false;
+    }
+
     /// Configures this sender to instrument the items passing through it.
     pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);

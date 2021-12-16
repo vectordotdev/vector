@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use tokio::time::timeout;
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
@@ -58,7 +61,6 @@ async fn writer_error_when_record_is_over_the_limit() {
 #[tokio::test]
 async fn writer_waits_when_buffer_is_full() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -159,7 +161,7 @@ async fn writer_waits_when_buffer_is_full() {
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
             acker.ack(1);
-            while !deleted_first_data_file.try_assert() && !got_past_wait_for_waiter.try_assert() {
+            while !(deleted_first_data_file.try_assert() && got_past_wait_for_waiter.try_assert()) {
                 assert_pending!(second_record_read.poll());
             }
 
@@ -198,8 +200,7 @@ async fn writer_waits_when_buffer_is_full() {
     });
 
     let parent = trace_span!("writer_waits_when_buffer_is_full");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
@@ -234,6 +235,96 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_write_size);
 
             writer.flush().await.expect("flush should not fail");
+            assert_buffer_size!(ledger, 1, first_bytes_written);
+            assert_reader_writer_file_positions!(ledger, 0, 0);
+
+            // Second write should also always complete, but at this point, we should have rolled
+            // over to the next data file.
+            let second_record = SizedRecord(second_write_size);
+            let second_bytes_written = writer
+                .write_record(second_record)
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_write_size);
+
+            writer.flush().await.expect("flush should not fail");
+            writer.close();
+
+            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_reader_writer_file_positions!(ledger, 0, 1);
+
+            // Now read both records, make sure they are what we expect, etc.
+            let first_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
+            acker.ack(1);
+
+            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_reader_writer_file_positions!(ledger, 0, 1);
+
+            let second_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(second_record_read, Some(SizedRecord(second_write_size)));
+            acker.ack(1);
+
+            assert_buffer_size!(ledger, 1, second_bytes_written);
+            assert_reader_writer_file_positions!(ledger, 1, 1);
+
+            let final_empty_read = reader.next().await.expect("read should not fail");
+            assert_eq!(final_empty_read, None);
+
+            assert_buffer_is_empty!(ledger);
+            assert_reader_writer_file_positions!(ledger, 1, 1);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create our buffer with and arbitrarily low max buffer size, and two write sizes that
+            // will both fit just under the limit but will provide no chance for another write to
+            // fit.  This will trigger data file rollover when we attempt the second write.
+            //
+            // The sizes are different so that we can assert that we got back the expected record at
+            // each read we perform.
+            let (mut writer, _, _, ledger) =
+                create_buffer_with_max_data_file_size(data_dir.clone(), 100).await;
+            let first_write_size = 92;
+            let second_write_size = 96;
+
+            assert_buffer_is_empty!(ledger);
+            assert_reader_writer_file_positions!(ledger, 0, 0);
+
+            // First write should always complete because we haven't written anything yet, so we
+            // haven't exceed our total buffer size limit yet, or the size limit of the data file
+            // itself.  We do need this write to be big enough to exceed the max data file limit,
+            // though.
+            let first_record = SizedRecord(first_write_size);
+            let first_bytes_written = writer
+                .write_record(first_record)
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_write_size);
+
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_size!(ledger, 1, first_bytes_written);
+            assert_reader_writer_file_positions!(ledger, 0, 0);
+
+            // Now drop the original reader/writer and reload it.  We want to make sure that when
+            // the current writer data file is at or over the limit, the writer can correctly
+            // determine whether or not it should simply move to the next file ID or if it actually
+            // needs to wait for the reader.
+            drop(writer);
+            drop(ledger);
+
+            let open_wait = Duration::from_secs(5);
+            let second_buffer_open = create_buffer_with_max_data_file_size(data_dir, 100);
+            let (mut writer, mut reader, acker, ledger) = timeout(open_wait, second_buffer_open)
+                .await
+                .expect("failed to open buffer a second time in the expected timeframe");
             assert_buffer_size!(ledger, 1, first_bytes_written);
             assert_reader_writer_file_positions!(ledger, 0, 0);
 

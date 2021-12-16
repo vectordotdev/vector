@@ -1,9 +1,5 @@
-#![allow(clippy::print_stderr)] // soak framework
-#![allow(clippy::print_stdout)]
-// Clippy allows are because this is an example/soak-y test, where we don't
-// actually care about the presence of `println!` calls.
 use std::path::PathBuf;
-use std::{error, fmt};
+use std::{cmp, error, fmt};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -24,7 +20,8 @@ use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::task;
 use tokio::{select, sync::oneshot, time};
-use tracing::Span;
+use tracing::{debug, info, Span};
+use tracing_subscriber::EnvFilter;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariableMessage {
@@ -110,7 +107,8 @@ impl error::Error for DecodeError {}
 
 struct Configuration {
     buffer_type: String,
-    total_records: usize,
+    read_total_records: usize,
+    write_total_records: usize,
     write_batch_size: usize,
     min_record_size: usize,
     max_record_size: usize,
@@ -129,10 +127,15 @@ impl Configuration {
                     .default_value("disk-v2"),
             )
             .arg(
-                Arg::with_name("total_records")
-                    .help("Sets the total number of records that should be written and read")
-                    .short("c")
-                    .long("total-records")
+                Arg::with_name("read_total_records")
+                    .help("Sets the total number of records that should be read")
+                    .long("read-total-records")
+                    .default_value("10000000"),
+            )
+            .arg(
+                Arg::with_name("write_total_records")
+                    .help("Sets the total number of records that should be write")
+                    .long("write-total-records")
                     .default_value("10000000"),
             )
             .arg(
@@ -160,10 +163,16 @@ impl Configuration {
             .value_of("buffer_type")
             .map(|s| s.to_string())
             .expect("default value for buffer_type should always be present");
-        let total_records = matches
-            .value_of("total_records")
+        let read_total_records = matches
+            .value_of("read_total_records")
             .map(Ok)
-            .expect("default value for total_records should always be present")
+            .expect("default value for read_total_records should always be present")
+            .and_then(|s| s.parse::<usize>())
+            .map_err(|e| e.to_string())?;
+        let write_total_records = matches
+            .value_of("write_total_records")
+            .map(Ok)
+            .expect("default value for write_total_records should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let write_batch_size = matches
@@ -187,7 +196,8 @@ impl Configuration {
 
         Ok(Configuration {
             buffer_type,
-            total_records,
+            read_total_records,
+            write_total_records,
             write_batch_size,
             min_record_size,
             max_record_size,
@@ -221,7 +231,7 @@ where
 
     let variant = match buffer_type {
         "in-memory-v1" => {
-            println!(
+            info!(
                 "[buffer-perf] creating in-memory v1 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
@@ -231,7 +241,7 @@ where
             }
         }
         "in-memory-v2" => {
-            println!(
+            info!(
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
@@ -241,7 +251,7 @@ where
             }
         }
         "disk-v1" => {
-            println!(
+            info!(
                 "[buffer-perf] creating disk v1 buffer with max_size={}, in blocking mode",
                 max_size_bytes
             );
@@ -251,7 +261,7 @@ where
             }
         }
         "disk-v2" => {
-            println!(
+            info!(
                 "[buffer-perf] creating disk v2 buffer with max_size={}, in blocking mode",
                 max_size_bytes
             );
@@ -278,17 +288,22 @@ where
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
     let config = Configuration::from_cli().expect("reading config parameters failed");
 
-    let total_records = config.total_records;
+    let read_total_records = config.read_total_records;
+    let write_total_records = config.write_total_records;
     let write_batch_size = config.write_batch_size;
-    println!(
-        "[buffer-perf] going to write and read {} record(s), with a write batch size of {} record(s)",
-        total_records, write_batch_size
+    debug!(
+        "[buffer-perf] going to write {} records, with a write batch size of {} record(s), and read {} records",
+        write_total_records, write_batch_size, read_total_records
     );
 
     let record_cache = generate_record_cache(config.min_record_size, config.max_record_size);
-    println!(
+    info!(
         "[buffer-perf] generated record cache ({} records, {}-{} bytes)",
         record_cache.len(),
         config.min_record_size,
@@ -302,7 +317,7 @@ async fn main() {
     let reader_position = Arc::clone(&read_position);
 
     let start = Instant::now();
-    println!(
+    info!(
         "[buffer-perf] {:?}s: creating buffer...",
         start.elapsed().as_secs()
     );
@@ -311,38 +326,41 @@ async fn main() {
     let (mut writer, mut reader, acker) = generate_buffer(config.buffer_type.as_str()).await;
     let buffer_delta = buffer_start.elapsed();
 
-    println!(
+    info!(
         "[buffer-perf] {:?}s: created/loaded buffer in {:?}",
         start.elapsed().as_secs(),
         buffer_delta
     );
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
-    tokio::spawn(async move {
+    let writer_task = async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle().cloned();
 
-        let mut remaining = total_records;
+        let mut remaining = write_total_records;
         while remaining > 0 {
             let tx_start = Instant::now();
 
-            match write_batch_size {
+            let records_written = match write_batch_size {
                 0 => unreachable!(),
                 1 => {
                     let record = records.next().expect("should never be empty");
                     writer.send(record).await.expect("failed to write record");
+                    1
                 }
                 n => {
-                    let mut record_chunk = (&mut records).take(n).map(Ok);
+                    let count = cmp::min(n, remaining);
+                    let mut record_chunk = (&mut records).take(count).map(Ok);
                     let mut record_chunk_iter = stream::iter(&mut record_chunk);
                     writer
                         .send_all(&mut record_chunk_iter)
                         .await
                         .expect("failed to write record");
+                    count
                 }
-            }
+            };
 
-            remaining -= write_batch_size;
+            remaining -= records_written;
 
             task::yield_now().await;
 
@@ -351,22 +369,28 @@ async fn main() {
             let elapsed = tx_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(write_batch_size, Ordering::Relaxed);
+            writer_position.fetch_add(records_written, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
         writer_tx.send(tx_histo).expect("should not fail");
-    });
+    };
+    tokio::spawn(writer_task);
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
-    tokio::spawn(async move {
+    let reader_task = async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
-        for _ in 0..total_records {
+        for _ in 0..read_total_records {
             let rx_start = Instant::now();
 
-            let _record = reader.next().await.expect("read should not fail");
-            acker.ack(1);
+            match reader.next().await {
+                Some(_) => acker.ack(1),
+                None => {
+                    info!("[buffer-perf] reader hit end of buffer, closing...");
+                    break;
+                }
+            }
 
             let elapsed = rx_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
@@ -375,7 +399,8 @@ async fn main() {
         }
 
         reader_tx.send(rx_histo).expect("should not fail");
-    });
+    };
+    tokio::spawn(reader_task);
 
     // Now let the tasks run, occasionally emitting metrics about their progress, while waiting for
     // them to complete.
@@ -388,14 +413,14 @@ async fn main() {
             result = &mut writer_rx, if writer_result.is_none() => match result {
                 Ok(result) => {
                     writer_result = Some(result);
-                    println!("[buffer-perf] {:?}s: writer finished", start.elapsed().as_secs());
+                    info!("[buffer-perf] {:?}s: writer finished", start.elapsed().as_secs());
                 },
                 Err(_) => panic!("[buffer-perf] writer task failed unexpectedly!"),
             },
             result = &mut reader_rx, if reader_result.is_none() => match result {
                 Ok(result) => {
                     reader_result = Some(result);
-                    println!("[buffer-perf] {:?}s: reader finished", start.elapsed().as_secs());
+                    info!("[buffer-perf] {:?}s: reader finished", start.elapsed().as_secs());
                 },
                 Err(_) => panic!("[buffer-perf] reader task failed unexpectedly!"),
             },
@@ -404,7 +429,7 @@ async fn main() {
                 let write_pos = write_position.load(Ordering::Relaxed);
                 let read_pos = read_position.load(Ordering::Relaxed);
 
-                println!("[buffer-perf] {:?}s: writer pos = {:11}, reader pos = {:11}", elapsed.as_secs(), write_pos, read_pos);
+                info!("[buffer-perf] {:?}s: writer pos = {:11}, reader pos = {:11}", elapsed.as_secs(), write_pos, read_pos);
             },
             else => break,
         }
@@ -412,39 +437,41 @@ async fn main() {
 
     // Now dump out all of our summary statistics.
     let total_time = start.elapsed();
+    let read_pos = read_position.load(Ordering::Relaxed);
+    let write_pos = write_position.load(Ordering::Relaxed);
 
-    println!(
-        "[buffer-perf] writer and reader done: {} records written and read in {:?}",
-        total_records, total_time
+    info!(
+        "[buffer-perf] writer and reader done: {} records written and {} records read in {:?}",
+        write_pos, read_pos, total_time
     );
 
-    println!("[buffer-perf] writer summary:");
+    info!("[buffer-perf] writer summary:");
 
     let writer_histo = writer_result.unwrap();
-    let rps = write_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
+    let write_rps = write_pos as f64 / total_time.as_secs_f64();
 
-    println!("  -> records per second: {}", rps as u64);
-    println!("  -> tx latency histo:");
-    println!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
+    info!("  -> records per second: {}", write_rps as u64);
+    info!("  -> tx latency histo:");
+    info!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = writer_histo.value_at_quantile(*q);
-        println!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
     }
-    println!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
+    info!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
 
-    println!("[buffer-perf] reader summary:");
+    info!("[buffer-perf] reader summary:");
 
     let reader_histo = reader_result.unwrap();
-    let rps = read_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
+    let read_rps = read_pos as f64 / total_time.as_secs_f64();
 
-    println!("  -> records per second: {}", rps as u64);
-    println!("  -> rx latency histo:");
-    println!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
+    info!("  -> records per second: {}", read_rps as u64);
+    info!("  -> rx latency histo:");
+    info!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = reader_histo.value_at_quantile(*q);
-        println!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
     }
-    println!("       q=max -> {:?}", nanos_to_dur(reader_histo.max()));
+    info!("       q=max -> {:?}", nanos_to_dur(reader_histo.max()));
 }
 
 fn nanos_to_dur(nanos: u64) -> Duration {

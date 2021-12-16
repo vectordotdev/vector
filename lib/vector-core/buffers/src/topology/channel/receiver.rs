@@ -102,6 +102,15 @@ impl<T> BufferReceiver<T> {
         }
     }
 
+    /// Converts this receiver into an overflowing receiver using the given `BufferSender<T>`.
+    ///
+    /// Note: this resets the internal state of this sender, and so this should not be called except
+    /// when initially constructing `BufferSender<T>`.
+    #[cfg(test)]
+    pub fn switch_to_overflow(&mut self, overflow: BufferReceiver<T>) {
+        self.overflow = Some(Box::new(overflow));
+    }
+
     /// Configures this receiver to instrument the items passing through it.
     pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);

@@ -1,8 +1,9 @@
 //! # Disk Buffer v2: Sequential File I/O Boogaloo.
 //!
-//! This disk buffer implementation is a reimplementation of the LevelDB-based disk buffer code that
-//! already exists, but seeks to increase performance and reliability, while reducing the amount of
-//! external code and hard-to-expose tunables.
+//! This disk buffer implementation is a replace from the LevelDB-based disk buffer implementation,
+//! referred internal to `disk` or `disk_v1`.  It focuses on avoiding external C/C++ dependencies,
+//! as well as optimizing itself for the job at hand to provide more consistent in both throughput
+//! and latency.
 //!
 //! ## Design constraints
 //!
@@ -163,6 +164,8 @@ where
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;
+
+        ledger.synchronize_buffer_usage();
 
         let acker = create_disk_v2_acker(Arc::clone(&ledger));
 

@@ -175,4 +175,6 @@ where
             error!("failed to flush the buffer: {}", e);
         }
     }
+
+    trace!("diskv2 writer task finished");
 }
