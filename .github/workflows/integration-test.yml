@@ -60,8 +60,6 @@ jobs:
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
-            env:
-              CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           - test: 'docker-logs'
           - test: 'elasticsearch'
           - test: 'eventstoredb_metrics'
@@ -94,7 +92,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-${{ matrix.test }}
-        env: ${{ matrix.env }}
+        env:
+          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
 
   test-integration-check:
     name: test-integration-check
