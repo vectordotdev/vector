@@ -236,9 +236,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.15"
+version = "3.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5dda87d4742c67d2a6df36e0a0de94d315baf761a2404ea46f57314539151e"
+checksum = "c6348b26dec6d7a0ca7cd970bc64529d4c9a4e2ce4b9c805c0106fabb1b1b7dd"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.15"
+version = "3.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0206a350172ea34012150b35eccd13fd2e3bdfc923965a0ed1604a9796a4334f"
+checksum = "6c031456570311c9f6125620329363dba3c8ca369debae3a0b5e0b11705ec7d9"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -6414,9 +6414,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.131"
+version = "1.0.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ad69dfbd3e45369132cc64e6748c2d65cdfb001a2b1c232d128b4ad60561c1"
+checksum = "8b9875c23cf305cd1fd7eb77234cbb705f21ea6a72c637a5c6db5fe4b8e7f008"
 dependencies = [
  "serde_derive",
 ]
@@ -6473,9 +6473,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.131"
+version = "1.0.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b710a83c4e0dff6a3d511946b95274ad9ca9e5d3ae497b63fda866ac955358d2"
+checksum = "ecc0db5cb2556c0e558887d9bbdcf6ac4471e83ff66cf696e5419024d1606276"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
