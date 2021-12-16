@@ -1052,10 +1052,10 @@ mod integration_tests {
         image::{CreateImageOptions, ListImagesOptions},
     };
     use futures::{stream::TryStreamExt, FutureExt};
-    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{
+        pipeline::ReceiverStream,
         test_util::{collect_n, collect_ready, trace_init},
         Pipeline,
     };

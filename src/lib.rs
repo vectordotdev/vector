@@ -56,7 +56,7 @@ pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub(crate) mod pipeline;
+pub mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;

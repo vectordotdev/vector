@@ -144,8 +144,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-        let pipeline = Pipeline::from_sender(tx);
+        let (pipeline, mut rx) = Pipeline::new_with_buffer(1000);
 
         let typetag = source.inner.source_type();
 
@@ -168,9 +167,10 @@ pub async fn build_pieces(
 
         let (mut output, control) = Fanout::new();
         let pump = async move {
-            while let Some(event) = rx.recv().await {
-                output.feed(event).await?
+            while let Some(event) = rx.next().await {
+                output.feed(event).await?;
             }
+            output.flush().await?;
             Ok(TaskOutput::Source)
         };
         let pump = Task::new(key.clone(), typetag, pump);
