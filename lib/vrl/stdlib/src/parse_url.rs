@@ -62,6 +62,19 @@ impl Function for ParseUrl {
         ]
     }
 
+    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        let string = value.try_bytes_utf8_lossy()?;
+        let default_known_ports = arguments
+            .optional("default_known_ports")
+            .map(|val| val.as_boolean().unwrap_or(false))
+            .unwrap_or(false);
+
+        Url::parse(&string)
+            .map_err(|e| format!("unable to parse url: {}", e).into())
+            .map(|url| url_to_value(url, default_known_ports))
+    }
+
     fn compile(
         &self,
         _state: &state::Compiler,
