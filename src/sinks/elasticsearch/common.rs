@@ -105,9 +105,8 @@ impl ElasticSearchCommon {
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
-        let mut config = config.clone();
-        let mut request = config.request;
-        request.add_old_option(config.headers.take());
+        let config = config.clone();
+        let request = config.request;
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(

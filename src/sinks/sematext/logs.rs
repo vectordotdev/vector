@@ -1,5 +1,5 @@
 use super::Region;
-use crate::sinks::elasticsearch::ElasticSearchEncoder;
+use crate::sinks::elasticsearch::{BulkConfig, ElasticSearchEncoder};
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, StreamSink};
 use crate::{
@@ -67,7 +67,10 @@ impl SinkConfig for SematextLogsConfig {
             endpoint,
             compression: Compression::None,
             doc_type: Some("logs".to_string()),
-            index: Some(self.token.clone()),
+            bulk: Some(BulkConfig {
+                action: None,
+                index: Some(self.token.clone()),
+            }),
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,
