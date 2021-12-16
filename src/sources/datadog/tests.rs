@@ -26,5 +26,11 @@ async fn wait_for_message() {
         2,
     )
     .await;
-    assert!(!events.is_empty());
+    assert_eq!(events.len(), 2);
+    let event = events.get(0).unwrap().as_log();
+    let msg = event.get("message").unwrap().as_bytes();
+    assert_eq!(msg, "hello world");
+    let event = events.get(1).unwrap().as_log();
+    let msg = event.get("message").unwrap().as_bytes();
+    assert_eq!(msg, "it's vector speaking");
 }
