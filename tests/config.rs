@@ -768,7 +768,7 @@ async fn parses_sink_full_es_basic_auth() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://localhost"
+        endpoint = "https://localhost"
 
         [sinks.out.auth]
         strategy = "basic"
@@ -792,7 +792,7 @@ async fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://es.us-east-1.amazonaws.com"
+        endpoint = "https://es.us-east-1.amazonaws.com"
 
         [sinks.out.auth]
         strategy = "aws"
