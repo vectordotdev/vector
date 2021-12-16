@@ -91,6 +91,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-${{ matrix.test }}
+        env:
+          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
 
   test-integration-check:
     name: test-integration-check
