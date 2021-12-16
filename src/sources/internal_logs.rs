@@ -93,11 +93,10 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use tokio::time::{sleep, Duration};
-    use tokio_stream::wrappers::ReceiverStream;
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, test_util::collect_ready, trace};
+    use crate::{event::Event, pipeline::ReceiverStream, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {

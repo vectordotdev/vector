@@ -24,7 +24,6 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use tokio_stream::wrappers::ReceiverStream;
 use tracing::{error, info};
 use vector::{
     config::{
@@ -35,11 +34,11 @@ use vector::{
         metric::{self, MetricData, MetricValue},
         Event, Value,
     },
+    pipeline::{Pipeline, ReceiverStream},
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
-    Pipeline,
 };
 use vector_core::buffers::Acker;
 

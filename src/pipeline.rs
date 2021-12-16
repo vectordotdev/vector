@@ -1,8 +1,12 @@
-use std::{collections::VecDeque, fmt};
+use std::{fmt, pin::Pin};
 
-use futures::{stream, Stream, StreamExt};
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
+use futures::{
+    channel::mpsc,
+    stream,
+    task::{Context, Poll},
+    SinkExt, Stream, StreamExt,
+};
+use pin_project::pin_project;
 #[cfg(test)]
 use vector_core::event::EventStatus;
 use vector_core::{event::Event, internal_event::EventsSent, ByteSizeOf};
@@ -20,8 +24,8 @@ impl fmt::Display for ClosedError {
 
 impl std::error::Error for ClosedError {}
 
-impl From<mpsc::error::SendError<Event>> for ClosedError {
-    fn from(_: mpsc::error::SendError<Event>) -> Self {
+impl From<mpsc::SendError> for ClosedError {
+    fn from(_: mpsc::SendError) -> Self {
         Self
     }
 }
@@ -50,7 +54,6 @@ impl<E> std::error::Error for StreamSendError<E> where E: std::error::Error {}
 #[derivative(Debug)]
 pub struct Pipeline {
     inner: mpsc::Sender<Event>,
-    enqueued: VecDeque<Event>,
 }
 
 impl Pipeline {
@@ -145,12 +148,37 @@ impl Pipeline {
         (Self::from_sender(tx), ReceiverStream::new(rx))
     }
 
-    pub fn from_sender(inner: mpsc::Sender<Event>) -> Self {
-        Self {
-            inner,
-            // We ensure the buffer is sufficient that it is unlikely to require reallocations.
-            // There is a possibility a component might blow this queue size.
-            enqueued: VecDeque::with_capacity(10),
-        }
+    pub const fn from_sender(inner: mpsc::Sender<Event>) -> Self {
+        Self { inner }
+    }
+}
+
+#[pin_project]
+#[derive(Debug)]
+pub struct ReceiverStream<T> {
+    #[pin]
+    inner: mpsc::Receiver<T>,
+}
+
+impl<T> ReceiverStream<T> {
+    fn new(inner: mpsc::Receiver<T>) -> Self {
+        Self { inner }
+    }
+
+    pub fn close(&mut self) {
+        self.inner.close()
+    }
+}
+
+impl<T> Stream for ReceiverStream<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        this.inner.poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }

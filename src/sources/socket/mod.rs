@@ -233,11 +233,12 @@ mod test {
             net::{UnixDatagram, UnixStream},
             task::yield_now,
         },
-        tokio_stream::wrappers::ReceiverStream,
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    #[cfg(unix)]
+    use crate::pipeline::ReceiverStream;
     use crate::{
         codecs::NewlineDelimitedDecoderConfig,
         config::{

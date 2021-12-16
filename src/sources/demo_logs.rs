@@ -252,10 +252,12 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use futures::{poll, StreamExt};
-    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, Pipeline};
+    use crate::{
+        config::log_schema, event::Event, pipeline::ReceiverStream, shutdown::ShutdownSignal,
+        Pipeline,
+    };
 
     #[test]
     fn generate_config() {
