@@ -44,12 +44,23 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[self.args.len() - pos - 1]
-            .take()
-            .unwrap()
-            .as_value()
+        self.values[pos].take().unwrap().as_value()
     }
 
+    /// Returns the parameter with the given name.
+    /// Note the this can only be called once per parameter since the value is
+    /// removed from the list.
+    pub fn optional(&mut self, name: &str) -> Option<Value> {
+        // Get the position the given argument is found in the parameter stack.
+        let pos = self
+            .args
+            .iter()
+            .position(|param| param.keyword == name)
+            .expect("parameter doesn't exist");
+
+        // Return the parameter found at this position.
+        self.values[pos].take().map(|v| v.as_value())
+    }
     /// Returns the parameter with the given name.
     /// Note the this can only be called once per parameter since the value is
     /// removed from the list.
@@ -62,9 +73,6 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[self.args.len() - pos - 1]
-            .take()
-            .unwrap()
-            .as_any()
+        self.values[pos].take().unwrap().as_any()
     }
 }

@@ -4,10 +4,8 @@ use datadog_grok::{
 };
 use std::collections::BTreeMap;
 use std::fmt;
-use vrl::{
-    diagnostic::{Label, Span},
-    prelude::*,
-};
+use vrl::diagnostic::{Label, Span};
+use vrl::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -100,6 +98,90 @@ impl Function for ParseGroks {
                 }
             "#}),
         }]
+    }
+
+    fn compile_argument(
+        &self,
+        args: &[(&'static str, Option<FunctionArgument>)],
+        name: &str,
+        expr: &expression::Expr,
+    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        if name == "patterns" {
+            let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                if *name == "aliases" {
+                    arg.as_ref()
+                } else {
+                    None
+                }
+            });
+
+            let patterns = expr.as_value().unwrap();
+            let patterns = patterns
+                .try_array()
+                .unwrap()
+                .into_iter()
+                .map(|value| {
+                    let pattern = value
+                        .try_bytes_utf8_lossy()
+                        .expect("grok pattern not bytes")
+                        .into_owned();
+                    Ok(pattern)
+                })
+                .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()
+                .unwrap();
+
+            let aliases = aliases
+                .map(|aliases| {
+                    aliases
+                        .to_value()
+                        .unwrap()
+                        .try_object()
+                        .unwrap()
+                        .into_iter()
+                        .map(|(key, expr)| {
+                            let alias = expr
+                                .try_bytes_utf8_lossy()
+                                .expect("should be a string")
+                                .into_owned();
+                            Ok((key, alias))
+                        })
+                    .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>().unwrap()
+                })
+                .unwrap_or_default();
+
+            // we use a datadog library here because it is a superset of grok
+            let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
+                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)
+                .unwrap();
+
+            Some(Box::new(grok_rules) as _)
+        } else {
+            None
+        }
+    }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        let bytes = value.try_bytes_utf8_lossy()?;
+
+        let remove_empty = args
+            .optional("remove_empty")
+            .map(|v| v.as_boolean().unwrap_or(false))
+            .unwrap_or(false);
+
+        let grok_rules = args
+            .required_any("patterns")
+            .downcast_ref::<Vec<GrokRule>>()
+            .unwrap();
+
+        let v = parse_grok::parse_grok(bytes.as_ref(), grok_rules, remove_empty)
+            .map_err(|e| format!("unable to parse grok: {}", e.to_string()))?;
+
+        Ok(v)
     }
 
     fn compile(

@@ -74,6 +74,7 @@ impl Function for MatchDatadogQuery {
 
     fn compile_argument(
         &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
         expr: &expression::Expr,
     ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
@@ -111,7 +112,7 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    fn call(&self, arguments: &mut VmArgumentList) -> Resolved {
+    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
         let filter = arguments
             .required_any("query")

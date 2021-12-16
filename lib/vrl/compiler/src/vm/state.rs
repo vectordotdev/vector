@@ -24,7 +24,7 @@ impl<'a> VmState<'a> {
         self.ip += 1;
         match byte {
             Instruction::OpCode(opcode) => opcode,
-            _ => panic!("Expecting opcode"),
+            _ => panic!("Expecting opcode at {}", self.ip - 1),
         }
     }
 

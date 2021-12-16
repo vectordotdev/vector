@@ -211,37 +211,44 @@ impl FunctionCall {
         &self,
         function: &Box<dyn Function + Send + Sync>,
     ) -> Vec<(&'static str, Option<FunctionArgument>)> {
-        let mut params = function.parameters().iter().collect::<Vec<_>>();
+        let params = function.parameters().iter().collect::<Vec<_>>();
         let mut result = params
             .iter()
             .map(|param| (param.keyword, None))
             .collect::<Vec<_>>();
-        let mut displaced = 0;
 
-        for (idx, param) in self.arguments.iter().enumerate() {
+        let mut unnamed = Vec::new();
+
+        // Position all the named parameters, keeping track of all the unnamed for later.
+        for param in self.arguments.iter() {
             match param.keyword() {
-                None => {
-                    // A keywordless parameter depends on the position, taking into account the
-                    // position that has been displaced by any named parameters.
-                    result[idx + displaced] = (
-                        params[idx + displaced].keyword,
-                        Some(param.clone().take().1),
-                    )
+                None => unnamed.push(param.clone().take().1),
+                Some(keyword) => {
+                    match params.iter().position(|param| param.keyword == keyword) {
+                        None => {
+                            // The parameter was not found in the list.
+                            todo!()
+                        }
+                        Some(pos) => {
+                            result[pos].1 = Some(param.clone().take().1);
+                        }
+                    }
                 }
-                Some(keyword) => match params.iter().position(|param| param.keyword == keyword) {
-                    None => {
-                        // The parameter was not found in the list.
-                        todo!()
-                    }
-                    Some(pos) => {
-                        result[pos] = (
-                            params[idx + displaced].keyword,
-                            Some(param.clone().take().1),
-                        );
-                        displaced += 1;
-                    }
-                },
             }
+        }
+
+        // Position all the remaining unnamed parameters
+        let mut pos = 0;
+        for param in unnamed {
+            while result[pos].1.is_some() {
+                pos += 1;
+            }
+
+            if pos > result.len() {
+                todo!("return proper errors")
+            }
+
+            result[pos].1 = Some(param);
         }
 
         result
@@ -368,7 +375,7 @@ impl Expression for FunctionCall {
             None => Err(format!("Function {} not found.", self.function_id))?,
         };
 
-        for (keyword, argument) in args {
+        for (keyword, argument) in &args {
             match argument {
                 Some(argument) => {
                     // We can unwrap here because we have already returned with an Err if
@@ -376,12 +383,12 @@ impl Expression for FunctionCall {
                     // We can't reuse the previous call to `function` since that lands us with a
                     // bunch of borrow errors.
                     let fun = vm.function(self.function_id).unwrap();
-                    match fun.compile_argument(keyword, argument.inner()) {
+                    match fun.compile_argument(&args, keyword, argument.inner()) {
                         Some(stat) => {
                             // The function has compiled this argument as a static
                             let stat = vm.add_static(stat);
-                            vm.write_primitive(stat);
                             vm.write_chunk(crate::vm::OpCode::MoveStatic);
+                            vm.write_primitive(stat);
                         }
                         None => {
                             argument.inner().dump(vm)?;
@@ -750,5 +757,188 @@ impl DiagnosticError for Error {
 
             _ => vec![],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        expression::{Expr, Literal},
+        value::kind,
+    };
+
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    struct Fn;
+
+    impl Expression for Fn {
+        fn resolve(&self, _ctx: &mut Context) -> Resolved {
+            todo!()
+        }
+
+        fn type_def(&self, _state: &crate::State) -> TypeDef {
+            TypeDef::new().infallible()
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestFn;
+
+    impl Function for TestFn {
+        fn identifier(&self) -> &'static str {
+            "test"
+        }
+
+        fn examples(&self) -> &'static [crate::function::Example] {
+            &[]
+        }
+
+        fn parameters(&self) -> &'static [Parameter] {
+            &[
+                Parameter {
+                    keyword: "one",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+                Parameter {
+                    keyword: "two",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+                Parameter {
+                    keyword: "three",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+            ]
+        }
+
+        fn compile(
+            &self,
+            _state: &crate::State,
+            _info: &FunctionCompileContext,
+            _arguments: ArgumentList,
+        ) -> crate::function::Compiled {
+            Ok(Box::new(Fn))
+        }
+    }
+
+    fn create_node<T>(inner: T) -> Node<T> {
+        Node::new(Span::new(0, 0), inner)
+    }
+
+    fn create_argument(ident: Option<&str>, value: i64) -> FunctionArgument {
+        FunctionArgument::new(
+            ident.map(|ident| create_node(Ident::new(ident))),
+            Node::new(Span::new(0, 0), Expr::Literal(Literal::Integer(value))),
+        )
+    }
+
+    fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
+        FunctionCall::new(
+            Span::new(0, 0),
+            Node::new(Span::new(0, 0), Ident::new("test")),
+            false,
+            arguments,
+            &vec![Box::new(TestFn) as _],
+            &mut Default::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn resolve_arguments_simple() {
+        let call = create_function_call(vec![
+            create_node(create_argument(None, 1)),
+            create_node(create_argument(None, 2)),
+            create_node(create_argument(None, 3)),
+        ]);
+
+        let fun = Box::new(TestFn) as _;
+        let params = call.resolve_arguments(&fun);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(None, 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(None, 3))),
+        ];
+
+        assert_eq!(expected, params);
+    }
+
+    #[test]
+    fn resolve_arguments_named() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("one"), 1)),
+            create_node(create_argument(Some("two"), 2)),
+            create_node(create_argument(Some("three"), 3)),
+        ]);
+
+        let fun = Box::new(TestFn) as _;
+        let params = call.resolve_arguments(&fun);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(Some("two"), 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(expected, params);
+    }
+
+    #[test]
+    fn resolve_arguments_named_unordered() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(Some("two"), 2)),
+            create_node(create_argument(Some("one"), 1)),
+        ]);
+
+        let fun = Box::new(TestFn) as _;
+        let params = call.resolve_arguments(&fun);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(Some("two"), 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(expected, params);
+    }
+
+    #[test]
+    fn resolve_arguments_unnamed_unordered_one() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(None, 2)),
+            create_node(create_argument(Some("one"), 1)),
+        ]);
+
+        let fun = Box::new(TestFn) as _;
+        let params = call.resolve_arguments(&fun);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(expected, params);
+    }
+
+    #[test]
+    fn resolve_arguments_unnamed_unordered_two() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(None, 1)),
+            create_node(create_argument(None, 2)),
+        ]);
+
+        let fun = Box::new(TestFn) as _;
+        let params = call.resolve_arguments(&fun);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(None, 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(expected, params);
     }
 }

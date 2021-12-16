@@ -128,6 +128,20 @@ impl Expr {
             Abort(..) => "abort operation",
         }
     }
+
+    pub fn to_value(&self) -> Option<Value> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => Some(v.to_value()),
+            Variable(v) if v.value().is_some() => match v.value().unwrap().clone().into_expr() {
+                Literal(literal) => Some(literal.to_value()),
+                _expr => None,
+            },
+            Container(v) => v.as_value(),
+            _ => None,
+        }
+    }
 }
 
 impl Expression for Expr {

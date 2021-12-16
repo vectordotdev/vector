@@ -28,8 +28,8 @@ pub use compiler::function::{ArgumentList, Compiled, Example, FunctionCompileCon
 
 // commonly used macros
 pub use compiler::{
-    bench_function, expr, func_args, map, test_function, test_type_def, type_def, value,
-    vm::VmArgumentList,
+    bench_function, expr, expression::FunctionArgument, func_args, map, test_function,
+    test_type_def, type_def, value, vm::VmArgumentList,
 };
 pub use indoc::indoc;
 // pub use crate::{array, bench_function, func_args, lit, map, test_function, test_type_def};

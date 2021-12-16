@@ -59,7 +59,6 @@ pub enum Instruction {
 pub struct Vm {
     fns: Vec<Box<dyn Function + Send + Sync>>,
     pub(super) instructions: Vec<Instruction>,
-    globals: HashMap<String, Value>,
     pub(super) values: Vec<Literal>,
     targets: Vec<Variable>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
@@ -267,9 +266,12 @@ impl Vm {
 
                     let mut argumentlist = VmArgumentList::new(parameters, args);
 
-                    match self.fns[function_id].call(&mut argumentlist) {
+                    match self.fns[function_id].call(ctx, &mut argumentlist) {
                         Ok(result) => state.stack.push(result),
-                        Err(_err) => todo!(),
+                        Err(err) => {
+                            println!("{:?}", err);
+                            todo!()
+                        }
                     }
                 }
                 OpCode::CreateObject => {
