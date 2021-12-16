@@ -173,11 +173,11 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Metric & DataType::Log
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::Metric & DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -202,7 +202,7 @@ impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
         if let Ok(state) = self.state.read() {
             match event {
-                Event::Log(ref mut log) => {
+                Event::Log(ref mut log) | Event::Trace(ref mut log) => {
                     state.iter().for_each(|(k, v)| {
                         log.insert(k.clone(), v.clone());
                     });

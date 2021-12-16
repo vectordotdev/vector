@@ -51,17 +51,17 @@ impl TransformConfig for RemapConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
         if self.reroute_dropped {
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ]
         } else {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -131,7 +131,7 @@ impl Remap {
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
+            Event::Log(ref mut log) | Event::Trace(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
@@ -798,7 +798,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(vec![Output::default(DataType::Any)], conf.outputs());
+        assert_eq!(vec![Output::default(DataType::all())], conf.outputs());
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -862,8 +862,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );
@@ -889,8 +889,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );

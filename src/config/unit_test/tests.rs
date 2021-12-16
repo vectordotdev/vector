@@ -973,7 +973,7 @@ async fn type_inconsistency_while_expanding_transform() {
     let err = crate::config::compiler::compile(config).err().unwrap();
     assert_eq!(
         err,
-        vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]
+        vec!["Data type mismatch between foo.step1 and foo.step2".to_owned()]
     );
 }
 

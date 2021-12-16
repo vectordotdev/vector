@@ -1,36 +1,36 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext},
+    config::{DataType, TransformConfig, TransformContext},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Noop;
+pub struct LogToTrace;
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "noop")]
-impl TransformConfig for Noop {
+#[typetag::serde(name = "log_to_trace")]
+impl TransformConfig for LogToTrace {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(self.clone()))
     }
 
     fn input_type(&self) -> DataType {
-        DataType::all()
+        DataType::Log
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn output_type(&self) -> DataType {
+        DataType::Trace
     }
 
     fn transform_type(&self) -> &'static str {
-        "noop"
+        "log_to_trace"
     }
 }
 
-impl FunctionTransform for Noop {
+impl FunctionTransform for LogToTrace {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        output.push(event);
+        output.push(Event::Trace(event.into_log()));
     }
 }

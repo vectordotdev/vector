@@ -446,10 +446,10 @@ pub async fn build_pieces(
 }
 
 const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(event, Event::Log(_)),
-        DataType::Metric => matches!(event, Event::Metric(_)),
+    match event {
+        Event::Log(_) => data_type.contains(DataType::Log),
+        Event::Metric(_) => data_type.contains(DataType::Metric),
+        Event::Trace(_) => data_type.contains(DataType::Trace),
     }
 }
 

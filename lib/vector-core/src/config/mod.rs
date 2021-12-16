@@ -1,3 +1,4 @@
+use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
 
 mod global_options;
@@ -12,10 +13,10 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
     vector_buffers::config::memory_buffer_default_max_events();
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[bitmask(u8)]
 pub enum DataType {
-    Any,
     Log,
+    Trace,
     Metric,
 }
 

@@ -29,9 +29,27 @@ impl From<Metric> for Event {
     }
 }
 
+impl From<Trace> for Event {
+    fn from(trace: Trace) -> Self {
+        Self::Trace(trace)
+    }
+}
+
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
         let fields = log
+            .fields
+            .into_iter()
+            .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
+            .collect::<BTreeMap<_, _>>();
+
+        Self::from(fields)
+    }
+}
+
+impl From<Trace> for event::LogEvent {
+    fn from(trace: Trace) -> Self {
+        let fields = trace
             .fields
             .into_iter()
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
@@ -123,6 +141,7 @@ impl From<EventWrapper> for event::Event {
         match event {
             Event::Log(proto) => Self::Log(proto.into()),
             Event::Metric(proto) => Self::Metric(proto.into()),
+            Event::Trace(proto) => Self::Trace(proto.into()),
         }
     }
 }
@@ -130,6 +149,12 @@ impl From<EventWrapper> for event::Event {
 impl From<event::LogEvent> for Log {
     fn from(log_event: event::LogEvent) -> Self {
         WithMetadata::<Self>::from(log_event).data
+    }
+}
+
+impl From<event::LogEvent> for Trace {
+    fn from(trace: event::LogEvent) -> Self {
+        WithMetadata::<Self>::from(trace).data
     }
 }
 
@@ -142,6 +167,19 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             .collect::<BTreeMap<_, _>>();
 
         let data = Log { fields };
+        Self { data, metadata }
+    }
+}
+
+impl From<event::LogEvent> for WithMetadata<Trace> {
+    fn from(trace: event::LogEvent) -> Self {
+        let (fields, metadata) = trace.into_parts();
+        let fields = fields
+            .into_iter()
+            .map(|(k, v)| (k, encode_value(v)))
+            .collect::<BTreeMap<_, _>>();
+
+        let data = Trace { fields };
         Self { data, metadata }
     }
 }
@@ -248,7 +286,9 @@ impl From<event::Event> for Event {
 impl From<event::Event> for WithMetadata<Event> {
     fn from(event: event::Event) -> Self {
         match event {
-            event::Event::Log(log_event) => WithMetadata::<Log>::from(log_event).into(),
+            event::Event::Log(log_event) | event::Event::Trace(log_event) => {
+                WithMetadata::<Log>::from(log_event).into()
+            }
             event::Event::Metric(metric) => WithMetadata::<Metric>::from(metric).into(),
         }
     }

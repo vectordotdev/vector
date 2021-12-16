@@ -15,9 +15,10 @@ use crate::{
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
-    Any,
+    Multiple,
     Log,
     Metric,
+    Trace,
 }
 
 impl From<DataType> for SourceOutputType {
@@ -25,7 +26,8 @@ impl From<DataType> for SourceOutputType {
         match data_type {
             DataType::Metric => SourceOutputType::Metric,
             DataType::Log => SourceOutputType::Log,
-            DataType::Any => SourceOutputType::Any,
+            DataType::Trace => SourceOutputType::Trace,
+            _ => SourceOutputType::Multiple,
         }
     }
 }
@@ -163,7 +165,7 @@ mod tests {
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
-                output_type: DataType::Any,
+                output_type: DataType::all(),
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
@@ -188,7 +190,7 @@ mod tests {
         let tests = vec![
             Test {
                 component_id: "gen1",
-                output_type: SourceOutputType::Any,
+                output_type: SourceOutputType::Multiple,
             },
             Test {
                 component_id: "gen2",
@@ -238,7 +240,7 @@ mod tests {
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
-                output_type: DataType::Any,
+                output_type: DataType::all(),
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
@@ -269,7 +271,7 @@ mod tests {
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "file".to_string(),
-                output_type: DataType::Any,
+                output_type: DataType::all(),
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
@@ -300,7 +302,7 @@ mod tests {
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
-                output_type: DataType::Any,
+                output_type: DataType::all(),
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
@@ -331,7 +333,7 @@ mod tests {
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
-                output_type: DataType::Any,
+                output_type: DataType::all(),
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),

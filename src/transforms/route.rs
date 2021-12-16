@@ -19,14 +19,38 @@ pub struct Route {
     conditions: IndexMap<String, Box<dyn Condition>>,
 }
 
-impl Route {
-    pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
-        let mut conditions = IndexMap::new();
-        for (output_name, condition) in config.route.iter() {
-            let condition = condition.build(&context.enrichment_tables)?;
-            conditions.insert(output_name.clone(), condition);
-        }
-        Ok(Self { conditions })
+#[async_trait::async_trait]
+#[typetag::serde(name = "lane")]
+impl TransformConfig for LaneConfig {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Lane::new(
+            self.condition.build(&context.enrichment_tables)?,
+        )))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::all()
+    }
+
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "lane"
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct Lane {
+    #[derivative(Debug = "ignore")]
+    condition: Box<dyn Condition>,
+}
+
+impl Lane {
+    pub fn new(condition: Box<dyn Condition>) -> Self {
+        Self { condition }
     }
 }
 
@@ -84,13 +108,13 @@ impl TransformConfig for RouteConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
         self.route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .map(|output_name| Output::from((output_name, DataType::all())))
             .collect()
     }
 

@@ -46,14 +46,14 @@ impl TransformConfig for ExpanderConfig {
         self.inner
             .first()
             .map(|(_, item)| item.input_type())
-            .unwrap_or(DataType::Any)
+            .unwrap_or_else(DataType::all)
     }
 
     fn outputs(&self) -> Vec<Output> {
         self.inner
             .last()
             .map(|(_, item)| item.outputs())
-            .unwrap_or_else(|| vec![Output::default(DataType::Any)])
+            .unwrap_or_else(|| vec![Output::default(DataType::all())])
     }
 
     fn transform_type(&self) -> &'static str {

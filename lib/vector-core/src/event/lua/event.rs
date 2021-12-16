@@ -9,6 +9,7 @@ impl<'a> ToLua<'a> for Event {
         match self {
             Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
             Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+            Event::Trace(trace) => table.raw_set("trace", trace.to_lua(lua)?)?,
         }
         Ok(LuaValue::Table(table))
     }
@@ -26,19 +27,22 @@ impl<'a> FromLua<'a> for Event {
                 })
             }
         };
-        match (table.raw_get("log")?, table.raw_get("metric")?) {
-            (LuaValue::Table(log), LuaValue::Nil) => {
+        match (table.raw_get("log")?, table.raw_get("metric")?, table.raw_get("trace")?) {
+            (LuaValue::Table(log), LuaValue::Nil, LuaValue::Nil) => {
                 Ok(Event::Log(LogEvent::from_lua(LuaValue::Table(log), lua)?))
             }
-            (LuaValue::Nil, LuaValue::Table(metric)) => Ok(Event::Metric(Metric::from_lua(
+            (LuaValue::Nil, LuaValue::Table(metric), LuaValue::Nil) => Ok(Event::Metric(Metric::from_lua(
                 LuaValue::Table(metric),
                 lua,
             )?)),
+            (LuaValue::Nil, LuaValue::Nil, LuaValue::Table(trace)) => {
+                Ok(Event::Trace(LogEvent::from_lua(LuaValue::Table(trace), lua)?))
+            }
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
                 to: "Event",
                 message: Some(
-                    "Event should contain either \"log\" or \"metric\" key at the top level"
+                    "Event should contain either \"log\", \"metric\" or \"trace\" key at the top level"
                         .to_string(),
                 ),
             }),
@@ -74,6 +78,7 @@ mod test {
         let assertions = vec![
             "type(event) == 'table'",
             "event.metric == nil",
+            "event.trace == nil",
             "type(event.log) == 'table'",
             "event.log.field == 'value'",
         ];
@@ -94,12 +99,29 @@ mod test {
         let assertions = vec![
             "type(event) == 'table'",
             "event.log == nil",
+            "event.trace == nil",
             "type(event.metric) == 'table'",
             "event.metric.name == 'example counter'",
             "event.metric.counter.value == 0.57721566",
         ];
 
         assert_event(event, assertions);
+    }
+
+    #[test]
+    fn to_lua_trace() {
+        let mut trace = Event::new_empty_trace();
+        trace.as_mut_log().insert("foo", "bar");
+
+        let assertions = vec![
+            "type(event) == 'table'",
+            "event.log == nil",
+            "event.metric == nil",
+            "type(event.trace) == 'table'",
+            "event.trace.foo == 'bar'",
+        ];
+
+        assert_event(trace, assertions);
     }
 
     #[test]
@@ -141,6 +163,24 @@ mod test {
 
         let event = Lua::new().load(lua_event).eval::<Event>().unwrap();
         shared::assert_event_data_eq!(event, expected);
+    }
+
+    #[test]
+    fn from_lua_trace() {
+        let lua_trace = r#"
+        {
+            trace = {
+                trace_id = 13245789,
+                tags = {
+                    foo = "bar"
+                }
+            }
+        }"#;
+
+        let trace = Lua::new().load(lua_trace).eval::<Event>().unwrap();
+        let log = trace.as_log();
+        assert_eq!(log["trace_id"], Value::Bytes("example".into()));
+        assert_eq!(log["tags.foo"], Value::Bytes("bar".into()));
     }
 
     #[test]
