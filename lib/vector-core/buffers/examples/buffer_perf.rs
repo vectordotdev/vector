@@ -379,7 +379,7 @@ async fn main() {
         writer.flush().await.expect("flush shouldn't fail");
         writer_tx.send(tx_histo).expect("should not fail");
     };
-    tokio::spawn(writer_task); //.instrument(writer_span));
+    tokio::spawn(writer_task);
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
     let reader_task = async move {
@@ -404,7 +404,7 @@ async fn main() {
 
         reader_tx.send(rx_histo).expect("should not fail");
     };
-    tokio::spawn(reader_task); //.instrument(reader_span));
+    tokio::spawn(reader_task);
 
     // Now let the tasks run, occasionally emitting metrics about their progress, while waiting for
     // them to complete.
