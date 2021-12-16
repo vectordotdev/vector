@@ -1,12 +1,13 @@
-use crate::config::ComponentKey;
-use crate::event::Event;
-use futures::{channel::mpsc, stream::Fuse, Sink, Stream, StreamExt};
-use futures_util::SinkExt;
 use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{channel::mpsc, stream::Fuse, Sink, Stream, StreamExt};
+use futures_util::SinkExt;
+
+use crate::{config::ComponentKey, event::Event};
 
 type GenericEventSink = Pin<Box<dyn Sink<Event, Error = ()> + Send>>;
 
@@ -200,8 +201,11 @@ impl Sink<Event> for Fanout {
 
 #[cfg(test)]
 mod tests {
-    use super::{ControlMessage, Fanout};
-    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
     use buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -210,11 +214,10 @@ mod tests {
         WhenFull,
     };
     use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
-    use std::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
     use tokio::time::{sleep, Duration};
+
+    use super::{ControlMessage, Fanout};
+    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
 
     #[tokio::test]
     async fn fanout_writes_to_all() {

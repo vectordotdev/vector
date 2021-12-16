@@ -1,3 +1,30 @@
+use std::{
+    collections::HashMap,
+    future::ready,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+
+use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
+use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
+use tokio::{
+    select,
+    time::{timeout, Duration},
+};
+use vector_core::{
+    buffers::{
+        topology::{
+            builder::TopologyBuilder,
+            channel::{BufferReceiver, BufferSender},
+        },
+        BufferType, WhenFull,
+    },
+    internal_event::EventsSent,
+    ByteSizeOf,
+};
+
 use super::{
     fanout::{self, Fanout},
     task::{Task, TaskOutput},
@@ -12,31 +39,6 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     Pipeline,
-};
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
-use once_cell::sync::Lazy;
-use std::{
-    collections::HashMap,
-    future::ready,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
-use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{
-    select,
-    time::{timeout, Duration},
-};
-use vector_core::{buffers::BufferType, internal_event::EventsSent};
-use vector_core::{
-    buffers::{
-        topology::{
-            builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender},
-        },
-        WhenFull,
-    },
-    ByteSizeOf,
 };
 
 lazy_static! {

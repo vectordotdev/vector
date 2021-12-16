@@ -1,3 +1,9 @@
+use std::{num::NonZeroU16, path::PathBuf};
+
+#[cfg(test)]
+use quickcheck::{Arbitrary, Gen};
+use tracing::Span;
+
 use crate::{
     topology::{
         builder::TopologyBuilder,
@@ -6,10 +12,6 @@ use crate::{
     variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
     Bufferable, WhenFull,
 };
-#[cfg(test)]
-use quickcheck::{Arbitrary, Gen};
-use std::{num::NonZeroU16, path::PathBuf};
-use tracing::Span;
 
 #[cfg(test)]
 const MAX_STR_SIZE: usize = 128;

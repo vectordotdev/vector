@@ -1,3 +1,10 @@
+use std::{convert::TryFrom, future::ready, num::NonZeroU8, sync::Arc};
+
+use futures::stream;
+use serde_json::Value as JsonValue;
+use tokio::time::{sleep, Duration};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
@@ -11,15 +18,11 @@ use crate::{
         util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
-    test_util::components::{self, HTTP_SINK_TAGS},
-    test_util::{random_lines_with_stream, random_string},
+    test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        random_lines_with_stream, random_string,
+    },
 };
-use futures::stream;
-use serde_json::Value as JsonValue;
-use std::future::ready;
-use std::{convert::TryFrom, num::NonZeroU8, sync::Arc};
-use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";

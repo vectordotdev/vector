@@ -1,10 +1,3 @@
-use crate::event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
-use crate::metrics::{AgentDDSketch, Handle};
-use crate::ByteSizeOf;
-use chrono::{DateTime, Utc};
-use getset::{Getters, MutGetters};
-use serde::{Deserialize, Serialize};
-use shared::EventDataEq;
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
@@ -12,6 +5,17 @@ use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
     sync::Arc,
+};
+
+use chrono::{DateTime, Utc};
+use getset::{Getters, MutGetters};
+use serde::{Deserialize, Serialize};
+use shared::EventDataEq;
+
+use crate::{
+    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    metrics::{AgentDDSketch, Handle},
+    ByteSizeOf,
 };
 
 #[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
@@ -1103,9 +1107,10 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

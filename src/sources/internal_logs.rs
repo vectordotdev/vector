@@ -1,14 +1,15 @@
+use bytes::Bytes;
+use chrono::Utc;
+use futures::{stream, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use futures::{stream, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -89,11 +90,12 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::Event, test_util::collect_ready, trace};
     use futures::channel::mpsc;
     use tokio::time::{sleep, Duration};
     use vector_core::event::Value;
+
+    use super::*;
+    use crate::{event::Event, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {

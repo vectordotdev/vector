@@ -7,13 +7,12 @@ use tokio::{
 };
 use tracing::Instrument;
 
+use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, UndecodableRecord};
 use crate::{
     assert_enough_bytes_written, assert_file_does_not_exist_async, assert_file_exists_async,
     assert_reader_writer_file_positions,
     disk_v2::{backed_archive::BackedArchive, record::Record, tests::SizedRecord, ReaderError},
 };
-
-use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, UndecodableRecord};
 
 #[tokio::test]
 async fn reader_throws_error_when_record_length_delimiter_is_zero() {

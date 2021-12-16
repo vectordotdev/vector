@@ -14,6 +14,20 @@ mod task;
 #[cfg(test)]
 mod test;
 
+use std::{
+    collections::HashMap,
+    panic::AssertUnwindSafe,
+    sync::{Arc, Mutex},
+};
+
+use futures::{Future, FutureExt};
+pub use running::RunningTopology;
+use tokio::sync::{mpsc, watch};
+use vector_core::buffers::{
+    topology::channel::{BufferReceiver, BufferSender},
+    Acker,
+};
+
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::Event,
@@ -21,18 +35,6 @@ use crate::{
         builder::Pieces,
         task::{Task, TaskOutput},
     },
-};
-use futures::{Future, FutureExt};
-pub use running::RunningTopology;
-use std::{
-    collections::HashMap,
-    panic::AssertUnwindSafe,
-    sync::{Arc, Mutex},
-};
-use tokio::sync::{mpsc, watch};
-use vector_core::buffers::{
-    topology::channel::{BufferReceiver, BufferSender},
-    Acker,
 };
 
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;

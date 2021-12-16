@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, env};
+
 use indoc::formatdoc;
 use k8s_openapi::{
     api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
@@ -6,8 +8,6 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
-use std::collections::BTreeMap;
-use std::env;
 use tracing::{debug, error, info};
 
 pub mod metrics;

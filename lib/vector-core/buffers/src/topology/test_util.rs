@@ -2,13 +2,12 @@ use std::{error, fmt};
 
 use bytes::{Buf, BufMut};
 
+use super::builder::TopologyBuilder;
 use crate::{
     encoding::{DecodeBytes, EncodeBytes},
     topology::channel::{BufferReceiver, BufferSender},
     Bufferable, WhenFull,
 };
-
-use super::builder::TopologyBuilder;
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {

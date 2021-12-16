@@ -1,11 +1,12 @@
+use std::{collections::HashMap, pin::Pin};
+
+use futures::{SinkExt, Stream};
+
 use crate::{
     event::Event,
     fanout::{self, Fanout},
     ByteSizeOf,
 };
-use futures::SinkExt;
-use futures::Stream;
-use std::{collections::HashMap, pin::Pin};
 
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;

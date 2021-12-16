@@ -1,3 +1,8 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
@@ -5,10 +10,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -104,12 +105,13 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::CoercerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {

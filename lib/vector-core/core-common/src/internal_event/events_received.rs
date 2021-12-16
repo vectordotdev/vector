@@ -1,5 +1,6 @@
-use crate::internal_event::InternalEvent;
 use metrics::counter;
+
+use crate::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct EventsReceived {

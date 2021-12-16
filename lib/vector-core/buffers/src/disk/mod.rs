@@ -1,13 +1,13 @@
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::Bufferable;
-use snafu::Snafu;
-use std::fmt::Debug;
 use std::{
+    fmt::Debug,
     io,
     path::{Path, PathBuf},
 };
 
+use snafu::Snafu;
+
 use self::leveldb_buffer::{Reader, Writer};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 pub mod leveldb_buffer;
 

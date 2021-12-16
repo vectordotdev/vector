@@ -1,19 +1,22 @@
-use super::FuturesUnorderedChunked;
-use crate::event::{EventStatus, Finalizable};
-use crate::internal_event::emit;
-use crate::internal_event::EventsSent;
-use buffers::{Ackable, Acker};
-use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use std::{
     collections::{BinaryHeap, VecDeque},
     fmt,
     num::NonZeroUsize,
     task::Poll,
 };
+
+use buffers::{Ackable, Acker};
+use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+
+use super::FuturesUnorderedChunked;
+use crate::{
+    event::{EventStatus, Finalizable},
+    internal_event::{emit, EventsSent},
+};
 
 /// Newtype wrapper around sequence numbers to enforce misuse resistance.
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -319,8 +322,7 @@ mod tests {
         iter::repeat_with,
         num::NonZeroUsize,
         pin::Pin,
-        sync::atomic::Ordering,
-        sync::Arc,
+        sync::{atomic::Ordering, Arc},
         task::{Context, Poll},
         time::Duration,
     };
@@ -338,12 +340,11 @@ mod tests {
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
 
+    use super::{Driver, DriverResponse};
     use crate::{
         event::{EventFinalizers, EventStatus, Finalizable},
         stream::driver::AcknowledgementTracker,
     };
-
-    use super::{Driver, DriverResponse};
 
     struct DelayRequest(usize);
 

@@ -1,7 +1,9 @@
-use std::error::Error;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    error::Error,
+    path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use async_trait::async_trait;
 use futures::{ready, Stream};
@@ -9,10 +11,15 @@ use pin_project::pin_project;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
-use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
-use crate::{topology::builder::IntoBuffer, Acker, Bufferable};
+use crate::{
+    buffer_usage_data::BufferUsageHandle,
+    disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
+    topology::{
+        builder::IntoBuffer,
+        channel::{ReceiverAdapter, SenderAdapter},
+    },
+    Acker, Bufferable,
+};
 
 pub struct DiskV2Buffer {
     id: String,

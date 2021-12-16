@@ -1,11 +1,12 @@
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, LogEvent},
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 
 /// Config used to build a `BytesDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

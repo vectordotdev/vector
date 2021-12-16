@@ -1,3 +1,5 @@
+use std::{iter::FromIterator, str::FromStr};
+
 use nom::{
     self,
     branch::alt,
@@ -9,7 +11,6 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use std::{iter::FromIterator, str::FromStr};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

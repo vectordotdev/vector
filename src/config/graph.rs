@@ -1,6 +1,8 @@
-use super::{ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, TransformOuter};
-use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
+
+use indexmap::{set::IndexSet, IndexMap};
+
+use super::{ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, TransformOuter};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -285,8 +287,9 @@ impl Graph {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     impl Graph {
         fn add_source(&mut self, id: &str, ty: DataType) {

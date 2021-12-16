@@ -1,18 +1,21 @@
-use futures::StreamExt;
 use std::num::NonZeroUsize;
-use vector_core::buffers::Acker;
 
-use crate::event::Event;
-use crate::sinks::aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder};
-use crate::sinks::aws_kinesis_firehose::service::KinesisResponse;
-use crate::Error;
-use futures::stream::BoxStream;
-use tower::util::BoxService;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
-
-use crate::sinks::util::SinkBuilderExt;
 use async_trait::async_trait;
+use futures::{stream::BoxStream, StreamExt};
+use tower::util::BoxService;
+use vector_core::{buffers::Acker, sink::StreamSink, stream::BatcherSettings};
+
+use crate::{
+    event::Event,
+    sinks::{
+        aws_kinesis_firehose::{
+            request_builder::{KinesisRequest, KinesisRequestBuilder},
+            service::KinesisResponse,
+        },
+        util::SinkBuilderExt,
+    },
+    Error,
+};
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;

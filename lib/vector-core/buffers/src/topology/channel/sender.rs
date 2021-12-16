@@ -8,10 +8,8 @@ use futures::{ready, Sink};
 use pin_project::pin_project;
 use tokio::sync::mpsc::Sender;
 
-use crate::Bufferable;
-use crate::{buffer_usage_data::BufferUsageHandle, WhenFull};
-
 use super::poll_sender::PollSender;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable, WhenFull};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SendState {

@@ -1,19 +1,22 @@
-use crate::event::{Event, LogEvent};
-use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
-use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
-use crate::Error;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-use rand::random;
 use std::num::NonZeroUsize;
-use tower::util::BoxService;
-use vector_core::buffers::Acker;
-use vector_core::stream::BatcherSettings;
 
-use crate::sinks::util::processed_event::ProcessedEvent;
-use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use async_trait::async_trait;
-use futures::future;
+use futures::{future, stream::BoxStream, StreamExt};
+use rand::random;
+use tower::util::BoxService;
+use vector_core::{buffers::Acker, stream::BatcherSettings};
+
+use crate::{
+    event::{Event, LogEvent},
+    sinks::{
+        aws_kinesis_streams::{
+            request_builder::{KinesisRequest, KinesisRequestBuilder},
+            service::KinesisResponse,
+        },
+        util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
+    },
+    Error,
+};
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisMetadata>;
 

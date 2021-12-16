@@ -24,6 +24,10 @@ use tokio::{
     io::{AsyncWrite, AsyncWriteExt, BufWriter},
 };
 
+use super::{
+    common::{create_crc32c_hasher, DiskBufferConfig},
+    record::try_as_record_archive,
+};
 use crate::{
     disk_v2::{
         ledger::Ledger,
@@ -31,11 +35,6 @@ use crate::{
     },
     encoding::EncodeBytes,
     Bufferable,
-};
-
-use super::{
-    common::{create_crc32c_hasher, DiskBufferConfig},
-    record::try_as_record_archive,
 };
 
 /// Error that occurred during calls to [`Writer`].

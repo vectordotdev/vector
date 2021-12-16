@@ -1,18 +1,20 @@
+use std::{
+    collections::{hash_map, HashMap},
+    pin::Pin,
+    time::{Duration, Instant},
+};
+
+use async_stream::stream;
+use futures::{stream, Stream, StreamExt};
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
-};
-use async_stream::stream;
-use futures::{stream, Stream, StreamExt};
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{hash_map, HashMap},
-    pin::Pin,
-    time::{Duration, Instant},
 };
 
 mod merge_strategy;
@@ -304,12 +306,13 @@ impl TaskTransform for Reduce {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Value},
     };
-    use serde_json::json;
 
     #[test]
     fn generate_config() {

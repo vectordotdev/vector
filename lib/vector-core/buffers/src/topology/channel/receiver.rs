@@ -9,10 +9,8 @@ use pin_project::pin_project;
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::Bufferable;
-
 use super::{strategy::StrategyResult, PollStrategy};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// Adapter for papering over various receiver backends by providing a [`Stream`] interface.
 #[pin_project(project = ProjectedReceiverAdapter)]

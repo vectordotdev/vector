@@ -1,7 +1,9 @@
-use crate::config::{ComponentKey, GlobalOptions};
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use std::collections::HashSet;
+
+use crate::config::{ComponentKey, GlobalOptions};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {

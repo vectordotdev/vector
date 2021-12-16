@@ -1,9 +1,10 @@
-use super::*;
-use crate::config::log_schema;
 use bytes::BytesMut;
 use pretty_assertions::assert_eq;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
+
+use super::*;
+use crate::config::log_schema;
 
 // Ser/De the Event never loses bytes
 #[test]

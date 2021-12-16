@@ -104,16 +104,14 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
-
 use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
-
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
+use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
 
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]

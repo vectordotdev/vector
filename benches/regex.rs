@@ -1,8 +1,6 @@
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
-
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::{Alphanumeric, Distribution, Uniform};
-
 use vector::{
     config::{TransformConfig, TransformContext},
     event::Event,

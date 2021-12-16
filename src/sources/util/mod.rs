@@ -32,21 +32,6 @@ mod unix_stream;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
 mod wrappers;
 
-#[cfg(any(feature = "sources-http"))]
-pub use self::body_decoding::Encoding;
-#[cfg(feature = "sources-utils-http-query")]
-pub use self::http::add_query_parameters;
-#[cfg(any(
-    feature = "sources-prometheus",
-    feature = "sources-utils-http-encoding"
-))]
-pub use self::http::decode;
-#[cfg(feature = "sources-utils-http-error")]
-pub use self::http::ErrorMessage;
-#[cfg(feature = "sources-utils-http-prelude")]
-pub use self::http::HttpSource;
-#[cfg(feature = "sources-utils-http-auth")]
-pub use self::http::HttpSourceAuthConfig;
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
     feature = "codecs",
@@ -62,3 +47,19 @@ pub use unix_datagram::build_unix_datagram_source;
 pub use unix_stream::build_unix_stream_source;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
 pub use wrappers::AfterReadExt;
+
+#[cfg(any(feature = "sources-http"))]
+pub use self::body_decoding::Encoding;
+#[cfg(feature = "sources-utils-http-query")]
+pub use self::http::add_query_parameters;
+#[cfg(any(
+    feature = "sources-prometheus",
+    feature = "sources-utils-http-encoding"
+))]
+pub use self::http::decode;
+#[cfg(feature = "sources-utils-http-error")]
+pub use self::http::ErrorMessage;
+#[cfg(feature = "sources-utils-http-prelude")]
+pub use self::http::HttpSource;
+#[cfg(feature = "sources-utils-http-auth")]
+pub use self::http::HttpSourceAuthConfig;

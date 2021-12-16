@@ -1,9 +1,11 @@
-use super::Value;
-use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     iter, slice,
 };
+
+use serde::{Serialize, Serializer};
+
+use super::Value;
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -129,10 +131,10 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use pretty_assertions::assert_eq;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn keys_simple() {

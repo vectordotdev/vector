@@ -1,5 +1,16 @@
-use super::Key;
-use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
+};
+
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -9,17 +20,10 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
-use std::{collections::VecDeque, sync::atomic::AtomicU64};
 use tokio::task::JoinHandle;
+
+use super::Key;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);

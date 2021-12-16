@@ -1,12 +1,13 @@
 pub mod prelude;
 mod runtime;
 
+use std::any::Any;
+
 pub use compiler::{
     function, state, type_def::Index, value, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
-use std::any::Any;
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(

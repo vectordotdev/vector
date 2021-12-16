@@ -1,6 +1,4 @@
-use crate::stream::batcher::data::BatchData;
-
-use crate::ByteSizeOf;
+use crate::{stream::batcher::data::BatchData, ByteSizeOf};
 
 pub trait BatchLimiter<T, B> {
     type ItemMetadata;

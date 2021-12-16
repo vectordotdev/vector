@@ -1,10 +1,9 @@
-use crate::event::BatchStatusReceiver;
-use crate::shutdown::ShutdownSignal;
+use std::{future::Future, pin::Pin, task::Poll};
+
 use futures::{future::Shared, stream::FuturesOrdered, FutureExt, StreamExt};
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Poll;
 use tokio::sync::mpsc;
+
+use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
 
 /// The `OrderedFinalizer` framework here is a mechanism for marking
 /// events from a source as done in a single background task *in the

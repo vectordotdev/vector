@@ -2,14 +2,15 @@ use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Ar
 
 use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
-use vector_core::stream::batcher::config::BatchConfig;
-use vector_core::stream::batcher::Batcher;
-use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::{Ackable, Acker},
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{BatcherSettings, ConcurrentMap, Driver, ExpirationQueue, PartitionedBatcher},
+    stream::{
+        batcher::{config::BatchConfig, Batcher},
+        BatcherSettings, ConcurrentMap, Driver, DriverResponse, ExpirationQueue,
+        PartitionedBatcher,
+    },
     ByteSizeOf,
 };
 

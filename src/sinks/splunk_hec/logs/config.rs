@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use futures_util::FutureExt;
+use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::{sink::VectorSink, transform::DataType};
 
+use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
@@ -23,10 +25,6 @@ use crate::{
     template::Template,
     tls::TlsOptions,
 };
-
-use serde::{Deserialize, Serialize};
-
-use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

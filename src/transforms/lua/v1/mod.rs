@@ -1,14 +1,15 @@
-use crate::transforms::TaskTransform;
+use std::{future::ready, pin::Pin};
+
+use futures::{stream, Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+
 use crate::{
     config::DataType,
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
-    transforms::Transform,
+    transforms::{TaskTransform, Transform},
 };
-use futures::{stream, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{future::ready, pin::Pin};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -508,8 +509,7 @@ mod tests {
 
     #[test]
     fn lua_load_file() {
-        use std::fs::File;
-        use std::io::Write;
+        use std::{fs::File, io::Write};
         crate::test_util::trace_init();
 
         let dir = tempfile::tempdir().unwrap();

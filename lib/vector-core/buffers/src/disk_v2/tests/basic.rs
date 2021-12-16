@@ -1,6 +1,5 @@
-use crate::assert_buffer_is_empty;
-
 use super::{create_default_buffer, with_temp_dir, SizedRecord};
+use crate::assert_buffer_is_empty;
 
 #[tokio::test]
 async fn basic_read_write_loop() {
