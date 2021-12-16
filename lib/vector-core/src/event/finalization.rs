@@ -3,14 +3,13 @@
 use super::Event;
 use crate::ByteSizeOf;
 use atomig::{Atom, Atomic, Ordering};
-use futures::future::FutureExt;
+use futures::{channel::oneshot, future::FutureExt};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::iter::{self, ExactSizeIterator};
 use std::pin::Pin;
 use std::task::Poll;
 use std::{cmp, mem, sync::Arc};
-use tokio::sync::oneshot;
 
 type ImmutVec<T> = Box<[T]>;
 
@@ -193,9 +192,8 @@ impl BatchStatusReceiver {
     ///
     /// # Errors
     ///
-    /// - `TryRecvError::Empty` if no value has been sent yet.
-    /// - `TryRecvError::Closed` if the sender has dropped without sending a value.
-    pub fn try_recv(&mut self) -> Result<BatchStatus, oneshot::error::TryRecvError> {
+    /// - `Canceled` if the sender has dropped without sending a value.
+    pub fn try_recv(&mut self) -> Result<Option<BatchStatus>, oneshot::Canceled> {
         self.0.try_recv()
     }
 }
@@ -383,7 +381,6 @@ impl<T: Finalizable> Finalizable for Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::oneshot::error::TryRecvError::Empty;
 
     #[test]
     fn defaults() {
@@ -394,19 +391,19 @@ mod tests {
     #[test]
     fn sends_notification() {
         let (fin, mut receiver) = make_finalizer();
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(fin);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.try_recv(), Ok(Some(BatchStatus::Delivered)));
     }
 
     #[test]
     fn early_update() {
         let (mut fin, mut receiver) = make_finalizer();
         fin.update_status(EventStatus::Rejected);
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         fin.update_sources();
         assert_eq!(fin.count_finalizers(), 0);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+        assert_eq!(receiver.try_recv(), Ok(Some(BatchStatus::Rejected)));
     }
 
     #[test]
@@ -417,11 +414,11 @@ mod tests {
         assert_eq!(fin2.count_finalizers(), 1);
         assert_eq!(fin1, fin2);
 
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(fin1);
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(fin2);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.try_recv(), Ok(Some(BatchStatus::Delivered)));
     }
 
     #[test]
@@ -436,11 +433,11 @@ mod tests {
         fin0.merge(fin2);
         assert_eq!(fin0.count_finalizers(), 2);
 
-        assert_eq!(receiver1.try_recv(), Err(Empty));
-        assert_eq!(receiver2.try_recv(), Err(Empty));
+        assert_eq!(receiver1.try_recv(), Ok(None));
+        assert_eq!(receiver2.try_recv(), Ok(None));
         drop(fin0);
-        assert_eq!(receiver1.try_recv(), Ok(BatchStatus::Delivered));
-        assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver1.try_recv(), Ok(Some(BatchStatus::Delivered)));
+        assert_eq!(receiver2.try_recv(), Ok(Some(BatchStatus::Delivered)));
     }
 
     #[test]
@@ -450,9 +447,9 @@ mod tests {
         fin1.merge(fin2);
         assert_eq!(fin1.count_finalizers(), 1);
 
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(fin1);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.try_recv(), Ok(Some(BatchStatus::Delivered)));
     }
 
     #[test]
@@ -478,13 +475,13 @@ mod tests {
         event2.merge(event3);
         assert_eq!(event2.count_finalizers(), 2);
 
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(event1);
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(event2);
-        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(receiver.try_recv(), Ok(None));
         drop(event4);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.try_recv(), Ok(Some(BatchStatus::Delivered)));
     }
 
     fn make_finalizer() -> (EventFinalizers, BatchStatusReceiver) {
