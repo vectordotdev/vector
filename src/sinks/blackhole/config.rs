@@ -31,7 +31,7 @@ impl SinkConfig for BlackholeConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -69,6 +69,7 @@ impl Arbitrary for Event {
         match self {
             Event::Log(log_event) => Box::new(log_event.shrink().map(Event::Log)),
             Event::Metric(metric) => Box::new(metric.shrink().map(Event::Metric)),
+            Event::Trace(log_event) => Box::new(log_event.shrink().map(Event::Trace)),
         }
     }
 }

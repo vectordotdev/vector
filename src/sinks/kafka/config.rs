@@ -180,7 +180,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Metric & DataType::Log
     }
 
     fn sink_type(&self) -> &'static str {

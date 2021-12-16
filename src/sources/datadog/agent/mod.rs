@@ -164,7 +164,7 @@ impl SourceConfig for DatadogAgentConfig {
                 Output::from((LOGS, DataType::Log)),
             ]
         } else {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
     }
 

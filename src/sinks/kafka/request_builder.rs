@@ -43,7 +43,7 @@ impl KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes()),
+        Event::Log(log) | Event::Trace(log) => log.get(key_field).map(|value| value.as_bytes()),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))
@@ -53,7 +53,7 @@ fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
 
 fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {
     match &event {
-        Event::Log(log) => log
+        Event::Log(log) | Event::Trace(log) => log
             .get(log_schema.timestamp_key())
             .and_then(|v| v.as_timestamp())
             .copied(),
@@ -64,7 +64,7 @@ fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option
 
 fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeaders> {
     headers_key.as_ref().and_then(|headers_key| {
-        if let Event::Log(log) = event {
+        if let Event::Log(log) | Event::Trace(log) = event {
             if let Some(headers) = log.get(headers_key) {
                 match headers {
                     Value::Map(headers_map) => {

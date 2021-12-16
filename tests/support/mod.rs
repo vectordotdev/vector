@@ -136,7 +136,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: None,
         }
     }
@@ -145,7 +145,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: Some(data.into()),
         }
     }
@@ -157,7 +157,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: None,
         }
     }
@@ -229,7 +229,7 @@ pub struct MockTransform {
 impl FunctionTransform for MockTransform {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         match &mut event {
-            Event::Log(log) => {
+            Event::Log(log) | Event::Trace(log) => {
                 let mut v = log
                     .get(vector::config::log_schema().message_key())
                     .unwrap()
@@ -299,11 +299,11 @@ impl TransformConfig for MockTransformConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -384,7 +384,7 @@ impl SinkConfig for MockSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn sink_type(&self) -> &'static str {

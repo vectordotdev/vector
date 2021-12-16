@@ -45,7 +45,7 @@ impl SourceConfig for UnitTestSourceConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -112,7 +112,7 @@ impl SinkConfig for UnitTestSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 }
 
@@ -207,7 +207,9 @@ fn events_to_string(events: &[Event]) -> String {
     events
         .iter()
         .map(|event| match event {
-            Event::Log(log) => serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string()),
+            Event::Log(log) | Event::Trace(log) => {
+                serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string())
+            }
             Event::Metric(metric) => {
                 serde_json::to_string(metric).unwrap_or_else(|_| "{}".to_string())
             }

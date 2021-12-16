@@ -4244,7 +4244,7 @@
           "interfaces": null,
           "enumValues": [
             {
-              "name": "ANY",
+              "name": "MULTIPLE",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -4257,6 +4257,12 @@
             },
             {
               "name": "METRIC",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "TRACE",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null

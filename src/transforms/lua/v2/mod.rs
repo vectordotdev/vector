@@ -94,11 +94,11 @@ impl LuaConfig {
     }
 
     pub const fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     pub fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub const fn transform_type(&self) -> &'static str {

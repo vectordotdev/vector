@@ -51,12 +51,13 @@ pub const PARTIAL: &str = "_partial";
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
+    Trace(LogEvent),
 }
 
 impl ByteSizeOf for Event {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Event::Log(log_event) => log_event.allocated_bytes(),
+            Event::Log(log_event) | Event::Trace(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
         }
     }
@@ -65,7 +66,7 @@ impl ByteSizeOf for Event {
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log) => log.take_finalizers(),
+            Event::Log(log_event) | Event::Trace(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
         }
     }
@@ -77,6 +78,11 @@ impl Event {
         Event::Log(LogEvent::default())
     }
 
+    #[must_use]
+    pub fn new_empty_trace() -> Self {
+        Event::Trace(LogEvent::default())
+    }
+
     /// Return self as a `LogEvent`
     ///
     /// # Panics
@@ -84,7 +90,7 @@ impl Event {
     /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
-            Event::Log(log) => log,
+            Event::Log(log) | Event::Trace(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -96,7 +102,7 @@ impl Event {
     /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
-            Event::Log(log) => log,
+            Event::Log(log) | Event::Trace(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -108,7 +114,7 @@ impl Event {
     /// This function panics if self is anything other than an `Event::Log`.
     pub fn into_log(self) -> LogEvent {
         match self {
-            Event::Log(log) => log,
+            Event::Log(log) | Event::Trace(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -118,7 +124,7 @@ impl Event {
     /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
     pub fn try_into_log(self) -> Option<LogEvent> {
         match self {
-            Event::Log(log) => Some(log),
+            Event::Log(log) | Event::Trace(log) => Some(log),
             _ => None,
         }
     }
@@ -171,14 +177,14 @@ impl Event {
 
     pub fn metadata(&self) -> &EventMetadata {
         match self {
-            Self::Log(log) => log.metadata(),
+            Self::Log(log) | Self::Trace(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
         }
     }
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         match self {
-            Self::Log(log) => log.metadata_mut(),
+            Self::Log(log) | Self::Trace(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
         }
     }
@@ -186,7 +192,7 @@ impl Event {
     /// Destroy the event and return the metadata.
     pub fn into_metadata(self) -> EventMetadata {
         match self {
-            Self::Log(log) => log.into_parts().1,
+            Self::Log(log) | Self::Trace(log) => log.into_parts().1,
             Self::Metric(metric) => metric.into_parts().2,
         }
     }
@@ -194,21 +200,21 @@ impl Event {
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {
-            Self::Log(log) => log.add_finalizer(finalizer),
+            Self::Log(log) | Self::Trace(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
         }
     }
 
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         match self {
-            Self::Log(log) => log.with_batch_notifier(batch).into(),
+            Self::Log(log) | Self::Trace(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
         }
     }
 
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         match self {
-            Self::Log(log) => log.with_batch_notifier_option(batch).into(),
+            Self::Log(log) | Self::Trace(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
         }
     }
@@ -217,7 +223,7 @@ impl Event {
 impl EventDataEq for Event {
     fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Log(a), Self::Log(b)) | (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             _ => false,
         }
@@ -263,7 +269,7 @@ impl TryInto<serde_json::Value> for Event {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Event::Log(fields) => serde_json::to_value(fields),
+            Event::Log(fields) | Event::Trace(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
         }
     }
@@ -369,7 +375,7 @@ pub trait MaybeAsLogMut {
 impl MaybeAsLogMut for Event {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
         match self {
-            Event::Log(log) => Some(log),
+            Event::Log(log) | Event::Trace(log) => Some(log),
             Event::Metric(_) => None,
         }
     }
@@ -381,12 +387,13 @@ impl MaybeAsLogMut for Event {
 pub enum EventRef<'a> {
     Log(&'a LogEvent),
     Metric(&'a Metric),
+    Trace(&'a LogEvent),
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {
     fn from(event: &'a Event) -> Self {
         match event {
-            Event::Log(log) => log.into(),
+            Event::Log(log) | Event::Trace(log) => log.into(),
             Event::Metric(metric) => metric.into(),
         }
     }

@@ -955,6 +955,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "bitmask-enum"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb8ac9438bbed34c8697e95c79ca2e9359d724b83f07208020e6c8ccd2b86a1e"
+dependencies = [
+ "quote 1.0.10",
+ "syn 1.0.84",
+]
+
+[[package]]
 name = "blake2b_simd"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8465,6 +8475,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "atomig",
+ "bitmask-enum",
  "bytes 1.1.0",
  "chrono",
  "criterion",

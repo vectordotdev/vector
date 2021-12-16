@@ -88,7 +88,7 @@ impl TransformConfig for EventRouterConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -115,7 +115,7 @@ impl TransformConfig for EventFilterConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
