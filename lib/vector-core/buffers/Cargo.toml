@@ -24,7 +24,7 @@ pin-project = { version = "1.0.8", default-features = false }
 rkyv = { version = "0.7.26", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde = { version = "1.0.131", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"] }
-tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.15.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }

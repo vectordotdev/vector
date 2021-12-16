@@ -19,7 +19,7 @@ anyhow = "1.0.51"
 async-stream = "0.3.2"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.13.0", features = ["full"] }
+tokio = { version = "1.15.0", features = ["full"] }
 tokio-stream = { version = "0.1.8", features = ["sync"] }
 
 # GraphQL
