@@ -154,7 +154,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         let mut schema = schema::Output::empty();
 
-        schema.define_field("message", Kind::boolean(), Some(Purpose::Message));
+        schema.define_field("message", Kind::bytes(), Some(Purpose::Message));
         schema.define_field("status", Kind::bytes(), Some(Purpose::Severity));
         schema.define_field("timestamp", Kind::integer(), Some(Purpose::Timestamp));
         schema.define_field("hostname", Kind::bytes(), Some(Purpose::Host));
@@ -162,6 +162,7 @@ impl SourceConfig for DatadogAgentConfig {
         schema.define_field("ddsource", Kind::bytes(), None);
         schema.define_field("ddtags", Kind::bytes(), None);
 
+        schema.merge(self.decoding.output_schema());
         schema
     }
 }

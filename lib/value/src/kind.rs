@@ -37,12 +37,28 @@ impl Kind {
         self.object.as_ref()
     }
 
+    /// Get a mutable reference to the inner object collection.
+    ///
+    /// This returns `None` if the type is not known to be an object.
+    #[must_use]
+    pub fn as_object_mut(&mut self) -> Option<&mut Collection<collection::Field>> {
+        self.object.as_mut()
+    }
+
     /// Get the inner array collection.
     ///
     /// This returns `None` if the type is not known to be an array.
     #[must_use]
     pub fn as_array(&self) -> Option<&Collection<collection::Index>> {
         self.array.as_ref()
+    }
+
+    /// Get a mutable reference to the inner array collection.
+    ///
+    /// This returns `None` if the type is not known to be an array.
+    #[must_use]
+    pub fn as_array_mut(&mut self) -> Option<&mut Collection<collection::Index>> {
+        self.array.as_mut()
     }
 
     /// Check if other is contained within self.
@@ -210,6 +226,12 @@ impl Kind {
         };
 
         kind.find_at_path(LookupBuf::from_segments(iter.collect()))
+    }
+
+    /// Returns `true` if there is a known kind at the given path.
+    #[must_use]
+    pub fn has_path(&self, path: LookupBuf) -> bool {
+        self.find_at_path(path).is_some()
     }
 }
 
@@ -414,6 +436,72 @@ impl Kind {
             array: None,
             object: None,
         }
+    }
+}
+
+// `or_*` methods to extend the state of a type using a builder-like API.
+impl Kind {
+    /// Add the `bytes` state to the type.
+    #[must_use]
+    pub fn or_bytes(mut self) -> Self {
+        self.bytes = Some(());
+        self
+    }
+
+    /// Add the `integer` state to the type.
+    #[must_use]
+    pub fn or_integer(mut self) -> Self {
+        self.integer = Some(());
+        self
+    }
+
+    /// Add the `float` state to the type.
+    #[must_use]
+    pub fn or_float(mut self) -> Self {
+        self.float = Some(());
+        self
+    }
+
+    /// Add the `boolean` state to the type.
+    #[must_use]
+    pub fn or_boolean(mut self) -> Self {
+        self.boolean = Some(());
+        self
+    }
+
+    /// Add the `timestamp` state to the type.
+    #[must_use]
+    pub fn or_timestamp(mut self) -> Self {
+        self.timestamp = Some(());
+        self
+    }
+
+    /// Add the `regex` state to the type.
+    #[must_use]
+    pub fn or_regex(mut self) -> Self {
+        self.regex = Some(());
+        self
+    }
+
+    /// Add the `null` state to the type.
+    #[must_use]
+    pub fn or_null(mut self) -> Self {
+        self.null = Some(());
+        self
+    }
+
+    /// Add the `array` state to the type.
+    #[must_use]
+    pub fn or_array(mut self, map: BTreeMap<collection::Index, Kind>) -> Self {
+        self.array = Some(map.into());
+        self
+    }
+
+    /// Add the `object` state to the type.
+    #[must_use]
+    pub fn or_object(mut self, map: BTreeMap<collection::Field, Kind>) -> Self {
+        self.object = Some(map.into());
+        self
     }
 }
 

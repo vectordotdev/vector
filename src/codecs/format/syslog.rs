@@ -3,6 +3,7 @@ use crate::{
     config::log_schema,
     event::{Event, Value},
     internal_events::SyslogConvertUtf8Error,
+    schema::{self, field},
 };
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
@@ -18,6 +19,40 @@ pub struct SyslogDeserializerConfig;
 impl DeserializerConfig for SyslogDeserializerConfig {
     fn build(&self) -> crate::Result<BoxedDeserializer> {
         Ok(Box::new(SyslogDeserializer))
+    }
+
+    fn output_schema(&self) -> schema::Output {
+        use field::{Kind, Purpose};
+
+        let mut schema = schema::Output::empty();
+
+        // The `message` field is always defined. If parsing fails, the entire body becomes the
+        // message.
+        schema.define_field(
+            log_schema().message_key(),
+            Kind::bytes(),
+            Some(Purpose::Message),
+        );
+
+        // All other fields are optional.
+        schema.define_optional_field(
+            log_schema().timestamp_key(),
+            Kind::timestamp(),
+            Some(Purpose::Timestamp),
+        );
+        schema.define_optional_field("hostname", Kind::bytes(), Some(Purpose::Host));
+        schema.define_optional_field("severity", Kind::bytes(), Some(Purpose::Severity));
+        schema.define_optional_field("facility", Kind::bytes(), None);
+        schema.define_optional_field("version", Kind::integer(), None);
+        schema.define_optional_field("appname", Kind::bytes(), None);
+        schema.define_optional_field("msgid", Kind::bytes(), None);
+        schema.define_optional_field("procid", Kind::integer().or_bytes(), None);
+
+        // "structured data" in a syslog message can be stored in any field, but will always be
+        // a string.
+        schema.define_other_fields(Kind::bytes());
+
+        schema
     }
 }
 
@@ -68,6 +103,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         );
     }
     if let Some(host) = parsed.hostname {
+        // FIXME: should this be `log_schema().host_key()`?
         log.insert("hostname", host.to_string());
     }
     if let Some(severity) = parsed.severity {

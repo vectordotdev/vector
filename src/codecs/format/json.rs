@@ -2,6 +2,7 @@ use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::Event,
+    schema::{self, field},
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -17,6 +18,21 @@ pub struct JsonDeserializerConfig;
 impl DeserializerConfig for JsonDeserializerConfig {
     fn build(&self) -> crate::Result<BoxedDeserializer> {
         Ok(Box::new(Into::<JsonDeserializer>::into(self)))
+    }
+
+    fn output_schema(&self) -> schema::Output {
+        use field::{Kind, Purpose};
+
+        let mut schema = schema::Output::empty();
+
+        schema.define_field(
+            log_schema().timestamp_key(),
+            Kind::json().or_timestamp(),
+            Some(Purpose::Timestamp),
+        );
+
+        schema.define_other_fields(Kind::json());
+        schema
     }
 }
 

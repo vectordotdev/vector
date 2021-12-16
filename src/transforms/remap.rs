@@ -12,9 +12,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::{collections::HashSet, fs::File};
 use vrl::diagnostic::Formatter;
 use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
@@ -129,7 +129,7 @@ impl Remap {
             .cloned()
             .unwrap_or_default();
 
-        let output_schema = schema::Output::from_parts(kind, purposes);
+        let output_schema = schema::Output::from_parts(kind, purposes, HashSet::default());
 
         Ok(Remap {
             component_key: ctx.key.clone(),

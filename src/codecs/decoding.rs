@@ -5,6 +5,7 @@ use crate::{
     codecs::{BytesDeserializer, NewlineDelimitedDecoder},
     event::Event,
     internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
+    schema,
     sources::util::StreamDecodingError,
 };
 use bytes::{Bytes, BytesMut};
@@ -150,6 +151,9 @@ pub trait DeserializerConfig: Debug + DynClone + Send + Sync {
     ///
     /// Fails if the configuration is invalid.
     fn build(&self) -> crate::Result<BoxedDeserializer>;
+
+    /// The schema produced by the deserializer.
+    fn output_schema(&self) -> schema::Output;
 }
 
 dyn_clone::clone_trait_object!(DeserializerConfig);

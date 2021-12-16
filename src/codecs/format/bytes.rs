@@ -2,6 +2,7 @@ use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, LogEvent},
+    schema::{self, field},
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,20 @@ impl BytesDeserializerConfig {
 impl DeserializerConfig for BytesDeserializerConfig {
     fn build(&self) -> crate::Result<BoxedDeserializer> {
         Ok(Box::new(BytesDeserializer))
+    }
+
+    fn output_schema(&self) -> schema::Output {
+        use field::{Kind, Purpose};
+
+        let mut schema = schema::Output::empty();
+
+        schema.define_field(
+            log_schema().message_key(),
+            Kind::bytes(),
+            Some(Purpose::Message),
+        );
+
+        schema
     }
 }
 

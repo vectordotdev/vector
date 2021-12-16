@@ -4,11 +4,11 @@ pub use value::Kind;
 /// A list of special purposes a field can fullfil.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Purpose {
-    Timestamp,
-    Host,
     Message,
-    Source,
+    Timestamp,
     Severity,
+    Source,
+    Host,
     Custom(String),
 }
 
