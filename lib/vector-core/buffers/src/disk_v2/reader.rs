@@ -398,8 +398,6 @@ where
 
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
-        //trace!("handling pending acknowledgements");
-
         // In this method, we handle ensuring that whatever pending deletions that are now "ready"
         // are handled as quickly as possible.
         //
@@ -416,8 +414,6 @@ where
         // adjusting the ledger, as well as seeing if any pending deletions are now ready to run.
         let pending_acks = self.ledger.consume_pending_acks();
         if pending_acks > 0 {
-            //trace!("got {} pending acks", pending_acks);
-
             // First, recognize all of the bytes read for the now-acknowledged records so we can
             // adjust the total buffer size correctly.
             let total_bytes_read = self.pending_read_sizes.drain(..pending_acks).sum();
@@ -536,8 +532,6 @@ where
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
 
-        //trace!("updated last record ID from {} -> {}", previous_id, record_id);
-
         // Don't execute the ID delta logic when we're still in setup mode, which is where we would
         // be reading record IDs below our last read record ID.
         if !self.ready_to_read {
@@ -607,7 +601,7 @@ where
     /// describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
-        debug!("seek_to_next_record starting");
+        debug!("seeking to the last record acknowledged for this reader");
 
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
@@ -622,7 +616,7 @@ where
         let starting_self_last = self.last_reader_record_id;
         let ledger_last = self.ledger.state().get_last_reader_record_id();
         debug!(
-            "self.last_reader_record_id = {}, seeking to {} (per ledger)",
+            "currentl at {}, seeking to {} (per ledger)",
             self.last_reader_record_id, ledger_last
         );
 
@@ -641,7 +635,7 @@ where
 
         self.last_acked_record_id = ledger_last;
 
-        debug!("seek_to_next_record complete");
+        debug!("seeked to {} without issue, reader ready", ledger_last);
 
         self.ready_to_read = true;
 

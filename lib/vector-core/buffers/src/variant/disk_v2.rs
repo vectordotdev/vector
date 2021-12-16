@@ -176,5 +176,5 @@ where
         }
     }
 
-    info!("diskv2 writer task finished");
+    trace!("diskv2 writer task finished");
 }

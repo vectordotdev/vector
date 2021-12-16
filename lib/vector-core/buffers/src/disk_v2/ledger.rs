@@ -503,10 +503,7 @@ impl Ledger {
     /// will not be accurate.
     pub fn synchronize_buffer_usage(&self) {
         let initial_buffer_events = self.get_total_records();
-        let initial_buffer_size = self
-            .get_total_buffer_size()
-            .try_into()
-            .expect("buffer size greater than usize; is this a 32-bit platform?");
+        let initial_buffer_size = self.get_total_buffer_size();
         self.usage_handle
             .increment_received_event_count_and_byte_size(
                 initial_buffer_events,

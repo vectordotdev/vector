@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     io::{self, ErrorKind},
     marker::PhantomData,
     sync::Arc,
@@ -304,15 +305,13 @@ where
     /// the writer/ledger state to start a new file, etc.
     #[instrument(skip(self), level = "trace")]
     pub(super) async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
-        info!("validating last write");
+        debug!("validating last write to the current writer data file");
         self.ensure_ready_for_write().await.context(Io)?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
             return Ok(());
         }
-
-        debug!("checking currently loaded data file");
 
         // We do a neat little trick here where we open an immutable memory-mapped region against our
         // current writer data file, which lets us treat it as one big buffer... which is useful for
@@ -329,8 +328,6 @@ where
             .into_std()
             .await;
 
-        debug!("cloned data file handle to get mmap handle");
-
         let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(Io)? };
 
         // We have bytes, so we should have an archived record... hopefully!  Go through the motions
@@ -346,14 +343,35 @@ where
                 let ledger_next = self.ledger.state().get_next_writer_record_id();
                 let last_id = id;
 
-                if ledger_next - 1 == last_id {
-                    trace!("last record in file validated: next ID (ledger) = {}, last ID (written) = {}",
-                        ledger_next, last_id);
-                    false
-                } else {
-                    error!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
-                        ledger_next, last_id);
-                    true
+                match (ledger_next - 1).cmp(&last_id) {
+                    Ordering::Equal => {
+                        // We're exactly where the ledger thinks we should be, so nothing to do.
+                        trace!("last record in file validated: next ID (ledger) = {}, last ID (written) = {}",
+                            ledger_next, last_id);
+                        false
+                    }
+                    Ordering::Greater => {
+                        // Our last write is behind where the ledger thin ks we should be, so we
+                        // likely missed flushing some records, or partially flushed the data file.
+                        // Better roll over to be safe.
+                        error!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
+                            ledger_next, last_id);
+                        true
+                    }
+                    Ordering::Less => {
+                        // We're actually _ahead_ of the ledger, which is to say we wrote a valid
+                        // record to the data file, but never incremented our "writer next record
+                        // ID" field.  Given that record IDs are monotonic, it's safe to forward
+                        // ourselves to make the "writer next record ID" in the ledger match the
+                        // reality of the data file.  If there were somehow gaps in the data file,
+                        // the reader will detect it, and this way, we avoid duplicate record IDs.
+                        trace!("missing ledger update detected, fast forwarding writer_next_record_id to {}",
+                            last_id.wrapping_add(1));
+                        while self.ledger.state().get_next_writer_record_id() <= last_id {
+                            self.ledger.state().increment_next_writer_record_id();
+                        }
+                        false
+                    }
                 }
             }
             RecordStatus::Corrupted { .. } => {
@@ -403,14 +421,15 @@ where
                 break;
             }
 
-            debug!(
+            trace!(
                 "buffer size is {}, limit is {}, waiting for reader progress",
-                total_buffer_size, max_buffer_size
+                total_buffer_size,
+                max_buffer_size
             );
 
             self.ledger.wait_for_reader().await;
 
-            debug!("reader signalled progress");
+            trace!("reader signalled progress");
         }
 
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,

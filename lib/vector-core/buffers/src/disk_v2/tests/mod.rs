@@ -91,8 +91,16 @@ macro_rules! assert_buffer_size {
 macro_rules! assert_reader_writer_file_positions {
     ($ledger:expr, $reader:expr, $writer:expr) => {{
         let (reader, writer) = $ledger.get_current_reader_writer_file_id();
-        assert_eq!(reader, $reader as u16);
-        assert_eq!(writer, $writer as u16);
+        assert_eq!(
+            reader, $reader as u16,
+            "expected reader file ID of {}, got {} instead",
+            $reader, reader
+        );
+        assert_eq!(
+            writer, $writer as u16,
+            "expected writer file ID of {}, got {} instead",
+            $writer, writer
+        );
     }};
 }
 

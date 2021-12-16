@@ -294,7 +294,6 @@ where
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
-        //.with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .init();
 
     let config = Configuration::from_cli().expect("reading config parameters failed");
@@ -338,7 +337,6 @@ async fn main() {
     );
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
-    //let writer_span = trace_span!("writer");
     let writer_task = async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle().cloned();
@@ -384,7 +382,6 @@ async fn main() {
     tokio::spawn(writer_task); //.instrument(writer_span));
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
-    //let reader_span = trace_span!("reader");
     let reader_task = async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
