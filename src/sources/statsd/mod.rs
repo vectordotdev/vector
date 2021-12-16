@@ -60,6 +60,7 @@ struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
+    connection_limit: Option<u32>,
 }
 
 impl TcpConfig {
@@ -72,6 +73,7 @@ impl TcpConfig {
             tls: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
+            connection_limit: None,
         }
     }
 }
@@ -111,7 +113,7 @@ impl SourceConfig for StatsdConfig {
                     config.receive_buffer_bytes,
                     cx,
                     false.into(),
-                    None,
+                    config.connection_limit,
                 )
             }
             #[cfg(unix)]

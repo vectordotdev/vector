@@ -87,6 +87,15 @@ components: sources: statsd: {
 				unit:    "seconds"
 			}
 		}
+		connection_limit: {
+			description: "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:    false
+			type: uint: {
+				default: null
+				unit:    "connections"
+			}
+		}
 
 	}
 

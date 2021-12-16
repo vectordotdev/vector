@@ -48,6 +48,7 @@ pub enum Mode {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
+        connection_limit: Option<u32>,
     },
     Udp {
         address: SocketAddr,
@@ -79,6 +80,7 @@ impl GenerateConfig for SyslogConfig {
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,
+                connection_limit: None,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -102,6 +104,7 @@ impl SourceConfig for SyslogConfig {
                 keepalive,
                 tls,
                 receive_buffer_bytes,
+                connection_limit,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -117,7 +120,7 @@ impl SourceConfig for SyslogConfig {
                     receive_buffer_bytes,
                     cx,
                     false.into(),
-                    None,
+                    connection_limit,
                 )
             }
             Mode::Udp {

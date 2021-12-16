@@ -30,6 +30,7 @@ pub struct LogstashConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -66,7 +67,7 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
-            None,
+            self.connection_limit,
         )
     }
 

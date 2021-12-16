@@ -32,6 +32,7 @@ pub struct FluentConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -46,6 +47,7 @@ impl GenerateConfig for FluentConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: Some(2),
         })
         .unwrap()
     }
@@ -66,7 +68,7 @@ impl SourceConfig for FluentConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
-            None,
+            self.connection_limit,
         )
     }
 

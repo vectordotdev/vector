@@ -58,6 +58,14 @@ components: sources: fluent: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
+		connection_limit: {
+			description: "The max number of TCP connections that will be processed."
+			required:    false
+			type: uint: {
+				default: null
+				unit:    "connections"
+			}
+		}
 	}
 
 	output: logs: line: {
