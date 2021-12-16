@@ -368,7 +368,10 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse stop
 endif
 
-.PHONY: test-integration-docker-logs
+.PHONY: test-integration-datadog-metrics
+test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib sinks::datadog::metrics::tests::
+
 test-integration-docker-logs: ## Runs Docker Logs integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
 
