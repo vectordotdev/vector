@@ -61,6 +61,15 @@ impl<T: Ord> Collection<T> {
         }
     }
 
+    /// Create a collection kind of which the encapsulated values can be any JSON-compatible kind.
+    #[must_use]
+    pub fn json() -> Self {
+        Self {
+            known: BTreeMap::default(),
+            other: Other::Exact(Box::new(Kind::json())),
+        }
+    }
+
     /// Check if the collection fields can be of any kind.
     ///
     /// This returns `false` if at least _one_ field kind is known.

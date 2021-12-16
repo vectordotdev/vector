@@ -234,6 +234,25 @@ impl Kind {
         }
     }
 
+    /// The "json" type state.
+    ///
+    /// This state is similar to `any`, except that it excludes any types that can't be represented
+    /// in a native JSON-type (such as `timestamp` and `regex`).
+    #[must_use]
+    pub fn json() -> Self {
+        Self {
+            bytes: Some(()),
+            integer: Some(()),
+            float: Some(()),
+            boolean: Some(()),
+            timestamp: None,
+            regex: None,
+            null: Some(()),
+            array: Some(Collection::json()),
+            object: Some(Collection::json()),
+        }
+    }
+
     /// The "bytes" type state.
     #[must_use]
     pub fn bytes() -> Self {
