@@ -33,7 +33,10 @@ use crate::{
     Bufferable,
 };
 
-use super::{common::DiskBufferConfig, record::try_as_record_archive};
+use super::{
+    common::{create_crc32c_hasher, DiskBufferConfig},
+    record::try_as_record_archive,
+};
 
 /// Error that occurred during calls to [`Writer`].
 #[derive(Debug, Snafu)]
@@ -116,7 +119,7 @@ where
             encode_buf: Vec::with_capacity(16_384),
             ser_buf: AlignedVec::with_capacity(16_384),
             ser_scratch: AlignedVec::with_capacity(16_384),
-            checksummer: Hasher::new(),
+            checksummer: create_crc32c_hasher(),
             max_record_size: record_max_size,
             _t: PhantomData,
         }
@@ -397,11 +400,6 @@ where
         if should_skip_to_next_file {
             self.reset();
             self.ledger.state().increment_writer_file_id();
-
-            // SCREAM SCREAM I SHOULDN'T BE HERE
-            // This is definitely required to avoid stalls when write validation fails and we roll
-            // to the next data file.  We need to update our write validation tests to ensure that
-            // we make this call when we're instructed to skip to the next data file.
             self.ensure_ready_for_write().await?;
         }
 

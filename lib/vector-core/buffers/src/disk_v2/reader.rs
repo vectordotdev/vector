@@ -18,6 +18,7 @@ use tokio::{
 use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
 
 use super::{
+    common::create_crc32c_hasher,
     ledger::Ledger,
     record::{try_as_record_archive, Record, RecordStatus},
 };
@@ -129,7 +130,7 @@ where
         Self {
             reader: BufReader::new(reader),
             aligned_buf: AlignedVec::new(),
-            checksummer: Hasher::new(),
+            checksummer: create_crc32c_hasher(),
             current_record_id: 0,
             _t: PhantomData,
         }
@@ -494,13 +495,14 @@ where
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        // SCREAM SCREAM SCREAM
-                        // this is a not entirely proven out thought:
-                        // if the writer/reader file IDs are not the same, and we try to open our
-                        // current file and it doesn't exist, what actually happened is that we
-                        // deleted it as instructed but never made it to the "now update our reader
-                        // file ID in the ledger" step.  we should just increment our read file ID
-                        // and try again.
+                        // TODO: Add a test that can correctly suss out this situation and prove
+                        // this invariant for us:
+                        //
+                        // If the reader/writer file IDs are not the same, and we try to open our
+                        // current file and it doesn't exist, we're in a scenario where we deleted
+                        // the file but didn't get to the step where we increment our "current
+                        // reader file ID".  We simply increment that to set ourselves to the right
+                        // position and try again.
                         if reader_file_id == writer_file_id {
                             debug!("waiting for {:?} to be created...", data_file_path);
                             self.ledger.wait_for_writer().await;

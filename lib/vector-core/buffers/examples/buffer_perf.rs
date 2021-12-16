@@ -1,7 +1,3 @@
-#![allow(clippy::print_stderr)] // soak framework
-#![allow(clippy::print_stdout)]
-// Clippy allows are because this is an example/soak-y test, where we don't
-// actually care about the presence of `info!` calls.
 use std::path::PathBuf;
 use std::{cmp, error, fmt};
 use std::{
