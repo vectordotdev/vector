@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.15"
+version = "3.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0206a350172ea34012150b35eccd13fd2e3bdfc923965a0ed1604a9796a4334f"
+checksum = "6c031456570311c9f6125620329363dba3c8ca369debae3a0b5e0b11705ec7d9"
 dependencies = [
  "async-graphql",
  "futures-util",
