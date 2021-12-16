@@ -65,6 +65,7 @@ impl VectorConfig {
             self.receive_buffer_bytes,
             cx,
             false.into(),
+            None,
         )
     }
 

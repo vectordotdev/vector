@@ -16,7 +16,6 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 use tokio::sync::Semaphore;
 use tokio::{
@@ -113,7 +112,7 @@ where
             .out
             .sink_map_err(|error| error!(message = "Error sending event.", %error));
 
-        let mut listenfd = ListenFd::from_env();
+        let listenfd = ListenFd::from_env();
 
         Ok(Box::pin(async move {
             let listener = match make_listener(addr, listenfd, &tls).await {
@@ -147,12 +146,12 @@ where
                 .accept_stream()
                 .take_until(shutdown_clone)
                 .for_each(move |connection| {
-                    let connection_count = connection_count.clone();
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
                     let connection_gauge = connection_gauge.clone();
+                    let connection_semaphore = connection_semaphore.clone();
 
                     async move {
                         let socket = match connection {
@@ -169,10 +168,13 @@ where
                         let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
 
-                        let permit = connection_semaphore.and_then(|semaphore| {
-                            // is the semaphore is closed, or there is no limit, this will return `None`
-                            semaphore.acquire().await.ok()
-                        });
+                        let permit = match connection_semaphore {
+                            None => None,
+                            Some(semaphore) => {
+                                // is the semaphore is closed, or there is no limit, this will return `None`
+                                semaphore.acquire_owned().await.ok()
+                            }
+                        };
 
                         let tripwire = tripwire
                             .map(move |_| {
@@ -208,8 +210,7 @@ where
                                 })
                                 .instrument(span.clone()),
                             );
-                        })
-                        .await;
+                        });
                     }
                 })
                 .map(Ok)
