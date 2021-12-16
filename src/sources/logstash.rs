@@ -66,6 +66,7 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            None,
         )
     }
 

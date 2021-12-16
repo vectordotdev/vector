@@ -66,6 +66,7 @@ impl SourceConfig for FluentConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            None,
         )
     }
 
@@ -176,6 +177,7 @@ impl FluentDecoder {
     ) -> Result<(), DecodeError> {
         match message {
             FluentMessage::Message(tag, timestamp, record) => {
+                debug!("FluentD decoder: Message (1 event)");
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
@@ -188,6 +190,7 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
+                debug!("FluentD decoder: MessageWithOptions (1 event)");
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
@@ -200,6 +203,7 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::Forward(tag, entries) => {
+                debug!("FluentD decoder: Forward ({} events)", entries.len());
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -216,6 +220,10 @@ impl FluentDecoder {
                 Ok(())
             }
             FluentMessage::ForwardWithOptions(tag, entries, options) => {
+                debug!(
+                    "FluentD decoder: ForwardWithOptions ({} events)",
+                    entries.len()
+                );
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -236,7 +244,9 @@ impl FluentDecoder {
 
                 let mut decoder = FluentEntryStreamDecoder;
 
+                let mut count = 0;
                 while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
+                    count += 1;
                     self.unread_frames.push_back((
                         FluentFrame {
                             tag: tag.clone(),
@@ -247,6 +257,7 @@ impl FluentDecoder {
                         byte_size,
                     ));
                 }
+                debug!("FluentD decoder: PackedForward ({} events)", count);
                 Ok(())
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
@@ -266,7 +277,9 @@ impl FluentDecoder {
 
                 let mut decoder = FluentEntryStreamDecoder;
 
+                let mut count = 0;
                 while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
+                    count += 1;
                     self.unread_frames.push_back((
                         FluentFrame {
                             tag: tag.clone(),
@@ -277,6 +290,10 @@ impl FluentDecoder {
                         byte_size,
                     ));
                 }
+                debug!(
+                    "FluentD decoder: PackedForwardWithOptions ({} events)",
+                    count
+                );
                 Ok(())
             }
             FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(()),
@@ -304,20 +321,14 @@ impl Decoder for FluentDecoder {
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
             // check for unexpected EOF to indicate that we need more data
-            match res {
-                // can use or-patterns in 1.53
-                // https://github.com/rust-lang/rust/pull/79278
-                Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+            if let Err(DecodeError::Decode(
+                decode::Error::InvalidDataRead(ref custom)
+                | decode::Error::InvalidMarkerRead(ref custom),
+            )) = res
+            {
+                if custom.kind() == io::ErrorKind::UnexpectedEof {
+                    return Ok(None);
                 }
-                Err(DecodeError::Decode(decode::Error::InvalidMarkerRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
-                }
-                _ => {}
             }
 
             (des.position() as usize, res)

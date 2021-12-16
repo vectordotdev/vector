@@ -16,7 +16,9 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+use tokio::sync::Semaphore;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -105,12 +107,13 @@ where
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
+        max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
         let out = cx
             .out
             .sink_map_err(|error| error!(message = "Error sending event.", %error));
 
-        let listenfd = ListenFd::from_env();
+        let mut listenfd = ListenFd::from_env();
 
         Ok(Box::pin(async move {
             let listener = match make_listener(addr, listenfd, &tls).await {
@@ -136,10 +139,15 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
+            // let mut connection_count = Arc::new(AtomicU32::new(0));
+            let connection_semaphore =
+                max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
+
             listener
                 .accept_stream()
                 .take_until(shutdown_clone)
                 .for_each(move |connection| {
+                    let connection_count = connection_count.clone();
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
@@ -160,6 +168,11 @@ where
 
                         let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
+
+                        let permit = connection_semaphore.and_then(|semaphore| {
+                            // is the semaphore is closed, or there is no limit, this will return `None`
+                            semaphore.acquire().await.ok()
+                        });
 
                         let tripwire = tripwire
                             .map(move |_| {
@@ -189,9 +202,14 @@ where
                             );
 
                             tokio::spawn(
-                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                                fut.map(move |()| {
+                                    drop(open_token);
+                                    drop(permit);
+                                })
+                                .instrument(span.clone()),
                             );
-                        });
+                        })
+                        .await;
                     }
                 })
                 .map(Ok)

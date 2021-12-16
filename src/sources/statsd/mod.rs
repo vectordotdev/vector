@@ -111,6 +111,7 @@ impl SourceConfig for StatsdConfig {
                     config.receive_buffer_bytes,
                     cx,
                     false.into(),
+                    None,
                 )
             }
             #[cfg(unix)]

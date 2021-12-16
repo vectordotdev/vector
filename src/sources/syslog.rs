@@ -117,6 +117,7 @@ impl SourceConfig for SyslogConfig {
                     receive_buffer_bytes,
                     cx,
                     false.into(),
+                    None,
                 )
             }
             Mode::Udp {
