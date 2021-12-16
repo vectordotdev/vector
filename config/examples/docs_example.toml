@@ -3,37 +3,38 @@ data_dir = "/var/lib/vector"
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
-  type         = "file"
-  include      = ["/var/log/apache2/*.log"]    # supports globbing
-  ignore_older = 86400                         # 1 day
+type         = "file"
+include      = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older = 86400                         # 1 day
 
 # Structure and parse the data
 [transforms.apache_parser]
-  inputs       = ["apache_logs"]
-  type         = "regex_parser"                # fast/powerful regex
-  patterns      = ['^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$']
+inputs       = ["apache_logs"]
+type         = "regex_parser"                # fast/powerful regex
+patterns      = ['^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$']
 
 # Sample the data to save on cost
 [transforms.apache_sample]
-  inputs       = ["apache_parser"]
-  type         = "sample"
-  rate         = 50                            # only keep 50%
+inputs       = ["apache_parser"]
+type         = "sample"
+rate         = 50                            # only keep 50%
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-  inputs       = ["apache_sample"]            # only take sampled data
-  type         = "elasticsearch"
-  host         = "http://79.12.221.222:9200"   # local or external host
-  index        = "vector-%Y-%m-%d"             # daily indices
+inputs       = ["apache_sample"]            # only take sampled data
+type         = "elasticsearch"
+endpoint         = "http://79.12.221.222:9200"   # local or external host
+[sinks.es_cluster.bulk]
+index        = "vector-%Y-%m-%d"             # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
-  inputs       = ["apache_parser"]             # don't sample for S3
-  type         = "aws_s3"
-  region       = "us-east-1"
-  bucket       = "my-log-archives"
-  key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
-  compression  = "gzip"                        # compress final objects
-  encoding     = "ndjson"                      # new line delimited JSON
-  [sinks.s3_archives.batch]
-    max_bytes   = 10000000                      # 10mb uncompressed
+inputs       = ["apache_parser"]             # don't sample for S3
+type         = "aws_s3"
+region       = "us-east-1"
+bucket       = "my-log-archives"
+key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
+compression  = "gzip"                        # compress final objects
+encoding     = "ndjson"                      # new line delimited JSON
+[sinks.s3_archives.batch]
+max_bytes   = 10000000                      # 10mb uncompressed
