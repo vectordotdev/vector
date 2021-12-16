@@ -1,8 +1,10 @@
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
+use std::{cmp, io, usize};
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use std::{cmp, io, usize};
 use tokio_util::codec::{Decoder, Encoder};
+
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -180,9 +182,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use indoc::indoc;
     use std::collections::HashMap;
+
+    use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn character_delimited_decode() {

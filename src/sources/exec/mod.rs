@@ -1,3 +1,24 @@
+use std::{
+    io::{Error, ErrorKind},
+    path::PathBuf,
+    process::ExitStatus,
+};
+
+use bytes::Bytes;
+use chrono::Utc;
+use futures::{FutureExt, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use snafu::Snafu;
+use tokio::{
+    io::{AsyncRead, BufReader},
+    process::Command,
+    sync::mpsc::{channel, Sender},
+    time::{self, sleep, Duration, Instant},
+};
+use tokio_stream::wrappers::IntervalStream;
+use tokio_util::codec::FramedRead;
+
 use crate::{
     async_read::VecAsyncReadExt,
     codecs::{
@@ -12,21 +33,6 @@ use crate::{
     sources::util::StreamDecodingError,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use futures::{FutureExt, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
-use snafu::Snafu;
-use std::io::{Error, ErrorKind};
-use std::path::PathBuf;
-use std::process::ExitStatus;
-use tokio::io::{AsyncRead, BufReader};
-use tokio::process::Command;
-use tokio::sync::mpsc::{channel, Sender};
-use tokio::time::{self, sleep, Duration, Instant};
-use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
 
 pub mod sized_bytes_codec;
 
@@ -531,9 +537,10 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
     use crate::test_util::trace_init;
-    use std::io::Cursor;
 
     #[test]
     fn test_generate_config() {

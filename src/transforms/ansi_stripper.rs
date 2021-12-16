@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
@@ -5,7 +7,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -78,8 +79,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
-    use crate::transforms::test::transform_one;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

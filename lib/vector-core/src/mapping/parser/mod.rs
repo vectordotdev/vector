@@ -1,12 +1,19 @@
 extern crate pest;
 
+use std::{convert::TryFrom, str::FromStr};
+
+use pest::{
+    error::ErrorVariant,
+    iterators::{Pair, Pairs},
+    Parser,
+};
+
 use crate::{
     event::Value,
     mapping::{
         query::{
             self,
-            arithmetic::Arithmetic,
-            arithmetic::Operator,
+            arithmetic::{Arithmetic, Operator},
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
             query_value::QueryValue,
@@ -17,13 +24,6 @@ use crate::{
         OnlyFields, Result,
     },
 };
-use pest::{
-    error::ErrorVariant,
-    iterators::{Pair, Pairs},
-    Parser,
-};
-use std::convert::TryFrom;
-use std::str::FromStr;
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
 // updated in unexpected, and unsupported ways.

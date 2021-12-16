@@ -1,3 +1,23 @@
+use std::{
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
+
+use bytes::Bytes;
+use futures_util::{future::BoxFuture, ready};
+use http::Request;
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use tokio::sync::{
+    mpsc::{self},
+    oneshot, OwnedSemaphorePermit, Semaphore,
+};
+use tokio_util::sync::PollSemaphore;
+use tower::Service;
+use uuid::Uuid;
+use vector_core::event::EventStatus;
+
 use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
 use crate::{
     http::HttpClient,
@@ -8,24 +28,6 @@ use crate::{
         UriParseError,
     },
 };
-use bytes::Bytes;
-use futures_util::{future::BoxFuture, ready};
-use http::Request;
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use std::{
-    fmt,
-    sync::Arc,
-    task::{Context, Poll},
-};
-use tokio::sync::{
-    mpsc::{self},
-    oneshot, OwnedSemaphorePermit, Semaphore,
-};
-use tokio_util::sync::PollSemaphore;
-use tower::Service;
-use uuid::Uuid;
-use vector_core::event::EventStatus;
 
 pub struct HecService<S> {
     pub inner: S,
@@ -221,8 +223,6 @@ impl HttpRequestBuilder {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
     use std::{
         collections::HashMap,
         num::{NonZeroU64, NonZeroU8},
@@ -232,6 +232,9 @@ mod tests {
         },
         task::Poll,
     };
+
+    use bytes::Bytes;
+    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,

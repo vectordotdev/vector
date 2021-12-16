@@ -1,3 +1,10 @@
+use bytes::Bytes;
+use chrono::Utc;
+use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tokio_util::codec::FramedRead;
+
 use crate::{
     codecs::{
         self,
@@ -13,12 +20,6 @@ use crate::{
     sources::util::StreamDecodingError,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {

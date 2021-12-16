@@ -1,3 +1,7 @@
+use std::cmp;
+
+use async_graphql::{Enum, InputObject, Object};
+
 use super::{sink, source, state, Component};
 use crate::{
     api::schema::{
@@ -8,8 +12,6 @@ use crate::{
     config::{ComponentKey, OutputId},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Object};
-use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {

@@ -1,16 +1,22 @@
 #![deny(missing_docs)]
 
-use super::Event;
-use crate::ByteSizeOf;
+use std::{
+    cmp,
+    future::Future,
+    iter::{self, ExactSizeIterator},
+    mem,
+    pin::Pin,
+    sync::Arc,
+    task::Poll,
+};
+
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
-use std::iter::{self, ExactSizeIterator};
-use std::pin::Pin;
-use std::task::Poll;
-use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
+
+use super::Event;
+use crate::ByteSizeOf;
 
 type ImmutVec<T> = Box<[T]>;
 
@@ -382,8 +388,9 @@ impl<T: Finalizable> Finalizable for Vec<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::sync::oneshot::error::TryRecvError::Empty;
+
+    use super::*;
 
     #[test]
     fn defaults() {

@@ -2,9 +2,11 @@
 
 #![deny(missing_docs)]
 
-use crate::{event::Event, transforms::TaskTransform};
-use futures::Stream;
 use std::pin::Pin;
+
+use futures::Stream;
+
+use crate::{event::Event, transforms::TaskTransform};
 
 /// Optional transform.
 /// Passes events through the specified transform is any, otherwise passes them,

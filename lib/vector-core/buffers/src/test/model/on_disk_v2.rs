@@ -1,9 +1,13 @@
-use crate::test::common::Variant;
-use crate::test::model::{Message, Model};
-use crate::{EncodeBytes, WhenFull};
 use std::collections::VecDeque;
 
 use super::Progress;
+use crate::{
+    test::{
+        common::Variant,
+        model::{Message, Model},
+    },
+    EncodeBytes, WhenFull,
+};
 
 /// `OnDiskV2` is the `Model` for on-disk buffer for the pure Rust implementation (v2)
 pub(crate) struct OnDiskV2 {

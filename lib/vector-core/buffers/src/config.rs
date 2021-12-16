@@ -1,3 +1,9 @@
+use std::{fmt, path::PathBuf};
+
+use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use snafu::{ResultExt, Snafu};
+use tracing::Span;
+
 use crate::{
     topology::{
         builder::{TopologyBuilder, TopologyError},
@@ -6,10 +12,6 @@ use crate::{
     variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
     Acker, Bufferable, WhenFull,
 };
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
-use snafu::{ResultExt, Snafu};
-use std::{fmt, path::PathBuf};
-use tracing::Span;
 
 #[derive(Debug, Snafu)]
 pub enum BufferBuildError {

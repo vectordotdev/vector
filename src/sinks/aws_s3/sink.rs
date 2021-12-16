@@ -1,19 +1,23 @@
 use std::io;
 
+use bytes::Bytes;
+use chrono::Utc;
+use uuid::Uuid;
+use vector_core::{event::Finalizable, ByteSizeOf};
+
 use crate::{
     event::Event,
     sinks::{
-        s3_common::{config::S3Options, service::S3Metadata, service::S3Request},
+        s3_common::{
+            config::S3Options,
+            service::{S3Metadata, S3Request},
+        },
         util::{
             encoding::{EncodingConfig, StandardEncodings},
             Compression, RequestBuilder,
         },
     },
 };
-use bytes::Bytes;
-use chrono::Utc;
-use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
 
 #[derive(Clone)]
 pub struct S3RequestOptions {

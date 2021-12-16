@@ -1,5 +1,4 @@
 use std::marker::PhantomData;
-
 #[cfg(test)]
 use std::pin::Pin;
 

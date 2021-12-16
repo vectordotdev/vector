@@ -1,3 +1,17 @@
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+
+use futures::StreamExt;
+use once_cell::race::OnceNonZeroUsize;
+use tokio::{
+    runtime::{self, Runtime},
+    sync::mpsc,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
+#[cfg(windows)]
+use crate::service;
+#[cfg(feature = "api")]
+use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, graph, heartbeat, list, metrics,
@@ -5,22 +19,8 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use futures::StreamExt;
-use once_cell::race::OnceNonZeroUsize;
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::mpsc,
-};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
-
-#[cfg(windows)]
-use crate::service;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 

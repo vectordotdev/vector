@@ -1,13 +1,15 @@
+use std::convert::TryInto;
+
+use bytes::Bytes;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::Event,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use std::convert::TryInto;
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

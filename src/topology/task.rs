@@ -1,17 +1,18 @@
-use crate::config::ComponentKey;
-use crate::utilization::Utilization;
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
 use vector_core::{
     buffers::{topology::channel::BufferReceiver, Acker},
     event::Event,
 };
+
+use crate::{config::ComponentKey, utilization::Utilization};
 
 pub enum TaskOutput {
     Source,

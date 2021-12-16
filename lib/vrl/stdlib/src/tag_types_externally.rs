@@ -1,5 +1,6 @@
-use shared::btreemap;
 use std::collections::BTreeMap;
+
+use shared::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -129,10 +130,11 @@ fn tag_type_externally(value: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
     use regex::Regex;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         tag_types_externally => TagTypesExternally;

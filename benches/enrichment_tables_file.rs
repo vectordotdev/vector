@@ -1,7 +1,8 @@
+use std::{collections::BTreeMap, time::SystemTime};
+
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use enrichment::Case;
-use std::{collections::BTreeMap, time::SystemTime};
 use vector::enrichment_tables::{file::File, Condition, Table};
 use vrl::Value;
 

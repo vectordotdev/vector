@@ -1,15 +1,18 @@
+use std::borrow::Cow::{self, Borrowed, Owned};
+
 use indoc::indoc;
 use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use rustyline::completion::Completer;
-use rustyline::error::ReadlineError;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
-use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{self, ValidationResult, Validator};
-use rustyline::{Context, Editor, Helper};
+use rustyline::{
+    completion::Completer,
+    error::ReadlineError,
+    highlight::{Highlighter, MatchingBracketHighlighter},
+    hint::{Hinter, HistoryHinter},
+    validate::{self, ValidationResult, Validator},
+    Context, Editor, Helper,
+};
 use shared::TimeZone;
-use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup

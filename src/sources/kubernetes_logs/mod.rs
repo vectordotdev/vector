@@ -5,22 +5,8 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{Event, LogEvent};
-use crate::internal_events::{
-    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-    KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
-};
-use crate::kubernetes as k8s;
-use crate::kubernetes::hash_value::HashKey;
-use crate::{
-    config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
-        SourceConfig, SourceContext, SourceDescription,
-    },
-    shutdown::ShutdownSignal,
-    sources,
-    transforms::{FunctionTransform, TaskTransform},
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
@@ -30,9 +16,23 @@ use file_source::{
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use std::convert::TryInto;
-use std::path::PathBuf;
-use std::time::Duration;
+
+use crate::{
+    config::{
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
+        SourceConfig, SourceContext, SourceDescription,
+    },
+    event::{Event, LogEvent},
+    internal_events::{
+        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
+    },
+    kubernetes as k8s,
+    kubernetes::hash_value::HashKey,
+    shutdown::ShutdownSignal,
+    sources,
+    transforms::{FunctionTransform, TaskTransform},
+};
 
 mod k8s_paths_provider;
 mod lifecycle;

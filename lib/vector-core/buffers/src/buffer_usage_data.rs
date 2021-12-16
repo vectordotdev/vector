@@ -1,13 +1,19 @@
+use std::{
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
 use core_common::internal_event::emit;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::{sync::Arc, time::Duration};
 use tokio::time::interval;
 use tracing::{Instrument, Span};
 
-use crate::internal_events::{
-    BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped,
+use crate::{
+    internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped},
+    WhenFull,
 };
-use crate::WhenFull;
 
 #[derive(Clone, Debug)]
 pub struct BufferUsageHandle {

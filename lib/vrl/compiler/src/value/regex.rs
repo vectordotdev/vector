@@ -1,5 +1,7 @@
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
+use std::{
+    hash::{Hash, Hasher},
+    ops::Deref,
+};
 
 #[derive(Debug, Clone)]
 pub struct Regex(regex::Regex);

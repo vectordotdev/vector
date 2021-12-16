@@ -1,11 +1,16 @@
-use std::error::Error;
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf};
 
 use async_trait::async_trait;
 
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
-use crate::{disk::open, topology::builder::IntoBuffer, Acker, Bufferable};
+use crate::{
+    buffer_usage_data::BufferUsageHandle,
+    disk::open,
+    topology::{
+        builder::IntoBuffer,
+        channel::{ReceiverAdapter, SenderAdapter},
+    },
+    Acker, Bufferable,
+};
 
 pub struct DiskV1Buffer {
     id: String,

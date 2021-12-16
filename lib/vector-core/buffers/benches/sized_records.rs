@@ -1,13 +1,13 @@
-use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
+use std::{mem, path::PathBuf, time::Duration};
+
 use buffers::{self, BufferType, WhenFull};
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
 };
-use std::mem;
-use std::path::PathBuf;
-use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
+
+use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
 
 mod common;
 

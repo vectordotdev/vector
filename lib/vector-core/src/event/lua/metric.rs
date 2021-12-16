@@ -1,3 +1,7 @@
+use std::collections::BTreeMap;
+
+use mlua::prelude::*;
+
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::{
     event::{
@@ -6,8 +10,6 @@ use crate::{
     },
     metrics::AgentDDSketch,
 };
-use mlua::prelude::*;
-use std::collections::BTreeMap;
 
 impl<'a> ToLua<'a> for MetricKind {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
@@ -272,9 +274,10 @@ impl<'a> FromLua<'a> for Metric {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::{offset::TimeZone, Utc};
     use shared::assert_event_data_eq;
+
+    use super::*;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
         let lua = Lua::new();

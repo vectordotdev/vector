@@ -1,8 +1,6 @@
+use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
+
 use lazy_static::lazy_static;
-use std::borrow::Cow;
-use std::fmt;
-use std::str::FromStr;
-use std::sync::Arc;
 use uaparser::UserAgentParser as UAParser;
 use vrl::prelude::*;
 use woothee::parser::Parser as WootheeParser;

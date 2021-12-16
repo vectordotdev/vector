@@ -1,3 +1,12 @@
+use std::{num::NonZeroU64, sync::Arc};
+
+use futures_util::future::BoxFuture;
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use snafu::{ResultExt, Snafu};
+use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+
+use super::{request::HecRequest, service::HttpRequestBuilder};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
@@ -9,14 +18,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures_util::future::BoxFuture;
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use snafu::{ResultExt, Snafu};
-use std::{num::NonZeroU64, sync::Arc};
-use vector_core::{config::proxy::ProxyConfig, event::EventRef};
-
-use super::{request::HecRequest, service::HttpRequestBuilder};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -286,12 +287,14 @@ mod tests {
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
-    use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
-    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
-    use http::StatusCode;
     use std::net::SocketAddr;
+
+    use http::StatusCode;
     use vector_core::config::proxy::ProxyConfig;
     use warp::Filter;
+
+    use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
+    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
@@ -341,9 +344,10 @@ mod integration_tests {
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 pub mod integration_test_helpers {
-    use crate::test_util::retry_until;
     use serde_json::Value as JsonValue;
     use tokio::time::Duration;
+
+    use crate::test_util::retry_until;
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";

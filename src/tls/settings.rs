@@ -1,8 +1,10 @@
-use super::{
-    AddCertToStore, AddExtraChainCert, CaStackPush, DerExportError, FileOpenFailed, FileReadFailed,
-    MaybeTls, NewCaStack, NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result,
-    SetCertificate, SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
 };
+
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
@@ -12,8 +14,12 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::path::{Path, PathBuf};
-use std::{fmt, fs::File, io::Read};
+
+use super::{
+    AddCertToStore, AddExtraChainCert, CaStackPush, DerExportError, FileOpenFailed, FileReadFailed,
+    MaybeTls, NewCaStack, NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result,
+    SetCertificate, SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -288,9 +294,11 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
-    use super::SecurityFramework;
-    use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
     use std::collections::HashMap;
+
+    use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
+
+    use super::SecurityFramework;
 
     // The various domains are designed to interact like this:
     //

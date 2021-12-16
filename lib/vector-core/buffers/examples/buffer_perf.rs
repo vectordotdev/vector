@@ -1,6 +1,6 @@
-use std::path::PathBuf;
-use std::{cmp, error, fmt};
 use std::{
+    cmp, error, fmt,
+    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -8,18 +8,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use buffers::encoding::{DecodeBytes, EncodeBytes};
-use buffers::topology::channel::{BufferReceiver, BufferSender};
-use buffers::{topology::builder::TopologyBuilder, WhenFull};
-use buffers::{Acker, BufferType, Bufferable};
+use buffers::{
+    encoding::{DecodeBytes, EncodeBytes},
+    topology::{
+        builder::TopologyBuilder,
+        channel::{BufferReceiver, BufferSender},
+    },
+    Acker, BufferType, Bufferable, WhenFull,
+};
 use bytes::{Buf, BufMut};
 use clap::{App, Arg};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::{stream, SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
-use tokio::task;
-use tokio::{select, sync::oneshot, time};
+use tokio::{select, sync::oneshot, task, time};
 use tracing::{debug, info, Span};
 use tracing_subscriber::EnvFilter;
 

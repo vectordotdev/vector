@@ -1,5 +1,6 @@
-use crate::Value;
 use lookup::LookupBuf;
+
+use crate::Value;
 
 /// Any target object you want to remap using VRL has to implement this trait.
 pub trait Target: std::fmt::Debug {

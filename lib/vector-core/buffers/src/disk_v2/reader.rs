@@ -15,13 +15,12 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
 };
 
-use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
-
 use super::{
     common::create_crc32c_hasher,
     ledger::Ledger,
     record::{try_as_record_archive, Record, RecordStatus},
 };
+use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
 
 #[derive(Debug)]
 struct DeletionMarker {

@@ -1,6 +1,5 @@
-use vrl::prelude::*;
-
 use percent_encoding::percent_decode;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodePercent;

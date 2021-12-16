@@ -18,13 +18,12 @@ use tokio::{
     sync::Notify,
 };
 
-use crate::buffer_usage_data::BufferUsageHandle;
-
 use super::{
     backed_archive::BackedArchive,
     common::{DiskBufferConfig, MAX_FILE_ID},
     ser::SerializeError,
 };
+use crate::buffer_usage_data::BufferUsageHandle;
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]

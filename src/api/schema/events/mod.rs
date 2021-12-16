@@ -3,17 +3,16 @@ mod log;
 mod notification;
 mod output;
 
-use encoding::EventEncodingType;
-use output::OutputEventsPayload;
-
-use crate::{api::tap::TapController, topology::WatchRx};
-
 use async_graphql::{Context, Subscription};
+use encoding::EventEncodingType;
 use futures::Stream;
 use itertools::Itertools;
+use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{api::tap::TapController, topology::WatchRx};
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;

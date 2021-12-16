@@ -1,12 +1,16 @@
-use super::EncodedEvent;
-use crate::{event::EventFinalizers, internal_events::LargeEventDropped};
+use std::{
+    marker::PhantomData,
+    num::{NonZeroU64, NonZeroUsize},
+    time::Duration,
+};
+
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::marker::PhantomData;
-use std::num::{NonZeroU64, NonZeroUsize};
-use std::time::Duration;
 use vector_core::stream::BatcherSettings;
+
+use super::EncodedEvent;
+use crate::{event::EventFinalizers, internal_events::LargeEventDropped};
 
 // * Provide sensible sink default 10 MB with 1s timeout. Don't allow chaining builder methods on
 //   that.

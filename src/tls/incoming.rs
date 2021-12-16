@@ -1,3 +1,19 @@
+use std::{
+    future::Future,
+    net::SocketAddr,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{future::BoxFuture, stream, FutureExt, Stream};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use snafu::ResultExt;
+use tokio::{
+    io::{self, AsyncRead, AsyncWrite, ReadBuf},
+    net::{TcpListener, TcpStream},
+};
+use tokio_openssl::SslStream;
+
 use super::{
     CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError,
     TcpBind, TlsError, TlsSettings,
@@ -6,20 +22,6 @@ use super::{
 use crate::tcp;
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
-use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
-use snafu::ResultExt;
-use std::{
-    future::Future,
-    net::SocketAddr,
-    pin::Pin,
-    task::{Context, Poll},
-};
-use tokio::{
-    io::{self, AsyncRead, AsyncWrite, ReadBuf},
-    net::{TcpListener, TcpStream},
-};
-use tokio_openssl::SslStream;
 
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {

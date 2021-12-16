@@ -1,3 +1,17 @@
+use std::net::SocketAddr;
+#[cfg(unix)]
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use chrono::Utc;
+#[cfg(unix)]
+use codecs::Decoder;
+use futures::{FutureExt, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use tokio::net::UdpSocket;
+use tokio_util::udp::UdpFramed;
+
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
@@ -7,26 +21,13 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::SyslogEventReceived,
-    internal_events::SyslogUdpReadError,
+    internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     udp, Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-#[cfg(unix)]
-use codecs::Decoder;
-use futures::{FutureExt, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
-use std::net::SocketAddr;
-#[cfg(unix)]
-use std::path::PathBuf;
-use tokio::net::UdpSocket;
-use tokio_util::udp::UdpFramed;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -301,10 +302,11 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{codecs::decoding::Deserializer, config::log_schema, event::Event};
     use chrono::prelude::*;
     use shared::assert_event_data_eq;
+
+    use super::*;
+    use crate::{codecs::decoding::Deserializer, config::log_schema, event::Event};
 
     fn event_from_bytes(
         host_key: &str,

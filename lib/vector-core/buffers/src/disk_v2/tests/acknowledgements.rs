@@ -2,12 +2,11 @@ use std::sync::Arc;
 
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 
+use super::with_temp_dir;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     disk_v2::{acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfig},
 };
-
-use super::with_temp_dir;
 
 #[tokio::test]
 async fn ack_updates_ledger_correctly() {

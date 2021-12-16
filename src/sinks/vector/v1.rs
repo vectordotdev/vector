@@ -1,16 +1,16 @@
-use crate::{
-    config::{GenerateConfig, SinkContext},
-    sinks::util::tcp::TcpSinkConfig,
-    sinks::{Healthcheck, VectorSink},
-    tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
-};
 use bytes::{BufMut, Bytes, BytesMut};
 use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use vector_core::event::{proto, Event};
+
+use crate::{
+    config::{GenerateConfig, SinkContext},
+    sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
+    tcp::TcpKeepaliveConfig,
+    tls::TlsConfig,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]

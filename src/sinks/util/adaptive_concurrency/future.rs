@@ -1,10 +1,5 @@
 //! Future types
 //!
-use super::controller::Controller;
-use super::instant_now;
-use crate::sinks::util::retries::RetryLogic;
-use futures::ready;
-use pin_project::pin_project;
 use std::{
     future::Future,
     pin::Pin,
@@ -12,7 +7,13 @@ use std::{
     task::{Context, Poll},
     time::Instant,
 };
+
+use futures::ready;
+use pin_project::pin_project;
 use tokio::sync::OwnedSemaphorePermit;
+
+use super::{controller::Controller, instant_now};
+use crate::sinks::util::retries::RetryLogic;
 
 /// Future for the `AdaptiveConcurrencyLimit` service.
 ///

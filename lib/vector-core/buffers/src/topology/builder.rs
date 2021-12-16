@@ -4,12 +4,13 @@ use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 
-use crate::buffer_usage_data::{BufferUsage, BufferUsageHandle};
-use crate::topology::channel::{BufferReceiver, BufferSender};
-use crate::variant::MemoryV1Buffer;
-use crate::{Acker, Bufferable, WhenFull};
-
 use super::channel::{ReceiverAdapter, SenderAdapter};
+use crate::{
+    buffer_usage_data::{BufferUsage, BufferUsageHandle},
+    topology::channel::{BufferReceiver, BufferSender},
+    variant::MemoryV1Buffer,
+    Acker, Bufferable, WhenFull,
+};
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
@@ -279,13 +280,12 @@ impl<T> Default for TopologyBuilder<T> {
 mod tests {
     use tracing::Span;
 
+    use super::TopologyBuilder;
     use crate::{
         topology::{builder::TopologyError, test_util::assert_current_send_capacity},
         variant::MemoryV2Buffer,
         WhenFull,
     };
-
-    use super::TopologyBuilder;
 
     #[tokio::test]
     async fn single_stage_topology_block() {

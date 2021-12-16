@@ -1,3 +1,14 @@
+use std::{collections::BTreeMap, sync::Arc};
+
+use chrono::{TimeZone, Utc};
+use futures_util::{stream, StreamExt};
+use serde::Deserialize;
+use vector_core::{
+    config::log_schema,
+    event::{Event, Value},
+    ByteSizeOf,
+};
+
 use super::sink::HecProcessedEvent;
 use crate::{
     config::{SinkConfig, SinkContext},
@@ -7,15 +18,6 @@ use crate::{
     },
     template::Template,
     test_util::next_addr,
-};
-use chrono::{TimeZone, Utc};
-use futures_util::{stream, StreamExt};
-use serde::Deserialize;
-use std::{collections::BTreeMap, sync::Arc};
-use vector_core::{
-    config::log_schema,
-    event::{Event, Value},
-    ByteSizeOf,
 };
 
 #[derive(Deserialize, Debug)]
