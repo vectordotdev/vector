@@ -5,7 +5,7 @@ use crate::stream::batcher::limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLim
 use crate::time::KeyedTimer;
 use crate::ByteSizeOf;
 use futures::ready;
-use futures::stream::Stream;
+use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
@@ -314,7 +314,7 @@ where
     partitioner: Prt,
     #[pin]
     /// The stream this `Batcher` wraps
-    stream: St,
+    stream: Fuse<St>,
 }
 
 impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
@@ -332,7 +332,7 @@ where
             closed_batches: Vec::default(),
             timer: ExpirationQueue::new(settings.timeout),
             partitioner,
-            stream,
+            stream: stream.fuse(),
         }
     }
 }
@@ -359,7 +359,7 @@ where
             closed_batches: Vec::default(),
             timer,
             partitioner,
-            stream,
+            stream: stream.fuse(),
         }
     }
 }
