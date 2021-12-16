@@ -138,7 +138,6 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            // let mut connection_count = Arc::new(AtomicU32::new(0));
             let connection_semaphore =
                 max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
 
@@ -168,6 +167,7 @@ where
                         let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
 
+                        /// async block if we are over the connection limit
                         let permit = match connection_semaphore {
                             None => None,
                             Some(semaphore) => {

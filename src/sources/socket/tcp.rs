@@ -39,7 +39,7 @@ pub struct TcpConfig {
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
     decoding: Box<dyn DeserializerConfig>,
-    connection_limit: Option<u32>,
+    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
