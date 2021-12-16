@@ -167,7 +167,7 @@ where
                         let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
 
-                        /// async block if we are over the connection limit
+                        // async block if we are over the connection limit
                         let permit = match connection_semaphore {
                             None => None,
                             Some(semaphore) => {
