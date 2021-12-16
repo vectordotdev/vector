@@ -4,6 +4,7 @@
 use super::*;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{SinkConfig, SinkContext};
+use crate::sinks::elasticsearch::BulkConfig;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::test_util::components;
@@ -68,7 +69,10 @@ async fn firehose_put_records() {
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: "http://localhost:4571".into(),
-        index: Some(stream.clone()),
+        bulk: Some(BulkConfig {
+            index: Some(stream.clone()),
+            action: None,
+        }),
         ..Default::default()
     };
     let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
