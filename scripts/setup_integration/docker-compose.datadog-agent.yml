@@ -7,7 +7,7 @@ services:
     # communicate with vector running on the host.
     network_mode: host
     environment:
-      - DD_API_KEY
+      - DD_API_KEY=${CI_TEST_DATADOG_API_KEY}
       - DD_LOGS_ENABLED=true
       - DD_LOGS_CONFIG_LOGS_DD_URL=0.0.0.0:8080
       - DD_LOGS_CONFIG_LOGS_NO_SSL=true
