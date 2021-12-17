@@ -17,7 +17,7 @@ fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
 leveldb = { version = "0.8.6", default-features = false  }
-metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 memmap2 = { version = "0.5.0", default-features = false }
 parking_lot = { version = "0.11.2", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
