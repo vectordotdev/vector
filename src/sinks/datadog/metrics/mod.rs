@@ -5,8 +5,8 @@ mod request_builder;
 mod service;
 mod sink;
 
-#[cfg(test)]
-mod tests;
+#[cfg(all(test, feature = "datadog-metrics-integration-tests"))]
+mod integration_tests;
 
 use crate::config::SinkDescription;
 

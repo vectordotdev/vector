@@ -1,5 +1,3 @@
-#![cfg(feature = "datadog-metrics-integration-tests")]
-
 use super::DatadogMetricsConfig;
 use crate::{
     config::SinkConfig,
