@@ -8,6 +8,8 @@ services:
     build:
       context: ${PWD}
       dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
     working_dir: /code
     command:
       - "cargo"

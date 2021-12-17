@@ -105,7 +105,8 @@ jobs:
          - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
-      - run: docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml run runner
+      - run: echo "RUST_VERSION=`grep channel rust-toolchain.toml | cut -d '"' -f 2`" >> $GITHUB_ENV
+      - run: RUST_VERSION=${{ env.RUST_VERSION }} docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml run runner
       - run: docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml rm -fsv
         if: ${{ always() }}
 
