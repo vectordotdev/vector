@@ -90,6 +90,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-${{ matrix.test }}
+        env:
+          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
 
   # just keep both during migration
   test-integration-docker-compose:
