@@ -1115,7 +1115,7 @@ dependencies = [
  "tokio-util",
  "tracing 0.1.29",
  "tracing-fluent-assertions",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -1445,7 +1445,7 @@ dependencies = [
  "tonic 0.5.2",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -3949,9 +3949,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04c561fcf67df86d922cb3e17507ae0760b2e408c5b941ebebfe7e84f34e4c0"
+checksum = "7927d28bccc322a3f48fc445bffe7cb491ab8a43ea28f7c5f75bc16fc4e5d6bd"
 dependencies = [
  "itoa 0.4.8",
  "lockfree-object-pool",
@@ -3960,7 +3960,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.3",
 ]
 
 [[package]]
@@ -6897,7 +6897,7 @@ dependencies = [
  "snafu",
  "tokio",
  "tracing 0.1.29",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -7819,7 +7819,7 @@ checksum = "44099ad2b869e3d751d00c4d8b9d642871517eec60aed6a06598077592bd5e28"
 dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -7853,7 +7853,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -7897,6 +7897,15 @@ dependencies = [
  "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "245da694cc7fc4729f3f418b304cb57789f1bed2a78c575407ab8a23f53cb4d3"
+dependencies = [
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -8420,7 +8429,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -8543,7 +8552,7 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
  "twox-hash",
  "typetag",
  "vrl",
@@ -8701,7 +8710,7 @@ dependencies = [
  "shared",
  "structopt",
  "tikv-jemallocator",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",

@@ -43,7 +43,7 @@ temp-dir = "0.1.11"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.7"
 metrics-util = { version = "0.10.2", default-features = false }
-metrics-tracing-context = { version = "0.8.1", default-features = false }
+metrics-tracing-context = { version = "0.9.0", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 tracing = { version = "0.1.29", features = ["attributes"] }
 tracing-fluent-assertions = "0.2.0"

@@ -26,7 +26,7 @@ indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] 
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
-metrics-tracing-context = { version = "0.8.0", default-features = false }
+metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
