@@ -1,6 +1,8 @@
-use crate::log_util;
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
+
+use crate::log_util;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
@@ -171,9 +173,10 @@ fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_common_log => ParseApacheLog;

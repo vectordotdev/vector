@@ -1,9 +1,11 @@
-use super::Registry;
-use crate::metrics::handle::Handle;
+use std::sync::Arc;
+
 use metrics::{GaugeValue, Key, Recorder, Unit};
 use metrics_util::MetricKind;
 use once_cell::unsync::OnceCell;
-use std::sync::Arc;
+
+use super::Registry;
+use crate::metrics::handle::Handle;
 
 thread_local!(static LOCAL_REGISTRY: OnceCell<Registry>=OnceCell::new());
 

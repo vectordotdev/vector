@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use shared::TimeZone;
-use std::collections::HashMap;
 use vector::{
     event::{Event, Value},
     transforms::{

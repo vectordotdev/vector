@@ -1,13 +1,13 @@
 //! Work with HTTP bodies as streams of Kubernetes resources.
 
-use super::{multi_response_decoder::MultiResponseDecoder, response, Response};
-use crate::internal_events::kubernetes::stream as internal_events;
 use async_stream::try_stream;
 use bytes::Buf;
-use futures::pin_mut;
-use futures::stream::Stream;
+use futures::{pin_mut, stream::Stream};
 use hyper::body::HttpBody as Body;
 use snafu::{ResultExt, Snafu};
+
+use super::{multi_response_decoder::MultiResponseDecoder, response, Response};
+use crate::internal_events::kubernetes::stream as internal_events;
 
 /// Converts the HTTP response [`Body`] to a stream of parsed Kubernetes
 /// [`Response`]s.
@@ -68,10 +68,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::trace_init;
     use futures::StreamExt;
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::WatchEvent};
+
+    use super::*;
+    use crate::test_util::trace_init;
 
     fn hyper_body_from_chunks(
         chunks: Vec<Result<&'static str, std::io::Error>>,

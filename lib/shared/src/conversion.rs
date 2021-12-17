@@ -1,10 +1,14 @@
-use super::datetime::{datetime_to_utc, TimeZone};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    num::{ParseFloatError, ParseIntError},
+};
+
 use bytes::Bytes;
 use chrono::{DateTime, ParseError as ChronoParseError, TimeZone as _, Utc};
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::num::{ParseFloatError, ParseIntError};
+
+use super::datetime::{datetime_to_utc, TimeZone};
 
 #[cfg(test)]
 mod tests;

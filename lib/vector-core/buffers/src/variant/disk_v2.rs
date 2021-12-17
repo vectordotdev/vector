@@ -1,7 +1,9 @@
-use std::error::Error;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    error::Error,
+    path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use async_trait::async_trait;
 use futures::{ready, Stream};
@@ -9,21 +11,24 @@ use pin_project::pin_project;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
-use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
-use crate::{topology::builder::IntoBuffer, Acker, Bufferable};
-
-//const MAX_BUFFERED_ITEMS: usize = 128;
+use crate::{
+    buffer_usage_data::BufferUsageHandle,
+    disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
+    topology::{
+        builder::IntoBuffer,
+        channel::{ReceiverAdapter, SenderAdapter},
+    },
+    Acker, Bufferable,
+};
 
 pub struct DiskV2Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: usize,
+    max_size: u64,
 }
 
 impl DiskV2Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: usize) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
         Self {
             id,
             data_dir,
@@ -37,9 +42,13 @@ impl<T> IntoBuffer<T> for DiskV2Buffer
 where
     T: Bufferable + Clone,
 {
+    fn provides_instrumentation(&self) -> bool {
+        true
+    }
+
     async fn into_buffer_parts(
         self: Box<Self>,
-        usage_handle: &BufferUsageHandle,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
         usage_handle.set_buffer_limits(Some(self.max_size), None);
@@ -49,10 +58,9 @@ where
         let config = DiskBufferConfig::from_path(buffer_path)
             .max_buffer_size(self.max_size as u64)
             .build();
-        let (writer, reader, acker) = Buffer::from_config(config).await?;
+        let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
 
         let wrapped_reader = WrappedReader::new(reader);
-        //let wrapped_writer = WrappedWriter::new(writer);
 
         let (input_tx, input_rx) = channel(1024);
         tokio::spawn(drive_disk_v2_writer(writer, input_rx));
@@ -104,280 +112,6 @@ where
         }
     }
 }
-/*
-#[derive(Debug)]
-enum WriterState<T> {
-    Inconsistent,
-    Idle(Writer<T>),
-    Writing,
-    Flushing,
-}
-
-impl<T> WriterState<T> {
-    fn is_idle(&self) -> bool {
-        matches!(self, WriterState::Idle(..))
-    }
-}
-
-// TODO: it's even less likely that we need to truly kill the writer task for an error
-// unless it's a very specific type of error... we already distinguish failed
-// encoding/serialization which occurs before any actual bytes hit the file at all, or
-// before we update the ledger or any of that.
-//
-// so really we'd be down to like... certain I/O errors that we know we can't recover
-// from.
-//
-// where this could really get tricky is like, if we try to write a record here and the
-// permissions got messed up, so we couldn't write to the file, we could _theoretically_
-// loop and try it again until it works, or we could just drop the event and move on...
-// not sure which one is better.
-#[pin_project]
-struct WrappedWriter<T>
-where
-    T: Bufferable,
-{
-    state: WriterState<T>,
-    buffered: VecDeque<T>,
-    write_future: ReusableBoxFuture<(Writer<T>, Result<usize, WriterError<T>>)>,
-    flush_future: ReusableBoxFuture<(Writer<T>, Result<(), WriterError<T>>)>,
-}
-
-impl<T> WrappedWriter<T>
-where
-    T: Bufferable,
-{
-    pub fn new(writer: Writer<T>) -> Self {
-        Self {
-            state: WriterState::Idle(writer),
-            buffered: VecDeque::new(),
-            write_future: ReusableBoxFuture::new(make_write_future(None, None)),
-            flush_future: ReusableBoxFuture::new(make_flush_future(None)),
-        }
-    }
-
-    fn try_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), WriterError<T>>> {
-        loop {
-            if self.state.is_idle() {
-                return Poll::Ready(Ok(()));
-            }
-
-            if let Err(e) = ready!(self.drive_pending_operation(cx)) {
-                return Poll::Ready(Err(e));
-            }
-        }
-    }
-
-    fn drive_pending_operation(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), WriterError<T>>> {
-        let (writer, result) = match &self.state {
-            WriterState::Writing => ready!(self.drive_write_operation(cx)),
-            WriterState::Flushing => ready!(self.drive_flush_operation(cx)),
-            s => unreachable!("writer state not expected: {:?}", s),
-        };
-
-        self.state = WriterState::Idle(writer);
-        Poll::Ready(result)
-    }
-
-    fn drive_write_operation(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<(Writer<T>, Result<(), WriterError<T>>)> {
-        match &self.state {
-            WriterState::Writing => {
-                let (writer, result) = ready!(self.write_future.poll(cx));
-                // TODO: do we _need_ to reset the future here?
-                Poll::Ready((writer, result.map(|_| ())))
-            }
-            s => unreachable!("writer state not expected: {:?}", s),
-        }
-    }
-
-    fn drive_flush_operation(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<(Writer<T>, Result<(), WriterError<T>>)> {
-        match &self.state {
-            WriterState::Flushing => {
-                let (writer, result) = ready!(self.flush_future.poll(cx));
-                // TODO: do we _need_ to reset the future here?
-                Poll::Ready((writer, result.map(|_| ())))
-            }
-            s => unreachable!("writer state not expected: {:?}", s),
-        }
-    }
-
-    fn enqueue_write_operation(&mut self, record: T) {
-        match mem::replace(&mut self.state, WriterState::Inconsistent) {
-            WriterState::Idle(writer) => {
-                self.write_future
-                    .set(make_write_future(Some(writer), Some(record)));
-                self.state = WriterState::Writing;
-            }
-            s => unreachable!("writer state not expected: {:?}", s),
-        }
-    }
-
-    fn enqueue_flush_operation(&mut self) {
-        match mem::replace(&mut self.state, WriterState::Inconsistent) {
-            WriterState::Idle(writer) => {
-                self.flush_future.set(make_flush_future(Some(writer)));
-                self.state = WriterState::Flushing;
-            }
-            s => unreachable!("writer state not expected: {:?}", s),
-        }
-    }
-}
-
-impl<T> Sink<T> for WrappedWriter<T>
-where
-    T: Bufferable,
-{
-    type Error = ();
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Make sure any in-flight operation is completed first.
-        if let Err(e) = ready!(self.as_mut().get_mut().try_ready(cx)) {
-            error!("{}", e);
-            return Poll::Ready(Err(()));
-        }
-
-        // Now make sure our internal buffer isn't too large before accepting another item.
-        if self.buffered.len() < MAX_BUFFERED_ITEMS {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Pending
-        }
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        // Make sure the caller isn't dodging `poll_ready`.
-        if self.buffered.len() >= MAX_BUFFERED_ITEMS {
-            error!(
-                "`start_send` called without getting a successful result from `poll_ready` first"
-            );
-            return Err(());
-        }
-
-        self.buffered.push_back(item);
-        Ok(())
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Logic:
-        //
-        // loop:
-        //   if !self.buffered.is_empty():
-        //     - drive in-flight operation until ready
-        //     - enqueue write operation
-        //   else:
-        //     - drive in-flight operation
-        //     -- if operation was flush, return when fully driven
-        //     - enqueue flush operation
-        //
-        // Any error at any point gets returned immediately.
-
-        loop {
-            if self.buffered.is_empty() {
-                // We're all out of items to send, so now we need to flush the writer.  We're still
-                // driving the last write operation, though, so we need to make sure that's cleared out.
-                if let WriterState::Writing = &self.state {
-                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
-                        error!("{}", e);
-                        return Poll::Ready(Err(()));
-                    }
-                }
-
-                // We've got any in-flight write operation out of the way, now it's time to flush.
-                if self.state.is_idle() {
-                    self.enqueue_flush_operation();
-                } else {
-                    let result = ready!(self.drive_pending_operation(cx));
-                    return Poll::Ready(result.map_err(|e| {
-                        error!("{}", e);
-                    }));
-                }
-            } else {
-                // Drive any in-flight operation that we have going on.
-                if !self.state.is_idle() {
-                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
-                        error!("{}", e);
-                        return Poll::Ready(Err(()));
-                    }
-                }
-
-                // Now we're idle, so enqueue another write operation.
-                let record = self
-                    .buffered
-                    .pop_front()
-                    .expect("buffered items should not be empty");
-                self.enqueue_write_operation(record);
-            }
-        }
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Try to drive any remaining items into the writer, as well as one final flush.
-        if let Err(e) = ready!(self.as_mut().poll_flush(cx)) {
-            return Poll::Ready(Err(e));
-        }
-
-        // Now we can actually close the writer for real.  We leave the state as Inconsistent here
-        // so that any future calls will panic and let us know there's some bad juju happening with
-        // the caller, trying to use a previously-closed writer.
-        match mem::replace(&mut self.state, WriterState::Inconsistent) {
-            WriterState::Idle(mut writer) => {
-                writer.close();
-                Poll::Ready(Ok(()))
-            }
-            s => unreachable!("writer state not expected: {:?}", s),
-        }
-    }
-}
-
-async fn make_write_future<T>(
-    writer: Option<Writer<T>>,
-    record: Option<T>,
-) -> (Writer<T>, Result<usize, WriterError<T>>)
-where
-    T: Bufferable,
-{
-    // TODO: it's even less likely that we need to truly kill the writer task for an error
-    // unless it's a very specific type of error... we already distinguish failed
-    // encoding/serialization which occurs before any actual bytes hit the file at all, or
-    // before we update the ledger or any of that.
-    //
-    // so really we'd be down to like... certain I/O errors that we know we can't recover
-    // from.
-    //
-    // where this could really get tricky is like, if we try to write a record here and the
-    // permissions got messed up, so we couldn't write to the file, we could _theoretically_
-    // loop and try it again until it works, or we could just drop the event and move on...
-    // not sure which one is better.
-    match (writer, record) {
-        (Some(mut writer), Some(record)) => {
-            let result = writer.write_record(record).await;
-            (writer, result)
-        }
-        _ => unreachable!("future should not be called in this state"),
-    }
-}
-
-async fn make_flush_future<T>(writer: Option<Writer<T>>) -> (Writer<T>, Result<(), WriterError<T>>)
-where
-    T: Bufferable,
-{
-    match writer {
-        Some(mut writer) => {
-            let result = writer.flush().await;
-            (writer, result.map_err(Into::into))
-        }
-        None => unreachable!("future should not be called in this state"),
-    }
-}
-*/
 
 async fn make_read_future<T>(reader: Option<Reader<T>>) -> (Reader<T>, Option<T>)
 where
@@ -448,4 +182,6 @@ where
             error!("failed to flush the buffer: {}", e);
         }
     }
+
+    trace!("diskv2 writer task finished");
 }

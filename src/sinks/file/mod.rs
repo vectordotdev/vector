@@ -1,14 +1,5 @@
-use crate::expiring_hash_map::ExpiringHashMap;
-use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, EventStatus, Finalizable},
-    internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        StreamSink,
-    },
-    template::Template,
-};
+use std::time::{Duration, Instant};
+
 use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -18,18 +9,27 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
-use vector_core::buffers::Acker;
-use vector_core::internal_event::EventsSent;
-use vector_core::ByteSizeOf;
-
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
+use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+
+use crate::{
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, EventStatus, Finalizable},
+    expiring_hash_map::ExpiringHashMap,
+    internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
+    template::Template,
+};
 mod bytes_path;
-use bytes_path::BytesPath;
 use std::convert::TryFrom;
+
+use bytes_path::BytesPath;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -365,15 +365,17 @@ impl StreamSink for FileSink {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
+
+    use futures::{stream, SinkExt};
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::test_util::{
         components::{self, FILE_SINK_TAGS, SINK_TESTS},
         lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
         temp_dir, temp_file, trace_init,
     };
-    use futures::{stream, SinkExt};
-    use pretty_assertions::assert_eq;
-    use std::convert::TryInto;
 
     #[test]
     fn generate_config() {

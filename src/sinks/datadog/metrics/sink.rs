@@ -15,13 +15,12 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::{
-    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
-};
-
 use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
+};
+use crate::{
+    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
 };
 
 /// Partitions metrics based on which Datadog API endpoint that they are sent to.

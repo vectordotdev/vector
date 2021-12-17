@@ -1,6 +1,6 @@
-use crate::ast::GrokPattern;
-use crate::lexer::Lexer;
 use lalrpop_util::{lalrpop_mod, ParseError};
+
+use crate::{ast::GrokPattern, lexer::Lexer};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -22,11 +22,11 @@ pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::ast::{Destination, Function, FunctionArgument};
-
     use lookup::{LookupBuf, SegmentBuf};
     use vrl_compiler::Value;
+
+    use super::*;
+    use crate::ast::{Destination, Function, FunctionArgument};
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(

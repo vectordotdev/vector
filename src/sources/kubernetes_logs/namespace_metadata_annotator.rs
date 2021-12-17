@@ -2,13 +2,14 @@
 
 #![deny(missing_docs)]
 
+use evmap::ReadHandle;
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     event::{Event, LogEvent, PathComponent, PathIter},
     kubernetes as k8s,
 };
-use evmap::ReadHandle;
-use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -71,8 +72,9 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shared::assert_event_data_eq;
+
+    use super::*;
 
     #[test]
     fn test_annotate_from_metadata() {

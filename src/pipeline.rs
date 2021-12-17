@@ -1,12 +1,13 @@
-use crate::transforms::FunctionTransform;
+use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
+
 use futures::{channel::mpsc, task::Poll, Sink};
 #[cfg(test)]
 use futures::{Stream, StreamExt};
-use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
 #[cfg(test)]
 use vector_core::event::EventStatus;
-use vector_core::internal_event::EventsSent;
-use vector_core::{event::Event, ByteSizeOf};
+use vector_core::{event::Event, internal_event::EventsSent, ByteSizeOf};
+
+use crate::transforms::FunctionTransform;
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -182,15 +183,17 @@ impl Pipeline {
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
 mod test {
+    use std::convert::TryFrom;
+
+    use futures::SinkExt;
+    use serde_json::json;
+
     use super::Pipeline;
     use crate::{
         event::{Event, Value},
         test_util::collect_ready,
         transforms::{add_fields::AddFields, filter::Filter},
     };
-    use futures::SinkExt;
-    use serde_json::json;
-    use std::convert::TryFrom;
 
     const KEYS: [&str; 2] = ["booper", "swooper"];
 

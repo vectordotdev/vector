@@ -1,11 +1,14 @@
-use crate::sinks::util::encoding::StandardEncodings;
+use tokio::time::{timeout, Duration};
+
 use crate::{
     config::Config,
-    sinks::console::{ConsoleSinkConfig, Target},
+    sinks::{
+        console::{ConsoleSinkConfig, Target},
+        util::encoding::StandardEncodings,
+    },
     sources::demo_logs::DemoLogsConfig,
     test_util::start_topology,
 };
-use tokio::time::{timeout, Duration};
 
 #[tokio::test]
 async fn sources_finished() {

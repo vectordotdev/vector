@@ -1,6 +1,9 @@
-use std::fmt;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
+
 use tower::{Layer, Service};
 
 pub struct MapLayer<R1, R2> {

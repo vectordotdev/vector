@@ -1,3 +1,17 @@
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader},
+    net::SocketAddr,
+    str::FromStr,
+};
+
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use tokio_util::codec::Decoder;
+use warp::http::{HeaderMap, StatusCode};
+
 use crate::{
     codecs::{
         self,
@@ -15,19 +29,6 @@ use crate::{
     },
     tls::TlsConfig,
 };
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-    net::SocketAddr,
-    str::FromStr,
-};
-use tokio_util::codec::Decoder;
-
-use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
@@ -276,6 +277,13 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
+    use chrono::{DateTime, Utc};
+    use futures::Stream;
+    use pretty_assertions::assert_eq;
+    use vector_core::event::{Event, EventStatus, Value};
+
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
@@ -283,11 +291,6 @@ mod tests {
         test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
         Pipeline,
     };
-    use chrono::{DateTime, Utc};
-    use futures::Stream;
-    use pretty_assertions::assert_eq;
-    use std::net::SocketAddr;
-    use vector_core::event::{Event, EventStatus, Value};
 
     #[test]
     fn generate_config() {

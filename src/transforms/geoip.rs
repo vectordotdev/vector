@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
@@ -5,8 +9,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -205,6 +207,8 @@ impl FunctionTransform for Geoip {
 #[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{
         event::Event,
@@ -213,7 +217,6 @@ mod tests {
             test::transform_one,
         },
     };
-    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {

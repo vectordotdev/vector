@@ -1,9 +1,10 @@
-use futures::{task::noop_waker_ref, Stream, StreamExt};
 use std::{
     fs::File,
     path::Path,
     task::{Context, Poll},
 };
+
+use futures::{task::noop_waker_ref, Stream, StreamExt};
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     serde_json::from_reader(File::open(path)?).map_err(Into::into)

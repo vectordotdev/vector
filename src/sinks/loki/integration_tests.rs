@@ -1,17 +1,18 @@
-use super::config::{LokiConfig, OutOfOrderAction};
-use crate::{
-    config::{log_schema, SinkConfig},
-    sinks::util::test::load_sink,
-    sinks::VectorSink,
-    template::Template,
-    test_util::{generate_events_with_stream, generate_lines_with_stream, random_lines},
-};
+use std::convert::TryFrom;
+
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
 use shared::encode_logfmt;
-use std::convert::TryFrom;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
+
+use super::config::{LokiConfig, OutOfOrderAction};
+use crate::{
+    config::{log_schema, SinkConfig},
+    sinks::{util::test::load_sink, VectorSink},
+    template::Template,
+    test_util::{generate_events_with_stream, generate_lines_with_stream, random_lines},
+};
 
 async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();

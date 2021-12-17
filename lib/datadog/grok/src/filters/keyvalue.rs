@@ -1,9 +1,5 @@
-use crate::{
-    ast::{Function, FunctionArgument},
-    grok_filter::GrokFilter,
-    parse_grok::Error as GrokRuntimeError,
-    parse_grok_rules::Error as GrokStaticError,
-};
+use std::fmt::Formatter;
+
 use bytes::Bytes;
 use nom::{
     self,
@@ -19,8 +15,14 @@ use nom::{
 use nom_regex::str::re_find;
 use ordered_float::NotNan;
 use regex::Regex;
-use std::fmt::Formatter;
 use vrl_compiler::Value;
+
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     {
@@ -362,8 +364,9 @@ fn parse_key<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     #[test]
     fn test_parse_keyvalue() {

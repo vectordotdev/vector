@@ -1,10 +1,10 @@
-use crate::config::proxy::ProxyConfig;
-use crate::config::LogSchema;
+use std::{fs::DirBuilder, path::PathBuf};
+
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::DirBuilder;
-use std::path::PathBuf;
+
+use crate::config::{proxy::ProxyConfig, LogSchema};
 
 #[derive(Debug, Snafu)]
 pub enum DataDirError {

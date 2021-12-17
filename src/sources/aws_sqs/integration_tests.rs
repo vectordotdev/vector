@@ -1,23 +1,22 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::region::RegionOrEndpoint;
-use crate::config::log_schema;
-use crate::config::{SourceConfig, SourceContext};
-use crate::event::Event;
-use crate::sources::aws_sqs::config::AwsSqsConfig;
-use crate::test_util::random_string;
-use crate::Pipeline;
-use aws_sdk_sqs::output::CreateQueueOutput;
-use aws_sdk_sqs::Endpoint;
+use std::{collections::HashSet, str::FromStr, time::Duration};
+
+use aws_sdk_sqs::{output::CreateQueueOutput, Endpoint};
 use aws_types::region::Region;
 use futures::StreamExt;
 use http::Uri;
-use std::collections::HashSet;
-use std::str::FromStr;
-use std::time::Duration;
 use tokio::time::timeout;
+
+use crate::{
+    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    config::{log_schema, SourceConfig, SourceContext},
+    event::Event,
+    sources::aws_sqs::config::AwsSqsConfig,
+    test_util::random_string,
+    Pipeline,
+};
 
 fn gen_queue_name() -> String {
     random_string(10).to_lowercase()

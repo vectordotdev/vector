@@ -1,13 +1,17 @@
-use crate::lex::Error;
+use std::{
+    collections::BTreeMap,
+    fmt,
+    hash::{Hash, Hasher},
+    iter::IntoIterator,
+    ops::Deref,
+    str::FromStr,
+};
+
 use diagnostic::Span;
 use lookup::LookupBuf;
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::iter::IntoIterator;
-use std::ops::Deref;
-use std::str::FromStr;
+
+use crate::lex::Error;
 
 // -----------------------------------------------------------------------------
 // node

@@ -1,3 +1,9 @@
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -14,10 +20,6 @@ use crate::{
     },
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

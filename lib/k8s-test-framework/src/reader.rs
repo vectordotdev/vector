@@ -1,8 +1,11 @@
 //! Read process output.
 
 use std::process::{ExitStatus, Stdio};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, ChildStdout, Command};
+
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    process::{Child, ChildStdout, Command},
+};
 
 /// Keeps track of the command invocation, proving the interface to
 /// read the output and send a termination signal.

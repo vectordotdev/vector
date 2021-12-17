@@ -1,9 +1,24 @@
+use std::{
+    fmt::Display,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
-    event::Event,
+    event::{
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+        Event,
+    },
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
         buffer::metrics::compress_distribution,
@@ -13,18 +28,6 @@ use crate::{
         BatchConfig, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
-use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Display,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::{Service, ServiceBuilder};
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -252,15 +255,15 @@ impl Service<Vec<u8>> for StatsdSvc {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    use super::*;
+    use crate::{event::Metric, test_util::*};
 
     #[test]
     fn generate_config() {

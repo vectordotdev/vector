@@ -1,7 +1,8 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::BoxedSubscription;
 use graphql_client::GraphQLQuery;
+
+use crate::BoxedSubscription;
 
 /// Shorthand for a Chrono datetime, set to UTC.
 type DateTime = chrono::DateTime<chrono::Utc>;

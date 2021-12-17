@@ -1,13 +1,15 @@
-use crate::event::{
-    metric::{Bucket, MetricData, MetricName, MetricSeries, Quantile, Sample},
-    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value,
-};
-use bytes::Bytes;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use quickcheck::{empty_shrinker, Arbitrary, Gen};
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter,
+};
+
+use bytes::Bytes;
+use chrono::{DateTime, NaiveDateTime, Utc};
+use quickcheck::{empty_shrinker, Arbitrary, Gen};
+
+use crate::event::{
+    metric::{Bucket, MetricData, MetricName, MetricSeries, Quantile, Sample},
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value,
 };
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;

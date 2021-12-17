@@ -2,12 +2,13 @@ use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
-
 use shared::btreemap;
-
-use crate::parse_grok_rules::GrokField;
-use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
 use vrl_compiler::{Target, Value};
+
+use crate::{
+    grok_filter::apply_filter,
+    parse_grok_rules::{GrokField, GrokRule},
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -101,10 +102,11 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::parse_grok_rules::parse_grok_rules;
     use ordered_float::NotNan;
     use vrl_compiler::Value;
+
+    use super::*;
+    use crate::parse_grok_rules::parse_grok_rules;
 
     #[test]
     fn parses_simple_grok() {

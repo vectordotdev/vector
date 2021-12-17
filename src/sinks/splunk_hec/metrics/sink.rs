@@ -1,14 +1,5 @@
 use std::{fmt, num::NonZeroUsize, sync::Arc};
 
-use crate::{
-    config::SinkContext,
-    internal_events::SplunkInvalidMetricReceivedError,
-    sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest},
-        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
-    },
-    template::Template,
-};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
@@ -21,6 +12,15 @@ use vector_core::{
 };
 
 use super::request_builder::HecMetricsRequestBuilder;
+use crate::{
+    config::SinkContext,
+    internal_events::SplunkInvalidMetricReceivedError,
+    sinks::{
+        splunk_hec::common::{render_template_string, request::HecRequest},
+        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
+    },
+    template::Template,
+};
 
 pub struct HecMetricsSink<S> {
     pub context: SinkContext,
