@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     convert::TryFrom,
     io::{self, Read},
 };
@@ -120,22 +120,29 @@ impl TcpSource for LogstashSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
-        LogstashAcker::new(frame)
+    fn build_acker(&self, frames: &[Self::Item]) -> Self::Acker {
+        LogstashAcker::new(frames)
     }
 }
 
 struct LogstashAcker {
-    protocol: LogstashProtocolVersion,
-    sequence_number: u32,
+    // TODO: this is very likely overkill, since there are only two protocol versions and it seems
+    // very unlikely that we'd ever be speaking both at once on the same TCP connection.
+    sequence_numbers: HashMap<LogstashProtocolVersion, u32>,
 }
 
 impl LogstashAcker {
-    const fn new(frame: &LogstashEventFrame) -> Self {
-        Self {
-            protocol: frame.protocol,
-            sequence_number: frame.sequence_number,
+    fn new(frames: &[LogstashEventFrame]) -> Self {
+        let mut sequence_numbers = HashMap::new();
+
+        for frame in frames {
+            let current = sequence_numbers.get(&frame.protocol).unwrap_or(&0);
+            if frame.sequence_number > *current {
+                sequence_numbers.insert(frame.protocol, frame.sequence_number);
+            }
         }
+
+        Self { sequence_numbers }
     }
 }
 
@@ -144,10 +151,12 @@ impl TcpSourceAcker for LogstashAcker {
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
         match ack {
             TcpSourceAck::Ack => {
-                let mut bytes: Vec<u8> = Vec::with_capacity(6);
-                bytes.push(self.protocol.into());
-                bytes.push(LogstashFrameType::Ack.into());
-                bytes.extend(self.sequence_number.to_be_bytes().iter());
+                let mut bytes: Vec<u8> = Vec::with_capacity(6 * self.sequence_numbers.len());
+                for (protocol, sequence_number) in self.sequence_numbers {
+                    bytes.push(protocol.into());
+                    bytes.push(LogstashFrameType::Ack.into());
+                    bytes.extend(sequence_number.to_be_bytes().iter());
+                }
                 Some(Bytes::from(bytes))
             }
             _ => None,
@@ -210,7 +219,7 @@ impl From<io::Error> for DecodeError {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LogstashProtocolVersion {
     V1, // 1
     V2, // 2

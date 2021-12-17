@@ -107,7 +107,7 @@ impl TcpSource for FluentSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, frame: &[Self::Item]) -> Self::Acker {
         FluentAcker::new(frame)
     }
 }
@@ -380,23 +380,32 @@ impl Decoder for FluentEntryStreamDecoder {
 }
 
 struct FluentAcker {
-    chunk: Option<String>,
+    chunks: Vec<String>,
 }
 
 impl FluentAcker {
-    fn new(frame: &FluentFrame) -> Self {
+    fn new(frames: &[FluentFrame]) -> Self {
         Self {
-            chunk: frame.chunk.clone(),
+            chunks: frames.iter().filter_map(|f| f.chunk.clone()).collect(),
         }
     }
 }
 
 impl TcpSourceAcker for FluentAcker {
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
-        self.chunk.map(|chunk| match ack {
-            TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
-            _ => "{}".into(),
-        })
+        if self.chunks.is_empty() {
+            return None;
+        }
+
+        let mut acks = String::new();
+        for chunk in self.chunks {
+            let ack = match ack {
+                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
+                _ => String::from("{}"),
+            };
+            acks.push_str(&ack);
+        }
+        Some(acks.into())
     }
 }
 
