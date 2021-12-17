@@ -29,12 +29,15 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
-use crate::Case;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, Mutex},
+};
+
+use arc_swap::ArcSwap;
 
 use super::{Condition, IndexHandle, Table};
-use arc_swap::ArcSwap;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
+use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
 type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
@@ -268,10 +271,11 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::DummyEnrichmentTable;
     use shared::btreemap;
     use vrl_core::Value;
+
+    use super::*;
+    use crate::test_util::DummyEnrichmentTable;
 
     #[test]
     fn tables_loaded() {

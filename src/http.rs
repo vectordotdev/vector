@@ -1,8 +1,8 @@
-use crate::{
-    config::ProxyConfig,
-    internal_events::http_client,
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+use std::{
+    fmt,
+    task::{Context, Poll},
 };
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
@@ -15,12 +15,14 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt,
-    task::{Context, Poll},
-};
 use tower::Service;
 use tracing_futures::Instrument;
+
+use crate::{
+    config::ProxyConfig,
+    internal_events::http_client,
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+};
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility = "pub(crate)")]

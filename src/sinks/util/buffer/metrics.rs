@@ -1,11 +1,13 @@
-use crate::sinks::util::{
-    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
-    Merged, SinkBatchSettings,
-};
 use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
+
 use vector_core::event::{
     metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue, Sample},
     Event, EventMetadata,
+};
+
+use crate::sinks::util::{
+    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
+    Merged, SinkBatchSettings,
 };
 
 /// The metrics buffer is a data structure for collecting a flow of data
@@ -296,13 +298,15 @@ pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::{
         event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
     };
-    use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
 
     type Buffer = Vec<Vec<Metric>>;
 

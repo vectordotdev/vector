@@ -78,8 +78,9 @@ impl Expression for ParseTimestampFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
+
+    use super::*;
 
     test_function![
         parse_timestamp => ParseTimestamp;

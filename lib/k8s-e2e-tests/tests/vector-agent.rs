@@ -1,13 +1,16 @@
 use core::array::IntoIter;
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    str::FromStr,
+};
+
 use futures::{SinkExt, StreamExt};
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use std::collections::{BTreeMap, HashSet};
-use std::iter::FromIterator;
-use std::str::FromStr;
 use tracing::{debug, info};
 
 const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"

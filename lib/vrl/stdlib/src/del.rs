@@ -148,8 +148,9 @@ impl fmt::Display for DelFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shared::{btreemap, TimeZone};
+
+    use super::*;
 
     #[test]
     fn del() {

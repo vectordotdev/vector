@@ -3,6 +3,25 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+use std::{collections::BTreeMap, io::Read, net::SocketAddr, sync::Arc};
+
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use chrono::{TimeZone, Utc};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
+use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use http::StatusCode;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tokio_util::codec::Decoder;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus},
+    ByteSizeOf,
+};
+use warp::{
+    filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
+};
+
 use super::sketch_parser::decode_ddsketch;
 use crate::{
     codecs::{
@@ -26,22 +45,6 @@ use crate::{
     },
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
-};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use chrono::{TimeZone, Utc};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use http::StatusCode;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::collections::BTreeMap;
-use std::{io::Read, net::SocketAddr, sync::Arc};
-use tokio_util::codec::Decoder;
-use vector_core::event::{BatchNotifier, BatchStatus};
-use vector_core::ByteSizeOf;
-use warp::{
-    filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]

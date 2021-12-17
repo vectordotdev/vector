@@ -1,3 +1,6 @@
+use indexmap::IndexMap;
+use serde::{self, Deserialize, Serialize};
+
 use crate::{
     config::{
         DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
@@ -5,8 +8,6 @@ use crate::{
     },
     transforms::Transform,
 };
-use indexmap::IndexMap;
-use serde::{self, Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CompoundConfig {

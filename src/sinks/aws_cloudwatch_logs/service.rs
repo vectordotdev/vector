@@ -1,32 +1,40 @@
-use crate::event::EventStatus;
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+use std::{
+    collections::HashMap,
+    fmt,
+    task::{Context, Poll},
+};
 
-use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-use crate::sinks::aws_cloudwatch_logs::sink::BatchCloudwatchRequest;
-use crate::sinks::aws_cloudwatch_logs::{request, CloudwatchKey};
-use crate::sinks::util::retries::FixedRetryPolicy;
-use crate::sinks::util::{EncodedLength, TowerRequestConfig, TowerRequestSettings};
 use chrono::Duration;
-use futures::future::BoxFuture;
-use futures::{ready, FutureExt};
+use futures::{future::BoxFuture, ready, FutureExt};
 use futures_util::TryFutureExt;
 use rusoto_core::RusotoError;
 use rusoto_logs::{
     CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError,
     InputLogEvent, PutLogEventsError,
 };
-use std::collections::HashMap;
-use std::fmt;
-use std::task::{Context, Poll};
 use tokio::sync::oneshot;
-use tower::buffer::Buffer;
-use tower::limit::{ConcurrencyLimit, RateLimit};
-use tower::retry::Retry;
-use tower::timeout::Timeout;
-use tower::{Service, ServiceBuilder, ServiceExt};
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use tower::{
+    buffer::Buffer,
+    limit::{ConcurrencyLimit, RateLimit},
+    retry::Retry,
+    timeout::Timeout,
+    Service, ServiceBuilder, ServiceExt,
+};
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 use vrl::prelude::fmt::Debug;
+
+use crate::{
+    event::EventStatus,
+    sinks::{
+        aws_cloudwatch_logs::{
+            config::CloudwatchLogsSinkConfig, request, retry::CloudwatchRetryLogic,
+            sink::BatchCloudwatchRequest, CloudwatchKey,
+        },
+        util::{
+            retries::FixedRetryPolicy, EncodedLength, TowerRequestConfig, TowerRequestSettings,
+        },
+    },
+};
 
 type Svc = Buffer<
     ConcurrencyLimit<

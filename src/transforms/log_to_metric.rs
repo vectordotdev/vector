@@ -1,10 +1,17 @@
+use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{Event, Value},
+    event::{
+        metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        Event, Value,
+    },
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
         LogToMetricTemplateParseError, TemplateRenderingFailed,
@@ -12,11 +19,6 @@ use crate::{
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::num::ParseFloatError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -415,14 +417,17 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, DateTime, Utc};
+
     use super::*;
-    use crate::transforms::test::transform_one;
     use crate::{
         config::log_schema,
-        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        event::Event,
+        event::{
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
+            Event,
+        },
+        transforms::test::transform_one,
     };
-    use chrono::{offset::TimeZone, DateTime, Utc};
 
     #[test]
     fn generate_config() {

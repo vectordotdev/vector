@@ -50,9 +50,9 @@ impl Condition for IsLog {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::Event,
+    use crate::event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
     };
 
     #[test]

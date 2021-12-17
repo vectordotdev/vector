@@ -9,7 +9,7 @@ publish = false
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
 bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
-crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
+crc32fast = { version = "1.2.1", default-features = false }
 crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
@@ -22,9 +22,9 @@ memmap2 = { version = "0.5.0", default-features = false }
 parking_lot = { version = "0.11.2", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
 rkyv = { version = "0.7.26", default-features = false, features = ["size_32", "std", "strict", "validation"] }
-serde = { version = "1.0.131", default-features = false, features = ["derive"] }
+serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"] }
-tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.15.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
@@ -36,13 +36,13 @@ hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
 quickcheck = "1.0"
-once_cell = "1.8"
+once_cell = "1.9"
 tempdir = "0.3"
 rand = "0.8.4"
 temp-dir = "0.1.11"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
-metrics-util = { version = "0.10.1", default-features = false }
+metrics-util = { version = "0.10.2", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 tracing = { version = "0.1.29", features = ["attributes"] }

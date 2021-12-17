@@ -1,5 +1,16 @@
-use super::Key;
-use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
+};
+
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -9,23 +20,16 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use std::collections::VecDeque;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
+
+use super::Key;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 
 /// Minimal size of uncompacted for which a compaction can be triggered.
-const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
+const MIN_UNCOMPACTED_SIZE: u64 = 4 * 1024 * 1024;
 
 /// The reader side of N to 1 channel through leveldb.
 ///
@@ -60,18 +64,18 @@ pub struct Reader<T> {
     pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     /// Size of unread events in bytes.
     /// Shared with Writers.
-    pub(crate) current_size: Arc<AtomicUsize>,
+    pub(crate) current_size: Arc<AtomicU64>,
     /// Number of oldest read, not deleted, events that have been acked by the consumer.
     /// Shared with consumer.
     pub(crate) ack_counter: Arc<AtomicUsize>,
     /// Size of deleted, not compacted, events in bytes.
-    pub(crate) uncompacted_size: usize,
+    pub(crate) uncompacted_size: u64,
     /// Sizes in bytes of read, not acked/deleted, events.
-    pub(crate) unacked_sizes: VecDeque<usize>,
+    pub(crate) unacked_sizes: VecDeque<u64>,
     /// Buffer for internal use.
     pub(crate) buffer: VecDeque<(Key, Vec<u8>)>,
     /// Limit on uncompacted_size after which we trigger compaction.
-    pub(crate) max_uncompacted_size: usize,
+    pub(crate) max_uncompacted_size: u64,
     /// Last time that compaction was triggered.
     pub(crate) last_compaction: Instant,
     // Pending read from the LevelDB datasbase
@@ -149,7 +153,7 @@ where
         }
 
         if let Some((key, value)) = this.buffer.pop_front() {
-            let bytes_read = value.len();
+            let bytes_read = value.len() as u64;
             this.unacked_sizes.push_back(bytes_read);
             this.read_offset = key.0 + 1;
 
@@ -184,7 +188,7 @@ impl<T> Drop for Reader<T> {
 
 impl<T> Reader<T> {
     /// Returns number of bytes to be read.
-    fn delete_acked(&mut self) -> usize {
+    fn delete_acked(&mut self) -> u64 {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
         let unread_size = if num_to_delete > 0 {
@@ -207,7 +211,7 @@ impl<T> Reader<T> {
         unread_size
     }
 
-    fn flush(&mut self, unread_size: usize) {
+    fn flush(&mut self, unread_size: u64) {
         if self.acked > 0 {
             let new_offset = self.delete_offset + self.acked;
             assert!(

@@ -1,5 +1,6 @@
-use metrics::{counter, gauge};
 use std::borrow::Cow;
+
+use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
@@ -38,11 +39,13 @@ impl InternalEvent for FileBytesSent<'_> {
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
-    use super::{FileOpen, InternalEvent};
-    use crate::emit;
+    use std::{io::Error, path::Path, time::Duration};
+
     use file_source::FileSourceInternalEvents;
     use metrics::counter;
-    use std::{io::Error, path::Path, time::Duration};
+
+    use super::{FileOpen, InternalEvent};
+    use crate::emit;
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {

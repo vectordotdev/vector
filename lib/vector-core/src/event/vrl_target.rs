@@ -1,8 +1,10 @@
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
-use crate::config::log_schema;
+use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
+
 use lookup::LookupBuf;
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
+
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
+use crate::config::log_schema;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -351,12 +353,15 @@ enum MetricPathError<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::{metric::MetricTags, MetricValue};
-    use super::*;
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
     use vrl_core::{self, Target};
+
+    use super::{
+        super::{metric::MetricTags, MetricValue},
+        *,
+    };
 
     #[test]
     fn log_get() {

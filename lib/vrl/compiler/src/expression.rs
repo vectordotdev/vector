@@ -1,7 +1,9 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use std::fmt;
+
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
-use std::fmt;
+
+use crate::{Context, Span, State, TypeDef, Value};
 
 mod abort;
 mod array;
@@ -28,8 +30,7 @@ pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
-pub use container::Container;
-pub use container::Variant;
+pub use container::{Container, Variant};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -40,8 +41,7 @@ pub use not::Not;
 pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
-pub use query::Query;
-pub use query::Target;
+pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
 

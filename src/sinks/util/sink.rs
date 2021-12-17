@@ -31,17 +31,6 @@
 //! from the sink. A oneshot channel is used to tie them back into the sink to allow
 //! it to notify the consumer that the request has succeeded.
 
-use super::{
-    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
-    buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
-    service::{Map, ServiceBuilderExt},
-    EncodedEvent,
-};
-use crate::event::EventStatus;
-use futures::{
-    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
-};
-use pin_project::pin_project;
 use std::{
     collections::HashMap,
     fmt,
@@ -50,17 +39,28 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{
+    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
+};
+use pin_project::pin_project;
 use tokio::{
     sync::oneshot,
     time::{sleep, Duration, Sleep},
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
+// === StreamSink ===
+pub use vector_core::sink::StreamSink;
 use vector_core::{buffers::Acker, internal_event::EventsSent};
 
-// === StreamSink ===
-
-pub use vector_core::sink::StreamSink;
+use super::{
+    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
+    buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
+    service::{Map, ServiceBuilderExt},
+    EncodedEvent,
+};
+use crate::event::EventStatus;
 
 // === BatchSink ===
 
@@ -634,19 +634,21 @@ impl<'a> Response for &'a str {}
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        convert::Infallible,
+        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
+    };
+
+    use bytes::Bytes;
+    use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
+    use tokio::{task::yield_now, time::Instant};
+    use vector_core::buffers::Acker;
+
     use super::*;
     use crate::{
         sinks::util::{BatchSettings, EncodedLength, VecBuffer},
         test_util::trace_init,
     };
-    use bytes::Bytes;
-    use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
-    use std::{
-        convert::Infallible,
-        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
-    };
-    use tokio::{task::yield_now, time::Instant};
-    use vector_core::buffers::Acker;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 

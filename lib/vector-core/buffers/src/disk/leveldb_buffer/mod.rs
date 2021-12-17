@@ -3,11 +3,17 @@ mod key;
 mod reader;
 mod writer;
 
-use self::acknowledgements::create_disk_v1_acker;
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    path::Path,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize},
+        Arc, Mutex,
+    },
+    time::Instant,
+};
 
-use super::{DataDirError, Open};
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::{Acker, Bufferable};
 use futures::task::AtomicWaker;
 use key::Key;
 use leveldb::database::{
@@ -18,17 +24,14 @@ use leveldb::database::{
 };
 pub use reader::Reader;
 use snafu::ResultExt;
-use std::{
-    collections::VecDeque,
-    marker::PhantomData,
-    path::Path,
-    sync::{atomic::AtomicUsize, Arc, Mutex},
-    time::Instant,
-};
 pub use writer::Writer;
 
+use self::acknowledgements::create_disk_v1_acker;
+use super::{DataDirError, Open};
+use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
+
 /// How much of disk buffer needs to be deleted before we trigger compaction.
-const MAX_UNCOMPACTED_DENOMINATOR: usize = 10;
+const MAX_UNCOMPACTED_DENOMINATOR: u64 = 10;
 
 #[derive(Default)]
 pub struct Buffer<T> {
@@ -51,7 +54,7 @@ pub struct Buffer<T> {
 /// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &Path) -> Result<(usize, u64), DataDirError> {
+fn db_initial_size(path: &Path) -> Result<(u64, u64), DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
     let db: Database<Key> = Database::open(path, options).with_context(|| Open {
@@ -61,7 +64,7 @@ fn db_initial_size(path: &Path) -> Result<(usize, u64), DataDirError> {
     let mut byte_size = 0;
     for v in db.value_iter(ReadOptions::new()) {
         item_size += 1;
-        byte_size += v.len();
+        byte_size += v.len() as u64;
     }
     Ok((byte_size, item_size))
 }
@@ -79,7 +82,7 @@ where
     #[allow(clippy::cast_precision_loss)]
     pub fn build(
         path: &Path,
-        max_size: usize,
+        max_size: u64,
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
@@ -108,7 +111,7 @@ where
             tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
         }
 
-        let current_size = Arc::new(AtomicUsize::new(initial_byte_size));
+        let current_size = Arc::new(AtomicU64::new(initial_byte_size));
 
         let write_notifier = Arc::new(AtomicWaker::new());
 

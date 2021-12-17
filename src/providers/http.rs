@@ -1,3 +1,12 @@
+use async_stream::stream;
+use bytes::Buf;
+use futures::Stream;
+use hyper::Body;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use tokio::time;
+use url::Url;
+
 use super::Result;
 use crate::{
     config::{
@@ -9,14 +18,6 @@ use crate::{
     signal,
     tls::{TlsOptions, TlsSettings},
 };
-use async_stream::stream;
-use bytes::Buf;
-use futures::Stream;
-use hyper::Body;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use tokio::time;
-use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct RequestConfig {

@@ -1,10 +1,10 @@
-use crate::line_agg;
+use std::{convert::TryFrom, time::Duration};
 
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
-use std::time::Duration;
+
+use crate::line_agg;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

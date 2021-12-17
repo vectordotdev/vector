@@ -1,13 +1,14 @@
+use std::{fmt, marker::PhantomData};
+
+use indexmap::map::IndexMap;
+use serde::{de, Deserialize, Serialize};
+pub use vector_core::serde::skip_serializing_if_default;
+
 #[cfg(feature = "codecs")]
 use crate::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
 };
-use indexmap::map::IndexMap;
-use serde::{de, Deserialize, Serialize};
-use std::fmt;
-use std::marker::PhantomData;
-pub use vector_core::serde::skip_serializing_if_default;
 
 pub const fn default_true() -> bool {
     true

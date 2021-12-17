@@ -1,8 +1,9 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::sinks::splunk_hec;
 use serde::{Deserialize, Serialize};
+
+use crate::sinks::splunk_hec;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]

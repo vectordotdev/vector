@@ -1,8 +1,9 @@
 //! # Disk Buffer v2: Sequential File I/O Boogaloo.
 //!
-//! This disk buffer implementation is a reimplementation of the LevelDB-based disk buffer code that
-//! already exists, but seeks to increase performance and reliability, while reducing the amount of
-//! external code and hard-to-expose tunables.
+//! This disk buffer implementation is a replace from the LevelDB-based disk buffer implementation,
+//! referred internal to `disk` or `disk_v1`.  It focuses on avoiding external C/C++ dependencies,
+//! as well as optimizing itself for the job at hand to provide more consistent in both throughput
+//! and latency.
 //!
 //! ## Design constraints
 //!
@@ -103,16 +104,14 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use crate::{Acker, Bufferable};
-
 use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
-
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
+use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
 
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
@@ -145,8 +144,11 @@ where
     #[cfg_attr(test, instrument(level = "trace"))]
     pub(crate) async fn from_config_inner(
         config: DiskBufferConfig,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
-        let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
+        let ledger = Ledger::load_or_create(config, usage_handle)
+            .await
+            .context(LedgerError)?;
         let ledger = Arc::new(ledger);
 
         let mut writer = Writer::new(Arc::clone(&ledger));
@@ -160,6 +162,8 @@ where
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;
+
+        ledger.synchronize_buffer_usage();
 
         let acker = create_disk_v2_acker(Arc::clone(&ledger));
 
@@ -180,8 +184,9 @@ where
     #[cfg_attr(test, instrument(level = "trace"))]
     pub async fn from_config(
         config: DiskBufferConfig,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker), BufferError<T>> {
-        let (writer, reader, acker, _) = Self::from_config_inner(config).await?;
+        let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
 
         Ok((writer, reader, acker))
     }

@@ -1,17 +1,5 @@
 use std::num::NonZeroU64;
 
-use crate::{
-    config::{DataType, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::{
-        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
-        util::{
-            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
-        },
-        Healthcheck, UriParseError, VectorSink,
-    },
-};
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use serde::{Deserialize, Serialize};
@@ -23,6 +11,18 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder,
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
+};
+use crate::{
+    config::{DataType, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
+        util::{
+            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
+        },
+        Healthcheck, UriParseError, VectorSink,
+    },
 };
 
 // TODO: revisit our concurrency and batching defaults

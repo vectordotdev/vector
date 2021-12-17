@@ -13,31 +13,28 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
+use std::convert::TryFrom;
+
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticSearchEncoder;
-
-use crate::{
-    config::SinkDescription,
-    internal_events::TemplateRenderingFailed,
-    template::{Template, TemplateParseError},
-};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
     Request,
 };
-
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::SignedRequest;
 use serde::{Deserialize, Serialize};
-
 use snafu::{ResultExt, Snafu};
 
-use crate::aws::rusoto::{self, AwsAuthentication};
-use std::convert::TryFrom;
-
-use crate::event::{EventRef, LogEvent};
+use crate::{
+    aws::rusoto::{self, AwsAuthentication},
+    config::SinkDescription,
+    event::{EventRef, LogEvent},
+    internal_events::TemplateRenderingFailed,
+    template::{Template, TemplateParseError},
+};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

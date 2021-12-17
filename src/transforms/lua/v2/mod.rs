@@ -1,14 +1,16 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+pub use vector_core::event::lua;
+use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
+
 use crate::{
     config::{self, DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::Transform,
 };
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::path::PathBuf;
-pub use vector_core::event::lua;
-use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -341,6 +343,8 @@ fn format_error(error: &mlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    use futures::{stream, StreamExt};
+
     use super::*;
     use crate::{
         event::{
@@ -350,7 +354,6 @@ mod tests {
         test_util::trace_init,
         transforms::TaskTransform,
     };
-    use futures::{stream, StreamExt};
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -698,8 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn lua_load_file() -> crate::Result<()> {
-        use std::fs::File;
-        use std::io::Write;
+        use std::{fs::File, io::Write};
         trace_init();
 
         let dir = tempfile::tempdir().unwrap();

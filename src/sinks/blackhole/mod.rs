@@ -1,9 +1,9 @@
 mod config;
 mod sink;
 
-use crate::config::SinkDescription;
-
 pub use config::BlackholeConfig;
+
+use crate::config::SinkDescription;
 
 inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
@@ -12,11 +12,15 @@ inventory::submit! {
 #[cfg(test)]
 mod tests {
 
-    use crate::sinks::blackhole::config::BlackholeConfig;
-    use crate::sinks::blackhole::sink::BlackholeSink;
-    use crate::sinks::util::StreamSink;
-    use crate::test_util::random_events_with_stream;
     use vector_core::buffers::Acker;
+
+    use crate::{
+        sinks::{
+            blackhole::{config::BlackholeConfig, sink::BlackholeSink},
+            util::StreamSink,
+        },
+        test_util::random_events_with_stream,
+    };
 
     #[tokio::test]
     async fn blackhole() {

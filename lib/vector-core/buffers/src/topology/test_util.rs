@@ -2,15 +2,12 @@ use std::{error, fmt};
 
 use bytes::{Buf, BufMut};
 
+use super::builder::TopologyBuilder;
 use crate::{
-    buffer_usage_data::BufferUsageHandle,
     encoding::{DecodeBytes, EncodeBytes},
     topology::channel::{BufferReceiver, BufferSender},
-    variant::MemoryV2Buffer,
     Bufferable, WhenFull,
 };
-
-use super::builder::IntoBuffer;
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {
@@ -63,39 +60,18 @@ pub async fn build_buffer(
     overflow_mode: Option<WhenFull>,
 ) -> (BufferSender<u64>, BufferReceiver<u64>) {
     match mode {
-        WhenFull::Block | WhenFull::DropNewest => {
-            let usage_handle = BufferUsageHandle::noop();
-            let channel = Box::new(MemoryV2Buffer::new(capacity));
-            let (sender, receiver, _) = channel
-                .into_buffer_parts(&usage_handle)
-                .await
-                .expect("should not fail to create memory buffer");
-            let sender = BufferSender::new(sender, mode);
-            let receiver = BufferReceiver::new(receiver);
-            (sender, receiver)
-        }
         WhenFull::Overflow => {
-            let usage_handle = BufferUsageHandle::noop();
-            let overflow_mode = overflow_mode
-                .expect("overflow_mode must be specified when base is in overflow mode");
-            let overflow_channel = Box::new(MemoryV2Buffer::new(capacity));
-            let (overflow_sender, overflow_receiver, _) = overflow_channel
-                .into_buffer_parts(&usage_handle)
-                .await
-                .expect("should not fail to create memory buffer");
-            let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
-            let overflow_receiver = BufferReceiver::new(overflow_receiver);
-
-            let base_channel = Box::new(MemoryV2Buffer::new(capacity));
-            let (base_sender, base_receiver, _) = base_channel
-                .into_buffer_parts(&usage_handle)
-                .await
-                .expect("should not fail to create memory buffer");
-            let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);
-            let base_receiver = BufferReceiver::with_overflow(base_receiver, overflow_receiver);
+            let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
+            let (overflow_sender, overflow_receiver) =
+                TopologyBuilder::memory_v2(capacity, overflow_mode).await;
+            let (mut base_sender, mut base_receiver) =
+                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow).await;
+            base_sender.switch_to_overflow(overflow_sender);
+            base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
+        m => TopologyBuilder::memory_v2(capacity, m).await,
     }
 }
 

@@ -1,20 +1,26 @@
-use crate::aws::rusoto;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::sinks::aws_cloudwatch_logs::healthcheck::healthcheck;
-use crate::sinks::aws_cloudwatch_logs::request_builder::CloudwatchRequestBuilder;
-use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchLogsPartitionSvc;
-use crate::sinks::aws_cloudwatch_logs::sink::CloudwatchSink;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::template::Template;
+use std::num::NonZeroU64;
+
 use futures::FutureExt;
 use rusoto_logs::CloudWatchLogsClient;
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroU64;
 use vector_core::config::log_schema;
+
+use crate::{
+    aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
+    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    sinks::{
+        aws_cloudwatch_logs::{
+            healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
+            retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
+        },
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::Template,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

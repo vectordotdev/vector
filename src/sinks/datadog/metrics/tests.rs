@@ -1,17 +1,18 @@
 #![allow(clippy::print_stdout)] // tests
 
-use super::DatadogMetricsConfig;
-use crate::{
-    config::SinkConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
-    test_util::{map_event_batch_stream, next_addr},
-};
 use bytes::Bytes;
 use flate2::read::ZlibDecoder;
 use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use hyper::StatusCode;
 use indoc::indoc;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue};
+
+use super::DatadogMetricsConfig;
+use crate::{
+    config::SinkConfig,
+    sinks::util::test::{build_test_server_status, load_sink},
+    test_util::{map_event_batch_stream, next_addr},
+};
 
 enum ApiStatus {
     OK,

@@ -1,25 +1,28 @@
-use crate::sinks::gcs_common::config::GcpError;
-use crate::{
-    config::ProxyConfig,
-    http::HttpClient,
-    sinks::gcs_common::config::{
-        BuildHttpClient, GetImplicitToken, GetToken, GetTokenBytes, InvalidCredentials1,
-        InvalidRsaKey,
-    },
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
 };
+
 use futures::StreamExt;
-use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
+    scopes::Scope,
 };
 use hyper::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::ResultExt;
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::ProxyConfig,
+    http::HttpClient,
+    sinks::gcs_common::config::{
+        BuildHttpClient, GcpError, GetImplicitToken, GetToken, GetTokenBytes, InvalidCredentials1,
+        InvalidRsaKey,
+    },
+};
 
 pub mod cloud_storage;
 pub mod pubsub;

@@ -1,5 +1,7 @@
-use chrono::format::{strftime::StrftimeItems, Item};
-use chrono::{DateTime, Utc};
+use chrono::{
+    format::{strftime::StrftimeItems, Item},
+    DateTime, Utc,
+};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -79,8 +81,9 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     test_function![
         format_timestamp => FormatTimestamp;

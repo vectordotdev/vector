@@ -1,10 +1,11 @@
+use bytes::{Bytes, BytesMut};
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Decoder;
+
 use crate::codecs::{
     decoding::{BoxedFramer, BoxedFramingError, FramingConfig},
     CharacterDelimitedDecoder,
 };
-use bytes::{Bytes, BytesMut};
-use serde::{Deserialize, Serialize};
-use tokio_util::codec::Decoder;
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]

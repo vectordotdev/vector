@@ -1,6 +1,8 @@
-use super::{ComponentKey, Config};
-use indexmap::IndexMap;
 use std::collections::HashSet;
+
+use indexmap::IndexMap;
+
+use super::{ComponentKey, Config};
 
 pub struct ConfigDiff {
     pub sources: Difference,

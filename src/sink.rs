@@ -25,12 +25,13 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use futures::{ready, stream::Peekable, Sink, SinkExt, Stream, StreamExt};
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{ready, stream::Peekable, Sink, SinkExt, Stream, StreamExt};
 
 impl<T: ?Sized, Item> VecSinkExt<Item> for T where T: Sink<Item> {}
 

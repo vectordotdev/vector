@@ -1,3 +1,24 @@
+use std::{
+    io::ErrorKind,
+    net::SocketAddr,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio::{
+    io::{AsyncRead, ReadBuf},
+    net::TcpStream,
+    time::sleep,
+};
+use vector_core::{buffers::Acker, ByteSizeOf};
+
 use crate::{
     config::SinkContext,
     dns,
@@ -18,25 +39,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    io::ErrorKind,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{
-    io::{AsyncRead, ReadBuf},
-    net::TcpStream,
-    time::sleep,
-};
-use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -294,9 +296,10 @@ impl StreamSink for TcpSink {
 
 #[cfg(test)]
 mod test {
+    use tokio::net::TcpListener;
+
     use super::*;
     use crate::test_util::{next_addr, trace_init};
-    use tokio::net::TcpListener;
 
     #[tokio::test]
     async fn healthcheck() {

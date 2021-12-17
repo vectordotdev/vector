@@ -1,9 +1,12 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use std::{
+    collections::{BTreeMap, HashMap},
+    error, fmt, iter, num,
+};
+
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::{error, fmt, iter, num};
+
+use crate::event::metric::{Metric, MetricKind, MetricValue};
 
 lazy_static! {
     static ref SCOREBOARD: HashMap<char, &'static str> = vec![
@@ -477,11 +480,12 @@ impl error::Error for ParseError {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
     use shared::{assert_event_data_eq, btreemap};
+
+    use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
 
     // Test ExtendedStatus: Off
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus

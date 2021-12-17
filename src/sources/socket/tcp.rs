@@ -1,3 +1,9 @@
+use bytes::Bytes;
+use chrono::Utc;
+use getset::{CopyGetters, Getters, Setters};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+
 use crate::{
     codecs::{
         self,
@@ -11,11 +17,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use getset::{CopyGetters, Getters, Setters};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {

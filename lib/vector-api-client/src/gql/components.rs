@@ -1,7 +1,9 @@
-use crate::{BoxedSubscription, QueryResult};
+use std::fmt;
+
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
-use std::fmt;
+
+use crate::{BoxedSubscription, QueryResult};
 
 /// Components query for returning sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]

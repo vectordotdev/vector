@@ -1,15 +1,19 @@
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    hash::Hasher,
+    path::PathBuf,
+    time::SystemTime,
+};
+
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::hash::Hasher;
-use std::path::PathBuf;
-use std::time::SystemTime;
 use tracing::trace;
 use vrl::Value;
+
+use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -516,9 +520,10 @@ impl std::fmt::Debug for File {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
     use shared::btreemap;
+
+    use super::*;
 
     #[test]
     fn parse_column() {

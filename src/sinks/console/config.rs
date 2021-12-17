@@ -1,12 +1,18 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::console::sink::WriterSink;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::{Healthcheck, VectorSink};
-
-use crate::sinks::util::StreamSink;
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    sinks::{
+        console::sink::WriterSink,
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            StreamSink,
+        },
+        Healthcheck, VectorSink,
+    },
+};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]

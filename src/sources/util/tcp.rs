@@ -1,3 +1,25 @@
+use std::{
+    fmt, io,
+    mem::drop,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
+
+use bytes::Bytes;
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
+use listenfd::ListenFd;
+use serde::{de, Deserialize, Deserializer, Serialize};
+use smallvec::SmallVec;
+use socket2::SockRef;
+use tokio::{
+    io::AsyncWriteExt,
+    net::{TcpListener, TcpStream},
+    time::sleep,
+};
+use tokio_util::codec::{Decoder, FramedRead};
+use tracing_futures::Instrument;
+
 use super::{AfterReadExt as _, StreamDecodingError};
 use crate::{
     config::{AcknowledgementsConfig, Resource, SourceContext},
@@ -9,21 +31,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
-use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
-use listenfd::ListenFd;
-use serde::{de, Deserialize, Deserializer, Serialize};
-use smallvec::SmallVec;
-use socket2::SockRef;
-use std::net::{IpAddr, SocketAddr};
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-use tokio::{
-    io::AsyncWriteExt,
-    net::{TcpListener, TcpStream},
-    time::sleep,
-};
-use tokio_util::codec::{Decoder, FramedRead};
-use tracing_futures::Instrument;
 
 async fn make_listener(
     addr: SocketListenAddr,
@@ -381,9 +388,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use serde::Deserialize;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    use serde::Deserialize;
+
+    use super::*;
 
     #[derive(Debug, Deserialize)]
     struct Config {

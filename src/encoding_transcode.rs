@@ -1,8 +1,9 @@
+use bytes::{Bytes, BytesMut};
+use encoding_rs::{CoderResult, Encoding};
+
 use crate::internal_events::{
     DecoderBomRemoval, DecoderMalformedReplacement, EncoderUnmappableReplacement,
 };
-use bytes::{Bytes, BytesMut};
-use encoding_rs::{CoderResult, Encoding};
 
 const BUFFER_SIZE: usize = 4096;
 
@@ -184,10 +185,12 @@ impl Encoder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Decoder, Encoder, BOM_UTF8};
+    use std::char::REPLACEMENT_CHARACTER;
+
     use bytes::Bytes;
     use encoding_rs::{SHIFT_JIS, UTF_16BE, UTF_16LE, UTF_8};
-    use std::char::REPLACEMENT_CHARACTER;
+
+    use super::{Decoder, Encoder, BOM_UTF8};
 
     // BOM unicode character (U+FEFF) expressed in utf-16
     // http://unicode.org/faq/utf_bom.html#bom4

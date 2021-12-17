@@ -1,13 +1,14 @@
+use futures::{stream, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
+
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{stream, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use tokio::time;
-use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
@@ -156,6 +157,10 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use metrics::{counter, gauge, histogram};
+
     use super::*;
     use crate::{
         event::{
@@ -165,8 +170,6 @@ mod tests {
         metrics::Controller,
         Pipeline,
     };
-    use metrics::{counter, gauge, histogram};
-    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {

@@ -1,6 +1,8 @@
-use crate::util::Base64Charset;
 use std::str::FromStr;
+
 use vrl::prelude::*;
+
+use crate::util::Base64Charset;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeBase64;

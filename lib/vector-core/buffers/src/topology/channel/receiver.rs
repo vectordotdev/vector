@@ -9,10 +9,8 @@ use pin_project::pin_project;
 use tokio::sync::mpsc::Receiver;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::Bufferable;
-
 use super::{strategy::StrategyResult, PollStrategy};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// Adapter for papering over various receiver backends by providing a [`Stream`] interface.
 #[pin_project(project = ProjectedReceiverAdapter)]
@@ -102,6 +100,15 @@ impl<T> BufferReceiver<T> {
         }
     }
 
+    /// Converts this receiver into an overflowing receiver using the given `BufferSender<T>`.
+    ///
+    /// Note: this resets the internal state of this sender, and so this should not be called except
+    /// when initially constructing `BufferSender<T>`.
+    #[cfg(test)]
+    pub fn switch_to_overflow(&mut self, overflow: BufferReceiver<T>) {
+        self.overflow = Some(Box::new(overflow));
+    }
+
     /// Configures this receiver to instrument the items passing through it.
     pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);
@@ -130,7 +137,7 @@ impl<T: Bufferable> Stream for BufferReceiver<T> {
             .map(|result| match result {
                 StrategyResult::Primary(i) => {
                     if let Some(handle) = this.instrumentation {
-                        handle.increment_received_event_count_and_byte_size(1, i.size_of());
+                        handle.increment_sent_event_count_and_byte_size(1, i.size_of() as u64);
                     }
                     Some(i)
                 }

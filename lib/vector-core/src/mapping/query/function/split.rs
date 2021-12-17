@@ -104,8 +104,7 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
-    use crate::mapping::query::regex::Regex;
+    use crate::mapping::query::{path::Path, regex::Regex};
 
     #[test]
     fn check_split() {
