@@ -59,6 +59,8 @@ export VERSION ?= $(shell scripts/version.sh)
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
+export RUST_VERSION ?= $(shell grep channel rust-toolchain.toml | cut -d '"' -f 2)
+
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
@@ -306,7 +308,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-splunk test-integration-dnstap
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -537,6 +539,11 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
+
+.PHONY: test-integration-redis
+test-integration-redis: ## Runs Redis integration tests
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml run --rm runner
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml rm -fsv
 
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
