@@ -1,3 +1,13 @@
+use std::net::SocketAddr;
+
+use bytes::{Bytes, BytesMut};
+use chrono::Utc;
+use futures::{SinkExt, StreamExt};
+use getset::{CopyGetters, Getters};
+use serde::{Deserialize, Serialize};
+use tokio::net::UdpSocket;
+use tokio_util::codec::FramedRead;
+
 use crate::{
     codecs::{
         self,
@@ -12,14 +22,6 @@ use crate::{
     sources::{util::StreamDecodingError, Source},
     udp, Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use futures::{SinkExt, StreamExt};
-use getset::{CopyGetters, Getters};
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use tokio::net::UdpSocket;
-use tokio_util::codec::FramedRead;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]

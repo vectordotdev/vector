@@ -1,5 +1,6 @@
-use pretty_assertions::assert_eq;
 use std::collections::HashMap;
+
+use pretty_assertions::assert_eq;
 use vector::{
     config::{self, ConfigDiff, Format},
     topology,

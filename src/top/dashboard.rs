@@ -1,4 +1,5 @@
-use super::{events::capture_key_press, state};
+use std::io::stdout;
+
 use crossterm::{
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -9,7 +10,6 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use std::io::stdout;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -18,6 +18,8 @@ use tui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
+
+use super::{events::capture_key_press, state};
 
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {

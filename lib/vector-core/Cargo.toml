@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "3.0.15", default-features = false, optional = true }
+async-graphql = { version = "3.0.17", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
@@ -38,12 +38,12 @@ pin-project = { version = "1.0.8", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.131", default-features = false, features = ["derive"] }
+serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.73", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
 substring = { version = "1.4", default-features = false }
-tokio = { version = "1.13.0", default-features = false }
+tokio = { version = "1.15.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
@@ -72,6 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.2"
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 
 [features]
 api = ["async-graphql"]

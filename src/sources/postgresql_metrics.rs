@@ -1,9 +1,10 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+use std::{
+    collections::{BTreeMap, HashSet},
+    future::ready,
+    path::PathBuf,
+    time::Instant,
 };
+
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
@@ -16,12 +17,6 @@ use openssl::{
 use postgres_openssl::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, HashSet},
-    future::ready,
-    path::PathBuf,
-    time::Instant,
-};
 use tokio::time;
 use tokio_postgres::{
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},
@@ -29,6 +24,15 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+};
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };

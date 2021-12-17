@@ -14,13 +14,13 @@ use crate::{
     sinks::{
         azure_common::{
             self,
-            config::AzureBlobMetadata,
-            config::{AzureBlobRequest, AzureBlobRetryLogic},
+            config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobRetryLogic},
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
         util::{
-            encoding::EncodingConfig, encoding::StandardEncodings, partitioner::KeyPartitioner,
+            encoding::{EncodingConfig, StandardEncodings},
+            partitioner::KeyPartitioner,
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
             ServiceBuilderExt, TowerRequestConfig,
         },
@@ -397,22 +397,22 @@ mod tests {
 #[cfg(feature = "azure-blob-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::io::{BufRead, BufReader};
-    use std::num::NonZeroU32;
+    use std::{
+        io::{BufRead, BufReader},
+        num::NonZeroU32,
+    };
 
-    use azure_core::prelude::Range;
-    use azure_core::HttpError;
+    use azure_core::{prelude::Range, HttpError};
     use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use futures::{stream, Stream, StreamExt};
     use http::StatusCode;
 
+    use super::*;
     use crate::{
         event::LogEvent,
         test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn azure_blob_healthcheck_passed() {

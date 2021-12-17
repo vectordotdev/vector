@@ -117,7 +117,7 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 async-stream = "0.3.2"
 async-trait = "0.1.52"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.13.1", default-features = false, features = ["full"] }
+tokio = { version = "1.15.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -150,9 +150,9 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = { version = "0.2.0", optional = true }
-aws-types = { version = "0.2.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-sqs = { version = "0.2.0", optional = true }
+aws-config = { version = "0.3.0", optional = true }
+aws-types = { version = "0.3.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-sqs = { version = "0.3.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -164,7 +164,7 @@ tower = { version = "0.4.10", default-features = false, features = ["buffer", "l
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.131", default-features = false, features = ["derive"] }
+serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.73", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.23", default-features = false }
@@ -185,8 +185,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.15", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.15", default-features = false, optional = true }
+async-graphql = { version = "3.0.17", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.17", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -307,7 +307,7 @@ security-framework = "2.3.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
-nix = "0.22.2"
+nix = "0.23.1"
 
 [build-dependencies]
 prost-build = { version = "0.9", optional = true }
@@ -327,7 +327,7 @@ pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.6", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.2.0"
-tokio = { version = "1.13.0", features = ["test-util"] }
+tokio = { version = "1.15.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
@@ -703,6 +703,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
+  "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -751,6 +752,7 @@ aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
+datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]

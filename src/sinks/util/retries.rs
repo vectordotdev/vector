@@ -1,5 +1,3 @@
-use crate::Error;
-use futures::FutureExt;
 use std::{
     borrow::Cow,
     cmp,
@@ -8,8 +6,12 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+
+use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
+
+use crate::Error;
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -257,13 +259,15 @@ impl Iterator for ExponentialBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::trace_init;
     use std::{fmt, time::Duration};
+
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
     use tower::retry::RetryLayer;
     use tower_test::{assert_request_eq, mock};
+
+    use super::*;
+    use crate::test_util::trace_init;
 
     #[tokio::test]
     async fn service_error_retry() {

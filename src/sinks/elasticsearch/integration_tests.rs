@@ -1,21 +1,26 @@
-use super::config::DATA_STREAM_TIMESTAMP_KEY;
-use super::*;
-use crate::sinks::util::{BatchConfig, Compression};
-use crate::{
-    config::{ProxyConfig, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::HealthcheckError,
-    test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
-};
+use std::{fs::File, future::ready, io::Read};
+
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde_json::{json, Value};
-use std::{fs::File, future::ready, io::Read};
-use vector_core::config::log_schema;
-use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+use vector_core::{
+    config::log_schema,
+    event::{BatchNotifier, BatchStatus, LogEvent},
+};
+
+use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
+use crate::{
+    config::{ProxyConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        util::{BatchConfig, Compression},
+        HealthcheckError,
+    },
+    test_util::{random_events_with_stream, random_string, trace_init},
+    tls::{self, TlsOptions},
+};
 
 impl ElasticSearchCommon {
     async fn flush_request(&self) -> crate::Result<()> {

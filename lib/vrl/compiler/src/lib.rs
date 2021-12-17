@@ -10,18 +10,16 @@ pub mod state;
 pub mod type_def;
 pub mod value;
 
-pub(crate) use diagnostic::Span;
-pub(crate) use state::Compiler as State;
-
 pub use context::Context;
+pub(crate) use diagnostic::Span;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
+pub use paste::paste;
 pub use program::Program;
+pub(crate) use state::Compiler as State;
 pub use target::Target;
 pub use type_def::TypeDef;
 pub use value::Value;
-
-pub use paste::paste;
 
 pub type Result = std::result::Result<Program, compiler::Errors>;
 
@@ -48,6 +46,8 @@ pub fn compile_with_state(
 
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
-    pub use ::parser::ast::{self, Ident, Node};
-    pub use ::parser::Program;
+    pub use ::parser::{
+        ast::{self, Ident, Node},
+        Program,
+    };
 }

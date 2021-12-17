@@ -3,19 +3,23 @@ mod in_memory_v2;
 mod on_disk_v1;
 mod on_disk_v2;
 
-use crate::test::common::{Action, Message};
-use crate::test::model::in_memory_v1::InMemoryV1;
-use crate::test::model::in_memory_v2::InMemoryV2;
-use crate::test::model::on_disk_v1::OnDiskV1;
-use crate::test::model::on_disk_v2::OnDiskV2;
-use futures::task::noop_waker;
-use futures::{Sink, Stream};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{task::noop_waker, Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::runtime::Runtime;
 
 use super::common::Variant;
+use crate::test::{
+    common::{Action, Message},
+    model::{
+        in_memory_v1::InMemoryV1, in_memory_v2::InMemoryV2, on_disk_v1::OnDiskV1,
+        on_disk_v2::OnDiskV2,
+    },
+};
 
 #[derive(Debug)]
 /// For operations that might block whether the operation would or would not

@@ -1,22 +1,30 @@
-use super::BulkAction;
-use crate::aws::rusoto::AwsAuthentication;
-use crate::event::{LogEvent, Metric, MetricKind, MetricValue, Value};
-use crate::sinks::elasticsearch::sink::process_log;
-use crate::sinks::elasticsearch::{
-    BulkConfig, DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig,
-    ElasticSearchMode,
-};
-use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed};
-use crate::sinks::util::BatchConfig;
-use crate::template::Template;
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use http::Uri;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
+
+use super::BulkAction;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    aws::rusoto::AwsAuthentication,
+    event::{LogEvent, Metric, MetricKind, MetricValue, Value},
+    sinks::{
+        elasticsearch::{
+            sink::process_log, DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon,
+            ElasticSearchConfig, ElasticSearchMode,
+        },
+        util::{
+            encoding::{Encoder, EncodingConfigFixed},
+            BatchConfig,
+        },
+    },
+    template::Template,
+};
 
 #[test]
 fn sets_create_action_when_configured() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
         bulk: Some(BulkConfig {
@@ -60,8 +68,9 @@ fn data_stream_body() -> BTreeMap<String, Value> {
 
 #[test]
 fn encode_datastream_mode() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
         bulk: Some(BulkConfig {
@@ -99,8 +108,9 @@ fn encode_datastream_mode() {
 
 #[test]
 fn encode_datastream_mode_no_routing() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
         bulk: Some(BulkConfig {
@@ -218,8 +228,9 @@ fn decode_bulk_action() {
 
 #[test]
 fn encode_datastream_mode_no_sync() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
         bulk: Some(BulkConfig {

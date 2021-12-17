@@ -1,5 +1,11 @@
 use std::num::NonZeroU64;
 
+use http::Uri;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+
+use super::util::SinkBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
@@ -11,12 +17,6 @@ use crate::{
         },
     },
 };
-use http::Uri;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-
-use super::util::SinkBatchSettings;
 
 // New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
 const MAX_PAYLOAD_SIZE: usize = 1_000_000_usize;
@@ -163,6 +163,13 @@ impl NewRelicLogsConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufRead;
+
+    use bytes::Buf;
+    use futures::{stream, StreamExt};
+    use hyper::Method;
+    use serde_json::Value;
+
     use super::*;
     use crate::{
         config::SinkConfig,
@@ -173,11 +180,6 @@ mod tests {
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
-    use bytes::Buf;
-    use futures::{stream, StreamExt};
-    use hyper::Method;
-    use serde_json::Value;
-    use std::io::BufRead;
 
     #[test]
     fn generate_config() {

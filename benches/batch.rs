@@ -1,7 +1,8 @@
+use std::{convert::Infallible, time::Duration};
+
 use bytes::Bytes;
 use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
-use std::{convert::Infallible, time::Duration};
 use vector::{
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},

@@ -59,9 +59,10 @@ impl Expression for EncodeJsonFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         encode_json => EncodeJson;

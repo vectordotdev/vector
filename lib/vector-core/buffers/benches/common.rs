@@ -1,15 +1,18 @@
-use buffers::encoding::{DecodeBytes, EncodeBytes};
-use buffers::topology::builder::TopologyBuilder;
-use buffers::topology::channel::{BufferReceiver, BufferSender};
-use buffers::BufferType;
+use std::{error, fmt, path::PathBuf};
+
+use buffers::{
+    encoding::{DecodeBytes, EncodeBytes},
+    topology::{
+        builder::TopologyBuilder,
+        channel::{BufferReceiver, BufferSender},
+    },
+    BufferType,
+};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::layers::Layer;
-use metrics_util::DebuggingRecorder;
-use std::path::PathBuf;
-use std::{error, fmt};
+use metrics_util::{layers::Layer, DebuggingRecorder};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 

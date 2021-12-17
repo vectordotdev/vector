@@ -1,27 +1,33 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::aws::rusoto::RegionOrEndpoint;
-    use crate::config::SinkContext;
-    use crate::sinks::aws_s3::S3SinkConfig;
-    use crate::sinks::s3_common::config::S3Options;
-    use crate::sinks::util::encoding::StandardEncodings;
-    use crate::sinks::util::BatchConfig;
-    use crate::sinks::util::Compression;
-    use crate::sinks::util::TowerRequestConfig;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    use std::{
+        io::{BufRead, BufReader},
+        time::Duration,
+    };
+
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
     use rusoto_core::{region::Region, RusotoError};
-    use rusoto_s3::S3Client;
-    use rusoto_s3::S3;
-    use std::io::{BufRead, BufReader};
-    use std::time::Duration;
+    use rusoto_s3::{S3Client, S3};
     use tokio_stream::StreamExt;
-    use vector_core::config::proxy::ProxyConfig;
-    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+    };
+
+    use crate::{
+        aws::rusoto::RegionOrEndpoint,
+        config::SinkContext,
+        sinks::{
+            aws_s3::S3SinkConfig,
+            s3_common::config::S3Options,
+            util::{encoding::StandardEncodings, BatchConfig, Compression, TowerRequestConfig},
+        },
+        test_util::{random_lines_with_stream, random_string},
+    };
 
     #[tokio::test]
     async fn s3_insert_message_into_with_flat_key_prefix() {

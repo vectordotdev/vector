@@ -3,15 +3,15 @@
 
 mod test_enrichment;
 
+use std::str::FromStr;
+
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use glob::glob;
 use shared::TimeZone;
-use std::str::FromStr;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
-
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]

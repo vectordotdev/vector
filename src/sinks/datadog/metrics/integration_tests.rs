@@ -1,5 +1,3 @@
-#![allow(clippy::print_stdout)] // tests
-
 use super::DatadogMetricsConfig;
 use crate::{
     config::SinkConfig,
@@ -143,4 +141,33 @@ async fn smoke() {
         assert_eq!(points.len(), 2);
         assert_eq!(points.get(1).unwrap().as_f64().unwrap(), 1.0);
     }
+}
+
+#[tokio::test]
+async fn real_endpoint() {
+    let config = indoc! {r#"
+        default_api_key = "${CI_TEST_DATADOG_API_KEY}"
+        default_namespace = "fake.test.integration"
+    "#};
+    let api_key = std::env::var("CI_TEST_DATADOG_API_KEY").unwrap();
+    let config = config.replace("${CI_TEST_DATADOG_API_KEY}", &api_key);
+    let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let events: Vec<_> = (0..10)
+        .map(|index| {
+            Event::Metric(Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter {
+                    value: index as f64,
+                },
+            ))
+        })
+        .collect();
+    let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
+
+    let _ = sink.run(stream).await.unwrap();
+    assert_eq!(receiver.await, BatchStatus::Delivered);
 }

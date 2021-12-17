@@ -1,13 +1,15 @@
-use super::{handler, schema, ShutdownTx};
-use crate::{config, topology};
+use std::{convert::Infallible, net::SocketAddr};
+
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig, WebSocketProtocols},
     Data, Request, Schema,
 };
 use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
-use std::{convert::Infallible, net::SocketAddr};
 use tokio::sync::oneshot;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
+
+use super::{handler, schema, ShutdownTx};
+use crate::{config, topology};
 
 pub struct Server {
     _shutdown: ShutdownTx,

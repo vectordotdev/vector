@@ -1,10 +1,12 @@
+use std::env;
+
+use serde::{Deserialize, Serialize};
+
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
-use serde::{Deserialize, Serialize};
-use std::env;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";

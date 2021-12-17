@@ -1,7 +1,9 @@
 use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
-use vector::event::Event;
-use vector::sources::dnstap::{schema::DnstapEventSchema, DnstapParser};
+use vector::{
+    event::Event,
+    sources::dnstap::{schema::DnstapEventSchema, DnstapParser},
+};
 
 fn benchmark_query_parsing(c: &mut Criterion) {
     let mut event = Event::new_empty_log();

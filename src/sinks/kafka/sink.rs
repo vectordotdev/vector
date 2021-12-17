@@ -1,27 +1,35 @@
-use super::config::KafkaRole;
-use super::config::KafkaSinkConfig;
-use crate::event::Event;
-use crate::kafka::KafkaStatisticsContext;
-use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
-use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
-use crate::sinks::kafka::service::KafkaService;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{builder::SinkBuilderExt, StreamSink};
-use crate::template::{Template, TemplateParseError};
-use async_trait::async_trait;
-use futures::future;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::error::KafkaError;
-use rdkafka::producer::FutureProducer;
-use rdkafka::ClientConfig;
-use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
+
+use async_trait::async_trait;
+use futures::{future, stream::BoxStream, StreamExt};
+use rdkafka::{
+    consumer::{BaseConsumer, Consumer},
+    error::KafkaError,
+    producer::FutureProducer,
+    ClientConfig,
+};
+use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
-use vector_core::buffers::Acker;
-use vector_core::config::log_schema;
+use vector_core::{buffers::Acker, config::log_schema};
+
+use super::config::{KafkaRole, KafkaSinkConfig};
+use crate::{
+    event::Event,
+    kafka::KafkaStatisticsContext,
+    sinks::{
+        kafka::{
+            config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
+            service::KafkaService,
+        },
+        util::{
+            builder::SinkBuilderExt,
+            encoding::{EncodingConfig, StandardEncodings},
+            StreamSink,
+        },
+    },
+    template::{Template, TemplateParseError},
+};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

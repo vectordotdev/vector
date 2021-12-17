@@ -1,12 +1,14 @@
+use std::collections::btree_map::Entry;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::collections::btree_map::Entry;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -93,12 +95,13 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
+    use shared::btreemap;
+
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         transforms::test::transform_one,
     };
-    use shared::btreemap;
 
     #[test]
     fn generate_config() {

@@ -1,19 +1,3 @@
-use crate::{
-    event::Event,
-    internal_events::{
-        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
-    },
-    shutdown::ShutdownSignal,
-    sources::Source,
-    Pipeline,
-};
-use bytes::{Buf, Bytes, BytesMut};
-use futures::{
-    executor::block_on,
-    future,
-    sink::{Sink, SinkExt},
-    stream::{self, StreamExt, TryStreamExt},
-};
 #[cfg(unix)]
 use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
 use std::{
@@ -28,11 +12,29 @@ use std::{
     thread,
     time::Duration,
 };
+
+use bytes::{Buf, Bytes, BytesMut};
+use futures::{
+    executor::block_on,
+    future,
+    sink::{Sink, SinkExt},
+    stream::{self, StreamExt, TryStreamExt},
+};
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
 use tracing::field;
 use tracing_futures::Instrument;
+
+use crate::{
+    event::Event,
+    internal_events::{
+        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
+    },
+    shutdown::ShutdownSignal,
+    sources::Source,
+    Pipeline,
+};
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
@@ -589,21 +591,6 @@ fn wait_for_task_quota(active_task_nums: &Arc<AtomicU32>, max_tasks: u32) {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
-        FrameHandler,
-    };
-    use crate::{
-        config::{log_schema, ComponentKey},
-        test_util::{collect_n, collect_n_stream},
-    };
-    use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
-    use bytes::{buf::Buf, Bytes, BytesMut};
-    use futures::{
-        future,
-        sink::{Sink, SinkExt},
-        stream::{self, StreamExt},
-    };
     #[cfg(unix)]
     use std::{
         path::PathBuf,
@@ -613,6 +600,13 @@ mod test {
         },
         thread,
     };
+
+    use bytes::{buf::Buf, Bytes, BytesMut};
+    use futures::{
+        future,
+        sink::{Sink, SinkExt},
+        stream::{self, StreamExt},
+    };
     use tokio::{
         self,
         net::UnixStream,
@@ -620,6 +614,18 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
+
+    use super::{
+        build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
+        FrameHandler,
+    };
+    use crate::{
+        config::{log_schema, ComponentKey},
+        event::Event,
+        shutdown::SourceShutdownCoordinator,
+        test_util::{collect_n, collect_n_stream},
+        Pipeline,
+    };
 
     #[derive(Clone)]
     struct MockFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {

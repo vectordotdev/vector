@@ -1,8 +1,11 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, TransformConfig, TransformContext},
+    event::Event,
+    transforms::{FunctionTransform, Transform},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EventType {

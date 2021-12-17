@@ -1,5 +1,12 @@
-use super::Key;
-use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
+use std::{
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
+};
+
 use bytes::BytesMut;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
@@ -7,12 +14,9 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
-use std::task::{Context, Poll, Waker};
-use std::{pin::Pin, sync::atomic::AtomicU64};
+
+use super::Key;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>

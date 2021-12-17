@@ -1,23 +1,28 @@
-use super::service::LogApiRetry;
-use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
-use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::service::ServiceBuilderExt;
-use crate::sinks::util::SinkBatchSettings;
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+
 use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::num::NonZeroU64;
-use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
+
+use super::{
+    service::LogApiRetry,
+    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
+};
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
+        util::{
+            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
+            SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
 // threshold the API will toss results. We previously serialized Events as they

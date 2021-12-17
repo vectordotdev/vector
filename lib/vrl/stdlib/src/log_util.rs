@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
+
 use chrono::prelude::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use shared::TimeZone;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 lazy_static! {

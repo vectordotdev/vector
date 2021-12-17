@@ -1,8 +1,9 @@
-use super::{LogEvent, Value};
 use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
 };
+
+use super::{LogEvent, Value};
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
@@ -155,9 +156,10 @@ fn hash_null<H: Hasher>(hasher: &mut H) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{hash_map::DefaultHasher, HashMap};
+
     use super::*;
     use crate::event::LogEvent;
-    use std::collections::{hash_map::DefaultHasher, HashMap};
 
     fn hash<H: Hash>(hash: H) -> u64 {
         let mut hasher = DefaultHasher::new();

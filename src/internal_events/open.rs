@@ -1,9 +1,12 @@
-use metrics::gauge;
-use std::hint;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    hint,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
+
+use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -103,9 +106,9 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
 
 #[cfg(test)]
 mod tests {
+    use std::{mem::drop, thread};
+
     use super::*;
-    use std::mem::drop;
-    use std::thread;
 
     /// If this fails at any run, then the algorithm in `gauge_add` is faulty.
     #[test]

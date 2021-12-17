@@ -1,6 +1,9 @@
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Write},
+};
+
 use serde::ser::*;
-use std::collections::BTreeMap;
-use std::fmt::{self, Write};
 
 #[derive(Debug, snafu::Snafu)]
 pub enum EncodingError {
@@ -519,10 +522,11 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::btreemap;
     use serde::*;
     use serde_json::{json, Value};
+
+    use super::*;
+    use crate::btreemap;
 
     #[test]
     fn single_element() {

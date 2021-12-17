@@ -26,8 +26,7 @@ mod config;
 mod service;
 mod sink;
 
-use crate::config::SinkDescription;
-use crate::sinks::datadog::logs::config::DatadogLogsConfig;
+use crate::{config::SinkDescription, sinks::datadog::logs::config::DatadogLogsConfig};
 
 inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")

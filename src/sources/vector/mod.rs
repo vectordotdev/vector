@@ -1,10 +1,11 @@
 pub mod v1;
 pub mod v2;
 
+use serde::{Deserialize, Serialize};
+
 use crate::config::{
     DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {

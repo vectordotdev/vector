@@ -1,5 +1,7 @@
 //! Parse a single line of Prometheus text format.
 
+use std::collections::BTreeMap;
+
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
@@ -10,7 +12,6 @@ use nom::{
     number::complete::double,
     sequence::{delimited, pair, preceded, tuple},
 };
-use std::collections::BTreeMap;
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
 /// to provide a meaningful error message.
@@ -393,8 +394,9 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     #[test]
     fn test_parse_escaped_string() {

@@ -1,14 +1,5 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    http::{Auth, HttpClient},
-    internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
-        NginxMetricsStubStatusParseError,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
+
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
@@ -16,9 +7,22 @@ use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    http::{Auth, HttpClient},
+    internal_events::{
+        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
+        NginxMetricsStubStatusParseError,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 pub mod parser;
 use parser::NginxStubStatus;

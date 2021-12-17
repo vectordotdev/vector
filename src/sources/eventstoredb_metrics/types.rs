@@ -1,7 +1,11 @@
-use crate::event::{Metric, MetricKind, MetricValue};
-use serde::de::{MapAccess, Visitor};
-use serde::{Deserialize, Deserializer};
 use std::collections::BTreeMap;
+
+use serde::{
+    de::{MapAccess, Visitor},
+    Deserialize, Deserializer,
+};
+
+use crate::event::{Metric, MetricKind, MetricValue};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

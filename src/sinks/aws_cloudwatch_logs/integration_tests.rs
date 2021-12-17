@@ -1,19 +1,8 @@
 #![cfg(feature = "aws-cloudwatch-logs-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::aws::rusoto;
-use crate::aws::rusoto::RegionOrEndpoint;
-use crate::config::log_schema;
-use crate::event::Event;
-use crate::event::Value;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BatchConfig;
-use crate::template::Template;
-use crate::{
-    config::{ProxyConfig, SinkConfig, SinkContext},
-    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
-};
+use std::convert::TryFrom;
+
 use chrono::Duration;
 use futures::{stream, StreamExt};
 use pretty_assertions::assert_eq;
@@ -21,7 +10,16 @@ use rusoto_core::Region;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, GetLogEventsRequest,
 };
-use std::convert::TryFrom;
+
+use super::*;
+use crate::{
+    aws::{rusoto, rusoto::RegionOrEndpoint},
+    config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
+    event::{Event, Value},
+    sinks::util::{encoding::StandardEncodings, BatchConfig},
+    template::Template,
+    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+};
 
 const GROUP_NAME: &str = "vector-cw";
 

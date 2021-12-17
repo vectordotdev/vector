@@ -14,12 +14,8 @@ mod uptime;
 #[cfg(feature = "sources-host_metrics")]
 mod host;
 
-use crate::config::ComponentKey;
-
 use async_graphql::{Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
-use tokio_stream::{Stream, StreamExt};
-
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::{ComponentEventsInThroughput, ComponentEventsInTotal, EventsInTotal};
 pub use events_out::{ComponentEventsOutThroughput, ComponentEventsOutTotal, EventsOutTotal};
@@ -36,8 +32,11 @@ pub use received_events::{
 pub use sent_events::{ComponentSentEventsThroughput, ComponentSentEventsTotal, SentEventsTotal};
 pub use sink::{IntoSinkMetrics, SinkMetrics};
 pub use source::{IntoSourceMetrics, SourceMetrics};
+use tokio_stream::{Stream, StreamExt};
 pub use transform::{IntoTransformMetrics, TransformMetrics};
 pub use uptime::Uptime;
+
+use crate::config::ComponentKey;
 
 #[derive(Interface)]
 #[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]

@@ -1,10 +1,9 @@
 mod cmd;
 
+pub use cmd::cmd;
 use structopt::StructOpt;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
-
-pub use cmd::cmd;
 
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]

@@ -1,14 +1,18 @@
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{self, Read},
+    iter::IntoIterator,
+    path::PathBuf,
+};
+
+use shared::TimeZone;
+use structopt::StructOpt;
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
+
 #[cfg(feature = "repl")]
 use super::repl;
 use super::Error;
-use shared::TimeZone;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{self, Read};
-use std::iter::IntoIterator;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]

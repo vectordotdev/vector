@@ -8,10 +8,8 @@ use futures::{ready, Sink};
 use pin_project::pin_project;
 use tokio::sync::mpsc::Sender;
 
-use crate::Bufferable;
-use crate::{buffer_usage_data::BufferUsageHandle, WhenFull};
-
 use super::poll_sender::PollSender;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable, WhenFull};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SendState {
@@ -189,6 +187,19 @@ impl<T> BufferSender<T> {
             when_full: WhenFull::Overflow,
             instrumentation: None,
         }
+    }
+
+    /// Converts this sender into an overflowing sender using the given `BufferSender<T>`.
+    ///
+    /// Note: this resets the internal state of this sender, and so this should not be called except
+    /// when initially constructing `BufferSender<T>`.
+    #[cfg(test)]
+    pub fn switch_to_overflow(&mut self, overflow: BufferSender<T>) {
+        self.overflow = Some(Box::new(overflow));
+        self.when_full = WhenFull::Overflow;
+        self.state = SendState::Idle;
+        self.base_flush = false;
+        self.overflow_flush = false;
     }
 
     /// Configures this sender to instrument the items passing through it.

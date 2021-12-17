@@ -3,11 +3,17 @@ mod key;
 mod reader;
 mod writer;
 
-use self::acknowledgements::create_disk_v1_acker;
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    path::Path,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize},
+        Arc, Mutex,
+    },
+    time::Instant,
+};
 
-use super::{DataDirError, Open};
-use crate::buffer_usage_data::BufferUsageHandle;
-use crate::{Acker, Bufferable};
 use futures::task::AtomicWaker;
 use key::Key;
 use leveldb::database::{
@@ -18,15 +24,11 @@ use leveldb::database::{
 };
 pub use reader::Reader;
 use snafu::ResultExt;
-use std::sync::atomic::AtomicU64;
-use std::{
-    collections::VecDeque,
-    marker::PhantomData,
-    path::Path,
-    sync::{atomic::AtomicUsize, Arc, Mutex},
-    time::Instant,
-};
 pub use writer::Writer;
+
+use self::acknowledgements::create_disk_v1_acker;
+use super::{DataDirError, Open};
+use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
 const MAX_UNCOMPACTED_DENOMINATOR: u64 = 10;

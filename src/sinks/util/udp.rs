@@ -1,5 +1,19 @@
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
+use vector_core::buffers::Acker;
+
 use super::SinkBuildError;
-use crate::udp;
 use crate::{
     config::SinkContext,
     dns,
@@ -12,20 +26,8 @@ use crate::{
         util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
+    udp,
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
-use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {

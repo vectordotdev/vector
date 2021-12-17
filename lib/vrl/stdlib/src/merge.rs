@@ -113,8 +113,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use value::Kind;
+
+    use super::*;
 
     test_function! [
         merge => Merge;

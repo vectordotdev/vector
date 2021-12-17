@@ -1,6 +1,9 @@
-use crate::expression::{Not, Resolved};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{Not, Resolved},
+    Context, Expression, State, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unary {
