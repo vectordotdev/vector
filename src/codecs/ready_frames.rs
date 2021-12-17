@@ -5,6 +5,8 @@ use futures::{
     {Stream, StreamExt},
 };
 
+const DEFAULT_CAPACITY: usize = 1024;
+
 /// A stream combinator aimed at improving the performance of decoder streams under load.
 ///
 /// This is similar in spirit to `StreamExt::ready_chunks`, but built specifically for the
@@ -15,6 +17,7 @@ pub struct ReadyFrames<T, U, E> {
     enqueued: Vec<U>,
     enqueued_size: usize,
     error_slot: Option<E>,
+    enqueued_limit: usize,
 }
 
 impl<T, U, E> ReadyFrames<T, U, E>
@@ -25,11 +28,20 @@ where
 {
     /// Create a new `ReadyChunks` by wrapping a decoder stream, most commonly a `FramedRead`.
     pub fn new(inner: T) -> Self {
+        Self::with_capacity(inner, DEFAULT_CAPACITY)
+    }
+
+    /// Create a new `ReadyChunks` with a specified capacity by wrapping a decoder stream, most
+    /// commonly a `FramedRead`.
+    ///
+    /// The specified capacity is a soft limit, and chunks may be returned that exceed that size.
+    pub fn with_capacity(inner: T, cap: usize) -> Self {
         Self {
             inner,
-            enqueued: Vec::with_capacity(128),
+            enqueued: Vec::with_capacity(cap),
             enqueued_size: 0,
             error_slot: None,
+            enqueued_limit: cap,
         }
     }
 
@@ -69,7 +81,7 @@ where
                 Poll::Ready(Some(Ok((frame, size)))) => {
                     self.enqueued.push(frame);
                     self.enqueued_size += size;
-                    if self.enqueued.len() >= 1024 {
+                    if self.enqueued.len() >= self.enqueued_limit {
                         return Poll::Ready(Some(Ok(self.flush())));
                     }
                 }
