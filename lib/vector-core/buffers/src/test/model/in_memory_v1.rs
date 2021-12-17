@@ -1,9 +1,13 @@
-use crate::test::common::Variant;
-use crate::test::model::{Message, Model};
-use crate::WhenFull;
 use std::collections::VecDeque;
 
 use super::Progress;
+use crate::{
+    test::{
+        common::Variant,
+        model::{Message, Model},
+    },
+    WhenFull,
+};
 
 /// `InMemory` is the `Model` for in-memory v1 buffers, based on `futures`.
 pub(crate) struct InMemoryV1 {

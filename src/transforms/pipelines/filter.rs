@@ -1,10 +1,12 @@
-use super::expander::ExpanderConfig;
-use crate::conditions::{not::NotConfig, AnyCondition};
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::transforms::filter::FilterConfig;
-use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use super::expander::ExpanderConfig;
+use crate::{
+    conditions::{not::NotConfig, AnyCondition},
+    config::{DataType, ExpandType, TransformConfig, TransformContext},
+    transforms::{filter::FilterConfig, Transform},
+};
 
 /// This transform is made to do the following trick
 ///

@@ -1,8 +1,20 @@
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    io::{self},
+};
+
+use bytes::Bytes;
+use chrono::Utc;
+use http::header::{HeaderName, HeaderValue};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use tower::ServiceBuilder;
+use uuid::Uuid;
+use vector_core::{event::Finalizable, ByteSizeOf};
+
 use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::config::{GcsRetryLogic, BASE_URL};
-use crate::sinks::gcs_common::service::GcsMetadata;
-use crate::sinks::util::partitioner::KeyPartitioner;
-use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -10,36 +22,25 @@ use crate::{
     serde::to_string,
     sinks::{
         gcs_common::{
-            config::{build_healthcheck, GcsPredefinedAcl, GcsStorageClass, KeyPrefixTemplate},
-            service::{GcsRequest, GcsRequestSettings, GcsService},
+            config::{
+                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass,
+                KeyPrefixTemplate, BASE_URL,
+            },
+            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
-        util::encoding::StandardEncodings,
-        util::RequestBuilder,
         util::{
             batch::BatchConfig,
-            encoding::{EncodingConfig, EncodingConfiguration},
-            Compression, ServiceBuilderExt, TowerRequestConfig,
+            encoding::{EncodingConfig, EncodingConfiguration, StandardEncodings},
+            partitioner::KeyPartitioner,
+            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
-use chrono::Utc;
-use http::header::{HeaderName, HeaderValue};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    io::{self},
-};
-use tower::ServiceBuilder;
-use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
 
 const NAME: &str = "gcp_cloud_storage";
 
@@ -301,8 +302,9 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::partition::Partitioner;
+
+    use super::*;
 
     #[test]
     fn generate_config() {

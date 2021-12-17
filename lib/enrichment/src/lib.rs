@@ -5,11 +5,11 @@ pub mod tables;
 #[cfg(test)]
 mod test_util;
 mod vrl_util;
-use dyn_clone::DynClone;
 use std::collections::BTreeMap;
-use vrl_core::Value;
 
+use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
+use vrl_core::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);

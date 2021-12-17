@@ -1,11 +1,12 @@
-use futures::SinkExt;
-use graphql_client::GraphQLQuery;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::{
     pin::Pin,
     sync::{Arc, Mutex, Weak},
 };
+
+use futures::SinkExt;
+use graphql_client::GraphQLQuery;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};

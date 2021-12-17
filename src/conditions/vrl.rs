@@ -1,13 +1,13 @@
-use crate::emit;
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+use vrl::{diagnostic::Formatter, Program, Runtime, Value};
+
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
+    emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {
@@ -147,7 +147,10 @@ mod test {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};
+    use crate::{
+        event::{Metric, MetricKind, MetricValue},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {

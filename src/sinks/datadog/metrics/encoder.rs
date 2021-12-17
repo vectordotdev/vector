@@ -17,13 +17,12 @@ use vector_core::{
     event::{metric::MetricSketch, Metric, MetricValue},
 };
 
+use super::config::{
+    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
+};
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     sinks::util::{encode_namespace, Compressor},
-};
-
-use super::config::{
-    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -706,13 +705,12 @@ mod tests {
         metrics::AgentDDSketch,
     };
 
-    use crate::sinks::datadog::metrics::{config::DatadogMetricsEndpoint, encoder::EncoderError};
-
     use super::{
         encode_tags, encode_timestamp, get_compressor, max_compression_overhead_len,
         max_uncompressed_header_len, validate_payload_size_limits, write_payload_footer,
         write_payload_header, DatadogMetricsEncoder,
     };
+    use crate::sinks::datadog::metrics::{config::DatadogMetricsEndpoint, encoder::EncoderError};
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };

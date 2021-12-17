@@ -1,6 +1,9 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{Expr, Resolved},
+    Context, Expression, State, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {

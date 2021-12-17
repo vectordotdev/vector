@@ -1,12 +1,14 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::{
     collections::BTreeMap,
     error, fmt,
     num::{ParseFloatError, ParseIntError},
     str::Utf8Error,
 };
+
+use lazy_static::lazy_static;
+use regex::Regex;
+
+use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
 lazy_static! {
     static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
@@ -226,9 +228,10 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
+    use shared::assert_event_data_eq;
+
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use shared::assert_event_data_eq;
 
     #[test]
     fn basic_counter() {

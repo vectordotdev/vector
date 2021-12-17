@@ -2,8 +2,9 @@ mod common;
 mod serialization;
 mod size_of;
 
-use super::*;
 use std::collections::HashSet;
+
+use super::*;
 
 #[test]
 fn event_iteration() {

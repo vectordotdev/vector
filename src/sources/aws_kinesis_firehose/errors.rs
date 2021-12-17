@@ -1,6 +1,7 @@
-use super::handlers::RecordDecodeError;
 use snafu::Snafu;
 use warp::http::StatusCode;
+
+use super::handlers::RecordDecodeError;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility = "pub")]

@@ -1,6 +1,7 @@
+use mlua::prelude::*;
+
 use super::util::{table_is_timestamp, table_to_timestamp, timestamp_to_table};
 use crate::event::Value;
-use mlua::prelude::*;
 
 impl<'a> ToLua<'a> for Value {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
@@ -45,8 +46,9 @@ impl<'a> FromLua<'a> for Value {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::{TimeZone, Utc};
+
+    use super::*;
 
     #[test]
     fn from_lua() {

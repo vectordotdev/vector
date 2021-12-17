@@ -1,3 +1,9 @@
+use std::{convert::TryFrom, string::ToString};
+
+use ordered_float::NotNan;
+use strum_macros::Display;
+use vrl_compiler::Value;
+
 use crate::{
     ast::{Function, FunctionArgument},
     filters::{array, keyvalue, keyvalue::KeyValueFilter},
@@ -5,10 +11,6 @@ use crate::{
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
-use ordered_float::NotNan;
-use std::{convert::TryFrom, string::ToString};
-use strum_macros::Display;
-use vrl_compiler::Value;
 
 #[derive(Debug, Display, Clone)]
 pub enum GrokFilter {

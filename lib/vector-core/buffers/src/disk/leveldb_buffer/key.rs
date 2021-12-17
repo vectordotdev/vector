@@ -1,5 +1,4 @@
-use std::convert::TryInto;
-use std::mem;
+use std::{convert::TryInto, mem};
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Key(pub usize);

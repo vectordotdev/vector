@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::HashSet};
 
 thread_local!(
     /// A buffer for recording internal events emitted by a single test.

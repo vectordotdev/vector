@@ -1,3 +1,16 @@
+use std::{
+    collections::{BTreeMap, VecDeque},
+    convert::TryFrom,
+    io::{self, Read},
+};
+
+use bytes::{Buf, Bytes, BytesMut};
+use flate2::read::ZlibDecoder;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Decoder;
+
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -10,17 +23,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     types,
 };
-use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::ZlibDecoder;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    convert::TryFrom,
-    io::{self, Read},
-};
-use tokio_util::codec::Decoder;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
@@ -543,12 +545,16 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::test_util::{next_addr, spawn_collect_n, wait_for_tcp};
-    use crate::{event::EventStatus, Pipeline};
     use bytes::BufMut;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+    use crate::{
+        event::EventStatus,
+        test_util::{next_addr, spawn_collect_n, wait_for_tcp},
+        Pipeline,
+    };
 
     #[test]
     fn generate_config() {
@@ -638,6 +644,11 @@ mod test {
 
 #[cfg(all(test, feature = "logstash-integration-tests"))]
 mod integration_tests {
+    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
+
+    use futures::Stream;
+    use tokio::time::timeout;
+
     use super::*;
     use crate::{
         config::SourceContext,
@@ -647,9 +658,6 @@ mod integration_tests {
         tls::TlsOptions,
         Pipeline,
     };
-    use futures::Stream;
-    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
-    use tokio::time::timeout;
 
     const BEATS_IMAGE: &str = "docker.elastic.co/beats/heartbeat";
     const BEATS_TAG: &str = "7.12.1";

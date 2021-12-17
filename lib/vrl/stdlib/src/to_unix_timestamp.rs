@@ -1,4 +1,5 @@
 use std::str::FromStr;
+
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -139,8 +140,9 @@ impl Expression for ToUnixTimestampFn {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     test_function![
         to_unix_timestamp => ToUnixTimestamp;

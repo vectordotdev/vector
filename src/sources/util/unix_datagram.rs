@@ -1,3 +1,11 @@
+use std::{fs::remove_file, path::PathBuf};
+
+use bytes::{Bytes, BytesMut};
+use futures::{SinkExt, StreamExt};
+use tokio::net::UnixDatagram;
+use tokio_util::codec::FramedRead;
+use tracing::field;
+
 use crate::{
     codecs,
     event::Event,
@@ -6,12 +14,6 @@ use crate::{
     sources::{util::codecs::StreamDecodingError, Source},
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt};
-use std::{fs::remove_file, path::PathBuf};
-use tokio::net::UnixDatagram;
-use tokio_util::codec::FramedRead;
-use tracing::field;
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow

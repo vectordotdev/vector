@@ -1,6 +1,14 @@
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+use bytes::Bytes;
+use futures::{SinkExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use tokio::net::UdpSocket;
+use tokio_util::udp::UdpFramed;
+
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
-use crate::udp;
 use crate::{
     codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
@@ -9,15 +17,8 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    udp, Pipeline,
 };
-use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use tokio::net::UdpSocket;
-use tokio_util::udp::UdpFramed;
 
 pub mod parser;
 #[cfg(unix)]
@@ -231,16 +232,19 @@ impl TcpSource for StatsdTcpSource {
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
+    use futures::channel::mpsc;
+    use hyper::body::to_bytes as body_to_bytes;
+    use tokio::{
+        io::AsyncWriteExt,
+        time::{sleep, Duration},
+    };
+
     use super::*;
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::channel::mpsc;
-    use hyper::body::to_bytes as body_to_bytes;
-    use tokio::io::AsyncWriteExt;
-    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {

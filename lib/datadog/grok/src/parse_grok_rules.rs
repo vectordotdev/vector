@@ -1,21 +1,23 @@
-use std::{collections::HashMap, convert::TryFrom, fmt::Write, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt::Write,
+    sync::Arc,
+};
 
 use grok::Grok;
+use itertools::{Itertools, Position};
 use lazy_static::lazy_static;
-
 use lookup::LookupBuf;
+use regex::Regex;
+use vrl_compiler::Value;
 
-use crate::matchers::date::DateFilter;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
-    matchers::date,
+    matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
-use itertools::{Itertools, Position};
-use regex::Regex;
-use std::collections::BTreeMap;
-use vrl_compiler::Value;
 
 #[derive(Debug, Clone)]
 pub struct GrokRule {
@@ -512,8 +514,9 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     #[test]
     fn supports_escaped_quotes() {

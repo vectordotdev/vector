@@ -1,27 +1,30 @@
-use crate::topology::builder;
-use crate::topology::fanout::{ControlChannel, ControlMessage};
-use crate::topology::{
-    build_or_log_errors, handle_errors, retain, take_healthchecks, BuiltBuffer, Outputs,
-    TaskHandle, WatchRx, WatchTx,
-};
-use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
-    event::Event,
-    shutdown::SourceShutdownCoordinator,
-    topology::{builder::Pieces, task::TaskOutput},
-    trigger::DisabledTrigger,
-};
-use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
+
+use futures::{future, Future, FutureExt, SinkExt};
 use tokio::{
     sync::{mpsc, watch},
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
 use vector_core::buffers::topology::channel::BufferSender;
+
+use crate::{
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
+    event::Event,
+    shutdown::SourceShutdownCoordinator,
+    topology::{
+        build_or_log_errors, builder,
+        builder::Pieces,
+        fanout::{ControlChannel, ControlMessage},
+        handle_errors, retain, take_healthchecks,
+        task::TaskOutput,
+        BuiltBuffer, Outputs, TaskHandle, WatchRx, WatchTx,
+    },
+    trigger::DisabledTrigger,
+};
 
 #[allow(dead_code)]
 pub struct RunningTopology {

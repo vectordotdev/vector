@@ -1,9 +1,12 @@
-use crate::expression::{assignment, Container, FunctionCall, Resolved, Variable};
-use crate::parser::ast::Ident;
-use crate::{Context, Expression, State, TypeDef, Value};
+use std::{collections::BTreeMap, fmt};
+
 use lookup::LookupBuf;
-use std::collections::BTreeMap;
-use std::fmt;
+
+use crate::{
+    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    parser::ast::Ident,
+    Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {

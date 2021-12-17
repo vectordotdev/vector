@@ -1,18 +1,20 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::sinks::{util::retries::RetryLogic, Healthcheck};
-use azure_core::prelude::*;
-use azure_core::HttpError;
-use azure_storage::blob::blob::responses::PutBlockBlobResponse;
-use azure_storage::blob::prelude::*;
-use azure_storage::core::prelude::*;
+use std::sync::Arc;
+
+use azure_core::{prelude::*, HttpError};
+use azure_storage::{
+    blob::{blob::responses::PutBlockBlobResponse, prelude::*},
+    core::prelude::*,
+};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use std::sync::Arc;
-use vector_core::buffers::Ackable;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    sinks::{util::retries::RetryLogic, Healthcheck},
+};
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {

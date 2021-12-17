@@ -1,11 +1,14 @@
-use crate::sinks::util::encoding::StandardEncodings;
+use std::path::Path;
+
 use crate::{
     config::Config,
-    sinks::console::{ConsoleSinkConfig, Target},
+    sinks::{
+        console::{ConsoleSinkConfig, Target},
+        util::encoding::StandardEncodings,
+    },
     sources::socket::SocketConfig,
     test_util::{next_addr, start_topology},
 };
-use std::path::Path;
 
 #[tokio::test]
 async fn topology_doesnt_reload_new_data_dir() {

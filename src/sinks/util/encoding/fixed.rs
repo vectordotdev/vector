@@ -1,10 +1,12 @@
+use std::fmt::Debug;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     event::PathComponent,
     serde::skip_serializing_if_default,
     sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///

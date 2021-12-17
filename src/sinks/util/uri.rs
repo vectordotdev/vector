@@ -1,12 +1,13 @@
-use crate::http::Auth;
+use std::{fmt, str::FromStr};
+
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::fmt;
-use std::str::FromStr;
+
+use crate::http::Auth;
 
 /// A wrapper for `http::Uri` that implements the serde traits.
 /// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.

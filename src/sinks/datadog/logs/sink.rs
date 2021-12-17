@@ -1,24 +1,32 @@
-use super::config::MAX_PAYLOAD_BYTES;
-use super::service::LogApiRequest;
-use crate::config::SinkContext;
-use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed, StandardEncodings};
-use crate::sinks::util::{Compression, Compressor, RequestBuilder, SinkBuilderExt};
+use std::{
+    fmt::Debug,
+    io::{self, Write},
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
+use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
-use std::fmt::Debug;
-use std::io::{self, Write};
-use std::num::NonZeroUsize;
-use std::sync::Arc;
 use tower::Service;
-use vector_core::buffers::Acker;
-use vector_core::config::{log_schema, LogSchema};
-use vector_core::event::{Event, EventFinalizers, Finalizable, Value};
-use vector_core::partition::Partitioner;
-use vector_core::sink::StreamSink;
-use vector_core::stream::{BatcherSettings, DriverResponse};
-use vector_core::ByteSizeOf;
+use vector_core::{
+    buffers::Acker,
+    config::{log_schema, LogSchema},
+    event::{Event, EventFinalizers, Finalizable, Value},
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
+
+use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
+use crate::{
+    config::SinkContext,
+    sinks::util::{
+        encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        Compression, Compressor, RequestBuilder, SinkBuilderExt,
+    },
+};
 #[derive(Default)]
 struct EventPartitioner;
 

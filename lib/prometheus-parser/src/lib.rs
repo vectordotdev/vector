@@ -1,6 +1,7 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use indexmap::IndexMap;
 use snafu::ResultExt;
-use std::{collections::BTreeMap, convert::TryFrom};
 
 mod line;
 

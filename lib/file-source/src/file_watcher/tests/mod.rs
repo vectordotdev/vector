@@ -1,8 +1,9 @@
 mod experiment;
 mod experiment_no_truncations;
 
-use quickcheck::{Arbitrary, Gen};
 use std::str;
+
+use quickcheck::{Arbitrary, Gen};
 
 // Welcome.
 //

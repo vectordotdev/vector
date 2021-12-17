@@ -1,10 +1,11 @@
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use datadog_filter::{
     regex::{wildcard_regex, word_regex},
     Filter, Matcher, Resolver, Run,
 };
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use std::borrow::Cow;
 use vector_core::event::{LogEvent, Value};
 
 #[derive(Default, Clone)]

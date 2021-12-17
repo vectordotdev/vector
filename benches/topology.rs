@@ -2,7 +2,6 @@ use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput}
 use futures::{future, stream, StreamExt};
 use indoc::indoc;
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
 use vector::{
     config, sinks, sources,
     test_util::{

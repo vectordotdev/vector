@@ -3,12 +3,14 @@
 
 #![allow(clippy::print_stdout)] // test framework
 
-use super::Result;
 use std::process::{ExitStatus, Stdio};
+
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, ChildStdout, Command},
 };
+
+use super::Result;
 
 /// Initiate a port forward (`kubectl port-forward`) with the specified
 /// `kubectl_command` for the specified `resource` at the specified `namespace`

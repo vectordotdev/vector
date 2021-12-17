@@ -1,6 +1,7 @@
 #![cfg(feature = "cli-tests")]
-use assert_cmd::prelude::*;
 use std::{fs::read_dir, process::Command};
+
+use assert_cmd::prelude::*;
 
 mod support;
 

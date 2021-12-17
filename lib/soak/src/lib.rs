@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt, str::FromStr};
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]

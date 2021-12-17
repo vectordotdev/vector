@@ -1,8 +1,9 @@
-use serde_json::{value::RawValue, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
     mem,
 };
+
+use serde_json::{value::RawValue, Value};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type

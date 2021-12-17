@@ -1,11 +1,7 @@
 #![allow(clippy::print_stdout)] // tests
 
-use crate::sinks::datadog::logs::DatadogLogsConfig;
-use crate::{
-    config::SinkConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
-    test_util::{next_addr, random_lines_with_stream},
-};
+use std::sync::Arc;
+
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{
@@ -15,9 +11,16 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use std::sync::Arc;
-use vector_core::event::Event;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::event::{BatchNotifier, BatchStatus, Event};
+
+use crate::{
+    config::SinkConfig,
+    sinks::{
+        datadog::logs::DatadogLogsConfig,
+        util::test::{build_test_server_status, load_sink},
+    },
+    test_util::{next_addr, random_lines_with_stream},
+};
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
