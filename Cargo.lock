@@ -4303,6 +4303,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset",
+]
+
+[[package]]
 name = "nkeys"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8325,7 +8338,7 @@ dependencies = [
  "metrics-util",
  "mlua",
  "mongodb",
- "nix 0.22.2",
+ "nix 0.23.1",
  "nom 7.1.0",
  "notify",
  "num-format",
