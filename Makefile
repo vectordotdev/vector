@@ -375,7 +375,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh datadog-agent stop
 	@scripts/setup_integration_env.sh datadog-agent start
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib sources::datadog::tests::
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib sources::datadog::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh datadog-agent stop
 endif

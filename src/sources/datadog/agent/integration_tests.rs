@@ -1,6 +1,4 @@
-#![cfg(feature = "datadog-agent-integration-tests")]
-
-use super::agent::DatadogAgentConfig;
+use super::DatadogAgentConfig;
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 use crate::event::EventStatus;
 use crate::test_util::spawn_collect_n;
