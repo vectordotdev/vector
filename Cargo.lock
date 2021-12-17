@@ -3920,9 +3920,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-exporter-prometheus"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "343a5ceb38235928e7a5687412590f07e6d281522dcd9ff51246f8856eef5fe5"
+checksum = "aee04ed06085ea4eb1e1378c4fd973d95e0d3e32897913cd58aedc3b10e71452"
 dependencies = [
  "hyper",
  "ipnet",
