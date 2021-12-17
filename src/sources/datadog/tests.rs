@@ -7,9 +7,42 @@ use crate::test_util::spawn_collect_n;
 use crate::Pipeline;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::time::{Duration, SystemTime};
+
+fn agent_address() -> String {
+    std::env::var("AGENT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8181".to_owned())
+}
+
+fn agent_health_address() -> String {
+    std::env::var("AGENT_HEALTH_ADDRESS").unwrap_or_else(|_| "http://0.0.0.0:8182".to_owned())
+}
+
+const AGENT_TIMEOUT: u64 = 60; // timeout in seconds
+
+async fn wait_for_agent() {
+    let start = SystemTime::now();
+    let address = agent_health_address();
+    while start
+        .elapsed()
+        .map(|value| value.as_secs() < AGENT_TIMEOUT)
+        .unwrap_or(false)
+    {
+        if reqwest::get(&address)
+            .await
+            .map(|res| res.status().is_success())
+            .unwrap_or(false)
+        {
+            return;
+        }
+        // wait a second before retry...
+        tokio::time::sleep(Duration::new(1, 0)).await;
+    }
+    panic!("unable to reach the datadog agent, check that it's started");
+}
 
 #[tokio::test]
 async fn wait_for_message() {
+    wait_for_agent().await;
     let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
     let context = SourceContext::new_test(sender);
     tokio::spawn(async move {
@@ -18,7 +51,8 @@ async fn wait_for_message() {
     });
     let events = spawn_collect_n(
         async move {
-            let mut stream = TcpStream::connect("0.0.0.0:8181").unwrap();
+            let address = agent_address();
+            let mut stream = TcpStream::connect(&address).unwrap();
             let data = "hello world\nit's vector speaking\n";
             stream.write_all(data.as_bytes()).unwrap();
         },

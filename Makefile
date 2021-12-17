@@ -374,7 +374,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh datadog-agent stop
 	@scripts/setup_integration_env.sh datadog-agent start
-	sleep 30 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib sources::datadog::tests::
 ifeq ($(AUTODESPAWN), true)
