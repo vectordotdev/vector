@@ -20,14 +20,10 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 ### kubectl
 
-[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] role.
+[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] and [aggregator] roles.
 
-{{< warning title="Aggregator role in public beta" >}}
-Support for the [aggregator] role is currently in public beta. We're seeking beta testers! If deploying the aggregator, please [join our chat][chat] and let us know how it went.
-
+[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
-[chat]: https://chat.vector.dev
-{{< /warning >}}
 
 #### Agent
 
