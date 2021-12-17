@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use futures_util::{
     future,
     stream::{self, BoxStream},
-    FutureExt, SinkExt,
+    FutureExt, SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc::{Sender, Receiver}, Mutex, oneshot};
 use vector_core::{
     event::{Event, LogEvent, Metric},
     sink::{StreamSink, VectorSink},
@@ -15,29 +17,30 @@ use crate::{conditions, sinks::Healthcheck, sources};
 
 use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct UnitTestSource {
-    pub input_log_events: Vec<LogEvent>,
-    pub input_metric_events: Vec<Metric>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UnitTestSourceConfig {
+    // Wrapped to satisfy trait bounds
+    #[serde(skip)]
+    pub receiver: Arc<Mutex<Option<Receiver<Event>>>>,
+    // pub input_log_events: Vec<LogEvent>,
+    // pub input_metric_events: Vec<Metric>,
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
-impl SourceConfig for UnitTestSource {
+impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let mut out = cx.out;
-
-        let mut events = Vec::new();
-        let log_events = self.input_log_events.clone();
-        events.extend(log_events.into_iter().map(Event::Log).map(Ok));
-
-        let metric_events = self.input_metric_events.clone();
-        events.extend(metric_events.into_iter().map(Event::Metric).map(Ok));
-
+        let mut receiver = self.receiver.lock().await.take().unwrap();
         Ok(Box::pin(async move {
-            out.send_all(&mut stream::iter(events))
-                .await
-                .map_err(|_| ())?;
+            let mut out = cx.out;
+            let _shutdown = cx.shutdown;
+            while let Some(event) = receiver.recv().await {
+                println!("source received an event: {:?}", event);
+                out.send(event)
+                    .await
+                    .map_err(|_| ())?;
+            }
+            println!("closing source...");
             Ok(())
         }))
     }
@@ -53,15 +56,18 @@ impl SourceConfig for UnitTestSource {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct UnitTestSinkConfig {
+    #[serde(skip)]
+    pub result_tx: Arc<Mutex<Option<oneshot::Sender<Vec<Event>>>>>,
     // need enrichment tables to build these conditions...current unit tests use Default::default
-    pub conditions: Vec<conditions::AnyCondition>,
+    // pub conditions: Vec<conditions::AnyCondition>,
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = UnitTestSink::new();
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let tx = self.result_tx.lock().await.take().unwrap();
+        let sink = UnitTestSink::new(tx);
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
@@ -76,21 +82,34 @@ impl SinkConfig for UnitTestSinkConfig {
     }
 }
 
-pub struct UnitTestSink;
+pub struct UnitTestSink {
+    result_tx: oneshot::Sender<Vec<Event>>,
+}
 
 impl UnitTestSink {
-    fn new() -> Self {
-        Self
+    fn new(result_tx: oneshot::Sender<Vec<Event>>) -> Self {
+        Self {
+            result_tx
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl StreamSink for UnitTestSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         // Check the input using the conditions
         // Send the results back to the unit test framework
         // Include some wrapping to associate the results, which condition the results came from
-        println!("I'm in the sink!");
+
+        let mut results = Vec::new();
+        while let Some(event) = input.next().await {
+            println!("sink received event: {:?}", event);
+            results.push(event);
+        }
+        if let Err(_) = self.result_tx.send(results) {
+            error!(message = "Sending unit test results failed in unit test sink.");
+        }
+        println!("closing sink...");
         Ok(())
     }
 }
