@@ -60,6 +60,7 @@ jobs:
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
+          - test: 'datadog-metrics'
           - test: 'docker-logs'
           - test: 'elasticsearch'
           - test: 'eventstoredb_metrics'
