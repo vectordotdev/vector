@@ -1,28 +1,27 @@
-use crate::codecs::Decoder;
-use crate::config::log_schema;
-use crate::event::BatchStatus;
-use crate::event::{BatchNotifier, Event};
-use crate::shutdown::ShutdownSignal;
-use crate::sources::util::StreamDecodingError;
-use crate::Pipeline;
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName};
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Cursor, panic, str::FromStr};
 
-use super::events::*;
-use crate::vector_core::ByteSizeOf;
 use async_stream::stream;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_sqs::{
+    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName},
+    Client as SqsClient,
+};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, TryStreamExt};
-use futures::{SinkExt, Stream, StreamExt};
-use std::io::Cursor;
-use std::panic;
-use std::str::FromStr;
-use tokio::time::Duration;
-use tokio::{pin, select};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
+use tokio::{pin, select, time::Duration};
 use tokio_util::codec::FramedRead;
 use vector_core::internal_event::EventsReceived;
+
+use super::events::*;
+use crate::{
+    codecs::Decoder,
+    config::log_schema,
+    event::{BatchNotifier, BatchStatus, Event},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    vector_core::ByteSizeOf,
+    Pipeline,
+};
 
 // This is the maximum SQS supports in a single batch request
 const MAX_BATCH_SIZE: i32 = 10;
@@ -212,8 +211,9 @@ fn decode_message<E>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::SecondsFormat;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_decode() {

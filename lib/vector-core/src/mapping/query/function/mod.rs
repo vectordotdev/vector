@@ -2,25 +2,30 @@
 
 mod not;
 
+use std::{collections::HashMap, convert::TryFrom, str::FromStr};
+
 pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
-use crate::event::Event;
-use crate::mapping::{query::query_value::QueryValue, Result};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::str::FromStr;
+use crate::{
+    event::Event,
+    mapping::{query::query_value::QueryValue, Result},
+};
 
 /// Commonly used types when building new functions.
 mod prelude {
+    pub(super) use std::convert::TryFrom;
+
     pub(super) use super::{ArgumentList, Parameter};
-    pub(super) use crate::event::{Event, Value};
-    pub(super) use crate::mapping::query::query_value::QueryValue;
-    pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
-    pub(super) use crate::mapping::Result;
-    pub(super) use std::convert::TryFrom;
+    pub(super) use crate::{
+        event::{Event, Value},
+        mapping::{
+            query::{query_value::QueryValue, Function},
+            Result,
+        },
+    };
 }
 
 // If this macro triggers, it means the logic to detect invalid types did not

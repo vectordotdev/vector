@@ -1,5 +1,7 @@
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 pub use error::LookupError;
 pub use lookup_buf::{FieldBuf, LookupBuf, SegmentBuf};

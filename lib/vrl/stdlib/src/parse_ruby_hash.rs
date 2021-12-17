@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
@@ -9,9 +11,7 @@ use nom::{
     sequence::{preceded, separated_pair, terminated, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
-use std::num::ParseIntError;
-use vrl::prelude::*;
-use vrl::Value;
+use vrl::{prelude::*, Value};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;

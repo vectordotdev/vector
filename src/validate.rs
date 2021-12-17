@@ -1,12 +1,13 @@
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+
+use colored::*;
+use exitcode::ExitCode;
+use structopt::StructOpt;
+
 use crate::{
     config::{self, Config, ConfigDiff},
     topology::{self, builder::Pieces},
 };
-use colored::*;
-use exitcode::ExitCode;
-use std::collections::HashMap;
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
-use structopt::StructOpt;
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 

@@ -1,3 +1,13 @@
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    num::NonZeroU64,
+};
+
+use futures::SinkExt;
+use http::{Request, Uri};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
@@ -15,14 +25,6 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
-};
-use futures::SinkExt;
-use http::{Request, Uri};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    num::NonZeroU64,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -254,20 +256,23 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
-        sinks::util::{
-            http::HttpSink,
-            test::{build_test_server_status, load_sink},
-        },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
-    };
     use chrono::{offset::TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
+    use super::*;
+    use crate::{
+        sinks::{
+            influxdb::test_util::{assert_fields, split_line_protocol, ts},
+            util::{
+                http::HttpSink,
+                test::{build_test_server_status, load_sink},
+            },
+        },
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+    };
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -701,6 +706,10 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use chrono::Utc;
+    use futures::stream;
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
     use super::*;
     use crate::{
         config::SinkContext,
@@ -711,9 +720,6 @@ mod integration_tests {
         },
         test_util::components::{self, HTTP_SINK_TAGS},
     };
-    use chrono::Utc;
-    use futures::stream;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {

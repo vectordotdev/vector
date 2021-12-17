@@ -1,21 +1,22 @@
-use crate::grok_filter::GrokFilter;
-use crate::{
-    ast::{Function, FunctionArgument},
-    parse_grok_rules::Error as GrokStaticError,
-};
+use std::convert::TryFrom;
+
 use bytes::Bytes;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_until},
     character::complete::char,
-    combinator::cut,
-    combinator::map,
+    combinator::{cut, map},
     multi::separated_list0,
     sequence::{preceded, terminated},
     IResult,
 };
-use std::convert::TryFrom;
 use vrl_compiler::Value;
+
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok_rules::Error as GrokStaticError,
+};
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     let args = f.args.as_ref();

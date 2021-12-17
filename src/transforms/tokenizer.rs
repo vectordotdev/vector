@@ -1,3 +1,9 @@
+use std::{collections::HashMap, str};
+
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use shared::{tokenize::parse, TimeZone};
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
@@ -5,11 +11,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use shared::{tokenize::parse, TimeZone};
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]

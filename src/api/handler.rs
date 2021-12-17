@@ -1,6 +1,5 @@
 use serde_json::json;
-use warp::reply::json;
-use warp::{Rejection, Reply};
+use warp::{reply::json, Rejection, Reply};
 
 // Health handler, responds with { ok: true }
 pub async fn health() -> Result<impl Reply, Rejection> {

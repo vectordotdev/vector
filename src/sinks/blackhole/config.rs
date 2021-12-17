@@ -1,8 +1,10 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::blackhole::sink::BlackholeSink;
-use crate::sinks::{Healthcheck, VectorSink};
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
+};
 
 const fn default_print_interval_secs() -> u64 {
     1

@@ -1,14 +1,3 @@
-use super::{AfterReadExt as _, StreamDecodingError};
-use crate::{
-    config::{AcknowledgementsConfig, Resource, SourceContext},
-    event::{BatchNotifier, BatchStatus, Event},
-    internal_events::{
-        ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
-    },
-    shutdown::ShutdownSignal,
-    tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-};
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
@@ -25,6 +14,18 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
+
+use super::{AfterReadExt as _, StreamDecodingError};
+use crate::{
+    config::{AcknowledgementsConfig, Resource, SourceContext},
+    event::{BatchNotifier, BatchStatus, Event},
+    internal_events::{
+        ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+    },
+    shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
+    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+};
 
 async fn make_listener(
     addr: SocketListenAddr,
@@ -400,9 +401,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use serde::Deserialize;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    use serde::Deserialize;
+
+    use super::*;
 
     #[derive(Debug, Deserialize)]
     struct Config {

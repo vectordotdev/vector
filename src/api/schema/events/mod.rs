@@ -3,17 +3,16 @@ mod log;
 mod notification;
 mod output;
 
+use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use output::OutputEventsPayload;
-
-use crate::{api::tap::TapController, topology::WatchRx};
-
-use async_graphql::{validators::IntRange, Context, Subscription};
 use futures::Stream;
 use itertools::Itertools;
+use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{api::tap::TapController, topology::WatchRx};
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -26,7 +25,7 @@ impl EventsSubscription {
         ctx: &'a Context<'a>,
         patterns: Vec<String>,
         #[graphql(default = 500)] interval: u32,
-        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
+        #[graphql(default = 100, validator(minimum = 1, maximum = 10_000))] limit: u32,
     ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 

@@ -1,17 +1,19 @@
-use super::{
-    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint, TransformOuter,
-};
-use crate::signal;
-use glob::glob;
-use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
     sync::Mutex,
 };
+
+use glob::glob;
+use indexmap::IndexMap;
+use lazy_static::lazy_static;
+
+use super::{
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
+    FormatHint, TransformOuter,
+};
+use crate::signal;
 
 #[cfg(not(windows))]
 fn default_config_paths() -> Vec<ConfigPath> {
@@ -421,10 +423,13 @@ where
     feature = "transforms-sample"
 ))]
 mod tests {
-    use super::load_builder_from_paths;
-    use crate::config::{ComponentKey, ConfigPath};
-    use crate::transforms::pipelines::PipelinesConfig;
     use std::path::PathBuf;
+
+    use super::load_builder_from_paths;
+    use crate::{
+        config::{ComponentKey, ConfigPath},
+        transforms::pipelines::PipelinesConfig,
+    };
 
     #[test]
     fn load_namespacing_folder() {

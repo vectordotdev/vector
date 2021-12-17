@@ -1,12 +1,5 @@
-use super::util::MultilineConfig;
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::{self, RegionOrEndpoint};
-use crate::config::AcknowledgementsConfig;
-use crate::serde::bool_or_struct;
-use crate::{
-    config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    line_agg,
-};
+use std::convert::TryInto;
+
 use async_compression::tokio::bufread;
 use futures::{stream, stream::StreamExt};
 use rusoto_core::Region;
@@ -14,7 +7,20 @@ use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
+
+use super::util::MultilineConfig;
+use crate::{
+    aws::{
+        auth::AwsAuthentication,
+        rusoto::{self, RegionOrEndpoint},
+    },
+    config::{
+        AcknowledgementsConfig, DataType, ProxyConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    line_agg,
+    serde::bool_or_struct,
+};
 
 pub mod sqs;
 
@@ -244,8 +250,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use super::{s3_object_decoder, Compression};
     use tokio::io::AsyncReadExt;
+
+    use super::{s3_object_decoder, Compression};
 
     #[test]
     fn determine_compression() {
@@ -299,9 +306,14 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use pretty_assertions::assert_eq;
+    use rusoto_core::Region;
+    use rusoto_s3::{PutObjectRequest, S3Client, S3};
+    use rusoto_sqs::{Sqs, SqsClient};
+
     use super::{sqs, AwsS3Config, Compression, Strategy};
-    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::{
+        aws::rusoto::RegionOrEndpoint,
         config::{SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
@@ -311,10 +323,6 @@ mod integration_tests {
         },
         Pipeline,
     };
-    use pretty_assertions::assert_eq;
-    use rusoto_core::Region;
-    use rusoto_s3::{PutObjectRequest, S3Client, S3};
-    use rusoto_sqs::{Sqs, SqsClient};
 
     #[tokio::test]
     async fn s3_process_message() {

@@ -4,14 +4,14 @@ use metrics::{counter, decrement_gauge, gauge, increment_gauge};
 pub struct BufferEventsReceived {
     pub idx: usize,
     pub count: u64,
-    pub byte_size: usize,
+    pub byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsReceived {
     #[allow(clippy::cast_precision_loss)]
     fn emit_metrics(&self) {
         counter!("buffer_received_events_total", self.count, "stage" => self.idx.to_string());
-        counter!("buffer_received_bytes_total", self.byte_size as u64, "stage" => self.idx.to_string());
+        counter!("buffer_received_bytes_total", self.byte_size, "stage" => self.idx.to_string());
         increment_gauge!("buffer_events", self.count as f64, "stage" => self.idx.to_string());
         increment_gauge!("buffer_byte_size", self.byte_size as f64, "stage" => self.idx.to_string());
     }
@@ -20,14 +20,14 @@ impl InternalEvent for BufferEventsReceived {
 pub struct BufferEventsSent {
     pub idx: usize,
     pub count: u64,
-    pub byte_size: usize,
+    pub byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsSent {
     #[allow(clippy::cast_precision_loss)]
     fn emit_metrics(&self) {
         counter!("buffer_sent_events_total", self.count, "stage" => self.idx.to_string());
-        counter!("buffer_sent_bytes_total", self.byte_size as u64, "stage" => self.idx.to_string());
+        counter!("buffer_sent_bytes_total", self.byte_size, "stage" => self.idx.to_string());
         decrement_gauge!("buffer_events", self.count as f64, "stage" => self.idx.to_string());
         decrement_gauge!("buffer_byte_size", self.byte_size as f64, "stage" => self.idx.to_string());
     }
@@ -57,7 +57,7 @@ impl InternalEvent for EventsCorrupted {
 pub struct BufferCreated {
     pub idx: usize,
     pub max_size_events: Option<usize>,
-    pub max_size_bytes: Option<usize>,
+    pub max_size_bytes: Option<u64>,
 }
 
 impl InternalEvent for BufferCreated {

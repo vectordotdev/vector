@@ -1,8 +1,7 @@
-use chrono::serde::ts_seconds;
-use chrono::{DateTime, TimeZone, Utc};
+use std::{collections::BTreeMap, convert::TryInto};
+
+use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryInto;
 use vector_core::event::Value;
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
@@ -213,11 +212,13 @@ impl From<FluentTimestamp> for Value {
 
 #[cfg(test)]
 mod test {
-    use crate::sources::fluent::message::FluentValue;
+    use std::collections::BTreeMap;
+
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
-    use std::collections::BTreeMap;
     use vector_core::event::Value;
+
+    use crate::sources::fluent::message::FluentValue;
 
     quickcheck! {
       fn from_bool(input: bool) -> () {

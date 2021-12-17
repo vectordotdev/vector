@@ -8,10 +8,8 @@ use futures::{ready, Sink};
 use pin_project::pin_project;
 use tokio::sync::mpsc::Sender;
 
-use crate::Bufferable;
-use crate::{buffer_usage_data::BufferUsageHandle, WhenFull};
-
 use super::poll_sender::PollSender;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable, WhenFull};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SendState {
@@ -191,6 +189,19 @@ impl<T> BufferSender<T> {
         }
     }
 
+    /// Converts this sender into an overflowing sender using the given `BufferSender<T>`.
+    ///
+    /// Note: this resets the internal state of this sender, and so this should not be called except
+    /// when initially constructing `BufferSender<T>`.
+    #[cfg(test)]
+    pub fn switch_to_overflow(&mut self, overflow: BufferSender<T>) {
+        self.overflow = Some(Box::new(overflow));
+        self.when_full = WhenFull::Overflow;
+        self.state = SendState::Idle;
+        self.base_flush = false;
+        self.overflow_flush = false;
+    }
+
     /// Configures this sender to instrument the items passing through it.
     pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);
@@ -324,8 +335,13 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         };
 
         if let Some(item_size) = item_size {
-            if let Some(handle) = this.instrumentation.as_ref() {
-                handle.increment_sent_event_count_and_byte_size(1, item_size);
+            // Only update our instrumentation if _we_ got the item, not the overflow.
+            let handle = this
+                .instrumentation
+                .as_ref()
+                .expect("item_size can't be present without instrumentation");
+            if *this.base_flush {
+                handle.increment_received_event_count_and_byte_size(1, item_size as u64);
             }
         }
 

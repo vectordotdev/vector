@@ -251,12 +251,6 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "array")]
-pub use crate::array::Array;
-#[cfg(feature = "md5")]
-pub use crate::md5::Md5;
-#[cfg(feature = "sha1")]
-pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -493,6 +487,13 @@ pub use unnest::Unnest;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+
+#[cfg(feature = "array")]
+pub use crate::array::Array;
+#[cfg(feature = "md5")]
+pub use crate::md5::Md5;
+#[cfg(feature = "sha1")]
+pub use crate::sha1::Sha1;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![

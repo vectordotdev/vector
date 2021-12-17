@@ -134,8 +134,9 @@ impl Expression for ToFloatFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
+
+    use super::*;
 
     test_function![
         to_float => ToFloat;

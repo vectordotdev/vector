@@ -1,10 +1,14 @@
-use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
-use crate::function::{ArgumentList, FunctionCompileContext, Parameter};
-use crate::parser::{Ident, Node};
-use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
+use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
-use std::fmt;
+
+use crate::{
+    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    function::{ArgumentList, FunctionCompileContext, Parameter},
+    parser::{Ident, Node},
+    value::Kind,
+    Context, Expression, Function, Resolved, Span, State, TypeDef,
+};
 
 #[derive(Clone)]
 pub struct FunctionCall {

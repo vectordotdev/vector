@@ -1,11 +1,12 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -136,9 +137,10 @@ impl FunctionTransform for JsonParser {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::{config::log_schema, event::Event, transforms::test::transform_one};
-    use serde_json::json;
 
     #[test]
     fn generate_config() {

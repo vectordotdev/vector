@@ -1,26 +1,25 @@
-use crate::event::{Event, EventFinalizers, Finalizable};
-
-use crate::sinks::aws_cloudwatch_logs::request_builder::{
-    CloudwatchRequest, CloudwatchRequestBuilder,
-};
-use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchLogsPartitionSvc, CloudwatchResponse};
-use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
-
-use crate::sinks::util::service::Svc;
-use crate::sinks::util::SinkBuilderExt;
-
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
+use futures::{future, stream::BoxStream, StreamExt};
+use vector_core::{
+    buffers::{Ackable, Acker},
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::BatcherSettings,
+};
 
-use futures::future;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-
-use vector_core::buffers::{Ackable, Acker};
-use vector_core::partition::Partitioner;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
+use crate::{
+    event::{Event, EventFinalizers, Finalizable},
+    sinks::{
+        aws_cloudwatch_logs::{
+            request_builder::{CloudwatchRequest, CloudwatchRequestBuilder},
+            retry::CloudwatchRetryLogic,
+            service::{CloudwatchLogsPartitionSvc, CloudwatchResponse},
+            CloudwatchKey,
+        },
+        util::{service::Svc, SinkBuilderExt},
+    },
+};
 
 pub struct CloudwatchSink {
     pub batcher_settings: BatcherSettings,

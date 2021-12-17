@@ -1,12 +1,12 @@
+use std::{cmp::Ordering, collections::BTreeMap};
+
+use chrono::{DateTime, TimeZone, Utc};
+use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
+
 use crate::event::{
     metric::{Bucket, Metric, MetricKind, MetricValue, Quantile},
     Event,
 };
-use chrono::{DateTime, TimeZone, Utc};
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-
-use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
 
 fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
     if tags.is_empty() {
@@ -138,12 +138,13 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{TimeZone, Utc};
     use lazy_static::lazy_static;
     use pretty_assertions::assert_eq;
     use shared::{assert_event_data_eq, btreemap};
+
+    use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
 
     lazy_static! {
         static ref TIMESTAMP: DateTime<Utc> = Utc.ymd(2021, 2, 4).and_hms_milli(4, 5, 6, 789);

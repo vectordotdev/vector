@@ -1,6 +1,5 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::http::{HttpClient, HttpError};
-use crate::sinks::gcp::GcpCredentials;
+use std::task::Poll;
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
@@ -8,11 +7,14 @@ use http::{
     Request, Uri,
 };
 use hyper::Body;
-use std::task::Poll;
 use tower::Service;
-use vector_core::buffers::Ackable;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    http::{HttpClient, HttpError},
+    sinks::gcp::GcpCredentials,
+};
 
 #[derive(Debug, Clone)]
 pub struct GcsService {

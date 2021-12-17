@@ -7,12 +7,12 @@ use tokio::{
 };
 use tracing::Instrument;
 
+use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, UndecodableRecord};
 use crate::{
-    assert_enough_bytes_written, assert_reader_writer_file_positions,
+    assert_enough_bytes_written, assert_file_does_not_exist_async, assert_file_exists_async,
+    assert_reader_writer_file_positions,
     disk_v2::{backed_archive::BackedArchive, record::Record, tests::SizedRecord, ReaderError},
 };
-
-use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, UndecodableRecord};
 
 #[tokio::test]
 async fn reader_throws_error_when_record_length_delimiter_is_zero() {
@@ -81,7 +81,19 @@ async fn reader_throws_error_when_record_length_delimiter_is_zero() {
 }
 
 #[tokio::test]
-async fn reader_throws_error_when_finished_file_has_truncated_record_data() {}
+async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
+    // TODO: We really do want this test, which is the equivalent of saying:
+    // "do we correctly detect when a file has, say, the u64 'record length' delimiter but either no
+    // more data after that, or not enough data, and we know for sure the writer has moved on?"
+    //
+    // Right now, we _always_ assume the data is coming if we can at least read 8 bytes for the
+    // length delimiter... but the point in the code where that happens is oblivious to the
+    // higher-level reader/writer state, so making it possible to detect this condition will take a
+    // small chunk of redesign work, but is definitely one of the last major possible issues that
+    // the buffer reasonably has to handle.
+    let worked = true;
+    assert!(worked);
+}
 
 #[tokio::test]
 async fn reader_throws_error_when_record_has_scrambled_archive_data() {
@@ -190,9 +202,8 @@ async fn reader_throws_error_when_record_has_decoding_error() {
 }
 
 #[tokio::test]
-async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() {
+async fn writer_detects_when_last_record_has_scrambled_archive_data() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -200,14 +211,15 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
             let writer_called_reset = assertion_registry
                 .build()
                 .with_name("reset")
-                .with_parent_name(
-                    "writer_correctly_detects_when_last_record_has_scrambled_archive_data",
-                )
+                .with_parent_name("writer_detects_when_last_record_has_scrambled_archive_data")
                 .was_entered()
                 .finalize();
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a `SizedRecord` record that we can scramble.  Since it will be the last record
             // in the data file, the writer should detect this error when the buffer is recreated,
@@ -262,22 +274,22 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call.
-            let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
-    let parent =
-        trace_span!("writer_correctly_detects_when_last_record_has_scrambled_archive_data");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    let parent = trace_span!("writer_detects_when_last_record_has_scrambled_archive_data");
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
-async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
+async fn writer_detects_when_last_record_has_invalid_checksum() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -285,12 +297,15 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
             let writer_called_reset = assertion_registry
                 .build()
                 .with_name("reset")
-                .with_parent_name("writer_correctly_detects_when_last_record_has_invalid_checksum")
+                .with_parent_name("writer_detects_when_last_record_has_invalid_checksum")
                 .was_entered()
                 .finalize();
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a `SizedRecord` record that we can scramble.  Since it will be the last record
             // in the data file, the writer should detect this error when the buffer is recreated,
@@ -357,21 +372,22 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
                 .expect("flush should not fail");
             drop(backed_record);
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call.
-            let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
-    let parent = trace_span!("writer_correctly_detects_when_last_record_has_invalid_checksum");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    let parent = trace_span!("writer_detects_when_last_record_has_invalid_checksum");
+    fut.instrument(parent).await;
 }
 
 #[tokio::test]
-async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
+async fn writer_detects_when_last_record_wasnt_flushed() {
     let assertion_registry = install_tracing_helpers();
-
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -379,12 +395,15 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
             let writer_called_reset = assertion_registry
                 .build()
                 .with_name("reset")
-                .with_parent_name("writer_correctly_detects_when_last_record_has_gap_in_record_id")
+                .with_parent_name("writer_detects_when_last_record_wasnt_flushed")
                 .was_entered()
                 .finalize();
 
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
 
             // Write a regular record so something is in the data file.
             let bytes_written = writer
@@ -395,7 +414,11 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
             writer.flush().await.expect("flush should not fail");
 
             // Now unsafely increment the next writer record ID, which will cause a divergence
-            // between the actual data file and the ledger.
+            // between the actual data file and the ledger.  Specifically, the code will think that
+            // a record was written but never flushed, given that the next writer record ID has
+            // advanced.  This represents a "lost write"/"corrupted events" scenario, where we end
+            // up reporting that we missed a bunch of events, either because we skipped a file or
+            // a bunch of writes never fully made it to disk.
             let writer_next_record_id = ledger.state().get_next_writer_record_id();
             unsafe {
                 ledger
@@ -404,22 +427,94 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
             }
 
             // Grab the current writer data file path, and then drop the writer/reader.
-            let expected_writer_file_id = ledger.get_next_writer_file_id();
             drop(writer);
             drop(ledger);
 
             // We should not have seen a call to `reset` yet.
             assert!(!writer_called_reset.try_assert());
 
-            // Now reopen the buffer, which should trigger a `Writer::reset` call, since the last
-            // record ID is too far behind what the ledger thinks it should be:
+            // Now reopen the buffer, which should trigger a `Writer::reset` call and additionally,
+            // we should be rolled over to a new data file now on the writer side.
             let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
-            assert_reader_writer_file_positions!(ledger, 0, expected_writer_file_id);
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_exists_async!(&expected_final_write_data_file);
         }
     });
 
-    let parent = trace_span!("writer_correctly_detects_when_last_record_has_gap_in_record_id");
-    let _enter = parent.enter();
-    fut.in_current_span().await;
+    let parent = trace_span!("writer_detects_when_last_record_wasnt_flushed");
+    fut.instrument(parent).await;
+}
+
+#[tokio::test]
+async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() {
+    let assertion_registry = install_tracing_helpers();
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let writer_called_reset = assertion_registry
+                .build()
+                .with_name("reset")
+                .with_parent_name(
+                    "writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented",
+                )
+                .was_entered()
+                .finalize();
+
+            // Create a regular buffer, no customizations required.
+            let (mut writer, _, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let starting_writer_next_record_id = ledger.state().get_next_writer_record_id();
+            let expected_final_writer_file_id = ledger.get_current_writer_file_id();
+            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
+
+            // Write a regular record so something is in the data file.
+            let bytes_written = writer
+                .write_record(SizedRecord(64))
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(bytes_written, SizedRecord, 64);
+            writer.flush().await.expect("flush should not fail");
+            let actual_writer_next_record_id = ledger.state().get_next_writer_record_id();
+
+            // Now unsafely decrement the next writer record ID, which will cause a divergence
+            // between the actual data file and the ledger.  Specifically, the code will think that
+            // a write made it to disk but that the process was stopped, or crashed, before it was
+            // able to actually increment the writer next record ID, so a record ID will exist on
+            // disk that it thinks should not exist, purely from the data we have in the ledger.
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_writer_next_record_id(starting_writer_next_record_id);
+            }
+
+            // Grab the current writer data file path, and then drop the writer/reader.
+            drop(writer);
+            drop(ledger);
+
+            // We should not have seen a call to `reset` yet.
+            assert!(!writer_called_reset.try_assert());
+
+            // Now reopen the buffer, which should trigger the skip ahead logic where we move our
+            // writer next record ID to be ahead of the actual last record ID, but on whatever we
+            // pulled out of the data file.  This is required to maintain our monotonicity invariant
+            // for all records written into the buffer.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
+
+            // TODO: Rewrite this as a negative assertion (i.e. `was_not_entered`) once
+            // `tracing-fluent-assertions` adds support for them.
+            assert!(!writer_called_reset.try_assert());
+            assert_reader_writer_file_positions!(ledger, 0, expected_final_writer_file_id);
+            assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(
+                actual_writer_next_record_id,
+                ledger.state().get_next_writer_record_id()
+            );
+        }
+    });
+
+    let parent =
+        trace_span!("writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented");
+    fut.instrument(parent).await;
 }

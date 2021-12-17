@@ -1,22 +1,24 @@
-use crate::event::{Event, LogEvent};
-use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
-use futures::stream::BoxStream;
 use std::num::NonZeroUsize;
-use vector_core::buffers::Acker;
 
-use crate::event::Value;
-use crate::sinks::elasticsearch::encoder::ProcessedEvent;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
-use crate::sinks::elasticsearch::service::{ElasticSearchRequest, ElasticSearchResponse};
-use crate::sinks::elasticsearch::{BulkAction, ElasticSearchCommonMode};
-use crate::transforms::metric_to_log::MetricToLog;
-use crate::Error;
 use async_trait::async_trait;
-use futures::future;
-use futures::StreamExt;
+use futures::{future, stream::BoxStream, StreamExt};
 use tower::util::BoxService;
-use vector_core::stream::BatcherSettings;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, stream::BatcherSettings, ByteSizeOf};
+
+use crate::{
+    event::{Event, LogEvent, Value},
+    sinks::{
+        elasticsearch::{
+            encoder::ProcessedEvent,
+            request_builder::ElasticsearchRequestBuilder,
+            service::{ElasticSearchRequest, ElasticSearchResponse},
+            BulkAction, ElasticSearchCommonMode,
+        },
+        util::{Compression, SinkBuilderExt, StreamSink},
+    },
+    transforms::metric_to_log::MetricToLog,
+    Error,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {

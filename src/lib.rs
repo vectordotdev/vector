@@ -22,6 +22,10 @@ extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
+#[cfg(feature = "tikv-jemallocator")]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[macro_use]
 pub mod config;
 pub mod cli;
@@ -86,7 +90,6 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use pipeline::Pipeline;
-
 pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {

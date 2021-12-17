@@ -47,9 +47,8 @@ mod tests {
         metrics::AgentDDSketch,
     };
 
-    use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
-
     use super::DatadogMetricsNormalizer;
+    use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
     fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u32) {
         // Generate buckets, and general statistics, for an input set of data.  We only use this in

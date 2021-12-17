@@ -1,3 +1,7 @@
+use lazy_static::lazy_static;
+use regex::bytes::Regex;
+use serde::{Deserialize, Serialize};
+
 use super::BuildError;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
@@ -5,10 +9,6 @@ use crate::{
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
 };
-use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
-
-use lazy_static::lazy_static;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

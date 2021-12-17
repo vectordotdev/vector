@@ -1,19 +1,28 @@
-use crate::http::HttpClient;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::Compression;
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
+
 use futures::future::BoxFuture;
-use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
-use http::{Request, StatusCode, Uri};
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    Request, StatusCode, Uri,
+};
 use hyper::Body;
 use snafu::Snafu;
-use std::sync::Arc;
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::buffers::Ackable;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    http::HttpClient,
+    sinks::util::{retries::RetryLogic, Compression},
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct LogApiRetry;

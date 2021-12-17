@@ -1,9 +1,13 @@
-use crate::test::common::Variant;
-use crate::test::model::{Message, Model};
-use crate::{EncodeBytes, WhenFull};
 use std::collections::VecDeque;
 
 use super::Progress;
+use crate::{
+    test::{
+        common::Variant,
+        model::{Message, Model},
+    },
+    EncodeBytes, WhenFull,
+};
 
 /// `OnDiskV1` is the `Model` for on-disk buffer for the LevelDB-based implementation (v1)
 pub(crate) struct OnDiskV1 {
@@ -21,9 +25,9 @@ impl OnDiskV1 {
                 when_full,
                 ..
             } => OnDiskV1 {
-                inner: VecDeque::with_capacity(*max_size),
+                inner: VecDeque::with_capacity((*max_size).try_into().unwrap_or(usize::MAX)),
                 current_bytes: 0,
-                capacity: *max_size,
+                capacity: (*max_size).try_into().unwrap_or(usize::MAX),
                 when_full: *when_full,
             },
             _ => unreachable!(),
