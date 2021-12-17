@@ -583,37 +583,37 @@ fn validate_sink_schema_expectations(
 
     // Get the schema against which we need to validate the schemas of the components feeding into
     // this sink.
-    let expected_schema = sink.inner.input_schema();
+    let schema_requirement = sink.inner.schema_requirement();
 
-    let schemas =
+    let schema_definitions =
         get_component_schemas_from_flattened_inputs(&sink.inputs, config, enrichment_tables);
 
     // We need to validate each sink input pipeline individually, and ensure that the events the
     // pipeline delivers to the sink are in a valid state.
-    for received_schema in schemas {
+    for schema_definition in schema_definitions {
         let mut errors = vec![];
 
         // Iterate over the purposes and kinds set by the sink schema. Validate them against the
         // schemas provided by the sink inputs, to ensure they match the required constraints.
-        for (expected_purpose, expected_kind) in expected_schema.clone().into_iter() {
-            match received_schema.purpose().get(&expected_purpose) {
+        for (required_purpose, required_kind) in schema_requirement.clone().into_iter() {
+            match schema_definition.purpose().get(&required_purpose) {
                 Some(path) => {
                     // Get the kind at the path for the given purpose. If no kind is found, we set the
                     // kind to "any", since we lack any further information.
-                    let received_kind = received_schema
+                    let definition_kind = schema_definition
                         .kind()
                         .find_at_path(path.clone())
                         .unwrap_or_else(|| value::Kind::any());
 
                     // We found a field matching the defined "purpose", but its kind does not match
                     // the expected kind, so we can't use it in the sink.
-                    if !expected_kind.contains(&received_kind) {
+                    if !required_kind.contains(&definition_kind) {
                         errors.push(format!(
                             r#"Sink "{}" requires a {} field formatted as a {}, but pipeline formats the field as {}."#,
                             sink_key,
-                            expected_purpose,
-                            expected_kind,
-                            received_kind,
+                            required_purpose,
+                            required_kind,
+                            definition_kind,
                         ))
                     }
                 }
@@ -622,7 +622,7 @@ fn validate_sink_schema_expectations(
                 None => errors.push(format!(
                         r#"Sink "{}" requires events to include a {} field, but none is provided by pipeline."#,
                         sink_key,
-                        expected_purpose,
+                        required_purpose,
                     )),
             }
         }
@@ -651,7 +651,7 @@ fn get_component_schemas_from_flattened_inputs(
     inputs: &[OutputId],
     config: &super::Config,
     enrichment_tables: enrichment::TableRegistry,
-) -> Vec<schema::Output> {
+) -> Vec<schema::Definition> {
     let mut outputs = vec![];
 
     for input in inputs {
@@ -659,7 +659,7 @@ fn get_component_schemas_from_flattened_inputs(
 
         // A source directly feeding into the receiving component is its own pipeline.
         if let Some(source) = config.sources.get(key) {
-            let schema = source.inner.output_schema();
+            let schema = source.inner.schema_definition();
             outputs.push(schema);
 
         // A transform can receive from multiple inputs, and each input needs to be flattened to
@@ -675,7 +675,7 @@ fn get_component_schemas_from_flattened_inputs(
                 schema_registry,
             };
 
-            let maybe_schema = transform.inner.output_schema(&ctx);
+            let maybe_schema = transform.inner.schema_definition(&ctx);
 
             let inputs = get_component_schemas_from_flattened_inputs(
                 &transform.inputs,
@@ -703,8 +703,8 @@ fn get_component_schema_from_merged_inputs(
     inputs: &[OutputId],
     config: &super::Config,
     enrichment_tables: enrichment::TableRegistry,
-) -> schema::Output {
-    let mut output = schema::Output::empty();
+) -> schema::Definition {
+    let mut output = schema::Definition::empty();
 
     for input in inputs {
         let key = &input.component;
@@ -714,7 +714,7 @@ fn get_component_schema_from_merged_inputs(
         //
         // We merge this schema into the top-level schema.
         if let Some(source) = config.sources.get(key) {
-            let schema = source.inner.output_schema();
+            let schema = source.inner.schema_definition();
             output.merge(schema);
 
         // If the input is a transform, it _might_ define its own output schema, or it might not
@@ -731,7 +731,7 @@ fn get_component_schema_from_merged_inputs(
                 schema_registry,
             };
 
-            let schema = match transform.inner.output_schema(&ctx) {
+            let schema = match transform.inner.schema_definition(&ctx) {
                 Some(schema) => schema,
                 None => get_component_schema_from_merged_inputs(
                     &transform.inputs,
@@ -753,15 +753,15 @@ fn build_transform_registry(
     enrichment_tables: enrichment::TableRegistry,
 ) -> schema::TransformRegistry {
     let (transform_id, transform) = transform;
-    let sink_schemas = get_pipeline_component_sinks(&transform_id.into(), config)
+    let schema_requirements = get_pipeline_component_sinks(&transform_id.into(), config)
         .into_iter()
-        .map(|s| s.inner.input_schema())
+        .map(|s| s.inner.schema_requirement())
         .collect();
 
-    let received_schema =
+    let schema_definition =
         get_component_schema_from_merged_inputs(&transform.inputs, config, enrichment_tables);
 
-    schema::TransformRegistry::new(sink_schemas, received_schema)
+    schema::TransformRegistry::new(schema_requirements, schema_definition)
 }
 
 /// Get sink details based on the key of a component within a pipeline.

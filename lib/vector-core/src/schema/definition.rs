@@ -6,7 +6,7 @@ use value::{kind, Kind};
 
 /// The schema representation of the "output" produced by a component.
 #[derive(Clone, Debug)]
-pub struct Output {
+pub struct Definition {
     kind: value::Kind,
     purpose: HashMap<field::Purpose, LookupBuf>,
 
@@ -14,7 +14,7 @@ pub struct Output {
     optional: HashSet<LookupBuf>,
 }
 
-impl Output {
+impl Definition {
     /// Create an "empty" output schema.
     ///
     /// This means no type information is known about the event.
@@ -148,8 +148,19 @@ impl Output {
     }
 }
 
-impl Default for Output {
+impl Default for Definition {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge() {
+        // TODO: LOTS OF TESTING
+        assert!(false)
     }
 }

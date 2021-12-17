@@ -7,10 +7,10 @@ use super::field;
 #[derive(Debug, Clone, Default)]
 pub struct TransformRegistry {
     /// The list of sink schemas to which this transform has to adhere.
-    sink_schemas: Vec<schema::Input>,
+    requirements: Vec<schema::Requirement>,
 
     /// A merged schema definition of all components feeding into the transform.
-    received_schema: schema::Output,
+    input_definition: schema::Definition,
 
     /// If `true`, the pipeline is considered to be in an incomplete state, which means calling
     /// some functions is disallowed, and others return "no-op" responses.
@@ -21,10 +21,13 @@ pub struct TransformRegistry {
 }
 
 impl TransformRegistry {
-    pub fn new(sink_schemas: Vec<schema::Input>, received_schema: schema::Output) -> Self {
+    pub fn new(
+        requirements: Vec<schema::Requirement>,
+        input_definition: schema::Definition,
+    ) -> Self {
         Self {
-            sink_schemas,
-            received_schema,
+            requirements,
+            input_definition,
             loading: true,
         }
     }
@@ -39,30 +42,34 @@ impl TransformRegistry {
     }
 
     pub fn is_valid_purpose(&self, purpose: &str) -> bool {
-        self.sink_schemas.iter().any(|s| {
+        self.requirements.iter().any(|s| {
             let purpose: field::Purpose = purpose.to_owned().into();
 
             s.purposes().contains(&&purpose)
         })
     }
 
-    pub fn sink_purposes(&self) -> Vec<&field::Purpose> {
-        self.sink_schemas
+    pub fn required_purposes(&self) -> Vec<&field::Purpose> {
+        self.requirements
             .iter()
-            .flat_map(schema::Input::purposes)
+            .flat_map(schema::Requirement::purposes)
             .collect()
     }
 
-    pub fn input_purpose(&self) -> &HashMap<field::Purpose, LookupBuf> {
-        self.received_schema.purpose()
+    pub fn input_purposes(&self) -> &HashMap<field::Purpose, LookupBuf> {
+        self.input_definition.purpose()
     }
 
     pub fn input_kind(&self) -> &value::Kind {
-        self.received_schema.kind()
+        self.input_definition.kind()
+    }
+
+    pub fn input_definition(&self) -> schema::Definition {
+        self.input_definition.clone()
     }
 
     pub fn register_purpose(&mut self, field: LookupBuf, purpose: &str) {
-        self.received_schema
+        self.input_definition
             .purpose_mut()
             .insert(purpose.into(), field);
     }

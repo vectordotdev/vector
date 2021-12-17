@@ -69,7 +69,7 @@ impl Function for SetFieldPurpose {
                 let context = format!(
                     r#"must be one of: {}"#,
                     registry
-                        .sink_purposes()
+                        .required_purposes()
                         .into_iter()
                         .map(|v| v.as_str())
                         .collect::<Vec<_>>()
@@ -82,7 +82,7 @@ impl Function for SetFieldPurpose {
                 return Err(Box::new(error));
             }
             Some(registry) => registry.register_purpose(query.path().clone(), &purpose),
-            None => panic!("set_field_purpose requires external context"),
+            None => panic!("register_purpose requires external context"),
         };
 
         Ok(Box::new(SetFieldPurposeFn))

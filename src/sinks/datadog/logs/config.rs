@@ -166,8 +166,8 @@ impl SinkConfig for DatadogLogsConfig {
         "datadog_logs"
     }
 
-    fn input_schema(&self) -> schema::Input {
-        let mut schema = schema::Input::empty();
+    fn schema_requirement(&self) -> schema::Requirement {
+        let mut schema = schema::Requirement::empty();
         schema.require_field_purpose("message", Kind::bytes());
         schema.require_field_purpose("timestamp", Kind::integer());
 

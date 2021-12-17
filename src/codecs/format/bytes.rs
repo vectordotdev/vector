@@ -25,10 +25,10 @@ impl DeserializerConfig for BytesDeserializerConfig {
         Ok(Box::new(BytesDeserializer))
     }
 
-    fn output_schema(&self) -> schema::Output {
+    fn schema_definition(&self) -> schema::Definition {
         use field::{Kind, Purpose};
 
-        let mut schema = schema::Output::empty();
+        let mut schema = schema::Definition::empty();
 
         schema.define_field(
             log_schema().message_key(),

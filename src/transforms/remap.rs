@@ -73,10 +73,10 @@ impl TransformConfig for RemapConfig {
 
     /// Calculate the output schema of the remap transform, based on the input, and the type
     /// definition of the compiled program.
-    fn output_schema(&self, ctx: &TransformContext) -> Option<schema::Output> {
+    fn schema_definition(&self, ctx: &TransformContext) -> Option<schema::Definition> {
         Remap::new(self.clone(), ctx)
             .ok()
-            .map(|remap| remap.output_schema)
+            .map(|remap| remap.schema_definition)
     }
 }
 
@@ -89,7 +89,7 @@ pub struct Remap {
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    output_schema: schema::Output,
+    schema_definition: schema::Definition,
 }
 
 impl Remap {
@@ -125,11 +125,12 @@ impl Remap {
 
         let purposes = state
             .get_external_context_mut::<schema::TransformRegistry>()
-            .map(|r| r.input_purpose())
+            .map(|r| r.input_purposes())
             .cloned()
             .unwrap_or_default();
 
-        let output_schema = schema::Output::from_parts(kind, purposes, HashSet::default());
+        let mut schema_definition =
+            schema::Definition::from_parts(kind, purposes, HashSet::default());
 
         Ok(Remap {
             component_key: ctx.key.clone(),
@@ -139,7 +140,7 @@ impl Remap {
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            output_schema,
+            schema_definition,
         })
     }
 
@@ -191,7 +192,7 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
-            output_schema: self.output_schema.clone(),
+            schema_definition: self.schema_definition.clone(),
         }
     }
 }

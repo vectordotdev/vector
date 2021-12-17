@@ -89,7 +89,7 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     ///
     /// If the transform ingests from multiple inputs and no custom schema output is defined, the
     /// resulting output is determined by a merge strategy.
-    fn output_schema(&self, _ctx: &TransformContext) -> Option<schema::Output> {
+    fn schema_definition(&self, _ctx: &TransformContext) -> Option<schema::Definition> {
         None
     }
 }

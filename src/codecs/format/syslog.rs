@@ -21,10 +21,10 @@ impl DeserializerConfig for SyslogDeserializerConfig {
         Ok(Box::new(SyslogDeserializer))
     }
 
-    fn output_schema(&self) -> schema::Output {
+    fn schema_definition(&self) -> schema::Definition {
         use field::{Kind, Purpose};
 
-        let mut schema = schema::Output::empty();
+        let mut schema = schema::Definition::empty();
 
         // The `message` field is always defined. If parsing fails, the entire body becomes the
         // message.

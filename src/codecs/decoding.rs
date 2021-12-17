@@ -153,7 +153,7 @@ pub trait DeserializerConfig: Debug + DynClone + Send + Sync {
     fn build(&self) -> crate::Result<BoxedDeserializer>;
 
     /// The schema produced by the deserializer.
-    fn output_schema(&self) -> schema::Output;
+    fn schema_definition(&self) -> schema::Definition;
 }
 
 dyn_clone::clone_trait_object!(DeserializerConfig);

@@ -1,8 +1,8 @@
+mod definition;
 pub mod field;
-mod input;
-mod output;
 mod registry;
+mod requirement;
 
-pub use input::Input;
-pub use output::Output;
+pub use definition::Definition;
 pub use registry::TransformRegistry;
+pub use requirement::Requirement;

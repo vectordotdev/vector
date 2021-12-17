@@ -200,8 +200,8 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     ///
     /// Defaults to an empty schema, meaning there is no known details about the shape of the
     /// events.
-    fn output_schema(&self) -> schema::Output {
-        schema::Output::empty()
+    fn schema_definition(&self) -> schema::Definition {
+        schema::Definition::empty()
     }
 }
 
@@ -389,8 +389,8 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     /// The schema events are required to match for this sink.
     ///
     /// Defaults to an empty schema, meaning there are no limitations on the shape of an event.
-    fn input_schema(&self) -> schema::Input {
-        schema::Input::empty()
+    fn schema_requirement(&self) -> schema::Requirement {
+        schema::Requirement::empty()
     }
 }
 

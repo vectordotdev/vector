@@ -149,10 +149,10 @@ impl SourceConfig for DatadogAgentConfig {
         vec![Resource::tcp(self.address)]
     }
 
-    fn output_schema(&self) -> schema::Output {
+    fn schema_definition(&self) -> schema::Definition {
         use field::{Kind, Purpose};
 
-        let mut schema = schema::Output::empty();
+        let mut schema = schema::Definition::empty();
 
         schema.define_field("message", Kind::bytes(), Some(Purpose::Message));
         schema.define_field("status", Kind::bytes(), Some(Purpose::Severity));
@@ -162,7 +162,7 @@ impl SourceConfig for DatadogAgentConfig {
         schema.define_field("ddsource", Kind::bytes(), None);
         schema.define_field("ddtags", Kind::bytes(), None);
 
-        schema.merge(self.decoding.output_schema());
+        schema.merge(self.decoding.schema_definition());
         schema
     }
 }

@@ -20,10 +20,10 @@ impl DeserializerConfig for JsonDeserializerConfig {
         Ok(Box::new(Into::<JsonDeserializer>::into(self)))
     }
 
-    fn output_schema(&self) -> schema::Output {
+    fn schema_definition(&self) -> schema::Definition {
         use field::{Kind, Purpose};
 
-        let mut schema = schema::Output::empty();
+        let mut schema = schema::Definition::empty();
 
         schema.define_field(
             log_schema().timestamp_key(),
