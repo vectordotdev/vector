@@ -175,7 +175,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn build_alloca_resolved(&self, name: &str) -> inkwell::values::PointerValue<'ctx> {
-        let resolved_type_identifier = "core::result::Result<vrl_compiler::value::Value, vrl_compiler::expression::ExpressionError>";
+        let resolved_type_identifier =
+            "std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>";
         let resolved_type = self
             .module
             .get_struct_type(resolved_type_identifier)

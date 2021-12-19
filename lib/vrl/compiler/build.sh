@@ -16,8 +16,12 @@ fi
 PRECOMPILED_DIR="$SCRIPT_DIR/src/precompiled"
 PRECOMPILED_TARGET_DIR="$PRECOMPILED_DIR/target/$TARGET/$PROFILE"
 
-RUSTFLAGS="--emit=llvm-bc" cargo +nightly build --manifest-path="$PRECOMPILED_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET -Z build-std
+STD_DIR="$PRECOMPILED_DIR/std"
+STD_TARGET_DIR="$STD_DIR/target/$TARGET/$PROFILE"
 
-BC_FILES=$(ls "$PRECOMPILED_TARGET_DIR"/deps/*.bc | egrep -v -i "(panic_abort|proc_macro).*\.bc")
+RUSTFLAGS="--emit=llvm-bc" cargo +nightly build --manifest-path="$STD_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET -Z build-std=std
+RUSTFLAGS="--emit=llvm-bc" cargo build --manifest-path="$PRECOMPILED_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET
+
+BC_FILES=$(ls "$STD_TARGET_DIR"/deps/*.bc "$PRECOMPILED_TARGET_DIR"/deps/*.bc | egrep -v -i "(panic_abort|proc_macro).*\.bc")
 
 llvm-link $BC_FILES > "$PRECOMPILED_TARGET_DIR/precompiled.bc"
