@@ -239,7 +239,8 @@ impl<'ctx> Context<'ctx> {
         &self,
         name: &str,
     ) -> Result<inkwell::values::PointerValue<'ctx>, String> {
-        let resolved_type_identifier = "core::result::Result<vrl_compiler::value::Value, vrl_compiler::expression::ExpressionError>";
+        let resolved_type_identifier =
+            "std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>";
         let resolved_type = self
             .module
             .get_struct_type(resolved_type_identifier)
