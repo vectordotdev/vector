@@ -16,7 +16,7 @@ use vector_core::{
     transform::DataType,
 };
 
-use crate::{conditions, sinks::Healthcheck, sources};
+use crate::{conditions::{self, Condition}, sinks::Healthcheck, sources};
 
 use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
 
@@ -72,12 +72,16 @@ impl SourceConfig for UnitTestSourceConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Derivative)]
+#[derivative(Debug)]
 pub struct UnitTestSinkConfig {
     #[serde(skip)]
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<Vec<Event>>>>>,
     // need enrichment tables to build these conditions...current unit tests use Default::default
-    // pub conditions: Vec<conditions::AnyCondition>,
+    #[serde(skip)]
+    #[derivative(Debug = "ignore")]
+    pub conditions: Vec<Box<dyn Condition>>,
+    pub no_outputs: bool,
 }
 
 #[async_trait::async_trait]

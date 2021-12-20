@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use super::{
     graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
-    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext,
+    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext, TestOutput,
 };
 use crate::{
     conditions::Condition,
@@ -14,13 +14,13 @@ use crate::{
         OutputId, SinkOuter, SourceOuter,
     },
     event::{Event, Value},
-    topology::{self, builder::load_enrichment_tables, start_validated},
+    topology::{self, builder::{load_enrichment_tables, Pieces, self}, start_validated},
     transforms::{Transform, TransformOutputsBuf},
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, oneshot::{Receiver, self}};
 use tokio_stream::wrappers::ReceiverStream;
 
 // pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
@@ -103,16 +103,11 @@ use tokio_stream::wrappers::ReceiverStream;
 //     globals: GlobalOptions,
 // }
 
-// struct UnitTestTransform {
-//     transform: Transform,
-//     config: Box<dyn TransformConfig>,
-//     next: Vec<ComponentKey>,
-// }
-
 pub struct UnitTest {
     pub name: String,
-    pub checks: Vec<UnitTestCheck>,
-    pub no_outputs_from: Vec<ComponentKey>,
+    config: Config,
+    diff: ConfigDiff, 
+    pieces: Pieces,
     // globals: GlobalOptions,
 }
 
@@ -126,26 +121,25 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
 
     let (mut config_builder, _) = super::loading::load_builder_from_paths(paths)?;
     let tests = std::mem::take(&mut config_builder.tests);
+    let mut unit_tests = Vec::new();
+    let mut build_errors = Vec::new();
     // todo: generate random id for inserted components
 
     for test in tests {
+        let test_name = test.name.clone();
         match build_unit_test(test, config_builder.clone()).await {
-            Ok(_) => println!("built test successfully"),
-            Err(_) => println!("failed to build test"),
-            // Ok(t) => tests.push(t),
-            // Err(errs) => {
-            //     let mut test_err = errs.join("\n");
-            //     // Indent all line breaks
-            //     test_err = test_err.replace("\n", "\n  ");
-            //     test_err.insert_str(0, &format!("Failed to build test '{}':\n  ", test.name));
-            //     errors.push(test_err);
-            // }
+            Ok(test) => unit_tests.push(test),
+            Err(errors) => {
+                let mut test_error = errors.join("\n");
+                // Indent all line breaks
+                test_error = test_error.replace("\n", "\n  ");
+                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                build_errors.push(test_error);
+            },
         }
-
-        println!("tests");
     }
 
-    Ok(Vec::new())
+    Ok(unit_tests)
 }
 
 async fn build_unit_test(
@@ -154,16 +148,19 @@ async fn build_unit_test(
 ) -> Result<UnitTest, Vec<String>> {
     let mut build_errors = Vec::new();
 
-    println!("test has the following inputs: {:?}\n", test.inputs);
-    let inputs = build_inputs(&test.inputs).unwrap_or_else(|errors| {
-        build_errors.extend(errors);
-        Vec::new()
-    });
-    if !build_errors.is_empty() {
-        return Err(build_errors);
+    // Rid the transform inputs of any existing sources
+    let graph = Graph::new_unchecked(&IndexMap::new(), &config_builder.transforms, &IndexMap::new());
+    for (key, transform) in config_builder.transforms.iter_mut() {
+        transform.inputs = graph.inputs_for(key).into_iter().map(|id| id.to_string()).collect::<Vec<_>>();
     }
 
-    // Connect a test source to each unique input target transform
+    println!("test has the following inputs: {:?}\n", test.inputs);
+    let inputs = build_inputs(&test.inputs).unwrap_or_else(|errors| {
+      build_errors.extend(errors);
+      Vec::new()
+    });
+
+    // Connect a test source to each unique insert_at target transform
     let mut test_sources = IndexMap::new();
     for (target_transform_id, event) in inputs {
         let test_source_id = format!("{}-{}", target_transform_id, "unit-test-source");
@@ -183,109 +180,72 @@ async fn build_unit_test(
     let sources = build_unit_test_sources(test_sources);
     println!("test created the following sources: {:?}\n", sources);
 
-    // // mapping source key --> transmitter
-    // let mut source_txs = IndexMap::new();
-    // // construct the sources
-    // let sources = source_keys
-    //     .into_iter()
-    //     .map(|id| {
-    //         let (tx, rx) = tokio::sync::mpsc::channel(1);
-    //         // todo: remove duplicate to_string
-    //         source_txs.insert(ComponentKey::from(id.to_string()), tx);
-    //         (
-    //             ComponentKey::from(id.to_string()),
-    //             SourceOuter::new(UnitTestSourceConfig {
-    //                 receiver: Arc::new(Mutex::new(Some(rx))),
-    //             }),
-    //         )
-    //     })
-    //     .collect::<IndexMap<_, _>>();
-
-    // mapping sink key --> receiver
-    // let mut sink_rxs = IndexMap::new();
-    // let sinks = transforms
-    //     .iter()
-    //     .flat_map(|(key, transform)| {
-    //         // A transform and any of its named outputs
-    //         let mut keys = vec![key.to_string()];
-    //         keys.extend(
-    //             transform
-    //                 .inner
-    //                 .named_outputs()
-    //                 .iter()
-    //                 .map(|port| format!("{}.{}", key, port))
-    //                 .collect::<Vec<_>>(),
-    //         );
-
-    //         // For each possible output, create a sink
-    //         keys.into_iter()
-    //             .map(|key| {
-    //                 let inputs = vec![key.to_string()];
-    //                 let sink_key = ComponentKey::from(format!(
-    //                     "{}-{}",
-    //                     key.replace(".", ""),
-    //                     "vector-unit-test-sink"
-    //                 ));
-    //                 let (tx, rx) = tokio::sync::oneshot::channel();
-    //                 sink_rxs.insert(sink_key.clone(), rx);
-    //                 (
-    //                     sink_key,
-    //                     SinkOuter::new(
-    //                         inputs,
-    //                         Box::new(UnitTestSinkConfig {
-    //                             result_tx: Arc::new(Mutex::new(Some(tx))),
-    //                             // ..Default::default()
-    //                         }),
-    //                     ),
-    //                 )
-    //             })
-    //             .collect::<Vec<_>>()
-    //     })
-    //     .collect::<IndexMap<_, _>>();
-
-    // mapping sink key --> conditions for output events
-    // let mut sink_to_checks = IndexMap::new();
-    // for output in test.outputs {
-    //     let sink_key = ComponentKey::from(format!(
-    //         "{}-{}",
-    //         output.extract_from.to_string().replace(".", ""),
-    //         "vector-unit-test-sink"
-    //     ));
-    //     let mut conditions = Vec::new();
-    //     // todo: use errors outside of this loop
-    //     let mut errors = Vec::new();
-    //     for (index, condition) in output.conditions.unwrap_or(Vec::new()).iter().enumerate() {
-    //         match condition.build(&Default::default()) {
-    //             Ok(condition) => conditions.push(condition),
-    //             Err(error) => errors.push(format!(
-    //                 "failed to create test condition '{}': {}",
-    //                 index, error
-    //             )),
-    //         }
-    //     }
-    //     // a check is a collection of conditions
-    //     let mut checks = sink_to_checks.entry(sink_key).or_insert(vec![]);
-    //     checks.push(conditions);
-    // }
-
-    // builder.sources = sources;
-    // builder.transforms = transforms;
-    // builder.sinks = sinks;
-
-    // let config = builder.build().unwrap();
-    // let diff = config::ConfigDiff::initial(&config);
-    // let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-    //     .await
-    //     .unwrap();
-    if !build_errors.is_empty() {
-        Err(build_errors)
-    } else {
-        Ok(UnitTest {
-            name: test.name,
-            checks: Vec::new(),
-            no_outputs_from: Vec::new(),
-        })
+    if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
+        build_errors.push("unit test must contain at least one of `outputs` or `no_outputs_from`.".to_string());
+        return Err(build_errors);
     }
+
+    let outputs = build_outputs(&test.outputs).unwrap_or_else(|errors| {
+      build_errors.extend(errors);
+      Vec::new()
+    });
+    println!("built output errors: {:?}", build_errors); 
+    // Connect a test sink to each unique extract_from target transform
+    let mut test_output_sinks = IndexMap::new();
+    for (target_transform_id, conditions) in outputs {
+        // map of extract_from string --> conditions
+        let test_sink_id = format!("{}-{}", target_transform_id.to_string().replace(".", "-"), "unit-test-sink");
+        test_output_sinks.entry(test_sink_id).and_modify(|(_, sink_conditions): &mut (String, Vec<Box<dyn Condition>>)| sink_conditions.extend(conditions.clone())).or_insert((target_transform_id.to_string(), conditions));
+    }
+
+    // Connect a test sink to each unique no_outputs_from target transform
+    let mut test_non_output_sinks = test.no_outputs_from.into_iter().map(|target_transform_id| {
+        let test_sink_id = format!("{}-{}", target_transform_id.to_string().replace(".", "-"), "unit-test-sink");
+        (test_sink_id, target_transform_id.to_string())
+    }).collect::<IndexMap<_, _>>();
+
+    let mut sinks = IndexMap::new();
+    let mut sink_rxs = IndexMap::new();
+    for (key, (input, conditions)) in test_output_sinks {
+        let key = ComponentKey::from(key);
+        let (tx, rx) = oneshot::channel();
+        let sink_config = UnitTestSinkConfig {
+            result_tx: Arc::new(Mutex::new(Some(tx))),
+            conditions: conditions,
+            no_outputs: false,
+        };
+        sink_rxs.insert(key.clone(), rx);
+        sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
+    }
+
+    for (key, input) in test_non_output_sinks {
+        let key = ComponentKey::from(key);
+        let (tx, rx) = oneshot::channel();
+        let sink_config = UnitTestSinkConfig {
+            result_tx: Arc::new(Mutex::new(Some(tx))),
+            conditions: Vec::new(),
+            no_outputs: true,
+        };
+        sink_rxs.insert(key.clone(), rx);
+        sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
+    }
+
+    println!("test created the following sinks: {:?}\n", sinks);
+
+    config_builder.sources = sources;
+    config_builder.sinks = sinks;
+
+    let config = config_builder.build()?;
+    let diff = config::ConfigDiff::initial(&config);
+    let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
+
+    Ok(UnitTest {
+        name: test.name,
+        config, 
+        diff, 
+        pieces
+    })
+
 }
 
 fn build_inputs(test_inputs: &Vec<TestInput>) -> Result<Vec<(ComponentKey, Event)>, Vec<String>> {
@@ -310,21 +270,55 @@ fn build_inputs(test_inputs: &Vec<TestInput>) -> Result<Vec<(ComponentKey, Event
     }
 }
 
+fn build_outputs(test_outputs: &Vec<TestOutput>) -> Result<Vec<(ComponentKey, Vec<Box<dyn Condition>>)>, Vec<String>> {
+    let mut outputs = Vec::new();
+    let mut errors = Vec::new();
+
+
+    for output in test_outputs {
+        let mut conditions = Vec::new();
+        // todo: are you allowed to have an output with no condition assigned? if not, raise an error
+        for (index, condition) in output.conditions.clone().unwrap_or(Vec::new()).iter().enumerate() {
+            match condition.build(&Default::default()) {
+                Ok(condition) => conditions.push(condition),
+                Err(error) => errors.push(format!(
+                    "failed to create test condition '{}': {}",
+                    index, error
+                )),
+            }
+        }
+        outputs.push((output.extract_from.clone(), conditions));
+    }
+
+    if errors.is_empty() {
+        Ok(outputs)
+    } else {
+        Err(errors)
+    }
+}
+
 fn build_unit_test_sources(
     sources: IndexMap<String, Vec<Event>>,
 ) -> IndexMap<ComponentKey, SourceOuter> {
     sources
         .into_iter()
         .map(|(key, events)| {
-            let key = ComponentKey::from(key);
-            let config = UnitTestSourceConfig {
+            let source_config = UnitTestSourceConfig {
                 events,
                 ..Default::default()
             };
 
-            (key, SourceOuter::new(config))
+            (key.into(), SourceOuter::new(source_config))
         })
         .collect::<IndexMap<_, _>>()
+}
+
+impl UnitTest {
+    pub async fn run(self) -> (Vec<String>, Vec<String>) {
+        let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces).await;
+        let _ = topology.sources_finished().await;
+        let _stop_complete = topology.stop();
+    }
 }
 
 pub struct UnitTestCheck {
@@ -357,83 +351,6 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
             .unwrap_or(format!("  no {}", name))
     }
 }
-
-// fn walk(
-//     node: &ComponentKey,
-//     mut inputs: Vec<Event>,
-//     transforms: &mut IndexMap<ComponentKey, UnitTestTransform>,
-//     aggregated_results: &mut HashMap<ComponentKey, (Vec<Event>, Vec<Event>)>,
-//     globals: &GlobalOptions,
-// ) {
-//     let mut results = Vec::new();
-//     let mut targets = Vec::new();
-
-//     // Use `remove` to take ownership.
-//     if let Some((key, mut target)) = transforms.remove_entry(node) {
-//         match target.transform {
-//             Transform::Function(ref mut t) => {
-//                 for input in inputs.clone() {
-//                     t.transform(&mut results, input)
-//                 }
-//                 targets = target.next.clone();
-//                 transforms.insert(key, target);
-//             }
-//             Transform::Synchronous(ref mut t) => {
-//                 println!("walking through transform");
-//                 let mut outputs = TransformOutputsBuf::new_with_capacity(
-//                     target.config.named_outputs(),
-//                     inputs.len(),
-//                 );
-//                 for input in inputs.clone() {
-//                     t.transform(input, &mut outputs)
-//                 }
-//                 results.extend(outputs.drain());
-//                 for named in target.config.named_outputs() {
-//                     println!(
-//                         "secondary buffers {:?}\n ",
-//                         outputs.drain_named(named.as_ref()).collect::<Vec<_>>()
-//                     );
-//                 }
-//                 targets = target.next.clone();
-//                 println!("next targets are {:?}\n", targets);
-//                 transforms.insert(key, target);
-//             }
-//             Transform::Task(t) => {
-//                 error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
-//                 let in_stream = futures::stream::iter(inputs.clone());
-//                 let out_stream = t.transform(Box::pin(in_stream));
-//                 // TODO(new-transform-enum): Handle Many
-//                 let out_iter = futures::executor::block_on_stream(out_stream);
-//                 results.extend(out_iter);
-//                 targets = target.next.clone();
-//                 // TODO: This is a hack.
-//                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
-//                 transforms.insert(key, UnitTestTransform {
-//                     transform:  futures::executor::block_on(target.config.clone().build(&TransformContext::new_with_globals(globals.clone())))
-//                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
-//                     config: target.config,
-//                     next: target.next
-//                 });
-//             }
-//         }
-//     }
-
-//     for child in targets {
-//         walk(
-//             &child,
-//             results.clone(),
-//             transforms,
-//             aggregated_results,
-//             globals,
-//         );
-//     }
-
-//     if let Some((mut e_inputs, mut e_results)) = aggregated_results.remove(node) {
-//         inputs.append(&mut e_inputs);
-//         results.append(&mut e_results);
-//     }
-//     aggregated_results.insert(node.clone(), (inputs, results));
-// }
 
 // impl UnitTest {
 //     // Executes each test and provides a tuple of inspections and error lists.
@@ -1012,7 +929,7 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
                                 inputs,
                                 Box::new(UnitTestSinkConfig {
                                     result_tx: Arc::new(Mutex::new(Some(tx))),
-                                    // ..Default::default()
+                                    ..Default::default()
                                 }),
                             ),
                         )
