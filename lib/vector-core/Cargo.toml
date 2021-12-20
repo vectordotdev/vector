@@ -26,7 +26,7 @@ indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] 
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
-metrics-tracing-context = { version = "0.8.0", default-features = false }
+metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
@@ -51,7 +51,7 @@ tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.25", default-features = false }
+tracing-subscriber = { version = "0.3.1", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
@@ -72,7 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.2"
-tracing-subscriber = { version = "0.2.25", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { version = "0.3.1", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 
 [features]
 api = ["async-graphql"]
