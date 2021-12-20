@@ -1115,7 +1115,7 @@ dependencies = [
  "tokio-util",
  "tracing 0.1.29",
  "tracing-fluent-assertions",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1419,19 +1419,21 @@ dependencies = [
 [[package]]
 name = "console-api"
 version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c#f2c30d52c9f22de69bac38009a9183135808806c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "033fddce299c93dd44ae21d5f5a6e749baa5d103784bcdde65701c07272a9fde"
 dependencies = [
- "prost 0.8.0",
- "prost-types 0.8.0",
- "tonic 0.5.2",
- "tonic-build 0.5.2",
+ "prost 0.9.0",
+ "prost-types 0.9.0",
+ "tonic",
+ "tonic-build",
  "tracing-core 0.1.21",
 ]
 
 [[package]]
 name = "console-subscriber"
 version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c#f2c30d52c9f22de69bac38009a9183135808806c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2380cc150266375aeda8f9aeadc5527395c1a8807ecf9fa97a46d1bb760ec5b"
 dependencies = [
  "console-api",
  "futures 0.3.19",
@@ -1442,10 +1444,10 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.5.2",
+ "tonic",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3960,7 +3962,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -6897,7 +6899,7 @@ dependencies = [
  "snafu",
  "tokio",
  "tracing 0.1.29",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7619,37 +7621,6 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "796c5e1cd49905e65dd8e700d4cb1dffcbfdb4fc9d017de08c1a537afd83627c"
-dependencies = [
- "async-stream",
- "async-trait",
- "base64 0.13.0",
- "bytes 1.1.0",
- "futures-core",
- "futures-util",
- "h2",
- "http",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project 1.0.8",
- "prost 0.8.0",
- "prost-derive 0.8.0",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing 0.1.29",
- "tracing-futures 0.2.5",
-]
-
-[[package]]
-name = "tonic"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff08f4649d10a70ffa3522ca559031285d8e421d727ac85c60825761818f5d0a"
@@ -7678,18 +7649,6 @@ dependencies = [
  "tower-service",
  "tracing 0.1.29",
  "tracing-futures 0.2.5",
-]
-
-[[package]]
-name = "tonic-build"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12b52d07035516c2b74337d2ac7746075e7dcae7643816c1b12c5ff8a7484c08"
-dependencies = [
- "proc-macro2 1.0.32",
- "prost-build 0.8.0",
- "quote 1.0.10",
- "syn 1.0.82",
 ]
 
 [[package]]
@@ -7819,7 +7778,7 @@ source = "git+https://github.com/vectordotdev/tracing-fluent-assertions?branch=b
 dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7853,7 +7812,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7874,17 +7833,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.21",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
-dependencies = [
- "sharded-slab",
- "thread_local",
  "tracing-core 0.1.21",
 ]
 
@@ -8420,8 +8368,8 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic 0.6.2",
- "tonic-build 0.6.2",
+ "tonic",
+ "tonic-build",
  "tower",
  "tower-layer",
  "tower-test",
@@ -8430,7 +8378,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -8553,7 +8501,7 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
  "twox-hash",
  "typetag",
  "vrl",
@@ -8711,7 +8659,7 @@ dependencies = [
  "shared",
  "structopt",
  "tikv-jemallocator",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",

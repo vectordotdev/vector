@@ -121,7 +121,7 @@ tokio = { version = "1.15.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
-console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
+console-subscriber = { version = "0.1.0", optional = true }
 
 # Tracing
 tracing = { version = "0.1.29", default-features = false }
