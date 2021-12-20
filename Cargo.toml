@@ -229,7 +229,7 @@ encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
-futures-util = { version = "0.3.17", default-features = false }
+futures-util = { version = "0.3.19", default-features = false }
 getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.3.2", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
