@@ -110,19 +110,19 @@ a `datadog_agent` source with a `json` codec, which gets `remapped`, then routed
 
 ``` toml
 [sources.datadog_agent]
-type = "datadog_agent”
-decoding.codec = "json”
+type = "datadog_agent"
+decoding.codec = "json"
 
 [transforms.remap]
-type = "remap”
-inputs = ["datadog_agent”]
+type = "remap"
+inputs = ["datadog_agent"]
 source = ‘’’
-.duration = with_semantic_meaning("duration”, del(.attribute.duration)) // coerces and adds semantic context in one shot
+.duration = with_semantic_meaning("duration", del(.attribute.duration)) // coerces and adds semantic context in one shot
 ‘’’
 
 [sinks.datadog_logs]
-type = "datadog_logs”
-inputs = ["remap”]
+type = "datadog_logs"
+inputs = ["remap"]
 ```
 
 Identical to the previous example, data is received by the `datadog_agent` source and decoded into the
