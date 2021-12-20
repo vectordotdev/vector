@@ -2443,9 +2443,9 @@ dependencies = [
 
 [[package]]
 name = "fslock"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31bbcaaf785e09a604b93b15b9ccb41cbf4716fa04c788748d157cb3134d717b"
+checksum = "04412b8935272e3a9bae6f48c7bfff74c2911f60525404edfdd28e49884c3bfb"
 dependencies = [
  "libc",
  "winapi 0.3.9",

@@ -13,7 +13,7 @@ crc32fast = { version = "1.2.1", default-features = false }
 crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
-fslock = { version = "0.2.0", default-features = false, features = ["std"] }
+fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.19", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
 leveldb = { version = "0.8.6", default-features = false  }
