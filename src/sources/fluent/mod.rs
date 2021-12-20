@@ -1042,6 +1042,7 @@ mod integration_tests {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await
