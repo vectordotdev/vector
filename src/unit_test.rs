@@ -73,7 +73,9 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
     match config::build_unit_tests(&paths).await {
         Ok(mut tests) => {
-            println!("successfully built tests");
+            for test in tests {
+                let (inspections, errors) = test.run().await;
+            }
             // if test_results.is_empty() {
             //     #[allow(clippy::print_stdout)]
             //     {

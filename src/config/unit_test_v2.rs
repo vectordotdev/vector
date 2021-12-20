@@ -76,11 +76,11 @@ impl SourceConfig for UnitTestSourceConfig {
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
     #[serde(skip)]
-    pub result_tx: Arc<Mutex<Option<oneshot::Sender<Vec<Event>>>>>,
+    pub result_tx: Arc<Mutex<Option<oneshot::Sender<Vec<String>>>>>,
     // need enrichment tables to build these conditions...current unit tests use Default::default
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
-    pub conditions: Vec<Box<dyn Condition>>,
+    pub checks: Vec<Vec<Box<dyn Condition>>>,
     pub no_outputs: bool,
 }
 
@@ -89,7 +89,10 @@ pub struct UnitTestSinkConfig {
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take().unwrap();
-        let sink = UnitTestSink::new(tx);
+        let sink = UnitTestSink {
+            result_tx: tx,
+            checks: self.checks.clone(),
+        };
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
@@ -105,13 +108,8 @@ impl SinkConfig for UnitTestSinkConfig {
 }
 
 pub struct UnitTestSink {
-    result_tx: oneshot::Sender<Vec<Event>>,
-}
-
-impl UnitTestSink {
-    fn new(result_tx: oneshot::Sender<Vec<Event>>) -> Self {
-        Self { result_tx }
-    }
+    pub result_tx: oneshot::Sender<Vec<String>>,
+    pub checks: Vec<Vec<Box<dyn Condition>>>,
 }
 
 #[async_trait::async_trait]
@@ -121,15 +119,45 @@ impl StreamSink for UnitTestSink {
         // Send the results back to the unit test framework
         // Include some wrapping to associate the results, which condition the results came from
 
-        let mut results = Vec::new();
+        let mut output_events = Vec::new();
+        let mut test_errors = Vec::new();
+
         while let Some(event) = input.next().await {
-            // println!("sink received event: {:?}", event);
-            results.push(event);
+            println!("sink received event: {:?}", event);
+            output_events.push(event);
         }
-        if let Err(_) = self.result_tx.send(results) {
+
+        for check in self.checks {
+            let mut overall_check_errors = Vec::new();
+            for event in output_events.iter() {
+                // todo: add correct error message
+                let mut per_event_errors = Vec::new();
+                let check = check.clone();
+                for condition in check {
+                    match condition.check_with_context(event) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            per_event_errors.push(error);
+                        }
+                    }
+                }
+                if per_event_errors.is_empty() {
+                    overall_check_errors.clear();
+                    break;
+                } else {
+                    overall_check_errors.extend(per_event_errors);
+                }
+            }
+            // either one or more events passed the check or the check failed for one or more events.
+            // if failed, we need to update the test errors
+            if !overall_check_errors.is_empty() {
+                test_errors.extend(overall_check_errors);
+            }
+        }
+
+        if let Err(_) = self.result_tx.send(test_errors) {
             error!(message = "Sending unit test results failed in unit test sink.");
         }
-        // println!("closing sink...");
         Ok(())
     }
 }

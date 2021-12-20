@@ -108,6 +108,7 @@ pub struct UnitTest {
     config: Config,
     diff: ConfigDiff, 
     pieces: Pieces,
+    sink_rxs: Vec<Receiver<Vec<String>>>,
     // globals: GlobalOptions,
 }
 
@@ -195,7 +196,7 @@ async fn build_unit_test(
     for (target_transform_id, conditions) in outputs {
         // map of extract_from string --> conditions
         let test_sink_id = format!("{}-{}", target_transform_id.to_string().replace(".", "-"), "unit-test-sink");
-        test_output_sinks.entry(test_sink_id).and_modify(|(_, sink_conditions): &mut (String, Vec<Box<dyn Condition>>)| sink_conditions.extend(conditions.clone())).or_insert((target_transform_id.to_string(), conditions));
+        test_output_sinks.entry(test_sink_id).and_modify(|(_, sink_conditions): &mut (String, Vec<Vec<Box<dyn Condition>>>)| sink_conditions.push(conditions.clone())).or_insert((target_transform_id.to_string(), vec![conditions]));
     }
 
     // Connect a test sink to each unique no_outputs_from target transform
@@ -205,16 +206,18 @@ async fn build_unit_test(
     }).collect::<IndexMap<_, _>>();
 
     let mut sinks = IndexMap::new();
-    let mut sink_rxs = IndexMap::new();
-    for (key, (input, conditions)) in test_output_sinks {
+    // let mut sink_rxs = IndexMap::new();
+    let mut sink_rxs = Vec::new();
+    for (key, (input, checks)) in test_output_sinks {
         let key = ComponentKey::from(key);
         let (tx, rx) = oneshot::channel();
         let sink_config = UnitTestSinkConfig {
             result_tx: Arc::new(Mutex::new(Some(tx))),
-            conditions: conditions,
+            checks,
             no_outputs: false,
         };
-        sink_rxs.insert(key.clone(), rx);
+        // sink_rxs.insert(key.clone(), rx);
+        sink_rxs.push(rx);
         sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
     }
 
@@ -223,10 +226,11 @@ async fn build_unit_test(
         let (tx, rx) = oneshot::channel();
         let sink_config = UnitTestSinkConfig {
             result_tx: Arc::new(Mutex::new(Some(tx))),
-            conditions: Vec::new(),
+            checks: Vec::new(),
             no_outputs: true,
         };
-        sink_rxs.insert(key.clone(), rx);
+        // sink_rxs.insert(key.clone(), rx);
+        sink_rxs.push(rx);
         sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
     }
 
@@ -243,7 +247,8 @@ async fn build_unit_test(
         name: test.name,
         config, 
         diff, 
-        pieces
+        pieces,
+        sink_rxs,
     })
 
 }
@@ -315,9 +320,19 @@ fn build_unit_test_sources(
 
 impl UnitTest {
     pub async fn run(self) -> (Vec<String>, Vec<String>) {
-        let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces).await;
+        let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces).await.unwrap();
         let _ = topology.sources_finished().await;
         let _stop_complete = topology.stop();
+
+        let mut in_flight = self.sink_rxs
+            .into_iter()
+            .collect::<FuturesUnordered<_>>();
+
+        while let Some(output) = in_flight.next().await {
+            println!("unit testing framework heard back from a sink");
+        }
+
+        (Vec::new(), Vec::new())
     }
 }
 
@@ -1002,43 +1017,43 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
             name: test.name.clone(),
             test_errors: Vec::new(),
         };
-        while let Some((key, output_events)) = in_flight.next().await {
-            let output_events = output_events.unwrap();
-            // println!("received events from {:?} sink {:?}\n", key, output_events);
-            // todo: move this checking logic out of this receiving loop to allow us to receive everything without delay first
-            if let Some(checks) = sink_to_checks.get(&key) {
-                // println!("checking...\n");
-                // for each check, evaluate every event, breaking on the first event for which the check is entirely true
-                for check in checks {
-                    let mut overall_check_errors = Vec::new();
-                    let mut result = false;
-                    for event in output_events.iter() {
-                        // todo: add correct error message
-                        let mut per_event_errors = Vec::new();
-                        for condition in check {
-                            match condition.check_with_context(event) {
-                                Ok(_) => {}
-                                Err(error) => {
-                                    per_event_errors.push(error);
-                                }
-                            }
-                        }
-                        if per_event_errors.is_empty() {
-                            overall_check_errors.clear();
-                            break;
-                        } else {
-                            overall_check_errors.extend(per_event_errors);
-                        }
-                    }
-                    // either one or more events passed the check or the check failed for one or more events.
-                    // if failed, we need to update the test errors
-                    if !overall_check_errors.is_empty() {
-                        test_result.test_errors.extend(overall_check_errors);
-                    }
-                }
-            }
-        }
-        test_results.push(test_result);
+        // while let Some((key, output_events)) = in_flight.next().await {
+        //     let output_events = output_events.unwrap();
+        //     // println!("received events from {:?} sink {:?}\n", key, output_events);
+        //     // todo: move this checking logic out of this receiving loop to allow us to receive everything without delay first
+        //     if let Some(checks) = sink_to_checks.get(&key) {
+        //         // println!("checking...\n");
+        //         // for each check, evaluate every event, breaking on the first event for which the check is entirely true
+        //         for check in checks {
+        //             let mut overall_check_errors = Vec::new();
+        //             let mut result = false;
+        //             for event in output_events.iter() {
+        //                 // todo: add correct error message
+        //                 let mut per_event_errors = Vec::new();
+        //                 for condition in check {
+        //                     match condition.check_with_context(event) {
+        //                         Ok(_) => {}
+        //                         Err(error) => {
+        //                             per_event_errors.push(error);
+        //                         }
+        //                     }
+        //                 }
+        //                 if per_event_errors.is_empty() {
+        //                     overall_check_errors.clear();
+        //                     break;
+        //                 } else {
+        //                     overall_check_errors.extend(per_event_errors);
+        //                 }
+        //             }
+        //             // either one or more events passed the check or the check failed for one or more events.
+        //             // if failed, we need to update the test errors
+        //             if !overall_check_errors.is_empty() {
+        //                 test_result.test_errors.extend(overall_check_errors);
+        //             }
+        //         }
+        //     }
+        // }
+        // test_results.push(test_result);
     }
 
     Ok(test_results)
