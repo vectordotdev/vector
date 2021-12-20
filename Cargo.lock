@@ -7173,12 +7173,13 @@ dependencies = [
 
 [[package]]
 name = "syslog"
-version = "6.0.0"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7caf36e4fc5d8ccee2ff4a19e27185339cf00338bb0c68f284dc5a295e9cc045"
+checksum = "978044cc68150ad5e40083c9f6a725e6fd02d7ba1bcf691ec2ff0d66c0b41acc"
 dependencies = [
  "error-chain",
  "hostname",
+ "libc",
  "log",
  "time 0.3.5",
 ]
