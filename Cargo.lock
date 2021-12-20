@@ -783,7 +783,7 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "dyn-clone",
- "futures 0.3.18",
+ "futures 0.3.19",
  "http",
  "log",
  "oauth2",
@@ -808,7 +808,7 @@ dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
  "chrono",
- "futures 0.3.18",
+ "futures 0.3.19",
  "http",
  "log",
  "md5",
@@ -1087,7 +1087,7 @@ dependencies = [
  "db-key",
  "dyn-clone",
  "fslock",
- "futures 0.3.18",
+ "futures 0.3.19",
  "hdrhistogram",
  "human_bytes",
  "lading_common",
@@ -1434,7 +1434,7 @@ version = "0.1.0"
 source = "git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c#f2c30d52c9f22de69bac38009a9183135808806c"
 dependencies = [
  "console-api",
- "futures 0.3.18",
+ "futures 0.3.19",
  "hdrhistogram",
  "humantime",
  "serde",
@@ -1535,7 +1535,7 @@ dependencies = [
  "clap",
  "criterion-plot",
  "csv",
- "futures 0.3.18",
+ "futures 0.3.19",
  "itertools",
  "lazy_static",
  "num-traits",
@@ -2332,7 +2332,7 @@ dependencies = [
  "criterion",
  "dashmap 5.0.0",
  "flate2",
- "futures 0.3.18",
+ "futures 0.3.19",
  "glob",
  "indexmap",
  "libc",
@@ -2479,9 +2479,9 @@ checksum = "3a471a38ef8ed83cd6e40aa59c1ffe17db6855c18e3604d9c4ed8c08ebc28678"
 
 [[package]]
 name = "futures"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cd0210d8c325c245ff06fd95a3b13689a1a276ac8cfa8e8720cb840bfb84b9e"
+checksum = "28560757fe2bb34e79f907794bb6b22ae8b0e5c669b638a1132f2592b19035b4"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -2510,9 +2510,9 @@ checksum = "d0c8ff0461b82559810cdccfde3215c3f373807f5e5232b71479bff7bb2583d7"
 
 [[package]]
 name = "futures-executor"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b808bf53348a36cab739d7e04755909b9fcaaa69b7d7e588b37b6ec62704c97"
+checksum = "29d6d2ff5bb10fb95c85b8ce46538a2e5f5e7fdc755623a7d4529ab8a4ed9d2a"
 dependencies = [
  "futures-core",
  "futures-task",
@@ -2685,7 +2685,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a1d5b4e896797c19dff490f9706817b42e9b7aa4adfe844464d3bbc9aabb035"
 dependencies = [
  "arc-swap",
- "futures 0.3.18",
+ "futures 0.3.19",
  "log",
  "reqwest",
  "serde",
@@ -2718,7 +2718,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06c5d2f987ee8f6dff3fa1a352058dc59b990e447e4c7846aa7d804971314f7b"
 dependencies = [
  "dashmap 4.0.2",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-timer",
  "no-std-compat",
  "nonzero_ext",
@@ -2937,7 +2937,7 @@ version = "0.1.0-rc.1"
 source = "git+https://github.com/heim-rs/heim.git?rev=b292f1535bb27c03800cdb7509fa81a40859fbbb#b292f1535bb27c03800cdb7509fa81a40859fbbb"
 dependencies = [
  "cfg-if 1.0.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "glob",
  "heim-common",
  "heim-runtime",
@@ -3017,7 +3017,7 @@ name = "heim-runtime"
 version = "0.1.0-rc.1"
 source = "git+https://github.com/heim-rs/heim.git?rev=b292f1535bb27c03800cdb7509fa81a40859fbbb#b292f1535bb27c03800cdb7509fa81a40859fbbb"
 dependencies = [
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-timer",
  "once_cell",
  "smol",
@@ -3175,7 +3175,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
 dependencies = [
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "headers",
  "http",
  "hyper",
@@ -3474,7 +3474,7 @@ name = "k8s-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "env_logger 0.9.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
@@ -5024,7 +5024,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1de0ea6504e07ca78355a6fb88ad0f36cafe9e696cbc6717f16a207f3a60be72"
 dependencies = [
- "futures 0.3.18",
+ "futures 0.3.19",
  "openssl",
  "tokio",
  "tokio-openssl",
@@ -5375,7 +5375,7 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "crc",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-io",
  "futures-timer",
  "log",
@@ -5634,7 +5634,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a22ce72c78b471baba6c75bda6e03511ef2ee1bae3729902d2bb38951db1048"
 dependencies = [
- "futures 0.3.18",
+ "futures 0.3.19",
  "libc",
  "log",
  "rdkafka-sys",
@@ -5681,7 +5681,7 @@ dependencies = [
  "bytes 1.1.0",
  "combine 4.6.2",
  "dtoa",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-util",
  "itoa 0.4.8",
  "native-tls",
@@ -5937,7 +5937,7 @@ checksum = "0b42eaedbdf15b452446aa00aee94230c41443673985807f1c12fb1fb1cc5799"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde_urlencoded 0.7.0",
  "xml-rs",
@@ -5954,7 +5954,7 @@ dependencies = [
  "bytes 1.1.0",
  "crc32fast",
  "flate2",
- "futures 0.3.18",
+ "futures 0.3.19",
  "http",
  "hyper",
  "hyper-tls",
@@ -5978,7 +5978,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs-next",
- "futures 0.3.18",
+ "futures 0.3.19",
  "hyper",
  "serde",
  "serde_json",
@@ -5995,7 +5995,7 @@ checksum = "10c0918d84befe989cdbdffc0cf7742887eaf777655d45b767e4603d39245ff3"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde",
  "serde_derive",
@@ -6010,7 +6010,7 @@ checksum = "f77cd539a7f1916f3eee0ea5ed7ac5ede35a1b962db694cc1fafcb1ffa63b708"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde",
  "serde_json",
@@ -6024,7 +6024,7 @@ checksum = "9060c90faec6784573af8379107ff26de934206231f4431dfa878382e5584e1b"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde",
  "serde_json",
@@ -6038,7 +6038,7 @@ checksum = "a61dc73e8cda5d732b8512e00093c3537db6e95f1137998147f4d6d65041d129"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde",
  "serde_json",
@@ -6052,7 +6052,7 @@ checksum = "048c2fe811a823ad5a9acc976e8bf4f1d910df719dcf44b15c3e96c5b7a51027"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "xml-rs",
 ]
@@ -6067,7 +6067,7 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "digest 0.9.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "hex",
  "hmac",
  "http",
@@ -6091,7 +6091,7 @@ checksum = "5ae091bb560b2aa3b6ec2ab8224516b63f6b6f7c495ae4e41f0566089b156e5f"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde_urlencoded 0.7.0",
  "xml-rs",
@@ -6106,7 +6106,7 @@ dependencies = [
  "async-trait",
  "bytes 1.1.0",
  "chrono",
- "futures 0.3.18",
+ "futures 0.3.19",
  "rusoto_core",
  "serde_urlencoded 0.7.0",
  "xml-rs",
@@ -7504,7 +7504,7 @@ dependencies = [
  "byteorder",
  "bytes 1.1.0",
  "fallible-iterator",
- "futures 0.3.18",
+ "futures 0.3.19",
  "log",
  "parking_lot",
  "percent-encoding",
@@ -7828,7 +7828,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-task",
  "pin-project 1.0.8",
  "tracing 0.1.29",
@@ -7904,7 +7904,7 @@ name = "tracing-tower"
 version = "0.1.0"
 source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d763595d16373231#f470db1b0354b368f62f9ee4d763595d16373231"
 dependencies = [
- "futures 0.3.18",
+ "futures 0.3.19",
  "tower-service",
  "tracing 0.1.19",
  "tracing-futures 0.2.6",
@@ -8299,7 +8299,7 @@ dependencies = [
  "fakedata",
  "file-source",
  "flate2",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-util",
  "getset",
  "glob",
@@ -8450,7 +8450,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "futures 0.3.18",
+ "futures 0.3.19",
  "graphql_client",
  "indoc",
  "reqwest",
@@ -8499,7 +8499,7 @@ dependencies = [
  "dyn-clone",
  "enrichment",
  "env-test-util",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-util",
  "getset",
  "http",
@@ -9101,7 +9101,7 @@ checksum = "4c3fe7c6af90383100cd1486ef0467c2ebead0303ed7aa3dc6e51173ee3ff8ba"
 dependencies = [
  "async-trait",
  "deadpool",
- "futures 0.3.18",
+ "futures 0.3.19",
  "futures-timer",
  "http-types",
  "hyper",
