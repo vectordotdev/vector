@@ -18,7 +18,7 @@ derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.19", default-features = false, features = ["std"] }
 getset = { version = "0.1.2", default-features = false }
 http = { version = "0.2.5", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
