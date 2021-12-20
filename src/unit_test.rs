@@ -80,24 +80,22 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 }
             } else {
                 for test in tests {
+                    let name = test.name.clone();
                     let (inspections, errors) = test.run().await;
+                    // todo: add test_inspections
+                    if !errors.is_empty() {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "failed".red());
+                        }
+                        aggregated_test_errors.push((name, errors));
+                    } else {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "passed".green());
+                        }
+                    }
                 }
-            //     for result in test_results {
-            //         // todo: add test_inspections
-            //         if !result.test_errors.is_empty() {
-            //             #[allow(clippy::print_stdout)]
-            //             {
-            //                 println!("test {} ... {}", result.name, "failed".red());
-            //             }
-            //             aggregated_test_errors.push((result.name.clone(), result.test_errors));
-            //         } else {
-            //             #[allow(clippy::print_stdout)]
-            //             {
-            //                 println!("test {} ... {}", result.name, "passed".green());
-            //             }
-            //         }
-            //     }
-            // }
             }
         }
         Err(errors) => {

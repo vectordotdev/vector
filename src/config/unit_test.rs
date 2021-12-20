@@ -4,18 +4,17 @@ use indexmap::IndexMap;
 
 use super::{
     graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
-    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext, TestOutput,
+    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext, TestOutput, unit_test_v2::UnitTestSinkResult,
 };
 use crate::{
     conditions::Condition,
     config::{
         self,
-        unit_test_v2::{UnitTestSinkConfig, UnitTestSourceConfig},
+        unit_test_v2::{UnitTestSinkConfig, UnitTestSourceConfig, UnitTestSinkCheck},
         OutputId, SinkOuter, SourceOuter,
     },
     event::{Event, Value},
-    topology::{self, builder::{load_enrichment_tables, Pieces, self}, start_validated},
-    transforms::{Transform, TransformOutputsBuf},
+    topology::{self, builder::{Pieces, self}},
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -91,7 +90,7 @@ pub struct UnitTest {
     config: Config,
     diff: ConfigDiff, 
     pieces: Pieces,
-    sink_rxs: Vec<Receiver<Vec<String>>>,
+    sink_rxs: Vec<Receiver<UnitTestSinkResult>>,
     // globals: GlobalOptions,
 }
 
@@ -195,9 +194,9 @@ async fn build_unit_test(
         let key = ComponentKey::from(key);
         let (tx, rx) = oneshot::channel();
         let sink_config = UnitTestSinkConfig {
+            name: test.name.clone(),
             result_tx: Arc::new(Mutex::new(Some(tx))),
-            checks,
-            no_outputs: false,
+            check: UnitTestSinkCheck::Checks(checks),
         };
         // sink_rxs.insert(key.clone(), rx);
         sink_rxs.push(rx);
@@ -208,9 +207,9 @@ async fn build_unit_test(
         let key = ComponentKey::from(key);
         let (tx, rx) = oneshot::channel();
         let sink_config = UnitTestSinkConfig {
+            name: test.name.clone(),
             result_tx: Arc::new(Mutex::new(Some(tx))),
-            checks: Vec::new(),
-            no_outputs: true,
+            check: UnitTestSinkCheck::NoOutputs,
         };
         // sink_rxs.insert(key.clone(), rx);
         sink_rxs.push(rx);
@@ -311,11 +310,16 @@ impl UnitTest {
             .into_iter()
             .collect::<FuturesUnordered<_>>();
 
-        while let Some(output) = in_flight.next().await {
-            println!("unit testing framework heard back from a sink");
+        let mut inspections = Vec::new();
+        let mut errors = Vec::new();
+        while let Some(partial_result) = in_flight.next().await {
+            let partial_result = partial_result.unwrap();
+            if !partial_result.test_errors.is_empty() {
+                errors.extend(partial_result.test_errors);
+            }
         }
 
-        (Vec::new(), Vec::new())
+        (inspections, errors)
     }
 }
 
@@ -793,9 +797,6 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
                 (
                     ComponentKey::from(id.to_string()),
                     SourceOuter::new(UnitTestSourceConfig {
-                        receiver: Arc::new(Mutex::new(Some(rx))),
-                        input_log_events: Vec::new(),
-                        input_metric_events: Vec::new(),
                         ..Default::default()
                     }),
                 )
