@@ -68,6 +68,7 @@ impl Default for UnitTestSinkCheck {
 pub struct UnitTestSinkResult {
     pub name: String,
     pub test_errors: Vec<String>,
+    pub test_inspections: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Derivative)]
@@ -121,6 +122,7 @@ impl StreamSink for UnitTestSink {
         let mut result = UnitTestSinkResult {
             name: self.name,
             test_errors: Vec::new(),
+            test_inspections: Vec::new(),
         };
 
         // Receive all incoming events
@@ -132,6 +134,15 @@ impl StreamSink for UnitTestSink {
         match self.check {
             UnitTestSinkCheck::Checks(checks) => {
                 for check in checks {
+                    if check.is_empty() {
+                        // result.test_inspections.push(format!(
+                        //     "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
+                        //     self.name,
+                        //     events_to_string("input", inputs),
+                        //     events_to_string("output", outputs),
+                        // ));
+                        continue;
+                    }
                     let mut check_errors = Vec::new();
                     for event in output_events.iter() {
                         // todo: add correct error message
