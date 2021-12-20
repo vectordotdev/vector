@@ -221,7 +221,7 @@ impl From<io::Error> for DecodeError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 enum LogstashProtocolVersion {
     V1, // 1
     V2, // 2
