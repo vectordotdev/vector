@@ -514,6 +514,12 @@ impl TransformOuter<String> {
     }
 }
 
+// impl Clone for TransformOuter<String> {
+//     fn clone(&self) -> Self {
+//         Self { inputs: self.inputs.clone(), inner: self.inner.clone() }
+//     }
+// }
+
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);

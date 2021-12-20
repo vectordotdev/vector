@@ -22,25 +22,36 @@ pub struct UnitTestSourceConfig {
     // Wrapped to satisfy trait bounds
     #[serde(skip)]
     pub receiver: Arc<Mutex<Option<Receiver<Event>>>>,
-    // pub input_log_events: Vec<LogEvent>,
-    // pub input_metric_events: Vec<Metric>,
+    pub input_log_events: Vec<LogEvent>,
+    pub input_metric_events: Vec<Metric>,
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let mut receiver = self.receiver.lock().await.take().unwrap();
+        // let mut receiver = self.receiver.lock().await.take().unwrap();
+
+        let mut events = Vec::new();
+        let log_events = self.input_log_events.clone();
+        events.extend(log_events.into_iter().map(Event::Log).map(Ok));
+
+        let metric_events = self.input_metric_events.clone();
+        events.extend(metric_events.into_iter().map(Event::Metric).map(Ok));
+
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            while let Some(event) = receiver.recv().await {
-                println!("source received an event: {:?}", event);
-                out.send(event)
+                out.send_all(&mut stream::iter(events))
                     .await
                     .map_err(|_| ())?;
-            }
-            println!("closing source...");
+            // while let Some(event) = receiver.recv().await {
+            //     println!("source received an event: {:?}", event);
+            //     out.send(event)
+            //         .await
+            //         .map_err(|_| ())?;
+            // }
+            // println!("closing source...");
             Ok(())
         }))
     }
@@ -103,13 +114,13 @@ impl StreamSink for UnitTestSink {
 
         let mut results = Vec::new();
         while let Some(event) = input.next().await {
-            println!("sink received event: {:?}", event);
+            // println!("sink received event: {:?}", event);
             results.push(event);
         }
         if let Err(_) = self.result_tx.send(results) {
             error!(message = "Sending unit test results failed in unit test sink.");
         }
-        println!("closing sink...");
+        // println!("closing sink...");
         Ok(())
     }
 }
