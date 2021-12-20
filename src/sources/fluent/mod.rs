@@ -797,6 +797,7 @@ mod tests {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
