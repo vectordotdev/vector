@@ -70,7 +70,6 @@
       </div>
       {{ end }}
 
-      {{ with $release.changelog }}
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-dark max-w-none">
@@ -102,7 +101,35 @@
           {{ end }}
         </div>
       </div>
-      {{ end }}
+      {{ else }}
+        {{ if gt (len $release.commits) 0 }}
+        <div class="mt-8">
+          <div class="prose dark:prose-dark max-w-none">
+            {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+          </div>
+
+          <div class="mt-6 flex flex-col space-y-8">
+            {{ range $k, $v := $groups }}
+            {{ $commits := where $release.commits ".type" "eq" $k }}
+            {{ if $commits }}
+            {{ $numCommits := len $commits }}
+            {{ $heading := printf "%d %s" $numCommits $v }}
+            <div>
+              <div class="prose dark:prose-dark max-w-none">
+                {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+              </div>
+
+              <div class="mt-4 flex flex-col space-y-2">
+                {{ range $commits }}
+                {{ template "commit" . }}
+                {{ end }}
+              </div>
+            </div>
+            {{ end }}
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
       {{ end }}
 
       {{ with $release.whats_next }}
@@ -152,6 +179,36 @@
       {{ .description | markdownify }}
     </span>
   </span>
+</span>
+{{ end }}
+
+{{ define "commit" }}
+<span class="flex items-center justify-between space-x-3">
+  <span class="flex items-center space-x-3">
+    {{/* Scopes */}}
+    <span class="flex space-x-1.5">
+      {{ range .scopes }}
+      {{ partial "badge.html" (dict "word" . "color" "blue") }}
+      {{ end }}
+    </span>
+
+    {{/* Description */}}
+    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+      {{ .description | markdownify }}
+    </span>
+  </span>
+
+  {{/* Pull request chip */}}
+  {{ with .pr_number }}
+  {{ $link := printf "https://github.com/vectordotdev/vector/pull/%v" . }}
+  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" rel="noopener" target="_blank">
+    <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
+
+    <span class="text-xs p-0">
+      {{ . }}
+    </span>
+  </a>
+  {{ end }}
 </span>
 {{ end }}
 
