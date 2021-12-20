@@ -68,15 +68,15 @@ inputs = ["datadog_agent"]
 
 In this case, data is received by the `datadog_agent` source and decoded into the [Datadog schema][DD schema]:
 
-``` json
+```json
 {
-  “message”: “string”, // semantic message
-  “status”: “int”, // semantic severity
-  “timestamp”: “timestamp”, // semantic timestamp
-  “hostname”: “string”, // semantic host
-  “service”: “string”, // semantic service
-  “source”: “string”, // semantic source
-  “tags”: “string” // semantic tags
+  "message": "string", // semantic message
+  "status": "int", // semantic severity
+  "timestamp": "timestamp", // semantic timestamp
+  "hostname": "string", // semantic host
+  "service": "string", // semantic service
+  "source": "string", // semantic source
+  "tags": "string" // semantic tags
 }
 ```
 
@@ -85,19 +85,19 @@ can see, the semantic message field (i.e. `message`), is decoded according to th
 
 ``` json
 {
-  “message”: “string”, // semantic message
-  “status”: “int”, // semantic severity
-  “timestamp”: “timestamp”, // semantic timestamp
-  “hostname”: “string”, // semantic host
-  “service”: “string”, // semantic service
-  “source”: “string”, // semantic source
-  “tags”: “string” // semantic tags
-  “syslog”: {
-    “hostname”: “string”,
-    “appname”: “string”,
-    “severity”: “int”,
-    “timestamp”: “string”,
-    “env”: “string”
+  "message": "string", // semantic message
+  "status": "int", // semantic severity
+  "timestamp": "timestamp", // semantic timestamp
+  "hostname": "string", // semantic host
+  "service": "string", // semantic service
+  "source": "string", // semantic source
+  "tags": "string",// semantic tags
+  "syslog": {
+    "hostname": "string",
+    "appname": "string",
+    "severity": "int",
+    "timestamp": "string",
+    "env": "string"
   }
 }
 ```
@@ -110,19 +110,19 @@ a `datadog_agent` source with a `json` codec, which gets `remapped`, then routed
 
 ``` toml
 [sources.datadog_agent]
-type = “datadog_agent”
-decoding.codec = “json”
+type = "datadog_agent”
+decoding.codec = "json”
 
 [transforms.remap]
-type = “remap”
-inputs = [“datadog_agent”]
+type = "remap”
+inputs = ["datadog_agent”]
 source = ‘’’
-.duration = with_semantic_meaning(“duration”, del(.attribute.duration)) // coerces and adds semantic context in one shot
+.duration = with_semantic_meaning("duration”, del(.attribute.duration)) // coerces and adds semantic context in one shot
 ‘’’
 
 [sinks.datadog_logs]
-type = “datadog_logs”
-inputs = [“remap”]
+type = "datadog_logs”
+inputs = ["remap”]
 ```
 
 Identical to the previous example, data is received by the `datadog_agent` source and decoded into the
@@ -130,13 +130,13 @@ Datadog schema:
 
 ``` json
 {
-  “message”: “string”, // semantic message
-  “status”: “int”, // semantic severity
-  “timestamp”: “timestamp”, // semantic timestamp
-  “hostname”: “string”, // semantic host
-  “service”: “string”, // semantic service
-  “source”: “string”, // semantic source
-  “tags”: “string” // semantic tags
+  "message": "string", // semantic message
+  "status": "int", // semantic severity
+  "timestamp": "timestamp", // semantic timestamp
+  "hostname": "string", // semantic host
+  "service": "string", // semantic service
+  "source": "string", // semantic source
+  "tags": "string" // semantic tags
 }
 ```
 
@@ -144,15 +144,15 @@ Datadog schema:
 
 ``` json
 {
-  “message”: “string”, // semantic message
-  “status”: “int”, // semantic severity
-  “timestamp”: “timestamp”, // semantic timestamp
-  “hostname”: “string”, // semantic host
-  “service”: “string”, // semantic service
-  “source”: “string”, // semantic source
-  “tags”: “string” // semantic tags
-  “attributes”: {
-    “string”: “any - timestamp”, // JSON types only
+  "message": "string", // semantic message
+  "status": "int", // semantic severity
+  "timestamp": "timestamp", // semantic timestamp
+  "hostname": "string", // semantic host
+  "service": "string", // semantic service
+  "source": "string", // semantic source
+  "tags": "string", // semantic tags
+  "attributes": {
+    "string": "any - timestamp", // JSON types only
   }
 }
 ```
@@ -163,16 +163,16 @@ coerces the value into the proper type and adds semantic meaning to the field:
 
 ``` json
 {
-  “message”: “string”, // semantic message
-  “status”: “int”, // semantic severity
-  “timestamp”: “timestamp”, // semantic timestamp
-  “hostname”: “string”, // semantic host
-  “service”: “string”, // semantic service
-  “source”: “string”, // semantic source
-  “tags”: “string” // semantic tags
-  “duration”: “int” // semantic duration
-  “attributes”: {
-    “string”: “any - timestamp”, // JSON types only
+  "message": "string", // semantic message
+  "status": "int", // semantic severity
+  "timestamp": "timestamp", // semantic timestamp
+  "hostname": "string", // semantic host
+  "service": "string", // semantic service
+  "source": "string", // semantic source
+  "tags": "string", // semantic tags
+  "duration": "int", // semantic duration
+  "attributes": {
+    "string": "any - timestamp", // JSON types only
   }
 }
 ```
