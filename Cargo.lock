@@ -3824,15 +3824,6 @@ checksum = "ffbee8634e0d45d258acb448e7eaab3fce7a0a467395d4d9f228e3c1f01fb2e4"
 
 [[package]]
 name = "matchers"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f099785f7595cc4b4553a174ce30dd7589ef93391ff414dbb67f62392b9e0ce1"
-dependencies = [
- "regex-automata",
-]
-
-[[package]]
-name = "matchers"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
@@ -6906,7 +6897,7 @@ dependencies = [
  "snafu",
  "tokio",
  "tracing 0.1.29",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber 0.3.3",
 ]
 
 [[package]]
@@ -7824,12 +7815,11 @@ dependencies = [
 [[package]]
 name = "tracing-fluent-assertions"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44099ad2b869e3d751d00c4d8b9d642871517eec60aed6a06598077592bd5e28"
+source = "git+https://github.com/vectordotdev/tracing-fluent-assertions?branch=bump-tracing-subscriber#0b32307299b832bfbcaf6026e2f53436b8b9abee"
 dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber 0.3.3",
 ]
 
 [[package]]
@@ -7893,20 +7883,9 @@ version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
 dependencies = [
- "ansi_term",
- "chrono",
- "lazy_static",
- "matchers 0.0.1",
- "regex",
- "serde",
- "serde_json",
  "sharded-slab",
- "smallvec",
  "thread_local",
- "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-log",
- "tracing-serde",
 ]
 
 [[package]]
@@ -7917,14 +7896,16 @@ checksum = "245da694cc7fc4729f3f418b304cb57789f1bed2a78c575407ab8a23f53cb4d3"
 dependencies = [
  "ansi_term",
  "lazy_static",
- "matchers 0.1.0",
+ "matchers",
  "regex",
  "serde",
  "serde_json",
  "sharded-slab",
+ "smallvec",
  "thread_local",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
+ "tracing-log",
  "tracing-serde",
 ]
 
@@ -8572,7 +8553,6 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
- "tracing-subscriber 0.2.25",
  "tracing-subscriber 0.3.3",
  "twox-hash",
  "typetag",
