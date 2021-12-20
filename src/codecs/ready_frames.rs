@@ -34,7 +34,8 @@ where
     /// Create a new `ReadyChunks` with a specified capacity by wrapping a decoder stream, most
     /// commonly a `FramedRead`.
     ///
-    /// The specified capacity is a soft limit, and chunks may be returned that exceed that size.
+    /// The specified capacity is a soft limit, and chunks may be returned that contain more than
+    /// that number of items.
     pub fn with_capacity(inner: T, cap: usize) -> Self {
         Self {
             inner,
