@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.5
         with:
-          ref: master
+          ref: ${{ github.base_ref }}
           path: baseline-vector
 
       - name: Report on PR metadata
