@@ -43,7 +43,7 @@ releases: "0.18.0": {
 				added via a new Vector concept, enrichment tables. To start, we've added
 				support for enriching events with data from a CSV file. See [the
 				highlight](/highlights/2021-11-18-csv-enrichment) for more.
-				""", pr_numbers: [1234, 3243]
+				"""
 		},
 		{
 			type: "feat"
