@@ -1,21 +1,23 @@
-use std::{collections::HashMap, convert::TryFrom, fmt::Write, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt::Write,
+    sync::Arc,
+};
 
 use grok::Grok;
+use itertools::{Itertools, Position};
 use lazy_static::lazy_static;
-
 use lookup::LookupBuf;
+use regex::Regex;
+use vrl_compiler::Value;
 
-use crate::matchers::date::DateFilter;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
-    matchers::date,
+    matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
-use itertools::{Itertools, Position};
-use regex::Regex;
-use std::collections::BTreeMap;
-use vrl_compiler::Value;
 
 #[derive(Debug, Clone)]
 pub struct GrokRule {
@@ -189,7 +191,7 @@ fn parse_grok_rule(
         .iter()
         .map(|pattern| {
             parse_grok_pattern(pattern)
-                .map_err(|e| Error::InvalidGrokExpression(pattern.to_string(), e.to_string()))
+                .map_err(|e| Error::InvalidGrokExpression(pattern.to_string(), e))
         })
         .collect::<Result<Vec<GrokPattern>, Error>>()?;
 
@@ -302,7 +304,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn purify_grok_pattern(
     pattern: &GrokPattern,
-    mut fields: &mut HashMap<String, GrokField>,
+    fields: &mut HashMap<String, GrokField>,
     aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
@@ -349,14 +351,14 @@ fn purify_grok_pattern(
             } else {
                 res.push_str("(?:"); // non-capturing group
             }
-            res.push_str(resolves_match_function(&mut fields, pattern)?.as_str());
+            res.push_str(resolves_match_function(fields, pattern)?.as_str());
             res.push(')');
         }
         None => {
             // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
             res.push_str("%{");
 
-            res.push_str(resolves_match_function(&mut fields, pattern)?.as_str());
+            res.push_str(resolves_match_function(fields, pattern)?.as_str());
 
             if let Some(destination) = &pattern.destination {
                 if destination.path.is_empty() {
@@ -512,8 +514,9 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     #[test]
     fn supports_escaped_quotes() {

@@ -1,14 +1,22 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::kafka::{KafkaAuthConfig, KafkaCompression};
-use crate::serde::to_string;
-use crate::sinks::kafka::sink::{healthcheck, KafkaSink};
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, NoDefaultsBatchSettings};
-use crate::sinks::{Healthcheck, VectorSink};
+use std::collections::HashMap;
+
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    kafka::{KafkaAuthConfig, KafkaCompression},
+    serde::to_string,
+    sinks::{
+        kafka::sink::{healthcheck, KafkaSink},
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, NoDefaultsBatchSettings,
+        },
+        Healthcheck, VectorSink,
+    },
+};
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 

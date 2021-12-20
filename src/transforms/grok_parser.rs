@@ -1,3 +1,11 @@
+use std::{collections::HashMap, str};
+
+use bytes::Bytes;
+use grok::Pattern;
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+use snafu::{ResultExt, Snafu};
+
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
@@ -5,13 +13,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use bytes::Bytes;
-use grok::Pattern;
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -71,6 +72,10 @@ impl TransformConfig for GrokParserConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -150,13 +155,14 @@ impl FunctionTransform for GrokParser {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, TransformConfig, TransformContext},
         event::{self, Event, LogEvent},
     };
-    use pretty_assertions::assert_eq;
-    use serde_json::json;
 
     #[test]
     fn generate_config() {

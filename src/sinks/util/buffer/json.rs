@@ -1,5 +1,6 @@
-use super::super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 use serde_json::value::{to_raw_value, RawValue, Value};
+
+use super::super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub type BoxedRawValue = Box<RawValue>;
 
@@ -61,11 +62,10 @@ impl Batch for JsonArrayBuffer {
 
 #[cfg(test)]
 mod tests {
-    use crate::sinks::util::BatchSettings;
-
-    use super::super::PushResult;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::PushResult, *};
+    use crate::sinks::util::BatchSettings;
 
     #[test]
     fn multi_object_array() {

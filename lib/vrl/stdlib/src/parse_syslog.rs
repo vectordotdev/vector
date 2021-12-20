@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Datelike, Utc};
 use shared::TimeZone;
-use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
 
@@ -159,9 +160,10 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_syslog => ParseSyslog;

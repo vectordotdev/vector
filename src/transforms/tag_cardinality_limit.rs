@@ -1,4 +1,15 @@
-use crate::transforms::TaskTransform;
+use std::{
+    borrow::{Borrow, Cow},
+    collections::{HashMap, HashSet},
+    fmt,
+    future::ready,
+    pin::Pin,
+};
+
+use bloom::{BloomFilter, ASMS};
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
@@ -6,17 +17,7 @@ use crate::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
-    transforms::Transform,
-};
-use bloom::{BloomFilter, ASMS};
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    borrow::{Borrow, Cow},
-    collections::{HashMap, HashSet},
-    fmt,
-    future::ready,
-    pin::Pin,
+    transforms::{TaskTransform, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -268,10 +269,13 @@ impl TaskTransform for TagCardinalityLimit {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
-    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{metric, Event, Metric},
+        transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
+    };
 
     #[test]
     fn generate_config() {

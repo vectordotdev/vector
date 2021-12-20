@@ -2,8 +2,9 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-use serde::de;
 use std::path::Path;
+
+use serde::de;
 
 /// A type alias to better capture the semantics.
 pub type FormatHint = Option<Format>;

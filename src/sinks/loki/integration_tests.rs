@@ -1,20 +1,18 @@
-use super::config::{LokiConfig, OutOfOrderAction};
-use crate::{
-    config::{log_schema, SinkConfig},
-    sinks::util::test::load_sink,
-    sinks::VectorSink,
-    template::Template,
-    test_util::{
-        random_events_with_stream, random_lines, random_lines_with_stream,
-        random_updated_events_with_stream,
-    },
-};
+use std::convert::TryFrom;
+
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
 use shared::encode_logfmt;
-use std::convert::TryFrom;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
+
+use super::config::{LokiConfig, OutOfOrderAction};
+use crate::{
+    config::{log_schema, SinkConfig},
+    sinks::{util::test::load_sink, VectorSink},
+    template::Template,
+    test_util::{generate_events_with_stream, generate_lines_with_stream, random_lines},
+};
 
 async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();
@@ -45,12 +43,20 @@ async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
     (stream, sink)
 }
 
+fn line_generator(index: usize) -> String {
+    format!("random line {}", index)
+}
+
+fn event_generator(index: usize) -> Event {
+    Event::from(line_generator(index))
+}
+
 #[tokio::test]
 async fn text() {
     let (stream, sink) = build_sink("text").await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) = random_lines_with_stream(100, 10, Some(batch));
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -68,7 +74,7 @@ async fn json() {
     let (stream, sink) = build_sink("json").await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) = random_events_with_stream(100, 10, Some(batch));
+    let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -88,12 +94,13 @@ async fn json_nested_fields() {
     let (stream, sink) = build_sink("json").await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) =
-        random_updated_events_with_stream(100, 10, Some(batch), |(_index, mut event)| {
-            let log = event.as_mut_log();
-            log.insert("foo.bar", "baz");
-            event
-        });
+    let generator = |idx| {
+        let mut event = event_generator(idx);
+        let log = event.as_mut_log();
+        log.insert("foo.bar", "baz");
+        event
+    };
+    let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -112,7 +119,7 @@ async fn logfmt() {
     let (stream, sink) = build_sink("logfmt").await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) = random_events_with_stream(100, 10, Some(batch));
+    let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -145,18 +152,19 @@ async fn many_streams() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) =
-        random_updated_events_with_stream(100, 10, Some(batch), |(i, mut event)| {
-            if i < 10 {
-                let log = event.as_mut_log();
-                if i % 2 == 0 {
-                    log.insert("stream_id", stream1.to_string());
-                } else {
-                    log.insert("stream_id", stream2.to_string());
-                }
+    let generator = move |idx| {
+        let mut event = event_generator(idx);
+        if idx < 10 {
+            let log = event.as_mut_log();
+            if idx % 2 == 0 {
+                log.insert("stream_id", stream1.to_string());
+            } else {
+                log.insert("stream_id", stream2.to_string());
             }
-            event
-        });
+        }
+        event
+    };
+    let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -210,13 +218,14 @@ async fn interpolate_stream_key() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let (lines, events) =
-        random_updated_events_with_stream(100, 10, Some(batch), |(i, mut event)| {
-            if i < 10 {
-                event.as_mut_log().insert("stream_key", "test_name");
-            }
-            event
-        });
+    let generator = |idx| {
+        let mut event = event_generator(idx);
+        if idx < 10 {
+            event.as_mut_log().insert("stream_key", "test_name");
+        }
+        event
+    };
+    let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

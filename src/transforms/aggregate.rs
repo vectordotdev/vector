@@ -1,16 +1,18 @@
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    pin::Pin,
+    time::Duration,
+};
+
+use async_stream::stream;
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{TaskTransform, Transform},
-};
-use async_stream::stream;
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    pin::Pin,
-    time::Duration,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -145,10 +147,12 @@ impl TaskTransform for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::metric, event::Event, event::Metric};
-    use futures::{stream, SinkExt};
     use std::{collections::BTreeSet, task::Poll};
+
+    use futures::{stream, SinkExt};
+
+    use super::*;
+    use crate::event::{metric, Event, Metric};
 
     #[test]
     fn generate_config() {

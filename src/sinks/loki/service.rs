@@ -1,15 +1,21 @@
-use crate::http::{Auth, HttpClient};
-use crate::sinks::util::UriSerde;
+use std::task::{Context, Poll};
+
 use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
-use vector_core::buffers::Ackable;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    http::{Auth, HttpClient},
+    sinks::util::UriSerde,
+};
 
 #[derive(Debug, Snafu)]
 pub enum LokiError {

@@ -1,3 +1,16 @@
+use std::io::Write;
+
+use flate2::write::GzEncoder;
+use futures::{future, FutureExt, SinkExt};
+use http::{
+    header::{self, HeaderName, HeaderValue},
+    Method, Request, StatusCode, Uri,
+};
+use hyper::Body;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -11,17 +24,6 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use flate2::write::GzEncoder;
-use futures::{future, FutureExt, SinkExt};
-use http::{
-    header::{self, HeaderName, HeaderValue},
-    Method, Request, StatusCode, Uri,
-};
-use hyper::Body;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::io::Write;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -299,6 +301,20 @@ fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crat
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        io::{BufRead, BufReader},
+        sync::{atomic, Arc},
+    };
+
+    use bytes::{Buf, Bytes};
+    use flate2::read::MultiGzDecoder;
+    use futures::{channel::mpsc, stream, StreamExt};
+    use headers::{Authorization, HeaderMapExt};
+    use http::request::Parts;
+    use hyper::{Method, Response, StatusCode};
+    use serde::Deserialize;
+    use vector_core::event::{BatchNotifier, BatchStatus};
+
     use super::*;
     use crate::{
         assert_downcast_matches,
@@ -312,16 +328,6 @@ mod tests {
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
-    use bytes::{Buf, Bytes};
-    use flate2::read::MultiGzDecoder;
-    use futures::{channel::mpsc, stream, StreamExt};
-    use headers::{Authorization, HeaderMapExt};
-    use http::request::Parts;
-    use hyper::{Method, Response, StatusCode};
-    use serde::Deserialize;
-    use std::io::{BufRead, BufReader};
-    use std::sync::{atomic, Arc};
-    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -351,6 +357,7 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
+        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,

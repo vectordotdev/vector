@@ -6,15 +6,15 @@ edition = "2021"
 build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 lalrpop-util = { version = "0.19", default-features = false }
 thiserror = { version = "1", default-features = false }
 lazy_static = { version = "1.3.0", default-features = false }
 regex = { version = "1", default-features = false }
 grok = { version = "1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-itertools = { version = "0.10.1", default-features = false, features = ["use_alloc"] }
-serde_json = { version = "1.0.68", default-features = false }
+itertools = { version = "0.10.3", default-features = false, features = ["use_alloc"] }
+serde_json = { version = "1.0.73", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
@@ -23,8 +23,10 @@ snafu = { version = "0.6", default-features = false }
 ordered-float = { version = "2", default-features = false }
 onig = {version  = "6.3.1", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
-chrono-tz = { version = "0.5.3", default-features = false }
+chrono-tz = { version = "0.6.1", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
+nom = { version = "7.1.0", default-features = false }
+nom-regex = { version = "0.2.0", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }

@@ -4,6 +4,8 @@ use std::{
     time::Duration,
 };
 
+use crc32fast::Hasher;
+
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
 pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
@@ -16,6 +18,10 @@ pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
 pub const MAX_FILE_ID: u16 = u16::MAX;
 #[cfg(test)]
 pub const MAX_FILE_ID: u16 = 32;
+
+pub(crate) fn create_crc32c_hasher() -> Hasher {
+    crc32fast::Hasher::new()
+}
 
 /// Buffer configuration.
 #[derive(Clone, Debug)]
@@ -94,6 +100,7 @@ impl DiskBufferConfigBuilder {
     ///
     /// Defaults to `usize::MAX`, or effectively no limit.  Due to the internal design of the
     /// buffer, the effective maximum limit is around `max_data_file_size + max_record_size` * 2^16.
+    #[allow(dead_code)]
     pub fn max_buffer_size(mut self, amount: u64) -> Self {
         self.max_buffer_size = Some(amount);
         self
@@ -107,6 +114,7 @@ impl DiskBufferConfigBuilder {
     /// that causes a data file to exceed this value by as much as `max_record_size`.
     ///
     /// Defaults to 128MB.
+    #[allow(dead_code)]
     pub fn max_data_file_size(mut self, amount: u64) -> Self {
         self.max_data_file_size = Some(amount);
         self
@@ -118,6 +126,7 @@ impl DiskBufferConfigBuilder {
     /// will not be written to the buffer.
     ///
     /// Defaults to 8MB.
+    #[allow(dead_code)]
     pub fn max_record_size(mut self, amount: usize) -> Self {
         self.max_record_size = Some(amount);
         self
@@ -133,12 +142,13 @@ impl DiskBufferConfigBuilder {
     /// amount of data written since the last flush would be lost.
     ///
     /// Defaults to 500ms.
+    #[allow(dead_code)]
     pub fn flush_interval(mut self, interval: Duration) -> Self {
         self.flush_interval = Some(interval);
         self
     }
 
-    /// Consumes this builder and constructs a `BufferConfig`.
+    /// Consumes this builder and constructs a `DiskBufferConfig`.
     pub fn build(self) -> DiskBufferConfig {
         let max_data_file_size = self
             .max_data_file_size

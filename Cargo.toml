@@ -93,6 +93,8 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/datadog/filter-test",
+  "lib/vector-datadog-filter",
   "lib/soak"
 ]
 
@@ -110,13 +112,12 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
-datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures
 async-stream = "0.3.2"
-async-trait = "0.1.51"
-futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.13.1", default-features = false, features = ["full"] }
+async-trait = "0.1.52"
+futures = { version = "0.3.19", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+tokio = { version = "1.15.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -131,9 +132,9 @@ tracing-subscriber = { version = "0.3.3", default-features = false, features = [
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.8.0", default-features = false }
-metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
+metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 
 # AWS - Rusoto
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
@@ -149,10 +150,9 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = {version = "0.0.22-alpha", optional = true}
-aws-types = {version = "0.0.22-alpha", optional = true}
-aws-sdk-sqs = {version = "0.0.22-alpha", optional = true}
-
+aws-config = { version = "0.3.0", optional = true }
+aws-types = { version = "0.3.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-sqs = { version = "0.3.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -164,10 +164,10 @@ tower = { version = "0.4.10", default-features = false, features = ["buffer", "l
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
-serde_yaml = { version = "0.8.21", default-features = false }
+serde_json = { version = "1.0.73", default-features = false, features = ["raw_value"] }
+serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.11.0", default-features = false, features = ["macros"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 
@@ -185,9 +185,9 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
-itertools = { version = "0.10.1", default-features = false, optional = true }
+async-graphql = { version = "3.0.17", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.17", default-features = false, optional = true }
+itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.21.0", default-features = false, features = ["event-stream"], optional = true }
@@ -196,14 +196,15 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-sha2 = { version = "0.9.8", optional = true }
+datadog-search-syntax = { path = "lib/datadog/search-syntax" }
+datadog-filter = { path = "lib/datadog/filter" }
+vector-datadog-filter = { path = "lib/vector-datadog-filter" }
+sha2 = { version = "0.10.0", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
-vrl-parser = { path = "lib/vrl/parser", optional = true }
-vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 
 # Lookup
 lookup = { path = "lib/lookup" }
@@ -213,22 +214,22 @@ async-compression = { version = "0.3.7", default-features = false, features = ["
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.11.0", default-features = false, features = ["ssl"], optional = true }
+bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
-dashmap = { version = "4.0.2", default-features = false }
+dashmap = { version = "5.0.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
-encoding_rs = { version = "0.8.29", features = ["serde"] }
+encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
-futures-util = { version = "0.3.17", default-features = false }
+futures-util = { version = "0.3.19", default-features = false }
 getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.3.2", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
@@ -238,7 +239,7 @@ headers = { version = "0.3.5", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.5", default-features = false }
-hyper = { version = "0.14.14", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
+hyper = { version = "0.14.16", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 infer = { version = "0.5.0", default-features = false, optional = true}
@@ -249,18 +250,18 @@ k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", 
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.7.0", default-features = false, optional = true }
+lru = { version = "0.7.1", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
-md-5 = { version = "0.9", optional = true }
+md-5 = { version = "0.10", optional = true }
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-mongodb = { version = "2.0.2", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
-once_cell = { version = "1.8", default-features = false }
-openssl = { version = "0.10.36", default-features = false }
+once_cell = { version = "1.9", default-features = false }
+openssl = { version = "0.10.38", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -282,8 +283,9 @@ socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
-syslog = { version = "5.0.0", default-features = false, optional = true }
+syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
+tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
@@ -305,25 +307,27 @@ security-framework = "2.3.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
-nix = "0.22.2"
+nix = "0.23.1"
 
 [build-dependencies]
 prost-build = { version = "0.9", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
+datadog-filter-test = { path = "lib/datadog/filter-test"}
+
 approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.106"
+libc = "0.2.112"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.6", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.2.0"
-tokio = { version = "1.13.0", features = ["test-util"] }
+tokio = { version = "1.15.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
@@ -337,20 +341,22 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
-leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+# Removes dependency on `time` v0.1
+# https://github.com/chronotope/chrono/pull/578
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default = ["api", "api-client", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
-disk-buffer = ["vector_core/disk-buffer"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-api-client = ["api", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-vrl-cli = ["api", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 tokio-console = ["console-subscriber", "tokio/tracing"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
@@ -359,16 +365,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datado
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -379,7 +385,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = []
+unix = ["tikv-jemallocator"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
@@ -568,7 +574,7 @@ transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
-transforms-filter = ["datadog-search-syntax", "vrl-parser", "vrl-compiler"]
+transforms-filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
@@ -697,6 +703,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
+  "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -745,6 +752,7 @@ aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
+datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
@@ -774,7 +782,6 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-fi
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = [
-  "disk-buffer",
   "sinks-file",
   "sinks-http",
   "sinks-socket",

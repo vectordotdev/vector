@@ -1,8 +1,10 @@
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use std::{error, fmt, mem};
+
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use quickcheck::{Arbitrary, Gen};
-use std::{error, fmt, mem};
+
+use crate::encoding::{DecodeBytes, EncodeBytes};
 
 #[derive(Debug)]
 pub struct EncodeError;

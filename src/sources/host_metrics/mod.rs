@@ -1,13 +1,5 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
-    internal_events::HostMetricsEventReceived,
-    shutdown::ShutdownSignal,
-    Pipeline,
-};
+use std::{collections::BTreeMap, fmt, path::Path};
+
 use chrono::{DateTime, Utc};
 use futures::{stream, SinkExt, StreamExt};
 use glob::{Pattern, PatternError};
@@ -20,11 +12,19 @@ use serde::{
 };
 #[cfg(unix)]
 use shared::btreemap;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::path::Path;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::HostMetricsEventReceived,
+    shutdown::ShutdownSignal,
+    Pipeline,
+};
 
 #[cfg(target_os = "linux")]
 mod cgroups;
@@ -425,10 +425,7 @@ impl FilterList {
     #[cfg(test)]
     fn contains_test(&self, value: Option<&str>) -> bool {
         let result = self.contains_str(value);
-        assert_eq!(
-            result,
-            self.contains_path(value.map(|value| std::path::Path::new(value)))
-        );
+        assert_eq!(result, self.contains_path(value.map(std::path::Path::new)));
         result
     }
 }
@@ -480,9 +477,9 @@ impl Serialize for PatternWrapper {
 
 #[cfg(test)]
 pub(self) mod tests {
+    use std::{collections::HashSet, future::Future};
+
     use super::*;
-    use std::collections::HashSet;
-    use std::future::Future;
 
     #[test]
     fn filterlist_default_includes_everything() {

@@ -1,4 +1,4 @@
-[target.'cfg(feature = "cargo-clippy")']
+[target.'cfg(all)']
 rustflags = [
   "-Dclippy::print_stdout",
   "-Dclippy::print_stderr",
@@ -22,3 +22,6 @@ rustflags = "-Lnative=/usr/local/i686-linux-musl/lib"
 
 [target.aarch64-unknown-linux-musl]
 rustflags = "-Lnative=/usr/local/aarch64-linux-musl/lib"
+
+[target.armv7-unknown-linux-musleabihf]
+rustflags = "-Lnative=/usr/local/arm-linux-musleabihf/lib"

@@ -1,12 +1,15 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
+use std::{collections::HashMap, fmt, str::FromStr};
+
 use bytes::Bytes;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
-use sinks::socket::{self, SocketSinkConfig};
-use sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding};
-use std::{collections::HashMap, fmt, str::FromStr};
+use sinks::{
+    socket::{self, SocketSinkConfig},
+    util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding},
+};
 #[cfg(unix)]
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::BytesCodec;

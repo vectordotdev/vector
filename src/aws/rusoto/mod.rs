@@ -2,9 +2,13 @@ mod auth;
 pub mod region;
 
 //TODO: replace with direct import
-pub use super::auth::AwsAuthentication;
-use crate::config::ProxyConfig;
-use crate::{http::HttpError, tls::MaybeTlsSettings};
+use std::{
+    fmt, io,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -12,13 +16,15 @@ use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
 };
-use hyper::body::{Body, HttpBody};
-use hyper::client;
+use hyper::{
+    body::{Body, HttpBody},
+    client,
+};
 use once_cell::sync::OnceCell;
 use regex::bytes::RegexSet;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
-use rusoto_core::credential::ProfileProvider;
 use rusoto_core::{
+    credential::ProfileProvider,
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
@@ -31,13 +37,10 @@ use rusoto_credential::{
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient, WebIdentityProvider};
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt, io,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tower::{Service, ServiceExt};
+
+pub use super::auth::AwsAuthentication;
+use crate::{config::ProxyConfig, http::HttpError, tls::MaybeTlsSettings};
 // use crate::http;
 
 pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
@@ -109,6 +112,7 @@ impl ProvideAwsCredentials for CustomChainProvider {
 }
 
 // A place-holder for the types of AWS credentials we support
+#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<CustomChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),

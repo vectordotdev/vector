@@ -1,6 +1,9 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
 use std::{fmt, ops::Deref};
+
+use crate::{
+    expression::{Expr, Resolved},
+    Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {

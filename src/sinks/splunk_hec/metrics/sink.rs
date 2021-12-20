@@ -1,25 +1,26 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, num::NonZeroUsize, sync::Arc};
 
-use crate::{
-    config::SinkContext,
-    internal_events::SplunkInvalidMetricReceived,
-    sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest},
-        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
-    },
-    template::Template,
-};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
     event::{Event, Metric, MetricValue},
+    partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
 use super::request_builder::HecMetricsRequestBuilder;
+use crate::{
+    config::SinkContext,
+    internal_events::SplunkInvalidMetricReceivedError,
+    sinks::{
+        splunk_hec::common::{render_template_string, request::HecRequest},
+        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
+    },
+    template::Template,
+};
 
 pub struct HecMetricsSink<S> {
     pub context: SinkContext,
@@ -61,7 +62,7 @@ where
                     default_namespace,
                 ))
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -88,6 +89,18 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[derive(Default)]
+struct EventPartitioner;
+
+impl Partitioner for EventPartitioner {
+    type Item = HecProcessedEvent;
+    type Key = Option<Arc<str>>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        item.event.metadata().splunk_hec_token().clone()
     }
 }
 
@@ -123,9 +136,10 @@ impl HecMetricsProcessedEventMetadata {
             MetricValue::Counter { value } => Some(value),
             MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(&SplunkInvalidMetricReceived {
+                emit!(&SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
+                    error: "Metric kind not supported.".into(),
                 });
                 None
             }

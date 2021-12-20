@@ -1,7 +1,9 @@
-use crate::config::{ComponentKey, GlobalOptions};
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use std::collections::HashSet;
+
+use crate::config::{ComponentKey, GlobalOptions};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
@@ -62,6 +64,12 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     }
 
     fn transform_type(&self) -> &'static str;
+
+    /// Return true if the transform is able to be run across multiple tasks simultaneously with no
+    /// concerns around statefulness, ordering, etc.
+    fn enable_concurrency(&self) -> bool {
+        false
+    }
 
     /// Allows to detect if a transform can be embedded in another transform.
     /// It's used by the pipelines transform for now.

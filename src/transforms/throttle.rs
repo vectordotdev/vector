@@ -1,18 +1,19 @@
-use crate::conditions::{AnyCondition, Condition};
-use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
-use crate::event::Event;
-use crate::internal_events::{TemplateRenderingFailed, ThrottleEventDiscarded};
-use crate::template::Template;
-use crate::transforms::{TaskTransform, Transform};
+use std::{num::NonZeroU32, pin::Pin, time::Duration};
 
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::num::NonZeroU32;
-use std::pin::Pin;
-use std::time::Duration;
+
+use crate::{
+    conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::{TemplateRenderingFailed, ThrottleEventDiscarded},
+    template::Template,
+    transforms::{TaskTransform, Transform},
+};
 
 #[derive(Deserialize, Default, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -184,10 +185,12 @@ pub enum ConfigError {
 
 #[cfg(test)]
 mod tests {
+    use std::task::Poll;
+
+    use futures::SinkExt;
+
     use super::*;
     use crate::event::Event;
-    use futures::SinkExt;
-    use std::task::Poll;
 
     #[test]
     fn generate_config() {

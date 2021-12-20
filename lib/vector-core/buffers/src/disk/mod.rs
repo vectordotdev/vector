@@ -1,16 +1,13 @@
-use crate::buffer_usage_data::BufferUsageData;
-use crate::{BufferStream, Bufferable};
-use futures::Sink;
-use pin_project::pin_project;
-use snafu::Snafu;
-use std::fmt::Debug;
-use std::sync::Arc;
 use std::{
+    fmt::Debug,
     io,
     path::{Path, PathBuf},
-    pin::Pin,
-    task::{Context, Poll},
 };
+
+use snafu::Snafu;
+
+use self::leveldb_buffer::{Reader, Writer};
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 pub mod leveldb_buffer;
 
@@ -32,38 +29,6 @@ pub enum DataDirError {
     },
 }
 
-#[pin_project]
-#[derive(Clone)]
-pub struct Writer<T>
-where
-    T: Bufferable + Clone,
-{
-    #[pin]
-    inner: leveldb_buffer::Writer<T>,
-}
-
-impl<T> Sink<T> for Writer<T>
-where
-    T: Bufferable + Clone,
-{
-    type Error = ();
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.project().inner.start_send(item)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
-}
-
 /// Open a [`leveldb_buffer::Buffer`]
 ///
 /// # Errors
@@ -73,13 +38,14 @@ where
 pub fn open<T>(
     data_dir: &Path,
     name: &str,
-    max_size: usize,
-    buffer_usage_data: Arc<BufferUsageData>,
-) -> Result<(Writer<T>, BufferStream<T>, super::Acker), DataDirError>
+    max_size: u64,
+    usage_handle: BufferUsageHandle,
+) -> Result<(Writer<T>, Reader<T>, super::Acker), DataDirError>
 where
     T: Bufferable + Clone,
 {
-    let path = data_dir.join(name);
+    let buffer_dir = format!("{}_id", name);
+    let path = data_dir.join(buffer_dir);
 
     // Check data dir
     std::fs::metadata(&data_dir)
@@ -105,7 +71,5 @@ where
             }
         })?;
 
-    let (writer, reader, acker) =
-        leveldb_buffer::Buffer::build(&path, max_size, buffer_usage_data)?;
-    Ok((Writer { inner: writer }, Box::new(reader), acker))
+    leveldb_buffer::Buffer::build(&path, max_size, usage_handle)
 }

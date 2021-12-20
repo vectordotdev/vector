@@ -1,17 +1,25 @@
-mod in_memory;
-#[cfg(feature = "disk-buffer")]
-mod on_disk;
+mod in_memory_v1;
+mod in_memory_v2;
+mod on_disk_v1;
+mod on_disk_v2;
 
-use crate::test::common::{Action, Message};
-use crate::test::model::in_memory::InMemory;
-#[cfg(feature = "disk-buffer")]
-use crate::test::model::on_disk::OnDisk;
-use crate::Variant;
-use futures::task::{noop_waker, Context, Poll};
-use futures::{Sink, Stream};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{task::noop_waker, Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
-use std::pin::Pin;
-use tracing::Span;
+use tokio::runtime::Runtime;
+
+use super::common::Variant;
+use crate::test::{
+    common::{Action, Message},
+    model::{
+        in_memory_v1::InMemoryV1, in_memory_v2::InMemoryV2, on_disk_v1::OnDiskV1,
+        on_disk_v2::OnDiskV2,
+    },
+};
 
 #[derive(Debug)]
 /// For operations that might block whether the operation would or would not
@@ -34,12 +42,8 @@ trait Model {
 
 fn check(variant: &Variant) -> bool {
     match variant {
-        Variant::Memory { .. } => {
-            // nothing to check
-            true
-        }
-        #[cfg(feature = "disk-buffer")]
-        Variant::Disk { id, data_dir, .. } => {
+        Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => true,
+        Variant::DiskV1 { id, data_dir, .. } | Variant::DiskV2 { id, data_dir, .. } => {
             // determine if data_dir is in temp_dir/id
             let mut prefix = std::path::PathBuf::new();
             prefix.push(std::env::temp_dir());
@@ -58,9 +62,8 @@ struct VariantGuard {
 impl VariantGuard {
     fn new(variant: Variant) -> Self {
         match variant {
-            Variant::Memory { .. } => VariantGuard { inner: variant },
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk {
+            Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => VariantGuard { inner: variant },
+            Variant::DiskV1 {
                 max_size,
                 when_full,
                 id,
@@ -73,7 +76,28 @@ impl VariantGuard {
                     .unwrap()
                     .into_path();
                 VariantGuard {
-                    inner: Variant::Disk {
+                    inner: Variant::DiskV1 {
+                        max_size,
+                        when_full,
+                        data_dir,
+                        id,
+                    },
+                }
+            }
+            Variant::DiskV2 {
+                max_size,
+                when_full,
+                id,
+                ..
+            } => {
+                // SAFETY: We allow tempdir to create the directory but by
+                // calling `into_path` we obligate ourselves to delete it. This
+                // is done in the drop implementation for `VariantGuard`.
+                let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &id)
+                    .unwrap()
+                    .into_path();
+                VariantGuard {
+                    inner: Variant::DiskV2 {
                         max_size,
                         when_full,
                         data_dir,
@@ -94,9 +118,8 @@ impl AsRef<Variant> for VariantGuard {
 impl Drop for VariantGuard {
     fn drop(&mut self) {
         match &self.inner {
-            Variant::Memory { .. } => { /* nothing to clean up */ }
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk { data_dir, .. } => {
+            Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => {}
+            Variant::DiskV1 { data_dir, .. } | Variant::DiskV2 { data_dir, .. } => {
                 // SAFETY: Here we clean up the data_dir of the inner `Variant`,
                 // see note in the constructor for this type.
                 std::fs::remove_dir_all(data_dir).unwrap();
@@ -113,8 +136,8 @@ impl Drop for VariantGuard {
 ///
 /// Acks are not modeled yet. I believe doing so would be a straightforward
 /// process.
-#[tokio::test]
-async fn model_check() {
+#[test]
+fn model_check() {
     fn inner(variant: Variant, actions: Vec<Action>) -> TestResult {
         if !check(&variant) {
             return TestResult::discard();
@@ -122,22 +145,22 @@ async fn model_check() {
 
         let guard = VariantGuard::new(variant);
         let mut model: Box<dyn Model> = match guard.as_ref() {
-            Variant::Memory { .. } => Box::new(InMemory::new(guard.as_ref(), 1)),
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk { .. } => Box::new(OnDisk::new(guard.as_ref())),
+            Variant::MemoryV1 { .. } => Box::new(InMemoryV1::new(guard.as_ref(), 1)),
+            Variant::MemoryV2 { .. } => Box::new(InMemoryV2::new(guard.as_ref())),
+            Variant::DiskV1 { .. } => Box::new(OnDiskV1::new(guard.as_ref())),
+            Variant::DiskV2 { .. } => Box::new(OnDiskV2::new(guard.as_ref())),
         };
 
-        let rcv_waker = noop_waker();
-        let mut rcv_context = Context::from_waker(&rcv_waker);
+        let runtime = Runtime::new().unwrap();
+        let (mut tx, mut rx, guard) = runtime.block_on(async move {
+            let (tx, rx) = guard.as_ref().create_sender_receiver().await;
+            (tx, rx, guard)
+        });
 
-        let snd_waker = noop_waker();
-        let mut snd_context = Context::from_waker(&snd_waker);
-
-        let (tx, mut rx, _) =
-            crate::build::<Message>(guard.as_ref().clone(), Span::none()).unwrap();
-
-        let mut tx = tx.get();
-        let sink = tx.as_mut();
+        let noop_send_waker = noop_waker();
+        let mut send_context = Context::from_waker(&noop_send_waker);
+        let noop_recv_waker = noop_waker();
+        let mut recv_context = Context::from_waker(&noop_recv_waker);
 
         for action in actions {
             match action {
@@ -146,15 +169,16 @@ async fn model_check() {
                 // flush. We might profitably model a distinct flush action but
                 // at the time this model was created there was no clear reason
                 // to do so.
-                Action::Send(msg) => match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
+                Action::Send(msg) => match Sink::poll_ready(Pin::new(&mut tx), &mut send_context) {
                     Poll::Ready(Ok(())) => {
                         // Once the buffer signals its ready we are allowed to
                         // call `start_send`. The buffer may or may not make the
                         // value immediately available to a receiver, something
                         // we elide by immediately flushing.
-                        assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg.clone()));
+                        let start_send_result = Sink::start_send(Pin::new(&mut tx), msg.clone());
+                        assert!(start_send_result.is_ok());
                         assert!(matches!(model.send(msg.clone()), Progress::Advanced));
-                        match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
+                        match Sink::poll_flush(Pin::new(&mut tx), &mut send_context) {
                             Poll::Ready(Ok(())) => {}
                             // If the buffer signals Ready/Ok then we're good to
                             // go. Both the model and the SUT will have received
@@ -172,7 +196,7 @@ async fn model_check() {
                     Poll::Pending => assert!(model.is_full()),
                     Poll::Ready(Err(_)) => return TestResult::failed(),
                 },
-                Action::Recv => match Stream::poll_next(Pin::new(&mut rx), &mut rcv_context) {
+                Action::Recv => match Stream::poll_next(Pin::new(&mut rx), &mut recv_context) {
                     Poll::Pending => {
                         assert!(model.is_empty());
                     }

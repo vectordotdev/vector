@@ -19,6 +19,11 @@ remap: functions: get_metadata_field: {
 
 					This exists if the `store_api_key` setting is true in the `datadog_agent` source.
 					"""
+				splunk_hec_token: """
+					The Splunk HEC token.
+
+					This exists if the `store_hec_token` setting is true in the `splunk_hec` source.
+					"""
 			}
 			type: ["string"]
 		},

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
@@ -5,7 +7,6 @@ use crate::{
     internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -48,6 +49,10 @@ impl TransformConfig for FilterConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {

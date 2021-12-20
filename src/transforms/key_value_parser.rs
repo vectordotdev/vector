@@ -1,3 +1,8 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
@@ -5,10 +10,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -83,6 +84,10 @@ impl TransformConfig for KeyValueConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {

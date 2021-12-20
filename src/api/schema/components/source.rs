@@ -1,3 +1,7 @@
+use std::cmp;
+
+use async_graphql::{Enum, InputObject, Object};
+
 use super::{sink, state, transform, Component};
 use crate::{
     api::schema::{
@@ -5,12 +9,9 @@ use crate::{
         metrics::{self, IntoSourceMetrics},
         sort,
     },
-    config::DataType,
-    config::{ComponentKey, OutputId},
+    config::{ComponentKey, DataType, OutputId},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Object};
-use std::cmp;
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {

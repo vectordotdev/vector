@@ -1,6 +1,6 @@
-use dns_lookup::lookup_addr;
 use std::net::IpAddr;
 
+use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

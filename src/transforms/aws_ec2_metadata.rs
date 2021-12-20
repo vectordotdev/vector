@@ -1,16 +1,3 @@
-use crate::{
-    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    http::HttpClient,
-    internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
-    transforms::{TaskTransform, Transform},
-};
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{body::to_bytes as body_to_bytes, Body};
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt as _;
 use std::{
     collections::{HashMap, HashSet},
     error, fmt,
@@ -18,8 +5,23 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock},
 };
+
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
+use http::{uri::PathAndQuery, Request, StatusCode, Uri};
+use hyper::{body::to_bytes as body_to_bytes, Body};
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
+
+use crate::{
+    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    http::HttpClient,
+    internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
+    transforms::{TaskTransform, Transform},
+};
 
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
@@ -227,6 +229,7 @@ struct MetadataClient {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // deserialize all fields
 struct IdentityDocument {
     account_id: String,
     architecture: String,
@@ -539,12 +542,14 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use futures::{SinkExt, StreamExt};
+
     use super::*;
     use crate::{
-        event::metric, event::LogEvent, event::Metric, test_util::trace_init,
+        event::{metric, LogEvent, Metric},
+        test_util::trace_init,
         transforms::TaskTransform,
     };
-    use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
     const TEST_METADATA: [(&str, &str); 12] = [

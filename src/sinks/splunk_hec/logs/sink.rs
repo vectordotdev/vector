@@ -1,17 +1,18 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
+    partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
+use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
     sinks::{
@@ -20,8 +21,6 @@ use crate::{
     },
     template::Template,
 };
-
-use super::request_builder::HecLogsRequestBuilder;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -66,7 +65,7 @@ where
                     timestamp_nanos_key,
                 ))
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -93,6 +92,18 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[derive(Default)]
+struct EventPartitioner;
+
+impl Partitioner for EventPartitioner {
+    type Item = HecProcessedEvent;
+    type Key = Option<Arc<str>>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        item.event.metadata().splunk_hec_token().clone()
     }
 }
 

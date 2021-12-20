@@ -1,3 +1,10 @@
+use std::{convert::TryFrom, future::ready, num::NonZeroU8, sync::Arc};
+
+use futures::stream;
+use serde_json::Value as JsonValue;
+use tokio::time::{sleep, Duration};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
@@ -6,20 +13,16 @@ use crate::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 integration_test_helpers::get_token,
             },
-            logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
+            logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
         },
         util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
-    test_util::components::{self, HTTP_SINK_TAGS},
-    test_util::{random_lines_with_stream, random_string},
+    test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        random_lines_with_stream, random_string,
+    },
 };
-use futures::stream;
-use serde_json::Value as JsonValue;
-use std::future::ready;
-use std::{convert::TryFrom, num::NonZeroU8, sync::Arc};
-use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
@@ -91,12 +94,12 @@ async fn find_entries(messages: &[String]) -> bool {
 async fn config(
     encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
     indexed_fields: Vec<String>,
-) -> HecSinkLogsConfig {
+) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
-    HecSinkLogsConfig {
-        token: get_token().await,
+    HecLogsSinkConfig {
+        default_token: get_token().await,
         endpoint: "http://localhost:8088/".into(),
         host_key: "host".into(),
         indexed_fields,
@@ -140,7 +143,7 @@ async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
     let mut config = config(HecLogsEncoder::Text, vec![]).await;
-    config.token = "BROKEN_TOKEN".into();
+    config.default_token = "BROKEN_TOKEN".into();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -293,7 +296,7 @@ async fn splunk_sourcetype() {
 async fn splunk_configure_hostname() {
     let cx = SinkContext::new_test();
 
-    let config = HecSinkLogsConfig {
+    let config = HecLogsSinkConfig {
         host_key: "roast".into(),
         ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
     };
@@ -326,8 +329,8 @@ async fn splunk_indexer_acknowledgements() {
         ..Default::default()
     };
 
-    let config = HecSinkLogsConfig {
-        token: String::from(ACK_TOKEN),
+    let config = HecLogsSinkConfig {
+        default_token: String::from(ACK_TOKEN),
         acknowledgements: acknowledgements_config,
         ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
     };

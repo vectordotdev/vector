@@ -3,23 +3,24 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+};
+
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
+use lazy_static::lazy_static;
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
         filter::{self, filter_items},
         relay, sort,
     },
-    config::ComponentKey,
-    config::Config,
+    config::{ComponentKey, Config},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use lazy_static::lazy_static;
-use std::{
-    cmp,
-    collections::{HashMap, HashSet},
-};
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(

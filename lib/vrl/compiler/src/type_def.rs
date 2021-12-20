@@ -24,13 +24,14 @@
 //! within that object.
 //!
 //!
-use crate::map;
-use crate::value::Kind;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Sub,
 };
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use crate::{map, value::Kind};
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -1347,10 +1348,11 @@ impl From<Kind> for TypeDef {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::type_def;
     use lookup::{FieldBuf, SegmentBuf};
     use shared::btreemap;
+
+    use super::*;
+    use crate::type_def;
 
     #[test]
     fn collect_subtypes() {

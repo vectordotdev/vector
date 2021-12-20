@@ -1,11 +1,5 @@
 #![cfg(feature = "shutdown-tests")]
 
-use assert_cmd::prelude::*;
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
-use serde_json::{json, Value};
 use std::{
     fs::read_dir,
     io::Write,
@@ -15,6 +9,13 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
+
+use assert_cmd::prelude::*;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use serde_json::{json, Value};
 use vector::test_util::{next_addr, temp_file};
 
 mod support;

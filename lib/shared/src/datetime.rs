@@ -1,7 +1,8 @@
+use std::fmt::Debug;
+
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
-use std::fmt::Debug;
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -35,8 +36,9 @@ pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: DateTime<TZ>) -> DateTim
 
 #[cfg(feature = "serde")]
 pub mod ser_de {
-    use super::*;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::*;
 
     impl Serialize for TimeZone {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use vector_core::event::Event;
 
 pub fn add_query_parameters(

@@ -1,13 +1,16 @@
 use core::array::IntoIter;
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    str::FromStr,
+};
+
 use futures::{SinkExt, StreamExt};
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use std::collections::{BTreeMap, HashSet};
-use std::iter::FromIterator;
-use std::str::FromStr;
 use tracing::{debug, info};
 
 const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
@@ -1681,7 +1684,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
-    let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
+    let processed_events_before =
+        metrics::get_component_sent_events_total(&vector_metrics_url).await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -1750,7 +1754,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
-    let processed_events_after = metrics::get_processed_events(&vector_metrics_url).await?;
+    let processed_events_after =
+        metrics::get_component_sent_events_total(&vector_metrics_url).await?;
 
     // Ensure we did get at least one event since before deployed the test pod.
     assert!(

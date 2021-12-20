@@ -1,3 +1,7 @@
+use derivative::Derivative;
+use shared::TimeZone;
+use snafu::{OptionExt, Snafu};
+
 use crate::{
     event::{self, Event, LogEvent, Value},
     transforms::{
@@ -5,9 +9,6 @@ use crate::{
         FunctionTransform,
     },
 };
-use derivative::Derivative;
-use shared::TimeZone;
-use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
 pub const NEW_LINE_TAG: &str = "new_line_tag";
@@ -95,10 +96,10 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::test_util;
-    use super::*;
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
     use bytes::Bytes;
+
+    use super::{super::test_util, *};
+    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

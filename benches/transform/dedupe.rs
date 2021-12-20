@@ -1,14 +1,14 @@
-use crate::common::{consume, FixedLogStream};
 use core::fmt;
-use criterion::BenchmarkId;
+use std::{num::NonZeroUsize, time::Duration};
+
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
-    Throughput,
+    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    SamplingMode, Throughput,
 };
-use std::num::NonZeroUsize;
-use std::time::Duration;
 use vector::transforms::dedupe::{CacheConfig, Dedupe, DedupeConfig, FieldMatchConfig};
 use vector_core::transform::Transform;
+
+use crate::common::{consume, FixedLogStream};
 
 #[derive(Debug)]
 struct Param {

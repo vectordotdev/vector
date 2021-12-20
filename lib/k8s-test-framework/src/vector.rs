@@ -1,7 +1,8 @@
 //! Manage Vector.
 
-use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
 use std::process::{Command, Stdio};
+
+use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
 
 /// Parameters required to build `kubectl` & `helm` commands to manage charts deployments in the
 /// Kubernetes cluster.

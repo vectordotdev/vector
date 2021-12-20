@@ -1,7 +1,9 @@
-use crate::sources::apache_metrics;
-use metrics::{counter, histogram};
 use std::time::Instant;
+
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+
+use crate::sources::apache_metrics;
 
 #[derive(Debug)]
 pub struct ApacheMetricsEventsReceived<'a> {

@@ -509,6 +509,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_discarded_events_total: {
+			description:       "The number of events dropped by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"

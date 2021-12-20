@@ -1,36 +1,40 @@
-use crate::aws::rusoto::RegionOrEndpoint;
-use crate::config::log_schema;
-use crate::config::{DataType, SinkConfig, SinkContext};
-use crate::event::{EventRef, LogEvent, Value};
-use crate::http::HttpClient;
-use crate::internal_events::TemplateRenderingFailed;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
-use crate::sinks::elasticsearch::sink::ElasticSearchSink;
-use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
-use crate::sinks::elasticsearch::{
-    ElasticSearchAuth, ElasticSearchCommon, ElasticSearchCommonMode, ElasticSearchMode,
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
 };
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::http::RequestConfig;
-use crate::sinks::util::{
-    BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-    TowerRequestConfig,
-};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::template::Template;
-use crate::tls::TlsOptions;
-use crate::transforms::metric_to_log::MetricToLogConfig;
+
 use futures::FutureExt;
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
-
-use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
-use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
-use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
 use tower::ServiceBuilder;
+
+use crate::{
+    aws::rusoto::RegionOrEndpoint,
+    config::{log_schema, DataType, SinkConfig, SinkContext},
+    event::{EventRef, LogEvent, Value},
+    http::HttpClient,
+    internal_events::TemplateRenderingFailed,
+    sinks::{
+        elasticsearch::{
+            encoder::ElasticSearchEncoder,
+            request_builder::ElasticsearchRequestBuilder,
+            retry::ElasticSearchRetryLogic,
+            service::{ElasticSearchService, HttpRequestBuilder},
+            sink::ElasticSearchSink,
+            BatchActionTemplate, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchCommonMode,
+            ElasticSearchMode, IndexTemplate,
+        },
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::Template,
+    tls::TlsOptions,
+    transforms::metric_to_log::MetricToLogConfig,
+};
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -51,6 +55,8 @@ pub struct ElasticSearchConfig {
     pub headers: Option<IndexMap<String, String>>,
 
     pub doc_type: Option<String>,
+    #[serde(default)]
+    pub suppress_type_name: bool,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
     #[serde(default)]
@@ -311,6 +317,7 @@ impl SinkConfig for ElasticSearchConfig {
         // This is a bit ugly, but removes a String allocation on every event
         let mut encoding = self.encoding.clone();
         encoding.codec.doc_type = common.doc_type;
+        encoding.codec.suppress_type_name = common.suppress_type_name;
 
         let request_builder = ElasticsearchRequestBuilder {
             compression: self.compression,

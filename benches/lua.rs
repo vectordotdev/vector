@@ -1,8 +1,9 @@
+use std::pin::Pin;
+
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{stream, SinkExt, Stream, StreamExt};
 use indexmap::IndexMap;
 use indoc::indoc;
-use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig, TransformContext},
@@ -63,15 +64,8 @@ fn bench_add_fields(c: &mut Criterion) {
                     stream::iter(buf.into_iter())
                 }))
             }
-            // ignoring multiple outputs for now
-            Transform::FallibleFunction(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    let mut err_buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, &mut err_buf, v);
-                    stream::iter(buf.into_iter())
-                }))
+            Transform::Synchronous(_t) => {
+                unreachable!("no sync transform used in these benches");
             }
             Transform::Task(t) => t.transform(Box::pin(rx)),
         };
@@ -158,15 +152,8 @@ fn bench_field_filter(c: &mut Criterion) {
                     stream::iter(buf.into_iter())
                 }))
             }
-            // ignoring multiple outputs for now
-            Transform::FallibleFunction(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    let mut err_buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, &mut err_buf, v);
-                    stream::iter(buf.into_iter())
-                }))
+            Transform::Synchronous(_t) => {
+                unreachable!("no sync transform used in these benches");
             }
             Transform::Task(t) => t.transform(Box::pin(rx)),
         };

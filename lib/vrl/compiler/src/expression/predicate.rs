@@ -1,8 +1,13 @@
-use crate::expression::{Block, Expr, Resolved};
-use crate::parser::Node;
-use crate::{value::Kind, Context, Expression, Span, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+
+use crate::{
+    expression::{Block, Expr, Resolved},
+    parser::Node,
+    value::Kind,
+    Context, Expression, Span, State, TypeDef, Value,
+};
 
 pub type Result = std::result::Result<Predicate, Error>;
 
@@ -20,7 +25,6 @@ impl Predicate {
             return Err(Error {
                 variant: ErrorVariant::NonBoolean(type_def.kind()),
                 span,
-                labels: vec![],
             });
         }
 
@@ -108,7 +112,6 @@ pub struct Error {
     pub(crate) variant: ErrorVariant,
 
     span: Span,
-    labels: Vec<Label>,
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -5,24 +5,14 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
-    use crate::{
-        event::metric::{MetricKind, MetricValue},
-        sinks::splunk_hec::common::acknowledgements::HecAckApiError,
-    };
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
 
-    #[derive(Debug)]
-    pub struct SplunkEventSent {
-        pub byte_size: usize,
-    }
-
-    impl InternalEvent for SplunkEventSent {
-        fn emit_metrics(&self) {
-            counter!("processed_bytes_total", self.byte_size as u64);
-        }
-    }
+    use crate::{
+        event::metric::{MetricKind, MetricValue},
+        sinks::splunk_hec::common::acknowledgements::HecAckApiError,
+    };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
@@ -42,28 +32,32 @@ mod sink {
 
         fn emit_metrics(&self) {
             counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
-            counter!("encode_errors_total", 1);
         }
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkInvalidMetricReceived<'a> {
+    pub(crate) struct SplunkInvalidMetricReceivedError<'a> {
         pub value: &'a MetricValue,
         pub kind: &'a MetricKind,
+        pub error: crate::Error,
     }
 
-    impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
+    impl<'a> InternalEvent for SplunkInvalidMetricReceivedError<'a> {
         fn emit_logs(&self) {
-            warn!(
-                message = "Invalid metric received kind; dropping event.",
+            error!(
+                message = "Invalid metric received.",
+                error = ?self.error,
                 value = ?self.value,
                 kind = ?self.kind,
+                error_type = "invalid_metric",
+                stage = "processing",
                 internal_log_rate_secs = 30,
             )
         }
 
         fn emit_metrics(&self) {
-            counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
+            counter!("component_errors_total", 1, "stage" => "processing", "error_type" => "invalid_metric");
+            counter!("component_discarded_events_total", 1);
         }
     }
 
@@ -137,9 +131,10 @@ mod sink {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use crate::sources::splunk_hec::ApiError;
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
+
+    use crate::sources::splunk_hec::ApiError;
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {

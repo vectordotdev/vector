@@ -1,11 +1,12 @@
 #![allow(non_upper_case_globals)]
 
-use super::Value;
-use crate::value;
+use std::{fmt, ops::Deref};
+
 use chrono::{TimeZone, Utc};
 use regex::Regex;
-use std::fmt;
-use std::ops::Deref;
+
+use super::Value;
+use crate::value;
 
 pub const BYTES: u16 = 1 << 1;
 pub const INTEGER: u16 = 1 << 2;

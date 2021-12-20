@@ -7,12 +7,26 @@
 //! each type of component.
 
 pub mod builder;
-pub mod fanout;
+pub use vector_core::fanout;
 mod running;
 mod task;
 
 #[cfg(test)]
 mod test;
+
+use std::{
+    collections::HashMap,
+    panic::AssertUnwindSafe,
+    sync::{Arc, Mutex},
+};
+
+use futures::{Future, FutureExt};
+pub use running::RunningTopology;
+use tokio::sync::{mpsc, watch};
+use vector_core::buffers::{
+    topology::channel::{BufferReceiver, BufferSender},
+    Acker,
+};
 
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
@@ -22,24 +36,12 @@ use crate::{
         task::{Task, TaskOutput},
     },
 };
-use futures::{Future, FutureExt};
-pub use running::RunningTopology;
-use std::{
-    collections::HashMap,
-    panic::AssertUnwindSafe,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
-use tokio::sync::{mpsc, watch};
-use vector_core::buffers::{Acker, BufferInputCloner, BufferStream};
 
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
-pub type EventStream = BufferStream<Event>;
-
 type BuiltBuffer = (
-    BufferInputCloner<Event>,
-    Arc<Mutex<Option<Pin<EventStream>>>>,
+    BufferSender<Event>,
+    Arc<Mutex<Option<BufferReceiver<Event>>>>,
     Acker,
 );
 
