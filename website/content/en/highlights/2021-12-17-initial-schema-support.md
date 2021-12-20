@@ -116,9 +116,9 @@ decoding.codec = "json"
 [transforms.remap]
 type = "remap"
 inputs = ["datadog_agent"]
-source = ‘’’
+source = '''
 .duration = with_semantic_meaning("duration", del(.attribute.duration)) // coerces and adds semantic context in one shot
-‘’’
+'''
 
 [sinks.datadog_logs]
 type = "datadog_logs"
