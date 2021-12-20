@@ -1,15 +1,15 @@
 # Soak test vector
 #
-# This workflow runs our 'soak' tests, which are relative evaluations of
-# vector's master branch HEAD to whatever SHA was just pushed into the project
-# (unless that SHA happens to be master branch HEAD). The goal is to give
-# quick-ish feedback on all-up vector for a variety of configs as to whether
-# throughput performance has gone down, gotten more variable in the pushed SHA.
+# This workflow runs our 'soak' tests, which are relative evaluations of the
+# base SHA for the PR to whatever SHA was just pushed into the project (unless
+# that SHA happens to be master branch HEAD). The goal is to give quick-ish
+# feedback on all-up vector for a variety of configs as to whether throughput
+# performance has gone down, gotten more variable in the pushed SHA.
 #
 # Soaks are always done relative to the pushed SHA, meaning any changes you
-# introduce to the soak tests will be picked up both for the master HEAD soak
-# and your current SHA. Tags are SHA-SHA. The first SHA is the one that
-# triggered this workflow, the second is the one of the vector being tested. For
+# introduce to the soak tests will be picked up both for the base SHA soak and
+# your current SHA. Tags are SHA-SHA. The first SHA is the one that triggered
+# this workflow, the second is the one of the vector being tested. For
 # comparison images the two SHAs are identical.
 name: Soak
 
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.5
         with:
-          ref: master
+          ref: ${{ github.base_ref }}
           path: baseline-vector
 
       - name: Report on PR metadata
@@ -152,10 +152,10 @@ jobs:
         variant:
           - name: baseline
             tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}"
-            ref: master
+            ref: "${{ needs.compute-soak-meta.outputs.baseline-sha }}"
           - name: comparison
             tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
-            ref: "${{ github.sha }}"
+            ref: "${{ needs.compute-soak-meta.outputs.comparison-sha }}"
     steps:
       - uses: actions/checkout@v2.3.5
 
