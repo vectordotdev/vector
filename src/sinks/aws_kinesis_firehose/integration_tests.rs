@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
 use super::*;
+use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{SinkConfig, SinkContext},
