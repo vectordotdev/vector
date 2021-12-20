@@ -73,15 +73,15 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
     match config::build_unit_tests(&paths).await {
         Ok(mut tests) => {
-            for test in tests {
-                let (inspections, errors) = test.run().await;
-            }
-            // if test_results.is_empty() {
-            //     #[allow(clippy::print_stdout)]
-            //     {
-            //         println!("{}", "No tests found.".yellow());
-            //     }
-            // } else {
+            if tests.is_empty() {
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{}", "No tests found.".yellow());
+                }
+            } else {
+                for test in tests {
+                    let (inspections, errors) = test.run().await;
+                }
             //     for result in test_results {
             //         // todo: add test_inspections
             //         if !result.test_errors.is_empty() {
@@ -98,6 +98,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             //         }
             //     }
             // }
+            }
         }
         Err(errors) => {
             error!("Failed to execute tests:\n{}.", errors.join("\n"));

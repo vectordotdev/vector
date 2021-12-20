@@ -23,14 +23,6 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, oneshot::{Receiver, self}};
 use tokio_stream::wrappers::ReceiverStream;
 
-// pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
-//     config::init_log_schema(paths, false)?;
-
-//     let (config, _) = super::loading::load_builder_from_paths(paths)?;
-
-//     build_unit_tests(config).await
-// }
-
 // async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
 //     let mut tests = vec![];
 //     let mut errors = vec![];
@@ -92,15 +84,6 @@ use tokio_stream::wrappers::ReceiverStream;
 //     } else {
 //         Err(errors)
 //     }
-// }
-
-// pub struct UnitTest {
-//     pub name: String,
-//     inputs: Vec<(Vec<ComponentKey>, Event)>,
-//     transforms: IndexMap<ComponentKey, UnitTestTransform>,
-//     checks: Vec<UnitTestCheck>,
-//     no_outputs_from: Vec<ComponentKey>,
-//     globals: GlobalOptions,
 // }
 
 pub struct UnitTest {
@@ -474,98 +457,6 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
 
 //------------------------------------------------------------------------------
 
-fn links_to_a_leaf(
-    target: &ComponentKey,
-    leaves: &IndexMap<ComponentKey, ()>,
-    link_checked: &mut IndexMap<ComponentKey, bool>,
-    transform_outputs: &IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
-) -> bool {
-    if *link_checked.get(target).unwrap_or(&false) {
-        return true;
-    }
-    let has_linked_children = if let Some(outputs) = transform_outputs.get(target) {
-        outputs
-            .iter()
-            .filter(|(o, _)| links_to_a_leaf(o, leaves, link_checked, transform_outputs))
-            .count()
-            > 0
-    } else {
-        false
-    };
-    let linked = leaves.contains_key(target) || has_linked_children;
-    link_checked.insert(target.to_owned(), linked);
-    linked
-}
-
-/// Reduces a collection of transforms into a set that only contains those that
-/// link between our root (test input) and a set of leaves (test outputs).
-fn reduce_transforms(
-    roots: Vec<ComponentKey>,
-    leaves: &IndexMap<ComponentKey, ()>,
-    transform_outputs: &mut IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
-) {
-    let mut link_checked: IndexMap<ComponentKey, bool> = IndexMap::new();
-
-    if roots
-        .iter()
-        .map(|r| links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
-        .collect::<Vec<_>>() // Ensure we map each element.
-        .iter()
-        .all(|b| !b)
-    {
-        transform_outputs.clear();
-    }
-
-    transform_outputs.retain(|id, children| {
-        let linked = roots.contains(id) || *link_checked.get(id).unwrap_or(&false);
-        if linked {
-            // Also remove all unlinked children.
-            children.retain(|child_id, _| {
-                roots.contains(child_id) || *link_checked.get(child_id).unwrap_or(&false)
-            })
-        }
-        linked
-    });
-}
-
-fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentKey>, Event), String> {
-    let target = config.get_inputs(&input.insert_at);
-
-    match input.type_str.as_ref() {
-        "raw" => match input.value.as_ref() {
-            Some(v) => Ok((target, Event::from(v.clone()))),
-            None => Err("input type 'raw' requires the field 'value'".to_string()),
-        },
-        "log" => {
-            if let Some(log_fields) = &input.log_fields {
-                let mut event = Event::from("");
-                for (path, value) in log_fields {
-                    let value: Value = match value {
-                        TestInputValue::String(s) => Value::from(s.to_owned()),
-                        TestInputValue::Boolean(b) => Value::from(*b),
-                        TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(*f),
-                    };
-                    event.as_mut_log().insert(path.to_owned(), value);
-                }
-                Ok((target, event))
-            } else {
-                Err("input type 'log' requires the field 'log_fields'".to_string())
-            }
-        }
-        "metric" => {
-            if let Some(metric) = &input.metric {
-                Ok((target, Event::Metric(metric.clone())))
-            } else {
-                Err("input type 'metric' requires the field 'metric'".to_string())
-            }
-        }
-        _ => Err(format!(
-            "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",
-            input.type_str
-        )),
-    }
-}
 
 // fn build_inputs(
 //     config: &Config,
