@@ -111,3 +111,84 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::ReadyFrames;
+    use futures::{channel::mpsc, poll, task::Poll, SinkExt, StreamExt};
+
+    #[tokio::test]
+    async fn idle_passthrough() {
+        let (mut tx, rx) = mpsc::channel::<Result<(&str, usize), &str>>(5);
+        let mut rf = ReadyFrames::with_capacity(rx, 2);
+
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+
+        tx.send(Ok(("foo", 1))).await.unwrap();
+
+        assert_eq!(Poll::Ready(Some(Ok((vec!["foo"], 1)))), poll!(rf.next()));
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+    }
+
+    #[tokio::test]
+    async fn limits_to_capacity() {
+        let (mut tx, rx) = mpsc::channel::<Result<(&str, usize), &str>>(5);
+        let mut rf = ReadyFrames::with_capacity(rx, 2);
+
+        tx.send(Ok(("foo", 2))).await.unwrap();
+        tx.send(Ok(("bar", 3))).await.unwrap();
+
+        assert_eq!(
+            Poll::Ready(Some(Ok((vec!["foo", "bar"], 5)))),
+            poll!(rf.next())
+        );
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+
+        tx.send(Ok(("foo", 4))).await.unwrap();
+        tx.send(Ok(("bar", 5))).await.unwrap();
+        tx.send(Ok(("baz", 6))).await.unwrap();
+
+        assert_eq!(
+            Poll::Ready(Some(Ok((vec!["foo", "bar"], 9)))),
+            poll!(rf.next())
+        );
+        assert_eq!(Poll::Ready(Some(Ok((vec!["baz"], 6)))), poll!(rf.next()));
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+    }
+
+    #[tokio::test]
+    async fn error_passing() {
+        let (mut tx, rx) = mpsc::channel::<Result<(&str, usize), &str>>(5);
+        let mut rf = ReadyFrames::with_capacity(rx, 2);
+
+        tx.send(Err("oops")).await.unwrap();
+
+        assert_eq!(Poll::Ready(Some(Err("oops"))), poll!(rf.next()));
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+
+        tx.send(Ok(("foo", 7))).await.unwrap();
+        tx.send(Err("oops")).await.unwrap();
+
+        assert_eq!(Poll::Ready(Some(Ok((vec!["foo"], 7)))), poll!(rf.next()));
+        assert_eq!(Poll::Ready(Some(Err("oops"))), poll!(rf.next()));
+        assert_eq!(Poll::Pending, poll!(rf.next()));
+    }
+
+    #[tokio::test]
+    async fn closing() {
+        let (mut tx, rx) = mpsc::channel::<Result<(&str, usize), &str>>(5);
+        let mut rf = ReadyFrames::with_capacity(rx, 2);
+
+        tx.send(Ok(("foo", 8))).await.unwrap();
+        tx.send(Ok(("bar", 9))).await.unwrap();
+        tx.send(Ok(("baz", 10))).await.unwrap();
+        drop(tx);
+
+        assert_eq!(
+            Poll::Ready(Some(Ok((vec!["foo", "bar"], 17)))),
+            poll!(rf.next())
+        );
+        assert_eq!(Poll::Ready(Some(Ok((vec!["baz"], 10)))), poll!(rf.next()));
+        assert_eq!(Poll::Ready(None), poll!(rf.next()));
+    }
+}
