@@ -148,107 +148,40 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
     Ok(Vec::new())
 }
 
-fn build_inputs(test_inputs: &Vec<TestInput>) -> Result<Vec<(ComponentKey, Event)>, Vec<String>> {
-    let mut inputs = Vec::new();
-    let mut errors = Vec::new();
-    if test_inputs.is_empty() {
-        errors.push("must specify at least one input.".to_string());
-        return Err(errors);
-    }
-
-    for input in test_inputs {
-        match build_input_event(&input) {
-            Ok(input_event) => inputs.push((input.insert_at.clone(), input_event)),
-            Err(error) => errors.push(error),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(inputs)
-    } else {
-        Err(errors)
-    }
-}
-
-fn build_unit_test_sources(sources: IndexMap<String, Vec<Event>>) -> IndexMap<ComponentKey, SourceOuter> {
-    IndexMap::new()
-}
-
-async fn build_unit_test(test: TestDefinition, mut config_builder: ConfigBuilder) -> Result<UnitTest, Vec<String>> {
+async fn build_unit_test(
+    test: TestDefinition,
+    mut config_builder: ConfigBuilder,
+) -> Result<UnitTest, Vec<String>> {
     let mut build_errors = Vec::new();
 
     println!("test has the following inputs: {:?}\n", test.inputs);
-    let inputs = match build_inputs(&test.inputs) {
-        Ok(inputs) => inputs,
-        Err(errors) => {
-          build_errors.extend(errors);
-          Vec::new()
-        },
-    };
-
+    let inputs = build_inputs(&test.inputs).unwrap_or_else(|errors| {
+        build_errors.extend(errors);
+        Vec::new()
+    });
     if !build_errors.is_empty() {
-      return Err(build_errors);
+        return Err(build_errors);
     }
 
-    let mut test_source_events= IndexMap::new();
+    // Connect a test source to each unique input target transform
+    let mut test_sources = IndexMap::new();
     for (target_transform_id, event) in inputs {
         let test_source_id = format!("{}-{}", target_transform_id, "unit-test-source");
 
-        if test_source_events.get(&test_source_id).is_none() {
-            test_source_events.insert(test_source_id.clone(), Vec::new());
-            // Connect a test source to each unique insert_at
+        if test_sources.get(&test_source_id).is_none() {
+            test_sources.insert(test_source_id.clone(), Vec::new());
             match config_builder.transforms.get_mut(&target_transform_id) {
                 Some(transform) => transform.inputs.push(test_source_id.clone()),
                 None => build_errors.push("No transform found for that insert_at".to_string()),
             }
         }
-        test_source_events.entry(test_source_id).and_modify(|events| events.push(event));
+        test_sources
+            .entry(test_source_id)
+            .and_modify(|events| events.push(event));
     }
 
-    // create the sources
-    let sources = build_unit_test_sources(test_source_events);
-
-    // let graph = Graph::new_unchecked(&IndexMap::new(), &builder.transforms, &IndexMap::new());
-    // let transforms = std::mem::take(&mut builder.transforms)
-    //     .into_iter()
-    //     .map(|(key, transform)| {
-    //         let mut inputs = graph.inputs_for(&key);
-    //         // Add a source as an input to every transform
-    //         let source_key = OutputId::from(ComponentKey::from(format!(
-    //             "{}-{}",
-    //             key, "vector-unit-test-source"
-    //         )));
-    //         source_keys.push(source_key.clone());
-    //         inputs.push(source_key);
-    //         (
-    //             key,
-    //             transform.with_inputs(
-    //                 inputs
-    //                     .into_iter()
-    //                     .map(|i| i.to_string())
-    //                     .collect::<Vec<_>>(),
-    //             ),
-    //         )
-    //     })
-    //     .collect::<IndexMap<_, _>>();
-
-    // // mapping source key --> input events
-    // let mut source_to_events: IndexMap<ComponentKey, Vec<Event>> = IndexMap::new();
-    // for input in test.inputs {
-    //     // todo: remove unwrap
-    //     let event = build_input_event(&input).unwrap();
-    //     // todo: add error if the insert_at doesn't exist
-    //     let target_source_key = ComponentKey::from(format!(
-    //         "{}-{}",
-    //         input.insert_at.to_string(),
-    //         "vector-unit-test-source"
-    //     ));
-    //     if let Some(events) = source_to_events.get_mut(&target_source_key) {
-    //         events.push(event);
-    //     } else {
-    //         source_to_events.insert(target_source_key, vec![event]);
-    //     }
-    // }
+    let sources = build_unit_test_sources(test_sources);
+    println!("test created the following sources: {:?}\n", sources);
 
     // // mapping source key --> transmitter
     // let mut source_txs = IndexMap::new();
@@ -345,14 +278,53 @@ async fn build_unit_test(test: TestDefinition, mut config_builder: ConfigBuilder
     //     .await
     //     .unwrap();
     if !build_errors.is_empty() {
-      Err(build_errors)
+        Err(build_errors)
     } else {
-      Ok(UnitTest {
-          name: test.name,
-          checks: Vec::new(),
-          no_outputs_from: Vec::new(),
-      })
+        Ok(UnitTest {
+            name: test.name,
+            checks: Vec::new(),
+            no_outputs_from: Vec::new(),
+        })
     }
+}
+
+fn build_inputs(test_inputs: &Vec<TestInput>) -> Result<Vec<(ComponentKey, Event)>, Vec<String>> {
+    let mut inputs = Vec::new();
+    let mut errors = Vec::new();
+    if test_inputs.is_empty() {
+        errors.push("must specify at least one input.".to_string());
+        return Err(errors);
+    }
+
+    for input in test_inputs {
+        match build_input_event(&input) {
+            Ok(input_event) => inputs.push((input.insert_at.clone(), input_event)),
+            Err(error) => errors.push(error),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(inputs)
+    } else {
+        Err(errors)
+    }
+}
+
+fn build_unit_test_sources(
+    sources: IndexMap<String, Vec<Event>>,
+) -> IndexMap<ComponentKey, SourceOuter> {
+    sources
+        .into_iter()
+        .map(|(key, events)| {
+            let key = ComponentKey::from(key);
+            let config = UnitTestSourceConfig {
+                events,
+                ..Default::default()
+            };
+
+            (key, SourceOuter::new(config))
+        })
+        .collect::<IndexMap<_, _>>()
 }
 
 pub struct UnitTestCheck {
@@ -1001,6 +973,7 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
                         receiver: Arc::new(Mutex::new(Some(rx))),
                         input_log_events: Vec::new(),
                         input_metric_events: Vec::new(),
+                        ..Default::default()
                     }),
                 )
             })
@@ -1109,8 +1082,8 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
             .map(|(key, rx)| async move { (key, rx.await) })
             .collect::<FuturesUnordered<_>>();
         let mut test_result = UnitTestResult {
-          name: test.name.clone(),
-          test_errors: Vec::new(),
+            name: test.name.clone(),
+            test_errors: Vec::new(),
         };
         while let Some((key, output_events)) = in_flight.next().await {
             let output_events = output_events.unwrap();
@@ -1126,24 +1099,24 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
                         // todo: add correct error message
                         let mut per_event_errors = Vec::new();
                         for condition in check {
-                          match condition.check_with_context(event) {
-                            Ok(_) => {},
-                            Err(error) => {
-                              per_event_errors.push(error);
+                            match condition.check_with_context(event) {
+                                Ok(_) => {}
+                                Err(error) => {
+                                    per_event_errors.push(error);
+                                }
                             }
-                          }
                         }
                         if per_event_errors.is_empty() {
-                          overall_check_errors.clear();
-                          break;
+                            overall_check_errors.clear();
+                            break;
                         } else {
-                          overall_check_errors.extend(per_event_errors);
+                            overall_check_errors.extend(per_event_errors);
                         }
                     }
                     // either one or more events passed the check or the check failed for one or more events.
                     // if failed, we need to update the test errors
                     if !overall_check_errors.is_empty() {
-                      test_result.test_errors.extend(overall_check_errors);
+                        test_result.test_errors.extend(overall_check_errors);
                     }
                 }
             }

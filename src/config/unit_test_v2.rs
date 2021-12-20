@@ -6,7 +6,10 @@ use futures_util::{
     FutureExt, SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc::{Sender, Receiver}, Mutex, oneshot};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    oneshot, Mutex,
+};
 use vector_core::{
     event::{Event, LogEvent, Metric},
     sink::{StreamSink, VectorSink},
@@ -17,11 +20,13 @@ use crate::{conditions, sinks::Healthcheck, sources};
 
 use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct UnitTestSourceConfig {
     // Wrapped to satisfy trait bounds
     #[serde(skip)]
     pub receiver: Arc<Mutex<Option<Receiver<Event>>>>,
+    #[serde(skip)]
+    pub events: Vec<Event>,
     pub input_log_events: Vec<LogEvent>,
     pub input_metric_events: Vec<Metric>,
 }
@@ -32,19 +37,21 @@ impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         // let mut receiver = self.receiver.lock().await.take().unwrap();
 
-        let mut events = Vec::new();
-        let log_events = self.input_log_events.clone();
-        events.extend(log_events.into_iter().map(Event::Log).map(Ok));
+        let mut events = self.events.clone().into_iter().map(Ok);
 
-        let metric_events = self.input_metric_events.clone();
-        events.extend(metric_events.into_iter().map(Event::Metric).map(Ok));
+        // let mut events = Vec::new();
+        // let log_events = self.input_log_events.clone();
+        // events.extend(log_events.into_iter().map(Event::Log).map(Ok));
+
+        // let metric_events = self.input_metric_events.clone();
+        // events.extend(metric_events.into_iter().map(Event::Metric).map(Ok));
 
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-                out.send_all(&mut stream::iter(events))
-                    .await
-                    .map_err(|_| ())?;
+            out.send_all(&mut stream::iter(events))
+                .await
+                .map_err(|_| ())?;
             // while let Some(event) = receiver.recv().await {
             //     println!("source received an event: {:?}", event);
             //     out.send(event)
@@ -99,9 +106,7 @@ pub struct UnitTestSink {
 
 impl UnitTestSink {
     fn new(result_tx: oneshot::Sender<Vec<Event>>) -> Self {
-        Self {
-            result_tx
-        }
+        Self { result_tx }
     }
 }
 

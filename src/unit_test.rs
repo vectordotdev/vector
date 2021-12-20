@@ -59,7 +59,7 @@ impl Opts {
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut aggregated_test_inspections: Vec<(String, Vec<String>)> = Vec::new();
-    let mut aggregated_test_errors: Vec<(String, Vec<String>)>= Vec::new();
+    let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -96,7 +96,6 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             //         }
             //     }
             // }
-            
         }
         Err(errors) => {
             error!("Failed to execute tests:\n{}.", errors.join("\n"));
