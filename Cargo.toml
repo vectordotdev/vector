@@ -116,7 +116,7 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 # Tokio / Futures
 async-stream = "0.3.2"
 async-trait = "0.1.52"
-futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.19", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.15.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
