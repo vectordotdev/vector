@@ -35,7 +35,7 @@ releases: {
 		known_issues: [string, ...string] | *[]
 
 		commits?: [#Commit, ...#Commit]
-		change_log: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
+		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		whats_next: #Any
 	}
 
