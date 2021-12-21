@@ -135,6 +135,11 @@ impl StreamSink for UnitTestSink {
 
         match self.check {
             UnitTestSinkCheck::Checks(checks) => {
+                if output_events.is_empty() {
+                    result
+                        .test_errors
+                        .push("check transform failed, no events received".to_string());
+                }
                 for check in checks {
                     if check.is_empty() {
                         // result.test_inspections.push(format!(

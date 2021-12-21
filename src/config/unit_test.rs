@@ -144,7 +144,11 @@ async fn build_unit_test(
     sanitize_config(&mut config_builder);
     let mut build_errors = Vec::new();
 
-    let available_insert_targets = config_builder.transforms.keys().map(|key| key.clone()).collect::<HashSet<_>>();
+    let available_insert_targets = config_builder
+        .transforms
+        .keys()
+        .map(|key| key.clone())
+        .collect::<HashSet<_>>();
     println!("test has the following inputs: {:?}\n", test.inputs);
     let inputs = build_and_validate_inputs(&test.inputs, &available_insert_targets)?;
 
@@ -1543,33 +1547,38 @@ mod tests {
         assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
 
-    //   #[tokio::test]
-    //   async fn test_fail_no_outputs() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-    //           [transforms.foo]
-    //             inputs = [ "TODO" ]
-    //             type = "field_filter"
-    //             field = "not_exist"
-    //             value = "not_value"
+    #[tokio::test]
+    async fn test_fail_no_outputs() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+              [transforms.foo]
+                inputs = [ "TODO" ]
+                type = "filter"
+                [transforms.foo.condition]
+                  type = "vrl"
+                  source = """
+                    .not_exist == "not_value"
+                  """
 
-    //             [[tests]]
-    //               name = "check_no_outputs"
-    //               [tests.input]
-    //                 insert_at = "foo"
-    //                 type = "raw"
-    //                 value = "test value"
+                [[tests]]
+                  name = "check_no_outputs"
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "test value"
 
-    //               [[tests.outputs]]
-    //                 extract_from = "foo"
-    //                 [[tests.outputs.conditions]]
-    //                   type = "check_fields"
-    //                   "message.equals" = "test value"
-    //       "#})
-    //       .unwrap();
+                  [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                      type = "vrl"
+                      source = """
+                        assert_eq!(.message, "test value")
+                      """
+          "#})
+        .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_ne!(tests[0].run().1, Vec::<String>::new());
-    //   }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
     //   #[tokio::test]
     //   async fn test_fail_two_output_events() {
