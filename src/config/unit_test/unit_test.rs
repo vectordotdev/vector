@@ -50,7 +50,6 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
 
     for mut test_definition in test_definitions {
         let test_name = test_definition.name.clone();
-        println!("test definition {:?}", test_definition);
         // Move the legacy single input into the inputs list if it exists
         let legacy_input = std::mem::take(&mut test_definition.input);
         if let Some(input) = legacy_input {
@@ -187,7 +186,9 @@ async fn build_unit_test(
         return Err(build_errors);
     }
 
-    let available_extract_targets = config_builder
+    let mut builder = config_builder.clone();
+    let _ = expand_macros(&mut builder)?;
+    let available_extract_targets = builder
         .transforms
         .iter()
         .flat_map(|(key, transform)| {
@@ -215,7 +216,7 @@ async fn build_unit_test(
         .collect::<HashMap<_, _>>();
     let outputs = build_outputs(&test.outputs).unwrap_or_else(|errors| {
         build_errors.extend(errors);
-        HashMap::new()
+        Default::default()
     });
 
     let mut sink_rxs = Vec::new();
@@ -300,7 +301,7 @@ async fn build_unit_test(
                 insert_at_targets,
                 extract_from_target
                     .to_string()
-                    .strip_suffix("-unit-test-sink")
+                    .strip_suffix("-sink")
                     .unwrap()
                     .replace("-", ".")
             ));
@@ -364,8 +365,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &Vec<TestOutput>,
-) -> Result<HashMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs = HashMap::new();
+) -> Result<IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
+    let mut outputs = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
