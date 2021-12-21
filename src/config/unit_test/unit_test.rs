@@ -1,24 +1,15 @@
-use std::collections::HashMap;
-
-use indexmap::IndexMap;
-
-use super::{
-    graph::Graph, unit_test_v2::UnitTestSinkResult, ComponentKey, Config, ConfigBuilder,
-    ConfigDiff, ConfigPath, TestDefinition, TestInput, TestInputValue, TestOutput,
-};
 use crate::{
     conditions::Condition,
-    config::{
-        self,
-        compiler::expand_macros,
-        unit_test_v2::{UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSourceConfig},
-        SinkOuter, SourceOuter,
-    },
+    config::{self, compiler::expand_macros, loading, SinkOuter, SourceOuter},
     event::{Event, Value},
     topology::{
         self,
         builder::{self, Pieces},
     },
+};
+use config::{
+    graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, TestDefinition,
+    TestInput, TestInputValue, TestOutput,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -29,6 +20,10 @@ use std::{
 use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
+};
+
+use super::unit_test_components::{
+    UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
 
 pub struct UnitTest {
@@ -42,7 +37,7 @@ pub struct UnitTest {
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
-    let (config_builder, _) = super::loading::load_builder_from_paths(paths)?;
+    let (config_builder, _) = loading::load_builder_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }

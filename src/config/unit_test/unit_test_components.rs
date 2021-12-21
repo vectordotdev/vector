@@ -13,9 +13,12 @@ use vector_core::{
     transform::DataType,
 };
 
-use crate::{conditions::Condition, sinks::Healthcheck, sources};
-
-use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
+use crate::{
+    conditions::Condition,
+    config::{SinkConfig, SinkContext, SourceConfig, SourceContext},
+    sinks::Healthcheck,
+    sources,
+};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct UnitTestSourceConfig {
