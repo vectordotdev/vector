@@ -1,3 +1,22 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Cursor,
+    sync::Arc,
+};
+
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures_util::future::ready;
+use rdkafka::{
+    config::ClientConfig,
+    consumer::{Consumer, StreamConsumer},
+    message::{BorrowedMessage, Headers, Message},
+};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::FramedRead;
+
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
     codecs::{
@@ -16,23 +35,6 @@ use crate::{
     sources::util::StreamDecodingError,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures_util::future::ready;
-use rdkafka::{
-    config::ClientConfig,
-    consumer::{Consumer, StreamConsumer},
-    message::{BorrowedMessage, Headers, Message},
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::sync::Arc;
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::Cursor,
-};
-use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -403,13 +405,8 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
-    use crate::{
-        shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
-        Pipeline,
-    };
+    use std::time::Duration;
+
     use chrono::{SubsecRound, Utc};
     use rdkafka::{
         config::{ClientConfig, FromClientConfig},
@@ -419,8 +416,14 @@ mod integration_test {
         util::Timeout,
         Offset, TopicPartitionList,
     };
-    use std::time::Duration;
     use vector_core::event::EventStatus;
+
+    use super::{test::*, *};
+    use crate::{
+        shutdown::ShutdownSignal,
+        test_util::{collect_n, random_string},
+        Pipeline,
+    };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();

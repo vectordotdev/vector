@@ -1,24 +1,25 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::internal_events::EndpointBytesSent;
-use crate::proto::vector as proto_vector;
-use crate::sinks::util::uri;
-use crate::sinks::vector::v2::VectorSinkError;
-use crate::Error;
-use futures::future::BoxFuture;
-use futures::TryFutureExt;
+use std::task::{Context, Poll};
+
+use futures::{future::BoxFuture, TryFutureExt};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use prost::Message;
 use proto_event::EventWrapper;
-use std::task::{Context, Poll};
-use tonic::body::BoxBody;
-use tonic::IntoRequest;
-use vector_core::buffers::Ackable;
-use vector_core::event::proto as proto_event;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use tonic::{body::BoxBody, IntoRequest};
+use vector_core::{
+    buffers::Ackable, event::proto as proto_event, internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_events::EndpointBytesSent,
+    proto::vector as proto_vector,
+    sinks::{util::uri, vector::v2::VectorSinkError},
+    Error,
+};
 
 #[derive(Clone, Debug)]
 pub struct VectorService {

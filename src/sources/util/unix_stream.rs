@@ -1,15 +1,7 @@
-use crate::{
-    async_read::VecAsyncReadExt,
-    codecs,
-    event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
-    shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
-    Pipeline,
-};
+use std::{fs::remove_file, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
-use std::{fs::remove_file, path::PathBuf, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -19,6 +11,16 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::field;
 use tracing_futures::Instrument;
+
+use crate::{
+    async_read::VecAsyncReadExt,
+    codecs,
+    event::Event,
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
+    shutdown::ShutdownSignal,
+    sources::{util::codecs::StreamDecodingError, Source},
+    Pipeline,
+};
 
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow

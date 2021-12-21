@@ -1,12 +1,12 @@
 //! [`Glob`] paths provider.
 
-use super::PathsProvider;
-use crate::FileSourceInternalEvents;
-
-use glob::Pattern;
 use std::path::PathBuf;
 
 pub use glob::MatchOptions;
+use glob::Pattern;
+
+use super::PathsProvider;
+use crate::FileSourceInternalEvents;
 
 /// A glob-based path provider.
 ///

@@ -2,12 +2,12 @@
 //! Not all features of a kubeconfig are currently supported,
 //! e.g. password and OIDC auth as well as inlined certificates and keys.
 
-use super::Config;
-use crate::tls::TlsOptions;
+use std::path::{Path, PathBuf};
+
 use snafu::{OptionExt, ResultExt, Snafu};
 
-use crate::kubernetes::client::config::kubeconfig_types::*;
-use std::path::{Path, PathBuf};
+use super::Config;
+use crate::{kubernetes::client::config::kubeconfig_types::*, tls::TlsOptions};
 
 impl Config {
     /// Prepares a config by reading a kubeconfig file from defined path

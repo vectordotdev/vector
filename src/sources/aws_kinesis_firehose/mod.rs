@@ -1,3 +1,9 @@
+use std::{fmt, net::SocketAddr};
+
+use futures::FutureExt;
+use serde::{Deserialize, Serialize};
+use warp::Filter;
+
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{
@@ -7,10 +13,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use futures::FutureExt;
-use serde::{Deserialize, Serialize};
-use std::{fmt, net::SocketAddr};
-use warp::Filter;
 
 pub mod errors;
 mod filters;
@@ -117,6 +119,19 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use std::{
+        io::{Cursor, Read},
+        net::SocketAddr,
+    };
+
+    use bytes::Bytes;
+    use chrono::{DateTime, SubsecRound, Utc};
+    use flate2::read::GzEncoder;
+    use futures::Stream;
+    use pretty_assertions::assert_eq;
+    use shared::assert_event_data_eq;
+    use tokio::time::{sleep, Duration};
+
     use super::*;
     use crate::{
         event::{Event, EventStatus},
@@ -124,17 +139,6 @@ mod tests {
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Pipeline,
     };
-    use bytes::Bytes;
-    use chrono::{DateTime, SubsecRound, Utc};
-    use flate2::read::GzEncoder;
-    use futures::Stream;
-    use pretty_assertions::assert_eq;
-    use shared::assert_event_data_eq;
-    use std::{
-        io::{Cursor, Read},
-        net::SocketAddr,
-    };
-    use tokio::time::{sleep, Duration};
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
     const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";

@@ -1,7 +1,8 @@
 // ## skip check-events ##
 
-use metrics::{counter, histogram};
 use std::time::Duration;
+
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

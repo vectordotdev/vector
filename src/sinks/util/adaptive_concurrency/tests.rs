@@ -1,6 +1,31 @@
 #![cfg(all(test, feature = "sources-demo_logs"))]
 #![allow(clippy::print_stderr)] //tests
 
+use core::task::Context;
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt,
+    fs::{read_dir, File},
+    future::pending,
+    io::Read,
+    path::PathBuf,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
+
+use futures::{
+    channel::oneshot,
+    future::{self, BoxFuture},
+    stream, FutureExt, SinkExt,
+};
+use rand::{thread_rng, Rng};
+use rand_distr::Exp1;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tokio::time::{self, sleep, Duration, Instant};
+use tower::Service;
+
 use super::controller::ControllerStatistics;
 use crate::{
     config::{self, DataType, SinkConfig, SinkContext},
@@ -19,29 +44,6 @@ use crate::{
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
 };
-use core::task::Context;
-use futures::{
-    channel::oneshot,
-    future::{self, BoxFuture},
-    stream, FutureExt, SinkExt,
-};
-use rand::{thread_rng, Rng};
-use rand_distr::Exp1;
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::pin::Pin;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt,
-    fs::{read_dir, File},
-    future::pending,
-    io::Read,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    task::Poll,
-};
-use tokio::time::{self, sleep, Duration, Instant};
-use tower::Service;
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]

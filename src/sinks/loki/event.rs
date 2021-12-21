@@ -1,9 +1,12 @@
-use crate::sinks::util::encoding::Encoder;
+use std::{collections::HashMap, io};
+
 use serde::{ser::SerializeSeq, Serialize};
-use std::collections::HashMap;
-use std::io;
-use vector_core::event::{EventFinalizers, Finalizable};
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::{EventFinalizers, Finalizable},
+    ByteSizeOf,
+};
+
+use crate::sinks::util::encoding::Encoder;
 
 pub type Labels = Vec<(String, String)>;
 

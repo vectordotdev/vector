@@ -1,3 +1,8 @@
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
@@ -5,19 +10,13 @@ use crate::{
     internal_events::{DnstapEventReceived, DnstapParseDataError},
     Result,
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 pub mod parser;
-pub use parser::parse_dnstap_data;
-pub use parser::DnstapParser;
+pub use parser::{parse_dnstap_data, DnstapParser};
 
 pub mod schema;
+use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
-
-use dnsmsg_parser::dns_message;
-use dnsmsg_parser::dns_message_parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
@@ -246,12 +245,14 @@ impl FrameHandler for DnstapFrameHandler {
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use super::*;
-    use crate::{event::Value, test_util::trace_init, Pipeline};
+    use std::{env, path::Path, process::Command, thread};
+
     use futures::StreamExt;
     use serde_json::json;
-    use std::{env, path::Path, process::Command, thread};
     use tokio::time;
+
+    use super::*;
+    use crate::{event::Value, test_util::trace_init, Pipeline};
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
         trace_init();

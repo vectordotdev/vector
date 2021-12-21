@@ -71,16 +71,16 @@ pub use fixed::EncodingConfigFixed;
 
 mod with_default;
 
+use std::{fmt::Debug, io, sync::Arc};
+
 pub use codec::as_tracked_write;
+use serde::{Deserialize, Serialize};
 pub use with_default::EncodingConfigWithDefault;
 
-use crate::event::{LogEvent, MaybeAsLogMut};
 use crate::{
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, LogEvent, MaybeAsLogMut, PathComponent, PathIter, Value},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io, sync::Arc};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -89,6 +89,17 @@ pub trait Encoder<T> {
     ///
     /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
+
+    /// Encodes the input into a String.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
+    fn encode_input_to_string(&self, input: T) -> io::Result<String> {
+        let mut buffer = vec![];
+        self.encode_input(input, &mut buffer)?;
+        Ok(String::from_utf8_lossy(&buffer).to_string())
+    }
 }
 
 impl<E, T> Encoder<T> for Arc<E>
@@ -265,10 +276,11 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::log_schema;
     use indoc::indoc;
     use shared::btreemap;
+
+    use super::*;
+    use crate::config::log_schema;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {

@@ -1,8 +1,11 @@
 //! A wrapper to implement hash for k8s resource objects.
 
+use std::{
+    hash::{Hash, Hasher},
+    ops::Deref,
+};
+
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 
 use super::pod_manager_logic::extract_static_pod_config_hashsum;
 

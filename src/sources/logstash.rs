@@ -1,3 +1,16 @@
+use std::{
+    collections::{BTreeMap, VecDeque},
+    convert::TryFrom,
+    io::{self, Read},
+};
+
+use bytes::{Buf, Bytes, BytesMut};
+use flate2::read::ZlibDecoder;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Decoder;
+
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -10,17 +23,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     types,
 };
-use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::ZlibDecoder;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    convert::TryFrom,
-    io::{self, Read},
-};
-use tokio_util::codec::Decoder;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
@@ -118,21 +120,32 @@ impl TcpSource for LogstashSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
-        LogstashAcker::new(frame)
+    fn build_acker(&self, frames: &[Self::Item]) -> Self::Acker {
+        LogstashAcker::new(frames)
     }
 }
 
 struct LogstashAcker {
-    protocol: LogstashProtocolVersion,
     sequence_number: u32,
+    protocol_version: Option<LogstashProtocolVersion>,
 }
 
 impl LogstashAcker {
-    const fn new(frame: &LogstashEventFrame) -> Self {
+    fn new(frames: &[LogstashEventFrame]) -> Self {
+        let mut sequence_number = 0;
+        let mut protocol_version = None;
+
+        for frame in frames {
+            sequence_number = std::cmp::max(sequence_number, frame.sequence_number);
+            // We assume that it's valid to ack via any of the protocol versions that we've seen in
+            // a set of frames from a single stream, so here we just take the last. In reality, we
+            // do not expect stream with multiple protocol versions to occur.
+            protocol_version = Some(frame.protocol);
+        }
+
         Self {
-            protocol: frame.protocol,
-            sequence_number: frame.sequence_number,
+            sequence_number,
+            protocol_version,
         }
     }
 }
@@ -140,10 +153,10 @@ impl LogstashAcker {
 impl TcpSourceAcker for LogstashAcker {
     // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
-        match ack {
-            TcpSourceAck::Ack => {
+        match (ack, self.protocol_version) {
+            (TcpSourceAck::Ack, Some(protocol_version)) => {
                 let mut bytes: Vec<u8> = Vec::with_capacity(6);
-                bytes.push(self.protocol.into());
+                bytes.push(protocol_version.into());
                 bytes.push(LogstashFrameType::Ack.into());
                 bytes.extend(self.sequence_number.to_be_bytes().iter());
                 Some(Bytes::from(bytes))
@@ -543,12 +556,16 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::test_util::{next_addr, spawn_collect_n, wait_for_tcp};
-    use crate::{event::EventStatus, Pipeline};
     use bytes::BufMut;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+    use crate::{
+        event::EventStatus,
+        test_util::{next_addr, spawn_collect_n, wait_for_tcp},
+        Pipeline,
+    };
 
     #[test]
     fn generate_config() {
@@ -638,6 +655,11 @@ mod test {
 
 #[cfg(all(test, feature = "logstash-integration-tests"))]
 mod integration_tests {
+    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
+
+    use futures::Stream;
+    use tokio::time::timeout;
+
     use super::*;
     use crate::{
         config::SourceContext,
@@ -647,9 +669,6 @@ mod integration_tests {
         tls::TlsOptions,
         Pipeline,
     };
-    use futures::Stream;
-    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
-    use tokio::time::timeout;
 
     const BEATS_IMAGE: &str = "docker.elastic.co/beats/heartbeat";
     const BEATS_TAG: &str = "7.12.1";

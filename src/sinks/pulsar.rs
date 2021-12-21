@@ -1,9 +1,9 @@
-use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    internal_events::PulsarEncodeEventFailed,
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+use std::{
+    collections::HashSet,
+    pin::Pin,
+    task::{Context, Poll},
 };
+
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -11,12 +11,14 @@ use pulsar::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::HashSet,
-    pin::Pin,
-    task::{Context, Poll},
-};
 use vector_core::buffers::Acker;
+
+use crate::{
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    internal_events::PulsarEncodeEventFailed,
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -311,8 +313,9 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -393,10 +396,11 @@ mod tests {
 #[cfg(feature = "pulsar-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use futures::StreamExt;
     use pulsar::SubType;
+
+    use super::*;
+    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
 
     #[tokio::test]
     async fn pulsar_happy() {
@@ -431,7 +435,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
         events.map(Ok).forward(sink).await.unwrap();

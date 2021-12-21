@@ -1,15 +1,16 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::http::HttpClient;
+use std::collections::{BTreeMap, HashMap};
+
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use snafu::Snafu;
-use std::collections::{BTreeMap, HashMap};
+use snafu::{ResultExt, Snafu};
 use tower::Service;
+
+use crate::http::HttpClient;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -306,11 +307,12 @@ pub(in crate::sinks) fn encode_uri(
 #[cfg(test)]
 #[allow(dead_code)]
 pub mod test_util {
+    use std::{fs::File, io::Read};
+
+    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+
     use super::*;
     use crate::tls;
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
-    use std::fs::File;
-    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";

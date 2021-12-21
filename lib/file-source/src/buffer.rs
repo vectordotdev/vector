@@ -1,8 +1,10 @@
-use crate::FilePosition;
+use std::io::{self, BufRead};
+
 use bstr::Finder;
 use bytes::BytesMut;
-use std::io::{self, BufRead};
 use tracing::warn;
+
+use crate::FilePosition;
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
@@ -92,12 +94,12 @@ pub fn read_until_with_max_size<R: BufRead + ?Sized>(
 
 #[cfg(test)]
 mod test {
-    use super::read_until_with_max_size;
+    use std::{io::Cursor, num::NonZeroU8, ops::Range};
+
     use bytes::{BufMut, BytesMut};
     use quickcheck::{QuickCheck, TestResult};
-    use std::io::Cursor;
-    use std::num::NonZeroU8;
-    use std::ops::Range;
+
+    use super::read_until_with_max_size;
 
     fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
         // The `global_data` is the view of `chunks` as a single contiguous

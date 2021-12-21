@@ -1,3 +1,22 @@
+use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
+use warp::{
+    filters::{
+        path::{FullPath, Tail},
+        BoxedFilter,
+    },
+    http::{HeaderMap, StatusCode},
+    reject::Rejection,
+    Filter,
+};
+
 use super::{
     auth::{HttpSourceAuth, HttpSourceAuthConfig},
     encoding::decode,
@@ -8,18 +27,6 @@ use crate::{
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
-};
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
-use vector_core::ByteSizeOf;
-use warp::{
-    filters::{path::FullPath, path::Tail, BoxedFilter},
-    http::{HeaderMap, StatusCode},
-    reject::Rejection,
-    Filter,
 };
 
 #[async_trait]

@@ -1,3 +1,21 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+    path::PathBuf,
+};
+
+use async_trait::async_trait;
+use component::ComponentDescription;
+use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
+use serde::{Deserialize, Serialize};
+use vector_core::buffers::{Acker, BufferConfig, BufferType};
+pub use vector_core::{
+    config::GlobalOptions,
+    transform::{DataType, ExpandType, TransformConfig, TransformContext},
+};
+
 use crate::{
     conditions,
     event::Metric,
@@ -7,18 +25,6 @@ use crate::{
     transforms::noop::Noop,
     Pipeline,
 };
-use async_trait::async_trait;
-use component::ComponentDescription;
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
-use std::hash::Hash;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use vector_core::buffers::{Acker, BufferConfig, BufferType};
-pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
 mod builder;
@@ -48,8 +54,7 @@ pub use loading::{
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
-pub use vector_core::config::proxy::ProxyConfig;
-pub use vector_core::config::{log_schema, LogSchema};
+pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
@@ -277,14 +282,14 @@ impl<T> SinkOuter<T> {
         }
     }
 
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::Memory { .. } => {}
-                #[cfg(feature = "disk-buffer")]
-                BufferType::Disk { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
+                    resources.push(Resource::DiskBuffer(id.to_string()))
+                }
             }
         }
         resources
@@ -390,7 +395,7 @@ impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::Null,
+            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
@@ -690,9 +695,11 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
-    use indoc::indoc;
     use std::path::PathBuf;
+
+    use indoc::indoc;
+
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
 
     #[test]
     fn default_data_dir() {
@@ -1017,10 +1024,14 @@ mod test {
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::{load_from_str, Format, Resource};
+    use std::{
+        collections::{HashMap, HashSet},
+        net::{Ipv4Addr, SocketAddr},
+    };
+
     use indoc::indoc;
-    use std::collections::{HashMap, HashSet};
-    use std::net::{Ipv4Addr, SocketAddr};
+
+    use super::{load_from_str, Format, Resource};
 
     fn localhost(port: u16) -> Resource {
         Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
@@ -1161,8 +1172,9 @@ mod resource_tests {
     feature = "transforms-filter"
 ))]
 mod pipelines_tests {
-    use super::{load_from_str, Format};
     use indoc::indoc;
+
+    use super::{load_from_str, Format};
 
     #[test]
     fn forbid_pipeline_nesting() {

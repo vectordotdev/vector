@@ -1,6 +1,8 @@
-use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
-use flate2::write::GzEncoder;
 use std::io::Write;
+
+use flate2::write::GzEncoder;
+
+use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub mod compression;
 pub mod json;
@@ -119,21 +121,23 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use super::{Buffer, Compression};
-    use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
-    use futures::{future, stream, SinkExt, StreamExt};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
     };
+
+    use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
     use vector_core::buffers::Acker;
+
+    use super::{Buffer, Compression};
+    use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
 
     #[tokio::test]
     async fn gzip() {
         use flate2::read::MultiGzDecoder;
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {

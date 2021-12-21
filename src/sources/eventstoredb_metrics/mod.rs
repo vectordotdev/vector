@@ -1,3 +1,11 @@
+use std::time::Duration;
+
+use futures::{stream, FutureExt, SinkExt, StreamExt};
+use http::Uri;
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use tokio_stream::wrappers::IntervalStream;
+
 use self::types::Stats;
 use crate::{
     config::{self, SourceConfig, SourceContext, SourceDescription},
@@ -8,12 +16,6 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use futures::{stream, FutureExt, SinkExt, StreamExt};
-use http::Uri;
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio_stream::wrappers::IntervalStream;
 
 pub mod types;
 
@@ -134,9 +136,10 @@ fn eventstoredb(
 
 #[cfg(all(test, feature = "eventstoredb_metrics-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{test_util, Pipeline};
-    use tokio::time::Duration;
 
     const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
 

@@ -1,5 +1,11 @@
 use std::num::NonZeroU64;
 
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use super::util::SinkBatchSettings;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
@@ -9,12 +15,6 @@ use crate::{
         BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-
-use super::util::SinkBatchSettings;
 
 lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");

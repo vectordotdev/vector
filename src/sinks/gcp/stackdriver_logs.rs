@@ -1,30 +1,31 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::config::healthcheck_response;
-use crate::sinks::util::RealtimeSizeBasedDefaultBatchSettings;
-use crate::template::TemplateRenderingError;
-use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
-    http::HttpClient,
-    internal_events::TemplateRenderingFailed,
-    sinks::{
-        util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        },
-        Healthcheck, VectorSink,
-    },
-    template::Template,
-    tls::{TlsOptions, TlsSettings},
-};
+use std::collections::HashMap;
+
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
-use std::collections::HashMap;
+
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::{
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
+    http::HttpClient,
+    internal_events::TemplateRenderingFailed,
+    sinks::{
+        gcs_common::config::healthcheck_response,
+        util::{
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::{Template, TemplateRenderingError},
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -304,11 +305,12 @@ impl StackdriverConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{LogEvent, Value};
     use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::value::RawValue;
+
+    use super::*;
+    use crate::event::{LogEvent, Value};
 
     #[test]
     fn generate_config() {

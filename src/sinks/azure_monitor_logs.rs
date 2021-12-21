@@ -1,3 +1,17 @@
+use futures::{FutureExt, SinkExt};
+use http::{
+    header,
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Request, StatusCode, Uri,
+};
+use hyper::Body;
+use lazy_static::lazy_static;
+use openssl::{base64, hash, pkey, sign};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
@@ -12,18 +26,6 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, SinkExt};
-use http::{
-    header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
-};
-use hyper::Body;
-use lazy_static::lazy_static;
-use openssl::{base64, hash, pkey, sign};
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
-
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 
 fn default_host() -> String {
     "ods.opinsights.azure.com".into()
@@ -294,9 +296,10 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
+    use serde_json::value::RawValue;
+
     use super::*;
     use crate::event::LogEvent;
-    use serde_json::value::RawValue;
 
     #[test]
     fn generate_config() {

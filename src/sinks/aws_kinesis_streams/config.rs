@@ -1,25 +1,31 @@
-use std::convert::TryInto;
-use std::num::NonZeroU64;
+use std::{convert::TryInto, num::NonZeroU64};
 
-use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::sinks::aws_kinesis_streams::service::KinesisService;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
 use serde::{Deserialize, Serialize};
-
-use super::service::KinesisResponse;
-use crate::aws::rusoto;
-use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequestBuilder;
-use crate::sinks::aws_kinesis_streams::sink::KinesisSink;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::ServiceBuilderExt;
-use crate::sinks::{Healthcheck, VectorSink};
 use snafu::Snafu;
 use tower::ServiceBuilder;
+
+use super::service::KinesisResponse;
+use crate::{
+    aws::{
+        rusoto,
+        rusoto::{AwsAuthentication, RegionOrEndpoint},
+    },
+    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    sinks::{
+        aws_kinesis_streams::{
+            request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
+        },
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            retries::RetryLogic,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {

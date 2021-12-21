@@ -9,15 +9,16 @@ use std::{
     },
 };
 
+use azure_storage::blob::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
+use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, Finalizable},
@@ -31,13 +32,9 @@ use super::util::{
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
     serde::to_string,
-};
-
-use crate::{
-    config::GenerateConfig,
-    config::{DataType, SinkConfig, SinkContext},
     sinks::{
         azure_common::{
             self,
@@ -49,8 +46,7 @@ use crate::{
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::GcsMetadata,
-            service::{GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -61,15 +57,12 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::partitioner::KeyPartitioner,
-        util::{ServiceBuilderExt, TowerRequestConfig},
+        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use azure_storage::blob::prelude::ContainerClient;
-use goauth::scopes::Scope;
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
@@ -723,11 +716,13 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
+    use std::{collections::BTreeMap, io::Cursor};
+
+    use chrono::DateTime;
+    use vector_core::partition::Partitioner;
+
     use super::*;
     use crate::event::LogEvent;
-    use chrono::DateTime;
-    use std::{collections::BTreeMap, io::Cursor};
-    use vector_core::partition::Partitioner;
 
     #[test]
     fn generate_config() {

@@ -1,3 +1,15 @@
+use std::task::Poll;
+
+use bytes::Bytes;
+use chrono::Utc;
+use fakedata::logs::*;
+use futures::{SinkExt, StreamExt};
+use rand::seq::SliceRandom;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tokio::time::{self, Duration};
+use tokio_util::codec::FramedRead;
+
 use crate::{
     codecs::{
         self,
@@ -10,16 +22,6 @@ use crate::{
     sources::util::StreamDecodingError,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use fakedata::logs::*;
-use futures::{SinkExt, StreamExt};
-use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::task::Poll;
-use tokio::time::{self, Duration};
-use tokio_util::codec::FramedRead;
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -247,10 +249,12 @@ impl SourceConfig for DemoLogsCompatConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
+    use futures::{channel::mpsc, poll, StreamExt};
+
     use super::*;
     use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, Pipeline};
-    use futures::{channel::mpsc, poll, StreamExt};
-    use std::time::{Duration, Instant};
 
     #[test]
     fn generate_config() {

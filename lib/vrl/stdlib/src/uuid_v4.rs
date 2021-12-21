@@ -45,8 +45,9 @@ impl Expression for UuidV4Fn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shared::TimeZone;
+
+    use super::*;
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },

@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
+use vrl_core::prelude::*;
+
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
-use std::collections::BTreeMap;
-use vrl_core::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FindEnrichmentTableRecords;
@@ -170,13 +172,15 @@ impl Expression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use chrono::{TimeZone as _, Utc};
+    use shared::{btreemap, TimeZone};
+
     use super::*;
     use crate::test_util::{
         get_table_registry, get_table_registry_with_tables, DummyEnrichmentTable,
     };
-    use chrono::{TimeZone as _, Utc};
-    use shared::{btreemap, TimeZone};
-    use std::sync::{Arc, Mutex};
 
     #[test]
     fn find_table_row() {

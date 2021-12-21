@@ -1,7 +1,7 @@
-use crate::{http::HttpClient, sinks::HealthcheckError};
-
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
+
+use crate::{http::HttpClient, sinks::HealthcheckError};
 
 #[cfg(feature = "sinks-datadog_events")]
 pub mod events;

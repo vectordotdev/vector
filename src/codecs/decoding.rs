@@ -1,18 +1,20 @@
 //! A collection of support structures that are used in the process of decoding
 //! bytes into events.
 
+use std::fmt::Debug;
+
+use bytes::{Bytes, BytesMut};
+use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use tokio_util::codec::LinesCodecError;
+
 use crate::{
     codecs::{BytesDeserializer, NewlineDelimitedDecoder},
     event::Event,
     internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
     sources::util::StreamDecodingError,
 };
-use bytes::{Bytes, BytesMut};
-use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
-use std::fmt::Debug;
-use tokio_util::codec::LinesCodecError;
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.

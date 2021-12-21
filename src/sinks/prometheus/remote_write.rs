@@ -1,3 +1,14 @@
+use std::{num::NonZeroU64, task};
+
+use bytes::{Bytes, BytesMut};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use http::Uri;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
+
 use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
@@ -17,16 +28,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::Uri;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::num::NonZeroU64;
-use std::task;
-use tower::ServiceBuilder;
-use vector_core::ByteSizeOf;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrometheusRemoteWriteDefaultBatchSettings;
@@ -248,6 +249,11 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
+
     use super::*;
     use crate::{
         config::SinkContext,
@@ -255,10 +261,6 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util,
     };
-    use futures::StreamExt;
-    use http::HeaderMap;
-    use indoc::indoc;
-    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
@@ -448,18 +450,18 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::tests::*;
-    use super::*;
+    use std::{collections::HashMap, ops::Range};
+
+    use futures::stream;
+    use serde_json::Value;
+
+    use super::{tests::*, *};
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::MetricValue,
-        event::Event,
+        event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         tls::{self, TlsOptions},
     };
-    use futures::stream;
-    use serde_json::Value;
-    use std::{collections::HashMap, ops::Range};
 
     const HTTP_URL: &str = "http://localhost:8086";
     const HTTPS_URL: &str = "https://localhost:8087";

@@ -1,13 +1,14 @@
+use std::{collections::BTreeMap, fmt::Write as _};
+
+use chrono::Utc;
+use indexmap::map::IndexMap;
+use prometheus_parser::{proto, METRIC_NAME_LABEL};
+use vector_core::event::metric::{MetricSketch, Quantile};
+
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
-use chrono::Utc;
-use indexmap::map::IndexMap;
-use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
-use vector_core::event::metric::{MetricSketch, Quantile};
 
 pub(super) trait MetricCollector {
     type Output;
@@ -437,15 +438,15 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
 
 #[cfg(test)]
 mod tests {
-    use super::super::default_summary_quantiles;
-    use super::*;
+    use chrono::{DateTime, TimeZone};
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    use super::{super::default_summary_quantiles, *};
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         test_util::stats::VariableHistogram,
     };
-    use chrono::{DateTime, TimeZone};
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
 
     fn encode_one<T: MetricCollector>(
         default_namespace: Option<&str>,

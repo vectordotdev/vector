@@ -1,20 +1,21 @@
-use super::config::S3Options;
-use crate::internal_events::AwsBytesSent;
-use crate::serde::to_string;
+use std::task::{Context, Poll};
+
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
 use md5::Digest;
 use rusoto_core::{ByteStream, Region, RusotoError};
 use rusoto_s3::{PutObjectError, PutObjectRequest, S3Client, S3};
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
 };
+
+use super::config::S3Options;
+use crate::{internal_events::AwsBytesSent, serde::to_string};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {

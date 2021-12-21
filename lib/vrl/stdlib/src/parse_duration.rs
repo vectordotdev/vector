@@ -1,8 +1,8 @@
+use std::{collections::HashMap, str::FromStr};
+
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use std::collections::HashMap;
-use std::str::FromStr;
 use vrl::prelude::*;
 
 lazy_static! {

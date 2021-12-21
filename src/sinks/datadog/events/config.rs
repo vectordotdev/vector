@@ -1,21 +1,25 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::{Healthcheck, VectorSink};
-
-use crate::http::HttpClient;
-use crate::sinks::datadog::events::service::{DatadogEventsResponse, DatadogEventsService};
-use crate::sinks::datadog::events::sink::DatadogEventsSink;
-use crate::sinks::datadog::{
-    get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
-};
-use crate::sinks::util::http::HttpStatusRetryLogic;
-use crate::sinks::util::ServiceBuilderExt;
-use crate::sinks::util::TowerRequestConfig;
-use crate::tls::TlsConfig;
 use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{
+            events::{
+                service::{DatadogEventsResponse, DatadogEventsService},
+                sink::DatadogEventsSink,
+            },
+            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+        },
+        util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
+        Healthcheck, VectorSink,
+    },
+    tls::TlsConfig,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

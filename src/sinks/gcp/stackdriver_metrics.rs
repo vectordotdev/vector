@@ -1,19 +1,25 @@
 use std::num::NonZeroU64;
 
-use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
-use crate::event::{Event, Metric, MetricValue};
-use crate::http::HttpClient;
-use crate::sinks::gcp;
-use crate::sinks::util::buffer::metrics::MetricsBuffer;
-use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::tls::{TlsOptions, TlsSettings};
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
-use http::header::AUTHORIZATION;
-use http::{HeaderValue, Uri};
+use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Metric, MetricValue},
+    http::HttpClient,
+    sinks::{
+        gcp,
+        util::{
+            buffer::metrics::MetricsBuffer,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StackdriverMetricsDefaultBatchSettings;
