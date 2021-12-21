@@ -46,6 +46,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.5
         with:
+          path: comparison-vector
+
+      - uses: actions/checkout@v2.3.5
+        with:
           ref: ${{ github.base_ref }}
           path: baseline-vector
 
@@ -59,8 +63,13 @@ jobs:
       - name: Setup comparison variables
         id: comparison
         run: |
-          export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
-          export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
+          pushd baseline-vector
+          export COMPARISON_SHA=$(git rev-parse HEAD)
+          # push up merge ref to Github so that it is linkable there
+          git push origin pr-${{ github.event.number }}-$COMPARISON_SHA
+          popd
+
+          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
@@ -75,7 +84,7 @@ jobs:
           export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
-          export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
+          export BASELINE_TAG="${{ github.sha }}-${BASELINE_SHA}"
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
 
