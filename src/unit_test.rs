@@ -99,7 +99,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             }
         }
         Err(errors) => {
-            error!("Failed to execute tests:\n{}.", errors.join("\n"));
+            error!("Failed to execute tests:\n{}", errors.join("\n"));
             return exitcode::CONFIG;
         }
     }

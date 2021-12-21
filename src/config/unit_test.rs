@@ -116,6 +116,7 @@ async fn build_unit_test(
     }
 
     let sources = build_unit_test_sources(test_sources);
+    let insert_at_sources = sources.keys().map(|key| key.clone()).collect::<Vec<_>>();
     println!("test created the following sources: {:?}\n", sources);
 
     if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
@@ -131,7 +132,6 @@ async fn build_unit_test(
     // Connect a test sink to each unique extract_from target transform
     let mut test_output_sinks = IndexMap::new();
     for (target_transform_id, conditions) in outputs {
-        // map of extract_from string --> conditions
         let test_sink_id = format!("{}-{}", target_transform_id.to_string().replace(".", "-"), "unit-test-sink");
         test_output_sinks.entry(test_sink_id).and_modify(|(_, sink_conditions): &mut (String, Vec<Vec<Box<dyn Condition>>>)| sink_conditions.push(conditions.clone())).or_insert((target_transform_id.to_string(), vec![conditions]));
     }
@@ -170,11 +170,35 @@ async fn build_unit_test(
         sink_rxs.push(rx);
         sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
     }
+    let extract_from_sinks = sinks.keys().map(|key| key.clone()).collect::<Vec<_>>();
 
     println!("test created the following sinks: {:?}\n", sinks);
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
+
+    
+    // Check for an invalid input/output configuration wherein there is a
+    // disconnect between insertions and extractions 
+    let graph = Graph::new(&config_builder.sources, &config_builder.transforms, &config_builder.sinks).unwrap();
+    // let graph = Graph::new_unchecked(&Default::default(), &config_builder.transforms, &Default::default());
+    let insert_at_targets = test.inputs.iter().map(|input| input.insert_at.to_string()).collect::<Vec<_>>();
+    // let extract_from_targets = test.outputs.iter().map(|output| output.extract_from.clone()).collect::<Vec<_>>();
+    // let valid_outputs = test.inputs.iter().flat_map(|input| {
+    let valid_outputs = insert_at_sources.iter().flat_map(|input| {
+        let mut leaves = graph.get_leaves(input);
+        // insert the input itself as a valid output since it is a valid extraction point
+        // leaves.insert(input.insert_at.clone());
+        leaves
+    }).collect::<HashSet<_>>();
+    for extract_from_target in extract_from_sinks {
+        if !valid_outputs.contains(&extract_from_target) {
+            build_errors.push(format!("unable to complete topology between target transforms {:?} and output target '{}'", insert_at_targets, extract_from_target.to_string().strip_suffix("-unit-test-sink").unwrap().replace("-", ".")));
+        }
+    }
+    if !build_errors.is_empty() {
+        return Err(build_errors);
+    }
 
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
@@ -728,9 +752,9 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
 
         // mapping source key --> input events
         let mut source_to_events: IndexMap<ComponentKey, Vec<Event>> = IndexMap::new();
-        for input in test.inputs {
+        for input in test.inputs.iter() {
             // todo: remove unwrap
-            let event = build_input_event(&input).unwrap();
+            let event = build_input_event(input).unwrap();
             // todo: add error if the insert_at doesn't exist
             let target_source_key = ComponentKey::from(format!(
                 "{}-{}",
@@ -984,165 +1008,165 @@ mod tests {
         );
     }
 
-  //   #[tokio::test]
-  //   async fn parse_no_test_input() {
-  //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-  //           [transforms.bar]
-  //             inputs = ["foo"]
-  //             type = "add_fields"
-  //             [transforms.bar.fields]
-  //               my_string_field = "string value"
+    #[tokio::test]
+    async fn parse_no_test_input() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.bar]
+              inputs = ["foo"]
+              type = "add_fields"
+              [transforms.bar.fields]
+                my_string_field = "string value"
 
-  //             [[tests]]
-  //               name = "broken test"
+              [[tests]]
+                name = "broken test"
 
-  //             [[tests.outputs]]
-  //               extract_from = "bar"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //       "#})
-  //       .unwrap();
+              [[tests.outputs]]
+                extract_from = "bar"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+        "#})
+        .unwrap();
 
-  //       let errs = build_unit_tests(config).await.err().unwrap();
-  //       assert_eq!(
-  //           errs,
-  //           vec![indoc! {r#"
-  //               Failed to build test 'broken test':
-  //                 must specify at least one input."#}
-  //           .to_owned(),]
-  //       );
-  //   }
+        let errs = build_unit_tests(config).await.err().unwrap();
+        assert_eq!(
+            errs,
+            vec![indoc! {r#"
+                Failed to build test 'broken test':
+                  must specify at least one input."#}
+            .to_owned(),]
+        );
+    }
 
-  //   #[tokio::test]
-  //   async fn parse_no_outputs() {
-  //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-  //           [transforms.foo]
-  //             inputs = ["ignored"]
-  //             type = "add_fields"
-  //             [transforms.foo.fields]
-  //               my_string_field = "string value"
+    #[tokio::test]
+    async fn parse_no_outputs() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+              inputs = ["ignored"]
+              type = "add_fields"
+              [transforms.foo.fields]
+                my_string_field = "string value"
 
-  //             [[tests]]
-  //               name = "broken test"
+              [[tests]]
+                name = "broken test"
 
-  //             [tests.input]
-  //               insert_at = "foo"
-  //               value = "nah this doesnt matter"
-  //       "#})
-  //       .unwrap();
+              [tests.input]
+                insert_at = "foo"
+                value = "nah this doesnt matter"
+        "#})
+        .unwrap();
 
-  //       let errs = build_unit_tests(config).await.err().unwrap();
-  //       assert_eq!(
-  //           errs,
-  //           vec![indoc! {r#"
-  //               Failed to build test 'broken test':
-  //                 unit test must contain at least one of `outputs` or `no_outputs_from`."#}
-  //           .to_owned(),]
-  //       );
-  //   }
+        let errs = build_unit_tests(config).await.err().unwrap();
+        assert_eq!(
+            errs,
+            vec![indoc! {r#"
+                Failed to build test 'broken test':
+                  unit test must contain at least one of `outputs` or `no_outputs_from`."#}
+            .to_owned(),]
+        );
+    }
 
-  //   #[tokio::test]
-  //   async fn parse_broken_topology() {
-  //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-  //           [transforms.foo]
-  //             inputs = ["something"]
-  //             type = "add_fields"
-  //             [transforms.foo.fields]
-  //               foo_field = "string value"
+    #[tokio::test]
+    async fn parse_broken_topology() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+              inputs = ["something"]
+              type = "add_fields"
+              [transforms.foo.fields]
+                foo_field = "string value"
 
-  //           [transforms.nah]
-  //             inputs = ["ignored"]
-  //             type = "add_fields"
-  //             [transforms.nah.fields]
-  //               new_field = "string value"
+            [transforms.nah]
+              inputs = ["ignored"]
+              type = "add_fields"
+              [transforms.nah.fields]
+                new_field = "string value"
 
-  //           [transforms.baz]
-  //             inputs = ["bar"]
-  //             type = "add_fields"
-  //             [transforms.baz.fields]
-  //               baz_field = "string value"
+            [transforms.baz]
+              inputs = ["bar"]
+              type = "add_fields"
+              [transforms.baz.fields]
+                baz_field = "string value"
 
-  //           [transforms.quz]
-  //             inputs = ["bar"]
-  //             type = "add_fields"
-  //             [transforms.quz.fields]
-  //               quz_field = "string value"
+            [transforms.quz]
+              inputs = ["bar"]
+              type = "add_fields"
+              [transforms.quz.fields]
+                quz_field = "string value"
 
-  //           [[tests]]
-  //             name = "broken test"
+            [[tests]]
+              name = "broken test"
 
-  //             [tests.input]
-  //               insert_at = "foo"
-  //               value = "nah this doesnt matter"
+              [tests.input]
+                insert_at = "foo"
+                value = "nah this doesnt matter"
 
-  //             [[tests.outputs]]
-  //               extract_from = "baz"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //                 "message.equals" = "not this"
+              [[tests.outputs]]
+                extract_from = "baz"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "message.equals" = "not this"
 
-  //             [[tests.outputs]]
-  //               extract_from = "quz"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //                 "message.equals" = "not this"
+              [[tests.outputs]]
+                extract_from = "quz"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "message.equals" = "not this"
 
-  //           [[tests]]
-  //             name = "broken test 2"
+            [[tests]]
+              name = "broken test 2"
 
-  //             [tests.input]
-  //               insert_at = "nope"
-  //               value = "nah this doesnt matter"
+              [tests.input]
+                insert_at = "nope"
+                value = "nah this doesnt matter"
 
-  //             [[tests.outputs]]
-  //               extract_from = "quz"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //                 "message.equals" = "not this"
+              [[tests.outputs]]
+                extract_from = "quz"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "message.equals" = "not this"
 
-  //           [[tests]]
-  //             name = "broken test 3"
+            [[tests]]
+              name = "broken test 3"
 
-  //             [[tests.inputs]]
-  //               insert_at = "foo"
-  //               value = "nah this doesnt matter"
+              [[tests.inputs]]
+                insert_at = "foo"
+                value = "nah this doesnt matter"
 
-  //             [[tests.inputs]]
-  //               insert_at = "nah"
-  //               value = "nah this doesnt matter"
+              [[tests.inputs]]
+                insert_at = "nah"
+                value = "nah this doesnt matter"
 
-  //             [[tests.outputs]]
-  //               extract_from = "baz"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //                 "message.equals" = "not this"
+              [[tests.outputs]]
+                extract_from = "baz"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "message.equals" = "not this"
 
-  //             [[tests.outputs]]
-  //               extract_from = "quz"
-  //               [[tests.outputs.conditions]]
-  //                 type = "check_fields"
-  //                 "message.equals" = "not this"
-  //       "#})
-  //       .unwrap();
+              [[tests.outputs]]
+                extract_from = "quz"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "message.equals" = "not this"
+        "#})
+        .unwrap();
 
-  //       let errs = build_unit_tests(config).await.err().unwrap();
-  //       assert_eq!(
-  //           errs,
-  //           vec![
-  //               r#"Failed to build test 'broken test':
-  // unable to complete topology between target transform 'foo' and output target 'baz'
-  // unable to complete topology between target transform 'foo' and output target 'quz'"#
-  //                   .to_owned(),
-  //               r#"Failed to build test 'broken test 2':
-  // inputs[0]: unable to locate target transform 'nope'"#
-  //                   .to_owned(),
-  //               r#"Failed to build test 'broken test 3':
-  // unable to complete topology between target transforms ["foo", "nah"] and output target 'baz'
-  // unable to complete topology between target transforms ["foo", "nah"] and output target 'quz'"#
-  //                   .to_owned(),
-  //           ]
-  //       );
-  //   }
+        let errs = build_unit_tests(config).await.err().unwrap();
+        assert_eq!(
+            errs,
+            vec![
+                r#"Failed to build test 'broken test':
+  unable to complete topology between target transforms ["foo"] and output target 'baz'
+  unable to complete topology between target transforms ["foo"] and output target 'quz'"#
+                    .to_owned(),
+                r#"Failed to build test 'broken test 2':
+  inputs[0]: unable to locate target transform 'nope'"#
+                    .to_owned(),
+                r#"Failed to build test 'broken test 3':
+  unable to complete topology between target transforms ["foo", "nah"] and output target 'baz'
+  unable to complete topology between target transforms ["foo", "nah"] and output target 'quz'"#
+                    .to_owned(),
+            ]
+        );
+    }
 
   //   #[tokio::test]
   //   async fn parse_bad_input_event() {

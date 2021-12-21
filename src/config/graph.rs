@@ -287,8 +287,8 @@ impl Graph {
     // Produce a set of all leaf components that the given root component is
     // connected to. For example, this is useful for determining the set of all
     // sinks that a source is connected to. Traversal is via a DFS.
-    pub fn get_leaves(&self, root: &ComponentKey) -> Result<Vec<ComponentKey>, String> {
-        let mut leaves = Vec::new();
+    pub fn get_leaves(&self, root: &ComponentKey) -> HashSet<ComponentKey> {
+        let mut leaves = HashSet::new();
 
         let mut traversal: VecDeque<ComponentKey> = VecDeque::new();
         let mut visited: HashSet<ComponentKey> = HashSet::new();
@@ -307,7 +307,7 @@ impl Graph {
                 .collect::<Vec<_>>();
 
             if neighbors.is_empty() && n != *root {
-                leaves.push(n);
+                leaves.insert(n);
             } else {
                 for neighbor in neighbors {
                     if !visited.contains(&neighbor) {
