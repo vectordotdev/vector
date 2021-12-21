@@ -58,6 +58,8 @@ pub enum UnitTestSinkCheck {
     Checks(Vec<Vec<Box<dyn Condition>>>),
     // Check that no events were received
     NoOutputs,
+    // Do nothing
+    Noop,
 }
 
 impl Default for UnitTestSinkCheck {
@@ -129,7 +131,6 @@ impl StreamSink for UnitTestSink {
 
         // Receive all incoming events
         while let Some(event) = input.next().await {
-            println!("sink received event: {:?}\n", event);
             output_events.push(event);
         }
 
@@ -142,12 +143,7 @@ impl StreamSink for UnitTestSink {
                 }
                 for check in checks {
                     if check.is_empty() {
-                        // result.test_inspections.push(format!(
-                        //     "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
-                        //     self.name,
-                        //     events_to_string("input", inputs),
-                        //     events_to_string("output", outputs),
-                        // ));
+                        // todo: implement inspections
                         continue;
                     }
 
@@ -173,11 +169,10 @@ impl StreamSink for UnitTestSink {
             }
             UnitTestSinkCheck::NoOutputs => {
                 if !output_events.is_empty() {
-                    result
-                        .test_errors
-                        .push("expected no outputs".to_string());
+                    result.test_errors.push("expected no outputs".to_string());
                 }
             }
+            UnitTestSinkCheck::Noop => {}
         }
 
         if let Err(_) = self.result_tx.send(result) {

@@ -149,29 +149,49 @@ async fn build_unit_test(
         .keys()
         .map(|key| key.clone())
         .collect::<HashSet<_>>();
-    println!("test has the following inputs: {:?}\n", test.inputs);
     let inputs = build_and_validate_inputs(&test.inputs, &available_insert_targets)?;
 
-    // Connect a test source to each unique insert_at target transform
-    let mut test_sources = IndexMap::new();
-    for (target_transform_id, event) in inputs {
-        let test_source_id = format!("{}-{}", target_transform_id, "unit-test-source");
+    // Mapping from transform name to unit test source name
+    let source_ids = available_insert_targets
+        .iter()
+        .map(|key| (key.clone(), format!("{}-{}", key, "source")))
+        .collect::<HashMap<_, _>>();
 
-        if test_sources.get(&test_source_id).is_none() {
-            test_sources.insert(test_source_id.clone(), Vec::new());
-            match config_builder.transforms.get_mut(&target_transform_id) {
-                Some(transform) => transform.inputs.push(test_source_id.clone()),
-                None => build_errors.push("No transform found for that insert_at".to_string()),
-            }
-        }
-        test_sources
-            .entry(test_source_id)
-            .and_modify(|events| events.push(event));
+    // Connect a test source to every transform
+    let mut test_sources = IndexMap::new();
+    for (key, transform) in config_builder.transforms.iter_mut() {
+        let test_source_id = source_ids
+            .get(key)
+            .expect("Missing test source for a transform")
+            .clone();
+        transform.inputs.push(test_source_id.clone());
+
+        test_sources.insert(key.clone(), UnitTestSourceConfig::default());
     }
 
-    let sources = build_unit_test_sources(test_sources);
-    let insert_at_sources = sources.keys().map(|key| key.clone()).collect::<Vec<_>>();
-    println!("test created the following sources: {:?}\n", sources);
+    let insert_at_sources = inputs
+        .keys()
+        .map(|input| source_ids.get(input).unwrap().clone())
+        .collect::<Vec<_>>();
+    for (input, events) in inputs {
+        let source_config = test_sources
+            .get_mut(&input)
+            .expect("Earlier validation of inputs was incorrect");
+        source_config.events.extend(events);
+    }
+    let sources = test_sources
+        .into_iter()
+        .map(|(transform_key, source_config)| {
+            let source_key: &str = source_ids
+                .get(&transform_key)
+                .expect("Corresponding source must exist")
+                .as_ref();
+            (
+                ComponentKey::from(source_key),
+                SourceOuter::new(source_config),
+            )
+        })
+        .collect::<IndexMap<_, _>>();
 
     if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
         build_errors.push(
@@ -180,80 +200,94 @@ async fn build_unit_test(
         return Err(build_errors);
     }
 
+    let available_extract_targets = config_builder
+        .transforms
+        .iter()
+        .flat_map(|(key, transform)| {
+            let mut extract_targets = vec![key.clone()];
+            extract_targets.extend(
+                transform
+                    .inner
+                    .named_outputs()
+                    .iter()
+                    .map(|port| ComponentKey::from(format!("{}.{}", key, port)))
+                    .collect::<Vec<_>>(),
+            );
+            extract_targets
+        })
+        .collect::<HashSet<_>>();
+    // Mapping from transform name to unit test sink name
+    let sink_ids = available_extract_targets
+        .iter()
+        .map(|key| {
+            (
+                key.clone(),
+                format!("{}-{}", key.to_string().replace(".", "-"), "sink"),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     let outputs = build_outputs(&test.outputs).unwrap_or_else(|errors| {
         build_errors.extend(errors);
-        Vec::new()
+        HashMap::new()
     });
 
-    // Connect a test sink to each unique extract_from target transform
-    let mut test_output_sinks = IndexMap::new();
-    for (target_transform_id, conditions) in outputs {
-        let test_sink_id = format!(
-            "{}-{}",
-            target_transform_id.to_string().replace(".", "-"),
-            "unit-test-sink"
-        );
-        test_output_sinks
-            .entry(test_sink_id)
-            .and_modify(
-                |(_, sink_conditions): &mut (String, Vec<Vec<Box<dyn Condition>>>)| {
-                    sink_conditions.push(conditions.clone())
-                },
-            )
-            .or_insert((target_transform_id.to_string(), vec![conditions]));
+    let mut sink_rxs = Vec::new();
+    // Connect a sink to every transform output
+    let mut test_sinks = IndexMap::new();
+    for (transform_id, _) in sink_ids.iter() {
+        let (tx, rx) = oneshot::channel();
+        let sink_config = UnitTestSinkConfig {
+            name: test.name.clone(),
+            result_tx: Arc::new(Mutex::new(Some(tx))),
+            check: UnitTestSinkCheck::Noop,
+        };
+        test_sinks.insert(transform_id.clone(), sink_config);
+        sink_rxs.push(rx);
     }
 
-    // Connect a test sink to each unique no_outputs_from target transform
-    let mut test_non_output_sinks = test
-        .no_outputs_from
+    let mut extract_from_sinks = Vec::new();
+    // Add checks to sinks associated with an extract_from
+    for (transform_id, checks) in outputs {
+        let sink_config = test_sinks.get_mut(&transform_id).expect("Sink does not exist");
+        sink_config.check = UnitTestSinkCheck::Checks(checks);
+
+        let sink_id = sink_ids
+            .get(&transform_id)
+            .expect("Sink does not exist")
+            .as_ref();
+        extract_from_sinks.push(ComponentKey::from(sink_id));
+    }
+
+    // Add no outputs assertion to relevant sinks
+    for transform_id in test.no_outputs_from {
+        let sink_config = test_sinks.get_mut(&transform_id).expect("Sink does not exist");
+        sink_config.check = UnitTestSinkCheck::NoOutputs;
+
+        let sink_id = sink_ids
+            .get(&transform_id)
+            .expect("Sink does not exist")
+            .as_ref();
+        extract_from_sinks.push(ComponentKey::from(sink_id));
+    }
+
+    let sinks = test_sinks
         .into_iter()
-        .map(|target_transform_id| {
-            let test_sink_id = format!(
-                "{}-{}",
-                target_transform_id.to_string().replace(".", "-"),
-                "unit-test-sink"
-            );
-            (test_sink_id, target_transform_id.to_string())
+        .map(|(transform_id, sink_config)| {
+            let sink_id = sink_ids
+                .get(&transform_id)
+                .expect("Sink does not exist")
+                .as_ref();
+            (
+                ComponentKey::from(sink_id),
+                SinkOuter::new(vec![transform_id.to_string()], Box::new(sink_config)),
+            )
         })
         .collect::<IndexMap<_, _>>();
 
-    let mut sinks = IndexMap::new();
-    // let mut sink_rxs = IndexMap::new();
-    let mut sink_rxs = Vec::new();
-    for (key, (input, checks)) in test_output_sinks {
-        let key = ComponentKey::from(key);
-        let (tx, rx) = oneshot::channel();
-        let sink_config = UnitTestSinkConfig {
-            name: test.name.clone(),
-            result_tx: Arc::new(Mutex::new(Some(tx))),
-            check: UnitTestSinkCheck::Checks(checks),
-        };
-        // sink_rxs.insert(key.clone(), rx);
-        sink_rxs.push(rx);
-        sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
-    }
-
-    for (key, input) in test_non_output_sinks {
-        let key = ComponentKey::from(key);
-        let (tx, rx) = oneshot::channel();
-        let sink_config = UnitTestSinkConfig {
-            name: test.name.clone(),
-            result_tx: Arc::new(Mutex::new(Some(tx))),
-            check: UnitTestSinkCheck::NoOutputs,
-        };
-        // sink_rxs.insert(key.clone(), rx);
-        sink_rxs.push(rx);
-        sinks.insert(key, SinkOuter::new(vec![input], Box::new(sink_config)));
-    }
-    let extract_from_sinks = sinks.keys().map(|key| key.clone()).collect::<Vec<_>>();
-
-    println!("test created the following sinks: {:?}\n", sinks);
-
     config_builder.sources = sources;
     config_builder.sinks = sinks;
-    println!("the transforms are: {:?}\n", config_builder.transforms);
     let mut builder = config_builder.clone();
-    let expansions = expand_macros(&mut builder)?;
+    let _ = expand_macros(&mut builder)?;
 
     // Check for an invalid input/output configuration wherein there is a
     // disconnect between insertions and extractions
@@ -266,13 +300,11 @@ async fn build_unit_test(
     let valid_outputs = insert_at_sources
         .iter()
         .flat_map(|input| {
-            let mut leaves = graph.get_leaves(input);
-            // insert the input itself as a valid output since it is a valid extraction point
-            // leaves.insert(input.insert_at.clone());
+            let mut leaves = graph.get_leaves(&ComponentKey::from(input.as_ref()));
             leaves
         })
         .collect::<HashSet<_>>();
-    println!("all valid outputs {:?}", valid_outputs);
+
     for extract_from_target in extract_from_sinks {
         if !valid_outputs.contains(&extract_from_target) {
             build_errors.push(format!(
@@ -303,15 +335,11 @@ async fn build_unit_test(
     })
 }
 
-fn validate_connected() -> Result<(), Vec<String>> {
-    Ok(())
-}
-
 fn build_and_validate_inputs(
     test_inputs: &Vec<TestInput>,
     available_insert_targets: &HashSet<ComponentKey>,
-) -> Result<Vec<(ComponentKey, Event)>, Vec<String>> {
-    let mut inputs = Vec::new();
+) -> Result<HashMap<ComponentKey, Vec<Event>>, Vec<String>> {
+    let mut inputs = HashMap::new();
     let mut errors = Vec::new();
     if test_inputs.is_empty() {
         errors.push("must specify at least one input.".to_string());
@@ -321,7 +349,14 @@ fn build_and_validate_inputs(
     for (index, input) in test_inputs.iter().enumerate() {
         if available_insert_targets.contains(&input.insert_at) {
             match build_input_event(&input) {
-                Ok(input_event) => inputs.push((input.insert_at.clone(), input_event)),
+                Ok(input_event) => {
+                    inputs
+                        .entry(input.insert_at.clone())
+                        .and_modify(|events: &mut Vec<Event>| {
+                            events.push(input_event.clone());
+                        })
+                        .or_insert(vec![input_event]);
+                }
                 Err(error) => errors.push(error),
             }
         } else {
@@ -341,13 +376,12 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &Vec<TestOutput>,
-) -> Result<Vec<(ComponentKey, Vec<Box<dyn Condition>>)>, Vec<String>> {
-    let mut outputs = Vec::new();
+) -> Result<HashMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
+    let mut outputs = HashMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
         let mut conditions = Vec::new();
-        // todo: are you allowed to have an output with no condition assigned? if not, raise an error
         for (index, condition) in output
             .conditions
             .clone()
@@ -363,7 +397,14 @@ fn build_outputs(
                 )),
             }
         }
-        outputs.push((output.extract_from.clone(), conditions));
+
+        outputs
+            .entry(output.extract_from.clone())
+            .and_modify(|existing_conditions: &mut Vec<Vec<Box<dyn Condition>>>| {
+                existing_conditions.push(conditions.clone())
+            })
+            .or_insert(vec![conditions]);
+        // ((output.extract_from.clone(), conditions));
     }
 
     if errors.is_empty() {
@@ -1574,9 +1615,9 @@ mod tests {
         assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
 
-      #[tokio::test]
-      async fn test_fail_two_output_events() {
-          let config: ConfigBuilder = toml::from_str(indoc! {r#"
+    #[tokio::test]
+    async fn test_fail_two_output_events() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
               [transforms.foo]
                 inputs = [ "TODO" ]
                 type = "add_fields"
@@ -1642,16 +1683,16 @@ mod tests {
                         assert_eq!(.bar, "new field 2")
                     """
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_no_outputs_from() {
-          let config: ConfigBuilder = toml::from_str(indoc! {r#"
+    #[tokio::test]
+    async fn test_no_outputs_from() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
               [transforms.foo]
                 inputs = [ "ignored" ]
                 type = "filter"
@@ -1679,16 +1720,16 @@ mod tests {
                   type = "raw"
                   value = "foo"
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_no_outputs_from_chained() {
-          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+    #[tokio::test]
+    async fn test_no_outputs_from_chained() {
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
               [transforms.foo]
                 inputs = [ "ignored" ]
                 type = "filter"
@@ -1722,16 +1763,16 @@ mod tests {
                   type = "raw"
                   value = "foo"
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_log_input() {
-          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+    #[tokio::test]
+    async fn test_log_input() {
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
               [transforms.foo]
                 inputs = ["ignored"]
                 type = "add_fields"
@@ -1761,15 +1802,15 @@ mod tests {
                         assert_eq!(.int_val, 5)
                     """
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_metric_input() {
-          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+    #[tokio::test]
+    async fn test_metric_input() {
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
               [transforms.foo]
                 inputs = ["ignored"]
                 type = "add_tags"
@@ -1799,15 +1840,15 @@ mod tests {
                         assert_eq!(.tags.new_tag, "new value added")
                     """
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_success_over_gap() {
-          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+    #[tokio::test]
+    async fn test_success_over_gap() {
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
               [transforms.foo]
                 inputs = ["ignored"]
                 type = "add_fields"
@@ -1844,15 +1885,15 @@ mod tests {
                         assert_eq!(.message, "nah this doesnt matter")
                     """
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
-      #[tokio::test]
-      async fn test_success_tree() {
-          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+    #[tokio::test]
+    async fn test_success_tree() {
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
               [transforms.ignored]
                 inputs = ["also_ignored"]
                 type = "add_fields"
@@ -1904,11 +1945,11 @@ mod tests {
                         assert_eq!(.message, "nah this doesnt matter")
                     """
           "#})
-          .unwrap();
+        .unwrap();
 
-          let mut tests = build_unit_tests(config).await.unwrap();
-          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-      }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
     //   #[tokio::test]
     //   async fn test_fails() {
