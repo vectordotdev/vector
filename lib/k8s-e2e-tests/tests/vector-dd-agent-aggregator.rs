@@ -55,6 +55,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         .helm_chart(
             &namespace,
             "vector",
+            "vector",
             "https://helm.vector.dev",
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, false)],
@@ -73,6 +74,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _datadog_agent = framework
         .helm_chart(
             &datadog_namespace,
+            "datadog",
             "datadog",
             "https://helm.datadoghq.com",
             // VectorConfig is a generic config container

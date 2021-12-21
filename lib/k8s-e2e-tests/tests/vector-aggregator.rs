@@ -16,6 +16,7 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
         .helm_chart(
             &namespace,
             "vector",
+            "vector",
             "https://helm.vector.dev",
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, false)],
@@ -49,6 +50,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .helm_chart(
             &namespace,
+            "vector",
             "vector",
             "https://helm.vector.dev",
             VectorConfig {

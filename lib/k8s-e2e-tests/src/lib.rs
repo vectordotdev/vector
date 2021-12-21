@@ -30,7 +30,7 @@ pub fn get_namespace() -> String {
         .map(|num| (num as char).to_ascii_lowercase())
         .collect();
 
-    format!("test-vector-{}", id)
+    format!("vector-{}", id)
 }
 
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
