@@ -147,9 +147,11 @@ fn parse_pattern(
 ) -> Result<GrokRule, Error> {
     let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases, &mut Vec::new())?;
     let mut pattern = String::new();
-    pattern.push('^');
+    // (?m) enables DOTALL mode(. includes new lines)
+    // \A, \z - parses from the beginning to the end of string, not line(until \n)
+    pattern.push_str(r#"\A(?m)"#);
     pattern.push_str(parsed_pattern.definition.as_str());
-    pattern.push('$');
+    pattern.push_str(r#"\z"#);
 
     // compile pattern
     let pattern = Arc::new(
@@ -216,6 +218,9 @@ fn parse_grok_rule(
     for (r, pure) in raw_grok_patterns.iter().zip(pure_grok_patterns.iter()) {
         rule_definition = rule_definition.replacen(r, pure.as_str(), 1);
     }
+
+    // our regex engine(onig) uses (?m) mode modifier instead of (?s) to make the dot match all characters
+    rule_definition = rule_definition.replace("(?s)", "(?m)");
 
     // collect all filters to apply later
     for pattern in &grok_patterns {
@@ -377,7 +382,15 @@ impl Destination {
     fn to_grok_field_name(&self) -> String {
         match &self.path {
             p if p.is_empty() => ".".to_string(), // grok does not support empty field names,
-            p => p.to_string(),
+            p => {
+                // Field names can start with  '$' | '@' | '_' | 'a'..='z' | 'A'..='Z',
+                // but grok capture names can't start with $ and @
+                let mut name: String = p.to_string();
+                if name.starts_with('$') || name.starts_with('@') || name.starts_with('"') {
+                    name = format!("grok{}", name)
+                }
+                name
+            }
         }
     }
 }

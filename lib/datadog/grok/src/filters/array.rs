@@ -69,6 +69,8 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
     }
 
     let brackets = match brackets {
+        None => None,
+        Some(b) if b.is_empty() => None,
         Some(b) if b.len() == 1 => {
             let char = b.chars().next().unwrap();
             Some((char, char))
@@ -77,7 +79,6 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
             let mut chars = b.chars();
             Some((chars.next().unwrap(), chars.next().unwrap()))
         }
-        None => None,
         _ => {
             return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
         }
@@ -97,6 +98,7 @@ pub fn parse<'a>(
     brackets: Option<(char, char)>,
     delimiter: Option<&'a str>,
 ) -> Result<Vec<Value>, String> {
+    println!("parse: {} {:?} {:?}", input, brackets, delimiter);
     let result = parse_array(brackets, delimiter)(input)
         .map_err(|_| format!("could not parse '{}' as array", input))
         .and_then(|(rest, result)| {

@@ -202,7 +202,7 @@ impl<'input> Lexer<'input> {
             "null" => Null,
 
             _ if ident.contains('@') || ident.contains('-') => ExtendedIdentifier(ident),
-            _ => Identifier(ident),
+            _Identifier => Identifier(ident),
         };
 
         (start, token, end)
@@ -257,7 +257,7 @@ fn unescape_string_literal(mut s: &str) -> Result<String, Error> {
     while let Some(i) = s.bytes().position(|b| b == b'\\') {
         if s.len() > i + 2 {
             let c = match &s[i..i + 3] {
-                r#"\\n"# => '\n',
+                "\\\\n" => '\n',
                 r#"\\r"# => '\r',
                 r#"\\t"# => '\t',
                 _ => '\0',
@@ -281,7 +281,6 @@ fn unescape_string_literal(mut s: &str) -> Result<String, Error> {
             s = &s[i + 2..];
         }
     }
-
     string.push_str(s);
     Ok(string)
 }
