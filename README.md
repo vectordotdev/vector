@@ -130,9 +130,9 @@ Vector is an end-to-end, unified, open data platform.
 
 |                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF |
 |--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|
-|      **End-to-end** |   **✓**    |       |           |         |          |           |           |
-|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |
-|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |
+|      **End-to-end** |   **✓**    |       |     ✓     |    ✓    |          |           |           |
+|               Agent |   **✓**    |   ✓   |     ✓     |    ✓    |          |     ✓     |           |
+|          Aggregator |   **✓**    |       |     ✓     |    ✓    |    ✓     |           |     ✓     |
 |         **Unified** |   **✓**    |       |           |         |          |           |           |
 |                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 |             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
