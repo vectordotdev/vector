@@ -69,7 +69,7 @@ To check available Helm chart configuration options:
 helm show values vector/vector
 ```
 
-An Aggregator by default is configured to accept events from a variety of common sources and writes them to standard output, it also reports internal metrics via a Prometheus exporter. For more information about configuration options, see the [Configuration] docs page.
+An Aggregator, by default, is configured to accept events from a variety of common sources and writes them to standard output, it also reports internal metrics via a Prometheus exporter. For more information about configuration options, see the [Configuration] docs page.
 
 The default sources and their associated ports are listed below:
 
