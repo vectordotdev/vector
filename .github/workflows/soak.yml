@@ -44,6 +44,11 @@ jobs:
       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
     steps:
+      # checks out the PR with the base ref merged in
+      - uses: actions/checkout@v2.3.5
+        with:
+          path: comparison-vector
+
       - uses: actions/checkout@v2.3.5
         with:
           ref: ${{ github.base_ref }}
@@ -59,8 +64,14 @@ jobs:
       - name: Setup comparison variables
         id: comparison
         run: |
-          export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
-          export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
+          pushd comparison-vector
+          export COMPARISON_SHA=$(git rev-parse HEAD)
+          # push up merge ref to Github so that it is linkable there
+          git checkout -b pr/${{ github.event.number }}/run/${{ github.run_number }}/attempt/${{ github.run_attempt }}
+          git push origin pr/${{ github.event.number }}/run/${{ github.run_number }}/attempt/${{ github.run_attempt }}
+          popd
+
+          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
@@ -75,7 +86,7 @@ jobs:
           export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
-          export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
+          export BASELINE_TAG="${{ github.sha }}-${BASELINE_SHA}"
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
 
