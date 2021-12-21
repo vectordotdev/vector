@@ -103,38 +103,6 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             return exitcode::CONFIG;
         }
     }
-    // match config::build_unit_tests(&paths).await {
-    //     Ok(mut tests) => {
-    //         tests.iter_mut().for_each(|t| {
-    //             let (test_inspections, test_errors) = t.run();
-    //             if !test_inspections.is_empty() {
-    //                 aggregated_test_inspections.push((t.name.clone(), test_inspections));
-    //             }
-    //             if !test_errors.is_empty() {
-    //                 #[allow(clippy::print_stdout)]
-    //                 {
-    //                     println!("test {} ... {}", t.name, "failed".red());
-    //                 }
-    //                 aggregated_test_errors.push((t.name.clone(), test_errors));
-    //             } else {
-    //                 #[allow(clippy::print_stdout)]
-    //                 {
-    //                     println!("test {} ... {}", t.name, "passed".green());
-    //                 }
-    //             }
-    //         });
-    //         if tests.is_empty() {
-    //             #[allow(clippy::print_stdout)]
-    //             {
-    //                 println!("{}", "No tests found.".yellow());
-    //             }
-    //         }
-    //     }
-    //     Err(errs) => {
-    //         error!("Failed to execute tests:\n{}.", errs.join("\n"));
-    //         return exitcode::CONFIG;
-    //     }
-    // }
 
     if !aggregated_test_inspections.is_empty() {
         #[allow(clippy::print_stdout)]

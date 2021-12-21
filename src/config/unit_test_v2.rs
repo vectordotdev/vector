@@ -175,7 +175,7 @@ impl StreamSink for UnitTestSink {
                 if !output_events.is_empty() {
                     result
                         .test_errors
-                        .push("Events were received when not expected".to_string());
+                        .push("expected no outputs".to_string());
                 }
             }
         }

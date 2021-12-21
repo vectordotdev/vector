@@ -258,14 +258,11 @@ async fn build_unit_test(
     // Check for an invalid input/output configuration wherein there is a
     // disconnect between insertions and extractions
     let graph = Graph::new(&builder.sources, &builder.transforms, &builder.sinks).unwrap();
-    // let graph = Graph::new_unchecked(&Default::default(), &config_builder.transforms, &Default::default());
     let insert_at_targets = test
         .inputs
         .iter()
         .map(|input| input.insert_at.to_string())
         .collect::<Vec<_>>();
-    // let extract_from_targets = test.outputs.iter().map(|output| output.extract_from.clone()).collect::<Vec<_>>();
-    // let valid_outputs = test.inputs.iter().flat_map(|input| {
     let valid_outputs = insert_at_sources
         .iter()
         .flat_map(|input| {
@@ -824,9 +821,6 @@ async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<Stri
     let mut tests = std::mem::take(&mut builder.tests);
 
     let mut test_results = Vec::new();
-    // todo: more efficient iteration for each test.
-    // Can we avoid re-reading the config every time?
-    // Can we reuse the same topology? We really only need to change the inputs each time...
     for test in tests {
         // Reload the ConfigBuilder from the user provided config paths
         let (mut builder, _) = super::loading::load_builder_from_paths(paths)?;
@@ -1580,318 +1574,341 @@ mod tests {
         assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
 
-    //   #[tokio::test]
-    //   async fn test_fail_two_output_events() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-    //           [transforms.foo]
-    //             inputs = [ "TODO" ]
-    //             type = "add_fields"
-    //             [transforms.foo.fields]
-    //               foo = "new field 1"
+      #[tokio::test]
+      async fn test_fail_two_output_events() {
+          let config: ConfigBuilder = toml::from_str(indoc! {r#"
+              [transforms.foo]
+                inputs = [ "TODO" ]
+                type = "add_fields"
+                [transforms.foo.fields]
+                  foo = "new field 1"
 
-    //           [transforms.bar]
-    //             inputs = [ "foo" ]
-    //             type = "add_fields"
-    //             [transforms.bar.fields]
-    //               bar = "new field 2"
+              [transforms.bar]
+                inputs = [ "foo" ]
+                type = "add_fields"
+                [transforms.bar.fields]
+                  bar = "new field 2"
 
-    //           [transforms.baz]
-    //             inputs = [ "foo" ]
-    //             type = "add_fields"
-    //             [transforms.baz.fields]
-    //               baz = "new field 3"
+              [transforms.baz]
+                inputs = [ "foo" ]
+                type = "add_fields"
+                [transforms.baz.fields]
+                  baz = "new field 3"
 
-    //           [transforms.boo]
-    //             inputs = [ "bar", "baz" ]
-    //             type = "add_fields"
-    //             [transforms.boo.fields]
-    //               boo = "new field 4"
+              [transforms.boo]
+                inputs = [ "bar", "baz" ]
+                type = "add_fields"
+                [transforms.boo.fields]
+                  boo = "new field 4"
 
-    //           [[tests]]
-    //             name = "check_multi_payloads"
+              [[tests]]
+                name = "check_multi_payloads"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "first"
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "first"
 
-    //             [[tests.outputs]]
-    //               extract_from = "boo"
+                [[tests.outputs]]
+                  extract_from = "boo"
 
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "baz.equals" = "new field 3"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                      assert_eq!(.baz, "new field 3")
+                    """
 
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "bar.equals" = "new field 2"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                      assert_eq!(.bar, "new field 2")
+                    """
 
-    //           [[tests]]
-    //             name = "check_multi_payloads_bad"
+              [[tests]]
+                name = "check_multi_payloads_bad"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "first"
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "first"
 
-    //             [[tests.outputs]]
-    //               extract_from = "boo"
+                [[tests.outputs]]
+                  extract_from = "boo"
 
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "baz.equals" = "new field 3"
-    //                 "bar.equals" = "new field 2"
-    //       "#})
-    //       .unwrap();
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.baz, "new field 3")
+                        assert_eq!(.bar, "new field 2")
+                    """
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //       assert_ne!(tests[1].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_no_outputs_from() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-    //           [transforms.foo]
-    //             inputs = [ "ignored" ]
-    //             type = "field_filter"
-    //             field = "message"
-    //             value = "foo"
+      #[tokio::test]
+      async fn test_no_outputs_from() {
+          let config: ConfigBuilder = toml::from_str(indoc! {r#"
+              [transforms.foo]
+                inputs = [ "ignored" ]
+                type = "filter"
+                [transforms.foo.condition]
+                  type = "vrl"
+                  source = """
+                    .message == "foo"
+                  """
 
-    //           [[tests]]
-    //             name = "check_no_outputs_from_succeeds"
-    //             no_outputs_from = [ "foo" ]
+              [[tests]]
+                name = "check_no_outputs_from_succeeds"
+                no_outputs_from = [ "foo" ]
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "not foo at all"
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "not foo at all"
 
-    //           [[tests]]
-    //             name = "check_no_outputs_from_fails"
-    //             no_outputs_from = [ "foo" ]
+              [[tests]]
+                name = "check_no_outputs_from_fails"
+                no_outputs_from = [ "foo" ]
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "foo"
-    //       "#})
-    //       .unwrap();
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "foo"
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //       assert_ne!(tests[1].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_no_outputs_from_chained() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! { r#"
-    //           [transforms.foo]
-    //             inputs = [ "ignored" ]
-    //             type = "field_filter"
-    //             field = "message"
-    //             value = "foo"
+      #[tokio::test]
+      async fn test_no_outputs_from_chained() {
+          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+              [transforms.foo]
+                inputs = [ "ignored" ]
+                type = "filter"
+                [transforms.foo.condition]
+                  type = "vrl"
+                  source = """
+                    .message == "foo"
+                  """
 
-    //           [transforms.bar]
-    //             inputs = [ "foo" ]
-    //             type = "add_fields"
-    //             [transforms.bar.fields]
-    //               bar = "new field"
+              [transforms.bar]
+                inputs = [ "foo" ]
+                type = "add_fields"
+                [transforms.bar.fields]
+                  bar = "new field"
 
-    //           [[tests]]
-    //             name = "check_no_outputs_from_succeeds"
-    //             no_outputs_from = [ "bar" ]
+              [[tests]]
+                name = "check_no_outputs_from_succeeds"
+                no_outputs_from = [ "bar" ]
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "not foo at all"
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "not foo at all"
 
-    //           [[tests]]
-    //             name = "check_no_outputs_from_fails"
-    //             no_outputs_from = [ "bar" ]
+              [[tests]]
+                name = "check_no_outputs_from_fails"
+                no_outputs_from = [ "bar" ]
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "raw"
-    //               value = "foo"
-    //       "#})
-    //       .unwrap();
+                [tests.input]
+                  insert_at = "foo"
+                  type = "raw"
+                  value = "foo"
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //       assert_ne!(tests[1].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+          assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_log_input() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! { r#"
-    //           [transforms.foo]
-    //             inputs = ["ignored"]
-    //             type = "add_fields"
-    //             [transforms.foo.fields]
-    //               new_field = "string value"
+      #[tokio::test]
+      async fn test_log_input() {
+          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+              [transforms.foo]
+                inputs = ["ignored"]
+                type = "add_fields"
+                [transforms.foo.fields]
+                  new_field = "string value"
 
-    //           [[tests]]
-    //             name = "successful test with log event"
+              [[tests]]
+                name = "successful test with log event"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "log"
-    //               [tests.input.log_fields]
-    //                 message = "this is the message"
-    //                 int_val = 5
-    //                 bool_val = true
+                [tests.input]
+                  insert_at = "foo"
+                  type = "log"
+                  [tests.input.log_fields]
+                    message = "this is the message"
+                    int_val = 5
+                    bool_val = true
 
-    //             [[tests.outputs]]
-    //               extract_from = "foo"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "new_field.equals" = "string value"
-    //                 "message.equals" = "this is the message"
-    //                 "bool_val.eq" = true
-    //                 "int_val.eq" = 5
-    //       "#})
-    //       .unwrap();
+                [[tests.outputs]]
+                  extract_from = "foo"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.new_field, "string value")
+                        assert_eq!(.message, "this is the message")
+                        assert_eq!(.message, "this is the message")
+                        assert!(.bool_val)
+                        assert_eq!(.int_val, 5)
+                    """
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_metric_input() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! { r#"
-    //           [transforms.foo]
-    //             inputs = ["ignored"]
-    //             type = "add_tags"
-    //             [transforms.foo.tags]
-    //               new_tag = "new value added"
+      #[tokio::test]
+      async fn test_metric_input() {
+          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+              [transforms.foo]
+                inputs = ["ignored"]
+                type = "add_tags"
+                [transforms.foo.tags]
+                  new_tag = "new value added"
 
-    //           [[tests]]
-    //             name = "successful test with metric event"
+              [[tests]]
+                name = "successful test with metric event"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               type = "metric"
-    //               [tests.input.metric]
-    //                 kind = "incremental"
-    //                 name = "foometric"
-    //                 [tests.input.metric.tags]
-    //                   tagfoo = "valfoo"
-    //                 [tests.input.metric.counter]
-    //                   value = 100.0
+                [tests.input]
+                  insert_at = "foo"
+                  type = "metric"
+                  [tests.input.metric]
+                    kind = "incremental"
+                    name = "foometric"
+                    [tests.input.metric.tags]
+                      tagfoo = "valfoo"
+                    [tests.input.metric.counter]
+                      value = 100.0
 
-    //             [[tests.outputs]]
-    //               extract_from = "foo"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "tagfoo.equals" = "valfoo"
-    //                 "new_tag.eq" = "new value added"
-    //       "#})
-    //       .unwrap();
+                [[tests.outputs]]
+                  extract_from = "foo"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.tags.tagfoo, "valfoo")
+                        assert_eq!(.tags.new_tag, "new value added")
+                    """
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_success_over_gap() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! { r#"
-    //           [transforms.foo]
-    //             inputs = ["ignored"]
-    //             type = "add_fields"
-    //             [transforms.foo.fields]
-    //               new_field = "string value"
+      #[tokio::test]
+      async fn test_success_over_gap() {
+          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+              [transforms.foo]
+                inputs = ["ignored"]
+                type = "add_fields"
+                [transforms.foo.fields]
+                  new_field = "string value"
 
-    //           [transforms.bar]
-    //             inputs = ["foo"]
-    //             type = "add_fields"
-    //             [transforms.bar.fields]
-    //               second_new_field = "also a string value"
+              [transforms.bar]
+                inputs = ["foo"]
+                type = "add_fields"
+                [transforms.bar.fields]
+                  second_new_field = "also a string value"
 
-    //           [transforms.baz]
-    //             inputs = ["bar"]
-    //             type = "add_fields"
-    //             [transforms.baz.fields]
-    //               third_new_field = "also also a string value"
+              [transforms.baz]
+                inputs = ["bar"]
+                type = "add_fields"
+                [transforms.baz.fields]
+                  third_new_field = "also also a string value"
 
-    //           [[tests]]
-    //             name = "successful test"
+              [[tests]]
+                name = "successful test"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               value = "nah this doesnt matter"
+                [tests.input]
+                  insert_at = "foo"
+                  value = "nah this doesnt matter"
 
-    //             [[tests.outputs]]
-    //               extract_from = "baz"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "new_field.equals" = "string value"
-    //                 "second_new_field.equals" = "also a string value"
-    //                 "third_new_field.equals" = "also also a string value"
-    //                 "message.equals" = "nah this doesnt matter"
-    //       "#})
-    //       .unwrap();
+                [[tests.outputs]]
+                  extract_from = "baz"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.new_field, "string value")
+                        assert_eq!(.second_new_field, "also a string value")
+                        assert_eq!(.third_new_field, "also also a string value")
+                        assert_eq!(.message, "nah this doesnt matter")
+                    """
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
-    //   #[tokio::test]
-    //   async fn test_success_tree() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! { r#"
-    //           [transforms.ignored]
-    //             inputs = ["also_ignored"]
-    //             type = "add_fields"
-    //             [transforms.ignored.fields]
-    //               not_field = "string value"
+      #[tokio::test]
+      async fn test_success_tree() {
+          let config: ConfigBuilder = toml::from_str(indoc! { r#"
+              [transforms.ignored]
+                inputs = ["also_ignored"]
+                type = "add_fields"
+                [transforms.ignored.fields]
+                  not_field = "string value"
 
-    //           [transforms.foo]
-    //             inputs = ["ignored"]
-    //             type = "add_fields"
-    //             [transforms.foo.fields]
-    //               new_field = "string value"
+              [transforms.foo]
+                inputs = ["ignored"]
+                type = "add_fields"
+                [transforms.foo.fields]
+                  new_field = "string value"
 
-    //           [transforms.bar]
-    //             inputs = ["foo"]
-    //             type = "add_fields"
-    //             [transforms.bar.fields]
-    //               second_new_field = "also a string value"
+              [transforms.bar]
+                inputs = ["foo"]
+                type = "add_fields"
+                [transforms.bar.fields]
+                  second_new_field = "also a string value"
 
-    //           [transforms.baz]
-    //             inputs = ["foo"]
-    //             type = "add_fields"
-    //             [transforms.baz.fields]
-    //               second_new_field = "also also a string value"
+              [transforms.baz]
+                inputs = ["foo"]
+                type = "add_fields"
+                [transforms.baz.fields]
+                  second_new_field = "also also a string value"
 
-    //           [[tests]]
-    //             name = "successful test"
+              [[tests]]
+                name = "successful test"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               value = "nah this doesnt matter"
+                [tests.input]
+                  insert_at = "foo"
+                  value = "nah this doesnt matter"
 
-    //             [[tests.outputs]]
-    //               extract_from = "bar"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "new_field.equals" = "string value"
-    //                 "second_new_field.equals" = "also a string value"
-    //                 "message.equals" = "nah this doesnt matter"
+                [[tests.outputs]]
+                  extract_from = "bar"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.new_field, "string value")
+                        assert_eq!(.second_new_field, "also a string value")
+                        assert_eq!(.message, "nah this doesnt matter")
+                    """
 
-    //             [[tests.outputs]]
-    //               extract_from = "baz"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "new_field.equals" = "string value"
-    //                 "second_new_field.equals" = "also also a string value"
-    //                 "message.equals" = "nah this doesnt matter"
-    //       "#})
-    //       .unwrap();
+                [[tests.outputs]]
+                  extract_from = "baz"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.new_field, "string value")
+                        assert_eq!(.second_new_field, "also also a string value")
+                        assert_eq!(.message, "nah this doesnt matter")
+                    """
+          "#})
+          .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //   }
+          let mut tests = build_unit_tests(config).await.unwrap();
+          assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+      }
 
     //   #[tokio::test]
     //   async fn test_fails() {
