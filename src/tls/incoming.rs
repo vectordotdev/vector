@@ -88,6 +88,7 @@ impl MaybeTlsListener {
         })
     }
 
+    #[allow(unused)]
     pub(crate) fn accept_stream_limited(
         self,
         max_connections: Option<u32>,
