@@ -11,6 +11,7 @@ use crate::{
     conditions::Condition,
     config::{
         self,
+        compiler::expand_macros,
         unit_test_v2::{UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSourceConfig},
         OutputId, SinkOuter, SourceOuter,
     },
@@ -87,34 +88,65 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
     }
 }
 
+// Remove any existing sources and sinks
+// Retain only transform inputs that are other transforms
+fn sanitize_config(config_builder: &mut ConfigBuilder) {
+    config_builder.sources = Default::default();
+    config_builder.sinks = Default::default();
+
+    let all_valid_inputs = config_builder
+        .transforms
+        .iter()
+        .flat_map(|(key, transform)| {
+            // A transform and any of its named outputs
+            let mut keys = vec![key.to_string()];
+            keys.extend(
+                transform
+                    .inner
+                    .named_outputs()
+                    .iter()
+                    .map(|port| format!("{}.{}", key, port))
+                    .collect::<Vec<_>>(),
+            );
+            keys
+        })
+        .collect::<HashSet<_>>();
+
+    for (_, transform) in config_builder.transforms.iter_mut() {
+        let original_inputs = transform.inputs.clone().into_iter().collect::<HashSet<_>>();
+        // Route is not covered by named outputs, so explicitly preserve inputs that start with a transform key + '.'
+        let route_inputs = original_inputs
+            .iter()
+            .filter_map(|input| {
+                let mut route_input = None;
+                for valid_input in all_valid_inputs.iter() {
+                    if input.starts_with::<&str>(format!("{}.", valid_input).as_ref()) {
+                        route_input = Some(input.clone());
+                        break;
+                    }
+                }
+                route_input
+            })
+            .collect::<Vec<_>>();
+        let mut new_inputs = original_inputs
+            .intersection(&all_valid_inputs)
+            .map(|input| input.clone())
+            .collect::<Vec<_>>();
+        new_inputs.extend(route_inputs);
+        transform.inputs = new_inputs;
+    }
+}
+
 async fn build_unit_test(
     test: TestDefinition,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
+    sanitize_config(&mut config_builder);
     let mut build_errors = Vec::new();
 
-    // Rid the transform inputs of any existing sources
-    let mut available_insert_targets = HashSet::new();
-    let graph = Graph::new_unchecked(
-        &IndexMap::new(),
-        &config_builder.transforms,
-        &IndexMap::new(),
-    );
-    for (key, transform) in config_builder.transforms.iter_mut() {
-        transform.inputs = graph
-            .inputs_for(key)
-            .into_iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<_>>();
-        available_insert_targets.insert(key.clone());
-    }
-
+    let available_insert_targets = config_builder.transforms.keys().map(|key| key.clone()).collect::<HashSet<_>>();
     println!("test has the following inputs: {:?}\n", test.inputs);
     let inputs = build_and_validate_inputs(&test.inputs, &available_insert_targets)?;
-    // let inputs = build_and_validate_inputs(&test.inputs, available_insert_targets).unwrap_or_else(|errors| {
-    //   build_errors.extend(errors);
-    //   Vec::new()
-    // });
 
     // Connect a test source to each unique insert_at target transform
     let mut test_sources = IndexMap::new();
@@ -148,7 +180,7 @@ async fn build_unit_test(
         build_errors.extend(errors);
         Vec::new()
     });
-    println!("built output errors: {:?}", build_errors);
+
     // Connect a test sink to each unique extract_from target transform
     let mut test_output_sinks = IndexMap::new();
     for (target_transform_id, conditions) in outputs {
@@ -215,15 +247,13 @@ async fn build_unit_test(
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
+    println!("the transforms are: {:?}\n", config_builder.transforms);
+    let mut builder = config_builder.clone();
+    let expansions = expand_macros(&mut builder)?;
 
     // Check for an invalid input/output configuration wherein there is a
     // disconnect between insertions and extractions
-    let graph = Graph::new(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
-    )
-    .unwrap();
+    let graph = Graph::new(&builder.sources, &builder.transforms, &builder.sinks).unwrap();
     // let graph = Graph::new_unchecked(&Default::default(), &config_builder.transforms, &Default::default());
     let insert_at_targets = test
         .inputs
@@ -241,6 +271,7 @@ async fn build_unit_test(
             leaves
         })
         .collect::<HashSet<_>>();
+    println!("all valid outputs {:?}", valid_outputs);
     for extract_from_target in extract_from_sinks {
         if !valid_outputs.contains(&extract_from_target) {
             build_errors.push(format!(
@@ -269,6 +300,10 @@ async fn build_unit_test(
         pieces,
         sink_rxs,
     })
+}
+
+fn validate_connected() -> Result<(), Vec<String>> {
+    Ok(())
 }
 
 fn build_and_validate_inputs(
@@ -1447,63 +1482,66 @@ mod tests {
         assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
 
-    //   #[tokio::test]
-    //   async fn test_route() {
-    //       let config: ConfigBuilder = toml::from_str(indoc! {r#"
-    //           [transforms.foo]
-    //             inputs = ["ignored"]
-    //             type = "route"
-    //             [transforms.foo.route.first]
-    //               type = "check_fields"
-    //               "message.eq" = "test swimlane 1"
-    //             [transforms.foo.route.second]
-    //               type = "check_fields"
-    //               "message.eq" = "test swimlane 2"
+    #[tokio::test]
+    async fn test_route() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+              [transforms.foo]
+                inputs = ["ignored"]
+                type = "route"
+                  [transforms.foo.route]
+                  first = '.message == "test swimlane 1"'
+                  second = '.message == "test swimlane 2"'
 
-    //           [transforms.bar]
-    //             inputs = ["foo.first"]
-    //             type = "add_fields"
-    //             [transforms.bar.fields]
-    //               new_field = "new field added"
+              [transforms.bar]
+                inputs = ["foo.first"]
+                type = "add_fields"
+                [transforms.bar.fields]
+                  new_field = "new field added"
 
-    //           [[tests]]
-    //             name = "successful route test 1"
+              [[tests]]
+                name = "successful route test 1"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               value = "test swimlane 1"
+                [tests.input]
+                  insert_at = "foo"
+                  value = "test swimlane 1"
 
-    //             [[tests.outputs]]
-    //               extract_from = "foo.first"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "message.equals" = "test swimlane 1"
+                [[tests.outputs]]
+                  extract_from = "foo.first"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.message, "test swimlane 1")
+                    """
 
-    //             [[tests.outputs]]
-    //               extract_from = "bar"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "message.equals" = "test swimlane 1"
-    //                 "new_field.equals" = "new field added"
+                [[tests.outputs]]
+                  extract_from = "bar"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.message, "test swimlane 1")
+                        assert_eq!(.new_field, "new field added")
+                    """
 
-    //           [[tests]]
-    //             name = "successful route test 2"
+              [[tests]]
+                name = "successful route test 2"
 
-    //             [tests.input]
-    //               insert_at = "foo"
-    //               value = "test swimlane 2"
+                [tests.input]
+                  insert_at = "foo"
+                  value = "test swimlane 2"
 
-    //             [[tests.outputs]]
-    //               extract_from = "foo.second"
-    //               [[tests.outputs.conditions]]
-    //                 type = "check_fields"
-    //                 "message.equals" = "test swimlane 2"
-    //       "#})
-    //       .unwrap();
+                [[tests.outputs]]
+                  extract_from = "foo.second"
+                  [[tests.outputs.conditions]]
+                    type = "vrl"
+                    source = """
+                        assert_eq!(.message, "test swimlane 2")
+                    """
+          "#})
+        .unwrap();
 
-    //       let mut tests = build_unit_tests(config).await.unwrap();
-    //       assert_eq!(tests[0].run().1, Vec::<String>::new());
-    //   }
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 
     //   #[tokio::test]
     //   async fn test_fail_no_outputs() {

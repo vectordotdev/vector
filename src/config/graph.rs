@@ -305,6 +305,7 @@ impl Graph {
                 .filter(|e| e.from.component == n)
                 .map(|e| e.to.clone())
                 .collect::<Vec<_>>();
+            println!("current node: {:?} has neighbors {:?}", n, neighbors);
 
             if neighbors.is_empty() && n != *root {
                 leaves.insert(n);
