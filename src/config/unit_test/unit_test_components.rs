@@ -63,7 +63,7 @@ pub enum UnitTestSinkCheck {
 
 impl Default for UnitTestSinkCheck {
     fn default() -> Self {
-        UnitTestSinkCheck::NoOutputs
+        UnitTestSinkCheck::Noop
     }
 }
 
@@ -128,7 +128,6 @@ impl StreamSink for UnitTestSink {
             test_inspections: Vec::new(),
         };
 
-        // Receive all incoming events
         while let Some(event) = input.next().await {
             output_events.push(event);
         }
