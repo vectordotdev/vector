@@ -153,6 +153,9 @@ fn parse_pattern(
     pattern.push_str(parsed_pattern.definition.as_str());
     pattern.push_str(r#"\z"#);
 
+    // our regex engine(onig) uses (?m) mode modifier instead of (?s) to make the dot match all characters
+    pattern = pattern.replace("(?s)", "(?m)").replace("(?-s)", "(?-m)");
+
     // compile pattern
     let pattern = Arc::new(
         grok.compile(&pattern, true)

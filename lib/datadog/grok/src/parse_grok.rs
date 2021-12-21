@@ -794,12 +794,34 @@ mod tests {
 
     #[test]
     fn parses_with_new_lines() {
-        test_full_grok(vec![(
-            "%{data:field}",
-            "a\nb\nc",
-            Ok(Value::from(btreemap! {
-                "field" => "a\nb\nc"
-            })),
-        )]);
+        test_full_grok(vec![
+            (
+                "%{data:field}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "field" => "a\nb"
+                })),
+            ),
+            (
+                "%{data:line1}\n%{data:line2}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "line1" => "a",
+                    "line2" => "b"
+                })),
+            ),
+            // disable DOTALL mode
+            ("(?-m)%{data:field}", "a\nb", Err(Error::NoMatch)),
+            // (?s) is not supported by the underlying regex engine(onig) - it uses (?m) instead, so we convert it silently
+            (
+                "(?s)%{data:field}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "field" => "a\nb"
+                })),
+            ),
+            // disable DOTALL mode with (?-s)
+            ("(?-s)%{data:field}", "a\nb", Err(Error::NoMatch)),
+        ]);
     }
 }
