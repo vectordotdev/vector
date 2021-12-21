@@ -19,6 +19,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
     threshold: u32,
+    #[serde(alias = "window")]
     window_secs: f64,
     key_field: Option<Template>,
     exclude: Option<AnyCondition>,
