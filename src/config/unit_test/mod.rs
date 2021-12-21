@@ -1589,4 +1589,85 @@ mod tests {
         assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
         assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
+
+    #[tokio::test]
+    async fn test_task_transform() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.ingress1]
+              type = "remap"
+              inputs = [ "ignored" ]
+              source = '.new_field = "value1"'
+
+            [transforms.ingress2]
+              type = "remap"
+              inputs = [ "ignored" ]
+              source = '.another_new_field = "value2"'
+
+            [transforms.task-transform]
+              type = "reduce"
+              inputs = [ "ingress1", "ingress2" ]
+              group_by = [ "message" ]
+
+            [[tests]]
+              name = "task transform test"
+
+              [[tests.inputs]]
+                type = "log"
+                insert_at = "ingress1"
+
+                [tests.inputs.log_fields]
+                  message = "test1"
+
+              [[tests.inputs]]
+                type = "log"
+                insert_at = "ingress2"
+
+                [tests.inputs.log_fields]
+                  message = "test1"
+
+              [[tests.outputs]]
+                extract_from = "task-transform"
+
+                [[tests.outputs.conditions]]
+                  type = "vrl"
+                  source = """
+                    assert_eq!(.message, "test1", "incorrect message")
+                    assert_eq!(.new_field, "value1", "incorrect value")
+                    assert_eq!(.another_new_field, "value2", "incorrect value")
+                  """
+
+            [[tests]]
+              name = "task transform test failure"
+
+              [[tests.inputs]]
+                type = "log"
+                insert_at = "ingress1"
+
+                [tests.inputs.log_fields]
+                  message = "test1"
+
+              [[tests.inputs]]
+                type = "log"
+                insert_at = "ingress2"
+
+                [tests.inputs.log_fields]
+                  message = "different message"
+
+              [[tests.outputs]]
+                extract_from = "task-transform"
+
+                [[tests.outputs.conditions]]
+                  type = "vrl"
+                  source = """
+                    assert_eq!(.message, "test1", "incorrect message")
+                    assert_eq!(.new_field, "value1", "incorrect value")
+                    assert_eq!(.another_new_field, "value2", "incorrect value")
+                  """
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    }
 }
