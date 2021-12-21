@@ -36,7 +36,8 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
-            | Some(SubCommand::List(_)) => {
+            | Some(SubCommand::List(_)) 
+            | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {
