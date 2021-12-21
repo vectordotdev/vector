@@ -107,7 +107,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
                       --vector-cpus "${VECTOR_CPUS}" \
-                      --warmup-seconds "${WARMUP_SECONDS}"
+                      --warmup-seconds "${WARMUP_SECONDS}" && \
     ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "comparison" \
@@ -116,7 +116,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
                       --vector-cpus "${VECTOR_CPUS}" \
-                      --warmup-seconds "${WARMUP_SECONDS}"
+                      --warmup-seconds "${WARMUP_SECONDS}" || true
 done
 
 # Aggregate all captures and analyze them.
