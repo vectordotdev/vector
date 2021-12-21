@@ -148,11 +148,11 @@ async fn nats_source(
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
 
-                        out.send(event)
-                            .await
-                            .map_err(|error: crate::source_sender::ClosedError| {
+                        out.send(event).await.map_err(
+                            |error: crate::source_sender::ClosedError| {
                                 error!(message = "Error sending to sink.", %error);
-                            })?;
+                            },
+                        )?;
                     }
                 }
                 Err(error) => {
