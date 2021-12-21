@@ -466,6 +466,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                         keepalive: None,
                         tls: None,
                         receive_buffer_bytes: None,
+                        connection_limit: None
                     }),
                 );
 

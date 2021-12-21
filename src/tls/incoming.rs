@@ -74,6 +74,7 @@ impl MaybeTlsListener {
         (self.accept().await, self)
     }
 
+    #[allow(unused)]
     pub(crate) fn accept_stream(
         self,
     ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> {
