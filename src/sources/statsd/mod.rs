@@ -227,7 +227,7 @@ impl TcpSource for StatsdTcpSource {
         )
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }

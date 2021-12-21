@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, convert::TryFrom};
 use http::Uri;
 
 use super::BulkAction;
+use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
     aws::rusoto::AwsAuthentication,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
@@ -26,8 +27,10 @@ fn sets_create_action_when_configured() {
     use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("{{ action }}te")),
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: Some(String::from("{{ action }}te")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
@@ -70,7 +73,10 @@ fn encode_datastream_mode() {
     use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         mode: ElasticSearchMode::DataStream,
         ..Default::default()
@@ -107,7 +113,10 @@ fn encode_datastream_mode_no_routing() {
     use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         mode: ElasticSearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
@@ -144,8 +153,10 @@ fn encode_datastream_mode_no_routing() {
 #[test]
 fn handle_metrics() {
     let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("create")),
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: Some(String::from("create")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
@@ -182,8 +193,10 @@ fn handle_metrics() {
 #[test]
 fn decode_bulk_action_error() {
     let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("{{ action }}")),
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: Some(String::from("{{ action }}")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
@@ -199,8 +212,10 @@ fn decode_bulk_action_error() {
 #[test]
 fn decode_bulk_action() {
     let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("create")),
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: Some(String::from("create")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
@@ -218,7 +233,10 @@ fn encode_datastream_mode_no_sync() {
     use crate::config::log_schema;
 
     let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         mode: ElasticSearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
@@ -257,7 +275,10 @@ fn encode_datastream_mode_no_sync() {
 #[test]
 fn allows_using_excepted_fields() {
     let config = ElasticSearchConfig {
-        index: Some(String::from("{{ idx }}")),
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("{{ idx }}")),
+        }),
         encoding: EncodingConfigFixed {
             except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
             ..Default::default()
