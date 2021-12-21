@@ -6,16 +6,18 @@ use futures_util::{
     FutureExt, SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::{
-    oneshot, Mutex,
-};
+use tokio::sync::{oneshot, Mutex};
 use vector_core::{
-    event::{Event},
+    event::Event,
     sink::{StreamSink, VectorSink},
     transform::DataType,
 };
 
-use crate::{conditions::{self, Condition}, sinks::Healthcheck, sources};
+use crate::{
+    conditions::{self, Condition},
+    sinks::Healthcheck,
+    sources,
+};
 
 use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
 
@@ -55,7 +57,7 @@ pub enum UnitTestSinkCheck {
     // Check sets of conditions against received events
     Checks(Vec<Vec<Box<dyn Condition>>>),
     // Check that no events were received
-    NoOutputs
+    NoOutputs,
 }
 
 impl Default for UnitTestSinkCheck {
@@ -77,7 +79,7 @@ pub struct UnitTestSinkConfig {
     // Name of the test associated with this sink
     pub name: String,
     #[serde(skip)]
-    // Sender used to transmit the test result 
+    // Sender used to transmit the test result
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
@@ -127,7 +129,7 @@ impl StreamSink for UnitTestSink {
 
         // Receive all incoming events
         while let Some(event) = input.next().await {
-            // println!("sink received event: {:?}", event);
+            println!("sink received event: {:?}\n", event);
             output_events.push(event);
         }
 
@@ -143,39 +145,34 @@ impl StreamSink for UnitTestSink {
                         // ));
                         continue;
                     }
+
                     let mut check_errors = Vec::new();
-                    for event in output_events.iter() {
-                        // todo: add correct error message
-                        let mut per_event_errors = Vec::new();
-                        let check = check.clone();
-                        for condition in check {
+                    for condition in check {
+                        let mut condition_errors = Vec::new();
+                        for event in output_events.iter() {
                             match condition.check_with_context(event) {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                    condition_errors.clear();
+                                    break;
+                                }
                                 Err(error) => {
-                                    per_event_errors.push(error);
+                                    condition_errors.push(error);
                                 }
                             }
                         }
-                        if per_event_errors.is_empty() {
-                            check_errors.clear();
-                            break;
-                        } else {
-                            check_errors.extend(per_event_errors);
-                        }
+                        check_errors.extend(condition_errors);
                     }
-                    // either one or more events passed the check or the check failed for one or more events.
-                    // if failed, we need to update the test errors
-                    if !check_errors.is_empty() {
-                        result.test_errors.extend(check_errors);
-                    }
-                }
 
-            },
+                    result.test_errors.extend(check_errors);
+                }
+            }
             UnitTestSinkCheck::NoOutputs => {
                 if !output_events.is_empty() {
-                    result.test_errors.push("Events were received when not expected".to_string());
+                    result
+                        .test_errors
+                        .push("Events were received when not expected".to_string());
                 }
-            },
+            }
         }
 
         if let Err(_) = self.result_tx.send(result) {

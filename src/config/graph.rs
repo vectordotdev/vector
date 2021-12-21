@@ -302,7 +302,7 @@ impl Graph {
             let neighbors = self
                 .edges
                 .iter()
-                .filter(|e| e.from.component == n) 
+                .filter(|e| e.from.component == n)
                 .map(|e| e.to.clone())
                 .collect::<Vec<_>>();
 
