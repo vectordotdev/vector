@@ -6,7 +6,6 @@ use smallvec::SmallVec;
 use socket2::SockRef;
 use std::net::{IpAddr, SocketAddr};
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-use tokio::sync::Semaphore;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -139,19 +138,15 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            let connection_semaphore =
-                max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
-
             listener
-                .accept_stream()
+                .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
-                .for_each(move |connection| {
+                .for_each(move |(connection, permit)| {
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
                     let connection_gauge = connection_gauge.clone();
-                    let connection_semaphore = connection_semaphore.clone();
 
                     async move {
                         let socket = match connection {
@@ -167,15 +162,6 @@ where
 
                         let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
-
-                        // async block if we are over the connection limit
-                        let permit = match connection_semaphore {
-                            None => None,
-                            Some(semaphore) => {
-                                // is the semaphore is closed, or there is no limit, this will return `None`
-                                semaphore.acquire_owned().await.ok()
-                            }
-                        };
 
                         let tripwire = tripwire
                             .map(move |_| {

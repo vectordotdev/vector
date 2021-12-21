@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{
     future::Future,
     net::SocketAddr,
@@ -8,6 +9,7 @@ use std::{
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use snafu::ResultExt;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
@@ -82,6 +84,43 @@ impl MaybeTlsListener {
                 Poll::Ready(Some(item))
             }
             Poll::Pending => Poll::Pending,
+        })
+    }
+
+    pub(crate) fn accept_stream_limited(
+        self,
+        max_connections: Option<u32>,
+    ) -> impl Stream<
+        Item = (
+            crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>,
+            Option<OwnedSemaphorePermit>,
+        ),
+    > {
+        let connection_semaphore =
+            max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
+
+        let mut semaphore_future = connection_semaphore
+            .clone()
+            .map(|x| Box::pin(x.acquire_owned()));
+        let mut accept = Box::pin(self.into_accept());
+        stream::poll_fn(move |context| {
+            let permit = match semaphore_future.as_mut() {
+                Some(semaphore) => match semaphore.as_mut().poll(context) {
+                    Poll::Ready(permit) => {
+                        semaphore.set(connection_semaphore.clone().unwrap().acquire_owned());
+                        permit.ok()
+                    }
+                    Poll::Pending => return Poll::Pending,
+                },
+                None => None,
+            };
+            match accept.as_mut().poll(context) {
+                Poll::Ready((item, this)) => {
+                    accept.set(this.into_accept());
+                    Poll::Ready(Some((item, permit)))
+                }
+                Poll::Pending => Poll::Pending,
+            }
         })
     }
 
