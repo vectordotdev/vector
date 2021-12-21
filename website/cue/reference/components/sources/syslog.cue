@@ -96,10 +96,10 @@ components: sources: syslog: {
 			}
 		}
 		connection_limit: {
-			common: false
-			description: "The max number of TCP connections that will be processed."
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
 			relevant_when: "mode = `tcp`"
-			required:    false
+			required:      false
 			type: uint: {
 				default: null
 				unit:    "concurrency"
