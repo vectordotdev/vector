@@ -182,21 +182,6 @@ async fn parse_broken_topology() {
         [[tests]]
           name = "broken test 2"
 
-          [tests.input]
-            insert_at = "nope"
-            value = "nah this doesnt matter"
-
-          [[tests.outputs]]
-            extract_from = "quz"
-            [[tests.outputs.conditions]]
-              type = "vrl"
-              source = """
-                assert_eq!(.message, "not this")
-              """
-
-        [[tests]]
-          name = "broken test 3"
-
           [[tests.inputs]]
             insert_at = "foo"
             value = "nah this doesnt matter"
@@ -220,26 +205,36 @@ async fn parse_broken_topology() {
               source = """
                 assert_eq!(.message, "not this")
               """
+
+        [[tests]]
+          name = "successful test"
+          [[tests.inputs]]
+          insert_at = "foo"
+          value = "this does matter"
+
+        [[tests.outputs]]
+          extract_from = "foo"
+          [[tests.outputs.conditions]]
+            type = "vrl"
+            source = """
+            assert_eq!(.message, "this does matter")
+            assert_eq!(.foo_field, "string value")
+            """
     "#})
     .unwrap();
 
-    let errs = build_unit_tests(config).await.err().unwrap();
-    assert_eq!(
-        errs,
-        vec![
-            r#"Failed to build test 'broken test':
-  unable to complete topology between target transforms ["foo"] and output target 'baz'
-  unable to complete topology between target transforms ["foo"] and output target 'quz'"#
-                .to_owned(),
-            r#"Failed to build test 'broken test 2':
-  inputs[0]: unable to locate target transform 'nope'"#
-                .to_owned(),
-            r#"Failed to build test 'broken test 3':
-  unable to complete topology between target transforms ["foo", "nah"] and output target 'baz'
-  unable to complete topology between target transforms ["foo", "nah"] and output target 'quz'"#
-                .to_owned(),
-        ]
-    );
+    let mut tests = build_unit_tests(config).await.unwrap();
+    let mut errs_broken_test = tests.remove(0).run().await.1;
+    errs_broken_test.sort();
+    let mut errs_broken_test_2 = tests.remove(0).run().await.1;
+    errs_broken_test_2.sort();
+    let expected_errs = vec![
+        r#"Check transform "baz" failed, no events received. Topology may be disconnected or this transform is missing inputs."#,
+        r#"Check transform "quz" failed, no events received. Topology may be disconnected or this transform is missing inputs."#,
+    ];
+    assert_eq!(errs_broken_test, expected_errs);
+    assert_eq!(errs_broken_test_2, expected_errs);
+    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
 }
 
 #[tokio::test]

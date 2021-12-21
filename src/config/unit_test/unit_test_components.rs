@@ -69,7 +69,7 @@ impl Default for UnitTestSinkCheck {
 
 #[derive(Debug)]
 pub struct UnitTestSinkResult {
-    pub name: String,
+    pub test_name: String,
     pub test_errors: Vec<String>,
     pub test_inspections: Vec<String>,
 }
@@ -77,8 +77,10 @@ pub struct UnitTestSinkResult {
 #[derive(Serialize, Deserialize, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
-    // Name of the test associated with this sink
-    pub name: String,
+    // Name of the test this sink is part of
+    pub test_name: String,
+    // Name of the transform/branch associated with this sink
+    pub transform_id: String,
     #[serde(skip)]
     // Sender used to transmit the test result
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
@@ -94,7 +96,8 @@ impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take().unwrap();
         let sink = UnitTestSink {
-            name: self.name.clone(),
+            test_name: self.test_name.clone(),
+            transform_id: self.transform_id.clone(),
             result_tx: tx,
             check: self.check.clone(),
         };
@@ -113,7 +116,8 @@ impl SinkConfig for UnitTestSinkConfig {
 }
 
 pub struct UnitTestSink {
-    pub name: String,
+    pub test_name: String,
+    pub transform_id: String,
     pub result_tx: oneshot::Sender<UnitTestSinkResult>,
     pub check: UnitTestSinkCheck,
 }
@@ -123,7 +127,7 @@ impl StreamSink for UnitTestSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut output_events = Vec::new();
         let mut result = UnitTestSinkResult {
-            name: self.name,
+            test_name: self.test_name,
             test_errors: Vec::new(),
             test_inspections: Vec::new(),
         };
@@ -137,7 +141,7 @@ impl StreamSink for UnitTestSink {
                 if output_events.is_empty() {
                     result
                         .test_errors
-                        .push("check transform failed, no events received".to_string());
+                        .push(format!("Check transform {:?} failed, no events received. Topology may be disconnected or this transform is missing inputs.", self.transform_id));
                 }
                 for check in checks {
                     if check.is_empty() {

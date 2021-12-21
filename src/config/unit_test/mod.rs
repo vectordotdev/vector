@@ -1,13 +1,12 @@
-mod unit_test_components;
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests;
+mod unit_test_components;
 
 use crate::{
     conditions::Condition,
     config::{
-        self, compiler::expand_macros, graph::Graph, loading, ComponentKey, Config, ConfigBuilder,
-        ConfigDiff, ConfigPath, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue,
-        TestOutput,
+        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigDiff,
+        ConfigPath, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
     topology::{
@@ -181,10 +180,6 @@ async fn build_unit_test(
         test_sources.insert(key.clone(), UnitTestSourceConfig::default());
     }
 
-    let insert_at_sources = inputs
-        .keys()
-        .map(|input| source_ids.get(input).unwrap().clone())
-        .collect::<Vec<_>>();
     for (input, events) in inputs {
         let source_config = test_sources
             .get_mut(&input)
@@ -230,6 +225,7 @@ async fn build_unit_test(
             extract_targets
         })
         .collect::<HashSet<_>>();
+
     // Mapping from transform name to unit test sink name
     let sink_ids = available_extract_targets
         .iter()
@@ -251,7 +247,8 @@ async fn build_unit_test(
     for (transform_id, _) in sink_ids.iter() {
         let (tx, rx) = oneshot::channel();
         let sink_config = UnitTestSinkConfig {
-            name: test.name.clone(),
+            test_name: test.name.clone(),
+            transform_id: transform_id.to_string(),
             result_tx: Arc::new(Mutex::new(Some(tx))),
             check: UnitTestSinkCheck::Noop,
         };
@@ -259,19 +256,12 @@ async fn build_unit_test(
         sink_rxs.push(rx);
     }
 
-    let mut extract_from_sinks = Vec::new();
     // Add checks to sinks associated with an extract_from
     for (transform_id, checks) in outputs {
         let sink_config = test_sinks
             .get_mut(&transform_id)
             .expect("Sink does not exist");
         sink_config.check = UnitTestSinkCheck::Checks(checks);
-
-        let sink_id = sink_ids
-            .get(&transform_id)
-            .expect("Sink does not exist")
-            .as_ref();
-        extract_from_sinks.push(ComponentKey::from(sink_id));
     }
 
     // Add no outputs assertion to relevant sinks
@@ -280,12 +270,6 @@ async fn build_unit_test(
             .get_mut(&transform_id)
             .expect("Sink does not exist");
         sink_config.check = UnitTestSinkCheck::NoOutputs;
-
-        let sink_id = sink_ids
-            .get(&transform_id)
-            .expect("Sink does not exist")
-            .as_ref();
-        extract_from_sinks.push(ComponentKey::from(sink_id));
     }
 
     let sinks = test_sinks
@@ -304,35 +288,7 @@ async fn build_unit_test(
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
-    let mut builder = config_builder.clone();
-    let _ = expand_macros(&mut builder)?;
 
-    // Check for an invalid input/output configuration wherein there is a
-    // disconnect between insertions and extractions
-    let graph = Graph::new(&builder.sources, &builder.transforms, &builder.sinks).unwrap();
-    let insert_at_targets = test
-        .inputs
-        .iter()
-        .map(|input| input.insert_at.to_string())
-        .collect::<Vec<_>>();
-    let valid_outputs = insert_at_sources
-        .iter()
-        .flat_map(|input| graph.get_leaves(&ComponentKey::from(input.as_ref())))
-        .collect::<HashSet<_>>();
-
-    for extract_from_target in extract_from_sinks {
-        if !valid_outputs.contains(&extract_from_target) {
-            build_errors.push(format!(
-                "unable to complete topology between target transforms {:?} and output target '{}'",
-                insert_at_targets,
-                extract_from_target
-                    .to_string()
-                    .strip_suffix("-sink")
-                    .unwrap()
-                    .replace("-", ".")
-            ));
-        }
-    }
     if !build_errors.is_empty() {
         return Err(build_errors);
     }
