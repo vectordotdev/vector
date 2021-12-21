@@ -4,8 +4,7 @@ use indexmap::IndexMap;
 
 use super::{
     graph::Graph, unit_test_v2::UnitTestSinkResult, ComponentKey, Config, ConfigBuilder,
-    ConfigDiff, ConfigPath, GlobalOptions, TestDefinition, TestInput, TestInputValue, TestOutput,
-    TransformConfig, TransformContext,
+    ConfigDiff, ConfigPath, TestDefinition, TestInput, TestInputValue, TestOutput,
 };
 use crate::{
     conditions::Condition,
@@ -13,7 +12,7 @@ use crate::{
         self,
         compiler::expand_macros,
         unit_test_v2::{UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSourceConfig},
-        OutputId, SinkOuter, SourceOuter,
+        SinkOuter, SourceOuter,
     },
     event::{Event, Value},
     topology::{
@@ -31,7 +30,6 @@ use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
 };
-use tokio_stream::wrappers::ReceiverStream;
 
 pub struct UnitTest {
     pub name: String,
@@ -39,12 +37,6 @@ pub struct UnitTest {
     diff: ConfigDiff,
     pieces: Pieces,
     sink_rxs: Vec<Receiver<UnitTestSinkResult>>,
-    // globals: GlobalOptions,
-}
-
-pub struct UnitTestResult {
-    pub name: String,
-    pub test_errors: Vec<String>,
 }
 
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
@@ -56,7 +48,7 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
 }
 
 async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
-    let mut test_definitions = std::mem::take(&mut config_builder.tests);
+    let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
     // todo: generate random id for inserted components
@@ -248,7 +240,9 @@ async fn build_unit_test(
     let mut extract_from_sinks = Vec::new();
     // Add checks to sinks associated with an extract_from
     for (transform_id, checks) in outputs {
-        let sink_config = test_sinks.get_mut(&transform_id).expect("Sink does not exist");
+        let sink_config = test_sinks
+            .get_mut(&transform_id)
+            .expect("Sink does not exist");
         sink_config.check = UnitTestSinkCheck::Checks(checks);
 
         let sink_id = sink_ids
@@ -260,7 +254,9 @@ async fn build_unit_test(
 
     // Add no outputs assertion to relevant sinks
     for transform_id in test.no_outputs_from {
-        let sink_config = test_sinks.get_mut(&transform_id).expect("Sink does not exist");
+        let sink_config = test_sinks
+            .get_mut(&transform_id)
+            .expect("Sink does not exist");
         sink_config.check = UnitTestSinkCheck::NoOutputs;
 
         let sink_id = sink_ids
@@ -299,10 +295,7 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     let valid_outputs = insert_at_sources
         .iter()
-        .flat_map(|input| {
-            let mut leaves = graph.get_leaves(&ComponentKey::from(input.as_ref()));
-            leaves
-        })
+        .flat_map(|input| graph.get_leaves(&ComponentKey::from(input.as_ref())))
         .collect::<HashSet<_>>();
 
     for extract_from_target in extract_from_sinks {
@@ -404,7 +397,6 @@ fn build_outputs(
                 existing_conditions.push(conditions.clone())
             })
             .or_insert(vec![conditions]);
-        // ((output.extract_from.clone(), conditions));
     }
 
     if errors.is_empty() {
@@ -412,22 +404,6 @@ fn build_outputs(
     } else {
         Err(errors)
     }
-}
-
-fn build_unit_test_sources(
-    sources: IndexMap<String, Vec<Event>>,
-) -> IndexMap<ComponentKey, SourceOuter> {
-    sources
-        .into_iter()
-        .map(|(key, events)| {
-            let source_config = UnitTestSourceConfig {
-                events,
-                ..Default::default()
-            };
-
-            (key.into(), SourceOuter::new(source_config))
-        })
-        .collect::<IndexMap<_, _>>()
 }
 
 impl UnitTest {
@@ -440,7 +416,6 @@ impl UnitTest {
 
         let mut in_flight = self.sink_rxs.into_iter().collect::<FuturesUnordered<_>>();
 
-        let mut inspections = Vec::new();
         let mut errors = Vec::new();
         while let Some(partial_result) = in_flight.next().await {
             let partial_result = partial_result.unwrap();
@@ -449,374 +424,9 @@ impl UnitTest {
             }
         }
 
-        (inspections, errors)
+        (Vec::new(), errors)
     }
 }
-
-pub struct UnitTestCheck {
-    extract_from: ComponentKey,
-    conditions: Vec<Box<dyn Condition>>,
-}
-
-fn event_to_string(event: &Event) -> String {
-    match event {
-        Event::Log(log) => serde_json::to_string(&log).unwrap_or_else(|_| "{}".into()),
-        Event::Metric(metric) => serde_json::to_string(&metric).unwrap_or_else(|_| "{}".into()),
-    }
-}
-
-fn events_to_string(name: &str, events: &[Event]) -> String {
-    if events.len() > 1 {
-        format!(
-            "  {}s:\n    {}",
-            name,
-            events
-                .iter()
-                .map(event_to_string)
-                .collect::<Vec<_>>()
-                .join("\n    ")
-        )
-    } else {
-        events
-            .first()
-            .map(|e| format!("  {}: {}", name, event_to_string(e)))
-            .unwrap_or(format!("  no {}", name))
-    }
-}
-
-// impl UnitTest {
-//     // Executes each test and provides a tuple of inspections and error lists.
-//     pub fn run(&mut self) -> (Vec<String>, Vec<String>) {
-//         println!("Running a unit test! {:?}\n", self.name);
-//         let mut errors = Vec::new();
-//         let mut inspections = Vec::new();
-//         let mut results = HashMap::new();
-
-//         let mut inputs_by_target = HashMap::new();
-//         for (targets, event) in &self.inputs {
-//             for target in targets {
-//                 let entry = inputs_by_target
-//                     .entry(target.clone())
-//                     .or_insert_with(Vec::new);
-//                 entry.push(event.clone());
-//             }
-//         }
-
-//         for (target, inputs) in inputs_by_target {
-//             walk(
-//                 &target,
-//                 inputs,
-//                 &mut self.transforms,
-//                 &mut results,
-//                 &self.globals,
-//             );
-//         }
-
-//         for check in &self.checks {
-//             if let Some((inputs, outputs)) = results.get(&check.extract_from) {
-//                 if check.conditions.is_empty() {
-//                     inspections.push(format!(
-//                         "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
-//                         check.extract_from,
-//                         events_to_string(" input", inputs),
-//                         events_to_string("output", outputs),
-//                     ));
-//                     continue;
-//                 }
-//                 let failed_conditions = check
-//                     .conditions
-//                     .iter()
-//                     .enumerate()
-//                     .flat_map(|(i, cond)| {
-//                         let cond_errs = outputs
-//                             .iter()
-//                             .enumerate()
-//                             .filter_map(|(j, e)| {
-//                                 cond.check_with_context(e).err().map(|err| {
-//                                     if outputs.len() > 1 {
-//                                         format!("condition[{}], payload[{}]: {}", i, j, err)
-//                                     } else {
-//                                         format!("condition[{}]: {}", i, err)
-//                                     }
-//                                 })
-//                             })
-//                             .collect::<Vec<_>>();
-//                         if cond_errs.len() < outputs.len() {
-//                             // At least one output succeeded for this condition.
-//                             Vec::new()
-//                         } else {
-//                             cond_errs
-//                         }
-//                     })
-//                     .collect::<Vec<_>>();
-//                 if !failed_conditions.is_empty() {
-//                     errors.push(format!(
-//                         "check transform '{}' failed conditions:\n  {}\npayloads (events encoded as JSON):\n{}\n{}",
-//                         check.extract_from,
-//                         failed_conditions.join("\n  "),
-//                         events_to_string(" input", inputs),
-//                         events_to_string("output", outputs),
-//                     ));
-//                 }
-//                 if outputs.is_empty() {
-//                     errors.push(format!(
-//                         "check transform {:?} failed, no events received.",
-//                         check.extract_from,
-//                     ));
-//                 }
-//             } else {
-//                 errors.push(format!(
-//                     "check transform '{}' failed: received zero resulting events.",
-//                     check.extract_from,
-//                 ));
-//             }
-//         }
-
-//         for tform in &self.no_outputs_from {
-//             if let Some((inputs, outputs)) = results.get(tform) {
-//                 if !outputs.is_empty() {
-//                     errors.push(format!(
-//                         "check transform '{}' failed: expected no outputs.\npayloads (events encoded as JSON):\n{}\n{}",
-//                         tform,
-//                         events_to_string(" input", inputs),
-//                         events_to_string("output", outputs),
-//                     ));
-//                 }
-//             }
-//         }
-
-//         (inspections, errors)
-//     }
-// }
-
-//------------------------------------------------------------------------------
-
-// fn build_inputs(
-//     config: &Config,
-//     definition: &TestDefinition,
-// ) -> Result<Vec<(Vec<ComponentKey>, Event)>, Vec<String>> {
-//     let mut inputs = Vec::new();
-//     let mut errors = vec![];
-
-//     if let Some(input_def) = &definition.input {
-//         match build_input(config, input_def) {
-//             Ok(input_event) => inputs.push(input_event),
-//             Err(err) => errors.push(err),
-//         }
-//     } else if definition.inputs.is_empty() {
-//         errors.push("must specify at least one input.".to_owned());
-//     }
-//     for input_def in &definition.inputs {
-//         match build_input(config, input_def) {
-//             Ok(input_event) => inputs.push(input_event),
-//             Err(err) => errors.push(err),
-//         }
-//     }
-
-//     if errors.is_empty() {
-//         Ok(inputs)
-//     } else {
-//         Err(errors)
-//     }
-// }
-
-// async fn build_unit_test(
-//     definition: &TestDefinition,
-//     config: &Config,
-// ) -> Result<UnitTest, Vec<String>> {
-//     let mut errors = vec![];
-
-//     let inputs = match build_inputs(config, definition) {
-//         Ok(inputs) => inputs,
-//         Err(mut errs) => {
-//             errors.append(&mut errs);
-//             Vec::new()
-//         }
-//     };
-//     println!("----- Building TestDef -------");
-//     println!("test definition: {:?}", definition);
-//     println!("-----");
-//     println!("inputs: {:?}", inputs);
-//     println!("-----");
-
-//     // Maps transform names with their output targets (transforms that use it as
-//     // an input).
-//     let mut transform_outputs: IndexMap<ComponentKey, IndexMap<ComponentKey, ()>> = config
-//         .transforms
-//         .iter()
-//         .map(|(k, _)| (k.clone(), IndexMap::new()))
-//         .collect();
-
-//     config.transforms.iter().for_each(|(k, t)| {
-//         t.inputs.iter().for_each(|i| {
-//             // TODO: this is intentionally ignoring named outputs for now
-//             if let Some(outputs) = transform_outputs.get_mut(&i.component) {
-//                 outputs.insert(k.clone(), ());
-//             }
-//         })
-//     });
-//     println!(
-//         "a mapping between a transform --> its outputs:\n {:?}\n",
-//         transform_outputs
-//     );
-
-//     for (i, (input_target, _)) in inputs.iter().enumerate() {
-//         for target in input_target {
-//             if !transform_outputs.contains_key(target) {
-//                 errors.push(format!(
-//                     "inputs[{}]: unable to locate target transform '{}'",
-//                     i, target
-//                 ));
-//             }
-//         }
-//     }
-//     if !errors.is_empty() {
-//         return Err(errors);
-//     }
-
-//     let mut leaves: IndexMap<ComponentKey, ()> = IndexMap::new();
-//     definition.outputs.iter().for_each(|o| {
-//         leaves.insert(o.extract_from.clone(), ());
-//     });
-//     definition.no_outputs_from.iter().for_each(|o| {
-//         leaves.insert(o.clone(), ());
-//     });
-//     println!(
-//         "all components that we want to extract events from:\n {:?}\n",
-//         leaves
-//     );
-
-//     // Reduce the configured transforms into just the ones connecting our test
-//     // target with output targets.
-//     reduce_transforms(
-//         inputs
-//             .iter()
-//             .map(|(names, _)| names)
-//             .flatten()
-//             .cloned()
-//             .collect::<Vec<_>>(),
-//         &leaves,
-//         &mut transform_outputs,
-//     );
-
-//     println!("the reduced version of the mapping between transform --> its outputs (we cut all the transforms not under test): \n {:?}\n", transform_outputs);
-
-//     let diff = ConfigDiff::initial(config);
-//     let (enrichment_tables, tables_errors) = load_enrichment_tables(config, &diff).await;
-
-//     errors.extend(tables_errors);
-
-//     // Build reduced transforms.
-//     let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
-//     for (id, transform_config) in &config.transforms {
-//         if let Some(outputs) = transform_outputs.remove(id) {
-//             let context = TransformContext {
-//                 key: Some(id.clone()),
-//                 globals: config.global.clone(),
-//                 enrichment_tables: enrichment_tables.clone(),
-//             };
-//             println!("--- transform from config {:?}", transform_config);
-
-//             match transform_config.inner.build(&context).await {
-//                 Ok(transform) => {
-//                     transforms.insert(
-//                         id.clone(),
-//                         UnitTestTransform {
-//                             transform,
-//                             config: transform_config.inner.clone(),
-//                             next: outputs.into_iter().map(|(k, _)| k).collect(),
-//                         },
-//                     );
-//                 }
-//                 Err(err) => {
-//                     errors.push(format!("failed to build transform '{}': {:#}", id, err));
-//                 }
-//             }
-//         }
-//     }
-
-//     println!(
-//         "we've built actual transforms for the following: \n {:?}\n",
-//         transforms.keys()
-//     );
-
-//     if !errors.is_empty() {
-//         return Err(errors);
-//     }
-
-//     println!("checking that every test output extraction matches a built transform\n");
-//     definition.outputs.iter().for_each(|o| {
-//         if !transforms.contains_key(&o.extract_from) {
-//             let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
-//             if targets.len() == 1 {
-//                 errors.push(format!(
-//                     "unable to complete topology between target transform '{}' and output target '{}'",
-//                     targets.first().unwrap(), o.extract_from
-//                 ));
-//             } else {
-//                 errors.push(format!(
-//                     "unable to complete topology between target transforms {:?} and output target '{}'",
-//                     targets.iter().map(|item| item.to_string()).collect::<Vec<_>>(), o.extract_from
-//                 ));
-//             }
-//         }
-//     });
-
-//     // Build all output conditions.
-//     let checks = definition
-//         .outputs
-//         .iter()
-//         .map(|o| {
-//             let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
-//             for (index, cond_conf) in o
-//                 .conditions
-//                 .as_ref()
-//                 .unwrap_or(&Vec::new())
-//                 .iter()
-//                 .enumerate()
-//             {
-//                 println!("building a condition {:?}", cond_conf);
-//                 match cond_conf.build(&Default::default()) {
-//                     Ok(c) => conditions.push(c),
-//                     Err(e) => errors.push(format!(
-//                         "failed to create test condition '{}': {}",
-//                         index, e,
-//                     )),
-//                 }
-//             }
-
-//             UnitTestCheck {
-//                 extract_from: o.extract_from.clone(),
-//                 conditions,
-//             }
-//         })
-//         .collect();
-
-//     println!("done building checks\n");
-
-//     if definition.outputs.is_empty() && definition.no_outputs_from.is_empty() {
-//         errors.push(
-//             "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_owned(),
-//         );
-//     }
-
-//     enrichment_tables.finish_load();
-
-//     if !errors.is_empty() {
-//         Err(errors)
-//     } else {
-//         Ok(UnitTest {
-//             name: definition.name.clone(),
-//             inputs,
-//             transforms,
-//             checks,
-//             no_outputs_from: definition.no_outputs_from.clone(),
-//             globals: config.global.clone(),
-//         })
-//     }
-// }
-
-// -----
 
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
@@ -853,228 +463,6 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             input.type_str
         )),
     }
-}
-
-async fn run_tests(paths: &[ConfigPath]) -> Result<Vec<UnitTestResult>, Vec<String>> {
-    // Load a ConfigBuilder from the user provided config paths
-    let (mut builder, _) = super::loading::load_builder_from_paths(paths)?;
-
-    let mut tests = std::mem::take(&mut builder.tests);
-
-    let mut test_results = Vec::new();
-    for test in tests {
-        // Reload the ConfigBuilder from the user provided config paths
-        let (mut builder, _) = super::loading::load_builder_from_paths(paths)?;
-
-        let mut source_keys = Vec::new();
-        let graph = Graph::new_unchecked(&IndexMap::new(), &builder.transforms, &IndexMap::new());
-        let transforms = std::mem::take(&mut builder.transforms)
-            .into_iter()
-            .map(|(key, transform)| {
-                let mut inputs = graph.inputs_for(&key);
-                // Add a source as an input to every transform
-                let source_key = OutputId::from(ComponentKey::from(format!(
-                    "{}-{}",
-                    key, "vector-unit-test-source"
-                )));
-                source_keys.push(source_key.clone());
-                inputs.push(source_key);
-                (
-                    key,
-                    transform.with_inputs(
-                        inputs
-                            .into_iter()
-                            .map(|i| i.to_string())
-                            .collect::<Vec<_>>(),
-                    ),
-                )
-            })
-            .collect::<IndexMap<_, _>>();
-
-        // println!("refactor transforms {:?}\n", transforms);
-
-        // mapping source key --> input events
-        let mut source_to_events: IndexMap<ComponentKey, Vec<Event>> = IndexMap::new();
-        for input in test.inputs.iter() {
-            // todo: remove unwrap
-            let event = build_input_event(input).unwrap();
-            // todo: add error if the insert_at doesn't exist
-            let target_source_key = ComponentKey::from(format!(
-                "{}-{}",
-                input.insert_at.to_string(),
-                "vector-unit-test-source"
-            ));
-            if let Some(events) = source_to_events.get_mut(&target_source_key) {
-                events.push(event);
-            } else {
-                source_to_events.insert(target_source_key, vec![event]);
-            }
-        }
-
-        // mapping source key --> transmitter
-        let mut source_txs = IndexMap::new();
-        // construct the sources
-        let sources = source_keys
-            .into_iter()
-            .map(|id| {
-                let (tx, rx) = tokio::sync::mpsc::channel(1);
-                // todo: remove duplicate to_string
-                source_txs.insert(ComponentKey::from(id.to_string()), tx);
-                (
-                    ComponentKey::from(id.to_string()),
-                    SourceOuter::new(UnitTestSourceConfig {
-                        ..Default::default()
-                    }),
-                )
-            })
-            .collect::<IndexMap<_, _>>();
-
-        // mapping sink key --> receiver
-        let mut sink_rxs = IndexMap::new();
-        let sinks = transforms
-            .iter()
-            .flat_map(|(key, transform)| {
-                // A transform and any of its named outputs
-                let mut keys = vec![key.to_string()];
-                keys.extend(
-                    transform
-                        .inner
-                        .named_outputs()
-                        .iter()
-                        .map(|port| format!("{}.{}", key, port))
-                        .collect::<Vec<_>>(),
-                );
-
-                // For each possible output, create a sink
-                keys.into_iter()
-                    .map(|key| {
-                        let inputs = vec![key.to_string()];
-                        let sink_key = ComponentKey::from(format!(
-                            "{}-{}",
-                            key.replace(".", ""),
-                            "vector-unit-test-sink"
-                        ));
-                        let (tx, rx) = tokio::sync::oneshot::channel();
-                        sink_rxs.insert(sink_key.clone(), rx);
-                        (
-                            sink_key,
-                            SinkOuter::new(
-                                inputs,
-                                Box::new(UnitTestSinkConfig {
-                                    result_tx: Arc::new(Mutex::new(Some(tx))),
-                                    ..Default::default()
-                                }),
-                            ),
-                        )
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<IndexMap<_, _>>();
-
-        // mapping sink key --> conditions for output events
-        let mut sink_to_checks = IndexMap::new();
-        for output in test.outputs {
-            let sink_key = ComponentKey::from(format!(
-                "{}-{}",
-                output.extract_from.to_string().replace(".", ""),
-                "vector-unit-test-sink"
-            ));
-            let mut conditions = Vec::new();
-            // todo: use errors outside of this loop
-            let mut errors = Vec::new();
-            for (index, condition) in output.conditions.unwrap_or(Vec::new()).iter().enumerate() {
-                match condition.build(&Default::default()) {
-                    Ok(condition) => conditions.push(condition),
-                    Err(error) => errors.push(format!(
-                        "failed to create test condition '{}': {}",
-                        index, error
-                    )),
-                }
-            }
-            // a check is a collection of conditions
-            let mut checks = sink_to_checks.entry(sink_key).or_insert(vec![]);
-            checks.push(conditions);
-        }
-        // println!("sinks to checks keys {:?}", sink_to_checks.keys());
-
-        // println!("refactor -- made the following sinks: {:?}\n", sinks);
-
-        builder.sources = sources;
-        builder.transforms = transforms;
-        builder.sinks = sinks;
-
-        let config = builder.build().unwrap();
-        let diff = config::ConfigDiff::initial(&config);
-        let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-            .await
-            .unwrap();
-
-        let (topology, _) = topology::start_validated(config, diff, pieces)
-            .await
-            .unwrap();
-        // Send input events, drop any senders that will not be used to send events
-        source_txs.retain(|key, _| source_to_events.get(key).is_some());
-        for (key, events) in source_to_events {
-            let tx = source_txs.get(&key).unwrap();
-            for event in events {
-                tx.send(event).await;
-            }
-        }
-        drop(source_txs);
-        let _ = topology.sources_finished().await;
-        // let _ = tokio::spawn(async move { topology.stop().await });
-        let _stop_complete = topology.stop();
-
-        // Collect outputs
-        // let mut in_flight = sink_rxs.into_iter().map(|(_, rx)| ReceiverStream::new(rx).collect::<Vec<_>>()).collect::<FuturesUnordered<_>>();
-        let mut in_flight = sink_rxs
-            .into_iter()
-            .map(|(key, rx)| async move { (key, rx.await) })
-            .collect::<FuturesUnordered<_>>();
-        let mut test_result = UnitTestResult {
-            name: test.name.clone(),
-            test_errors: Vec::new(),
-        };
-        // while let Some((key, output_events)) = in_flight.next().await {
-        //     let output_events = output_events.unwrap();
-        //     // println!("received events from {:?} sink {:?}\n", key, output_events);
-        //     // todo: move this checking logic out of this receiving loop to allow us to receive everything without delay first
-        //     if let Some(checks) = sink_to_checks.get(&key) {
-        //         // println!("checking...\n");
-        //         // for each check, evaluate every event, breaking on the first event for which the check is entirely true
-        //         for check in checks {
-        //             let mut overall_check_errors = Vec::new();
-        //             let mut result = false;
-        //             for event in output_events.iter() {
-        //                 // todo: add correct error message
-        //                 let mut per_event_errors = Vec::new();
-        //                 for condition in check {
-        //                     match condition.check_with_context(event) {
-        //                         Ok(_) => {}
-        //                         Err(error) => {
-        //                             per_event_errors.push(error);
-        //                         }
-        //                     }
-        //                 }
-        //                 if per_event_errors.is_empty() {
-        //                     overall_check_errors.clear();
-        //                     break;
-        //                 } else {
-        //                     overall_check_errors.extend(per_event_errors);
-        //                 }
-        //             }
-        //             // either one or more events passed the check or the check failed for one or more events.
-        //             // if failed, we need to update the test errors
-        //             if !overall_check_errors.is_empty() {
-        //                 test_result.test_errors.extend(overall_check_errors);
-        //             }
-        //         }
-        //     }
-        // }
-        // test_results.push(test_result);
-    }
-
-    Ok(test_results)
 }
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]

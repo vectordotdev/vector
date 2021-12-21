@@ -13,11 +13,7 @@ use vector_core::{
     transform::DataType,
 };
 
-use crate::{
-    conditions::{self, Condition},
-    sinks::Healthcheck,
-    sources,
-};
+use crate::{conditions::Condition, sinks::Healthcheck, sources};
 
 use super::{SinkConfig, SinkContext, SourceConfig, SourceContext};
 
@@ -31,7 +27,7 @@ pub struct UnitTestSourceConfig {
 #[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let mut events = self.events.clone().into_iter().map(Ok);
+        let events = self.events.clone().into_iter().map(Ok);
 
         Ok(Box::pin(async move {
             let mut out = cx.out;

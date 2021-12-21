@@ -58,7 +58,7 @@ impl Opts {
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut aggregated_test_inspections: Vec<(String, Vec<String>)> = Vec::new();
+    let aggregated_test_inspections: Vec<(String, Vec<String>)> = Vec::new();
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
@@ -72,7 +72,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         println!("Running tests");
     }
     match config::build_unit_tests(&paths).await {
-        Ok(mut tests) => {
+        Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]
                 {
@@ -81,7 +81,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             } else {
                 for test in tests {
                     let name = test.name.clone();
-                    let (inspections, errors) = test.run().await;
+                    let (_inspections, errors) = test.run().await;
                     // todo: add test_inspections
                     if !errors.is_empty() {
                         #[allow(clippy::print_stdout)]
