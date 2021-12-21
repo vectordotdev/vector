@@ -1,10 +1,13 @@
 use std::{fs::File, future::ready, io::Read};
+use std::time::Duration;
 
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde_json::{json, Value};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::matchers::method;
 use vector_core::{
     config::log_schema,
     event::{BatchNotifier, BatchStatus, LogEvent},
@@ -110,17 +113,19 @@ fn ensure_pipeline_in_params() {
 
 #[tokio::test]
 async fn timeout_occurs() {
-    // use governor::clock;
-    // let clock = clock::FakeRelativeClock::default();
-    use tokio::time::{sleep, Duration};
-
-    let pipeline = String::from("test-pipeline");
     const CONNECTION_TIMEOUT: u64 = 1;
 
+    let mock_server = MockServer::start().await;
+    let template = ResponseTemplate::new(200)
+        .set_delay(Duration::from_secs(CONNECTION_TIMEOUT * 5));
+    Mock::given(method("GET"))
+        .respond_with(template)
+        .mount(&mock_server)
+        .await;
+
     let config = ElasticSearchConfig {
-        endpoint: "https://example.com".into(),
+        endpoint: mock_server.uri().parse().unwrap(),
         index: Some(String::from("vector")),
-        pipeline: Some(pipeline.clone()),
         connection_timeout: Some(CONNECTION_TIMEOUT),
         ..config()
     };
@@ -130,20 +135,9 @@ async fn timeout_occurs() {
         .build(cx.clone())
         .await
         .expect("Building config failed");
-    let time_advanced = Duration::from_secs(CONNECTION_TIMEOUT + 1);
-    tokio::time::pause();
-    tokio::time::advance(time_advanced).await;
-    /* Tried to simulate connection timeout by connecting to either localhost or some external website;
-    after some search, there's doesn't seem to be a good existing solution.
-    Ideal steps:
-    1. connect to a fake server
-    2. advance the artificial time either by
-        a. tokio::time::advance(time_advanced);
-        b. clock.advance(time_advanced);
-    */
 
     let res = healthcheck.await;
-    assert!(res.is_err());
+    assert!(res.is_err());  // this assertion fells
     assert_eq!(
         res.err()
             .and_then(|e| e.downcast::<HealthcheckError>().ok()), // == None, currently e == some dns error (can't resolve domain name)
