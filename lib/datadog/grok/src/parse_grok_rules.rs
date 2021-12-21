@@ -147,9 +147,11 @@ fn parse_pattern(
 ) -> Result<GrokRule, Error> {
     let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases, &mut Vec::new())?;
     let mut pattern = String::new();
-    pattern.push('^');
+    // (?m) enables DOTALL mode(. includes new lines)
+    // \A, \z - parses from the beginning to the end of string, not line(until \n)
+    pattern.push_str(r#"\A(?m)"#);
     pattern.push_str(parsed_pattern.definition.as_str());
-    pattern.push('$');
+    pattern.push_str(r#"\z"#);
 
     // compile pattern
     let pattern = Arc::new(

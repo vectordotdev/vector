@@ -260,7 +260,7 @@ mod tests {
             parse_grok_rules(&["%{unknown}".to_string()], btreemap! {})
                 .unwrap_err()
                 .to_string(),
-            r#"failed to parse grok expression '^%{unknown}$': The given pattern definition name "unknown" could not be found in the definition map"#
+            r#"failed to parse grok expression '\A(?m)%{unknown}\z': The given pattern definition name "unknown" could not be found in the definition map"#
         );
     }
 
@@ -554,6 +554,11 @@ mod tests {
                 Ok(Value::Array(vec!["1".into(), "2".into()])),
             ),
             (
+                r#"%{data:field:array("[]","\\n")}"#,
+                "[1\n2]",
+                Ok(Value::Array(vec!["1".into(), "2".into()])),
+            ),
+            (
                 "%{data:field:array(integer)}",
                 "[1,2]",
                 Ok(Value::Array(vec![1.into(), 2.into()])),
@@ -785,5 +790,16 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
         ]);
+    }
+
+    #[test]
+    fn parses_with_new_lines() {
+        test_full_grok(vec![(
+            "%{data:field}",
+            "a\nb\nc",
+            Ok(Value::from(btreemap! {
+                "field" => "a\nb\nc"
+            })),
+        )]);
     }
 }
