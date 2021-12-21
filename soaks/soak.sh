@@ -99,6 +99,7 @@ for SOAK_NAME in ${SOAKS}; do
     echo "########    ${SOAK_NAME}"
     echo "########"
     echo "########"
+    # shellcheck disable=SC2015
     ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "baseline" \
