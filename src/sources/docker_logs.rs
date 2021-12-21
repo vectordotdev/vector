@@ -31,7 +31,7 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 const IMAGE: &str = "image";
@@ -297,7 +297,7 @@ struct DockerLogsSource {
 impl DockerLogsSource {
     fn new(
         config: DockerLogsConfig,
-        out: Pipeline,
+        out: SourceSender,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
@@ -507,7 +507,7 @@ struct EventStreamBuilder {
     hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
-    out: Pipeline,
+    out: SourceSender,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// Self and event streams will end on this.
@@ -645,7 +645,9 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(crate::pipeline::ClosedError), _) => Err((info.id, ErrorPersistence::Permanent)),
+            (Err(crate::source_sender::ClosedError), _) => {
+                Err((info.id, ErrorPersistence::Permanent))
+            }
             (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
@@ -1028,7 +1030,7 @@ mod tests {
 
     #[test]
     fn exclude_self() {
-        let (tx, _rx) = Pipeline::new_test();
+        let (tx, _rx) = SourceSender::new_test();
         let mut source =
             DockerLogsSource::new(DockerLogsConfig::default(), tx, ShutdownSignal::noop()).unwrap();
         source.hostname = Some("451062c59603".to_owned());
@@ -1055,9 +1057,9 @@ mod integration_tests {
 
     use super::*;
     use crate::{
-        pipeline::ReceiverStream,
+        source_sender::ReceiverStream,
         test_util::{collect_n, collect_ready, trace_init},
-        Pipeline,
+        SourceSender,
     };
 
     /// None if docker is not present on the system
@@ -1073,7 +1075,7 @@ mod integration_tests {
     }
 
     fn source_with_config(config: DockerLogsConfig) -> ReceiverStream<Event> {
-        let (sender, recv) = Pipeline::new_test();
+        let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
                 .build(SourceContext::new_test(sender))

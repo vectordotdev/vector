@@ -32,7 +32,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
-    Pipeline,
+    SourceSender,
 };
 
 mod k8s_paths_provider;
@@ -261,7 +261,11 @@ impl Source {
         })
     }
 
-    async fn run(self, mut out: Pipeline, global_shutdown: ShutdownSignal) -> crate::Result<()> {
+    async fn run(
+        self,
+        mut out: SourceSender,
+        global_shutdown: ShutdownSignal,
+    ) -> crate::Result<()> {
         let Self {
             client,
             data_dir,

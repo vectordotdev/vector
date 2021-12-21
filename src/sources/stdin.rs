@@ -14,7 +14,7 @@ use crate::{
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,7 +75,7 @@ pub fn stdin_source<R>(
     mut stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> crate::Result<super::Source>
 where
     R: Send + io::BufRead + 'static,
@@ -171,7 +171,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -182,7 +182,7 @@ mod tests {
     async fn stdin_decodes_line() {
         trace_init();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 

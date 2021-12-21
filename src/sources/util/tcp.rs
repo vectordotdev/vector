@@ -31,7 +31,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Pipeline,
+    SourceSender,
 };
 
 async fn make_listener(
@@ -218,7 +218,7 @@ async fn handle_stream<T>(
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: IpAddr,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,

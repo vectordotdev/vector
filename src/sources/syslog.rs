@@ -26,7 +26,7 @@ use crate::{
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -203,7 +203,7 @@ pub fn udp(
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> super::Source {
     Box::pin(async move {
         let socket = UdpSocket::bind(&addr)

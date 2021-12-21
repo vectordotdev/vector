@@ -33,7 +33,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::Source,
-    Pipeline,
+    SourceSender,
 };
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
@@ -367,7 +367,7 @@ pub trait FrameHandler {
 pub fn build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> crate::Result<Source> {
     let path = frame_handler.socket_path();
 
@@ -556,7 +556,7 @@ pub fn build_framestream_unix_source(
 fn spawn_event_handling_tasks(
     event_data: Bytes,
     event_handler: impl FrameHandler + Send + Sync + 'static,
-    mut event_sink: Pipeline,
+    mut event_sink: SourceSender,
     received_from: Option<Bytes>,
     active_task_nums: Arc<AtomicU32>,
     max_frame_handling_tasks: u32,
@@ -618,7 +618,7 @@ mod test {
         event::Event,
         shutdown::SourceShutdownCoordinator,
         test_util::{collect_n, collect_n_stream},
-        Pipeline,
+        SourceSender,
     };
 
     #[derive(Clone)]
@@ -710,7 +710,7 @@ mod test {
     fn init_framstream_unix(
         source_id: &str,
         frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
-        pipeline: Pipeline,
+        pipeline: SourceSender,
     ) -> (
         PathBuf,
         JoinHandle<Result<(), ()>>,
@@ -810,7 +810,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn normal_framestream_singlethreaded() {
         let source_name = "test_source";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
@@ -860,7 +860,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn normal_framestream_multithreaded() {
         let source_name = "test_source";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(true), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
@@ -908,7 +908,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn multiple_content_types() {
         let source_name = "test_source";
-        let (tx, _) = Pipeline::new_test();
+        let (tx, _) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
@@ -938,7 +938,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn wrong_content_type() {
         let source_name = "test_source";
-        let (tx, _) = Pipeline::new_test();
+        let (tx, _) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
@@ -973,7 +973,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn data_too_soon() {
         let source_name = "test_source";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
@@ -1031,7 +1031,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn unidirectional_framestream() {
         let source_name = "test_source";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let (path, source_handle, mut shutdown) =
             init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, _) = make_unix_stream(path).await.split();
@@ -1070,7 +1070,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spawn_event_handling_tasks() {
-        let (out, rx) = Pipeline::new_test();
+        let (out, rx) = SourceSender::new_test();
 
         let max_frame_handling_tasks = 20;
         let active_task_nums = Arc::new(AtomicU32::new(0));

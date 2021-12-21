@@ -137,7 +137,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, Pipeline};
+    use crate::{test_util, SourceSender};
 
     const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
 
@@ -150,7 +150,7 @@ mod integration_tests {
             default_namespace: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

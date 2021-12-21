@@ -23,7 +23,7 @@ use crate::{
     sinks::{self, util::UriSerde},
     sources,
     transforms::noop::Noop,
-    Pipeline,
+    SourceSender,
 };
 
 pub mod api;
@@ -205,7 +205,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
-    pub out: Pipeline,
+    pub out: SourceSender,
     pub proxy: ProxyConfig,
 }
 
@@ -213,7 +213,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
         key: &ComponentKey,
-        out: Pipeline,
+        out: SourceSender,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(key);
@@ -230,7 +230,7 @@ impl SourceContext {
     }
 
     #[cfg(test)]
-    pub fn new_test(out: Pipeline) -> Self {
+    pub fn new_test(out: SourceSender) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),

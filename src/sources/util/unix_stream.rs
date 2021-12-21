@@ -19,7 +19,7 @@ use crate::{
     internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
-    Pipeline,
+    SourceSender,
 };
 
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
@@ -31,7 +31,7 @@ pub fn build_unix_stream_source(
     decoder: codecs::Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");

@@ -20,7 +20,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     vector_core::ByteSizeOf,
-    Pipeline,
+    SourceSender,
 };
 
 // This is the maximum SQS supports in a single batch request
@@ -37,7 +37,7 @@ pub struct SqsSource {
 }
 
 impl SqsSource {
-    pub async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
 
         for _ in 0..self.concurrency {
@@ -67,7 +67,7 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut Pipeline, acknowledgements: bool) {
+    async fn run_once(&self, out: &mut SourceSender, acknowledgements: bool) {
         let result = self
             .client
             .receive_message()

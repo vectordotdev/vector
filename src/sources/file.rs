@@ -31,7 +31,7 @@ use crate::{
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -256,7 +256,7 @@ pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> super::Source {
     let ignore_before = config
@@ -1658,10 +1658,10 @@ mod tests {
         components::init_test();
 
         let (tx, rx) = if acking_mode == Acks {
-            let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
         } else {
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, rx) = SourceSender::new_test();
             (tx, rx.boxed())
         };
 

@@ -1041,13 +1041,13 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
 
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, SourceSender};
 
     async fn test_instance(endpoint: &'static str) {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             MongoDbMetricsConfig {

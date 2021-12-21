@@ -27,7 +27,7 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 lazy_static! {
@@ -111,7 +111,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::pipeline::ClosedError,
+        source: crate::source_sender::ClosedError,
         bucket: String,
         key: String,
     },
@@ -216,7 +216,7 @@ impl Ingestor {
 
 pub struct IngestorProcess {
     state: Arc<State>,
-    out: Pipeline,
+    out: SourceSender,
     shutdown: ShutdownSignal,
     acknowledgements: bool,
 }
@@ -224,7 +224,7 @@ pub struct IngestorProcess {
 impl IngestorProcess {
     pub fn new(
         state: Arc<State>,
-        out: Pipeline,
+        out: SourceSender,
         shutdown: ShutdownSignal,
         acknowledgements: bool,
     ) -> Self {
@@ -479,7 +479,7 @@ impl IngestorProcess {
 
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
-                    Err(_) => Some(crate::pipeline::ClosedError),
+                    Err(_) => Some(crate::source_sender::ClosedError),
                 };
 
                 // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,

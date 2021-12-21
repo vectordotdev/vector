@@ -30,10 +30,10 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
-    pipeline::StreamSendError,
     serde::bool_or_struct,
+    source_sender::StreamSendError,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 mod acknowledgements;
@@ -196,7 +196,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
         let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
@@ -280,7 +280,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
@@ -981,7 +981,7 @@ mod tests {
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -1006,7 +1006,7 @@ mod tests {
         store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());

@@ -22,7 +22,7 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
     },
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -33,7 +33,7 @@ pub async fn firehose(
     compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
         let bytes = decode_record(&record, compression)

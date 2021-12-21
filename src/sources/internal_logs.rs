@@ -8,7 +8,7 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     shutdown::ShutdownSignal,
-    trace, Pipeline,
+    trace, SourceSender,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -50,7 +50,7 @@ impl SourceConfig for InternalLogsConfig {
 async fn run(
     host_key: String,
     pid_key: String,
-    mut out: Pipeline,
+    mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
@@ -96,7 +96,7 @@ mod tests {
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, pipeline::ReceiverStream, test_util::collect_ready, trace};
+    use crate::{event::Event, source_sender::ReceiverStream, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {
@@ -146,7 +146,7 @@ mod tests {
     }
 
     async fn start_source() -> ReceiverStream<Event> {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()
             .build(SourceContext::new_test(tx))

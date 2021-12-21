@@ -17,7 +17,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 pub mod parser;
@@ -166,7 +166,7 @@ impl Deserializer for StatsdDeserializer {
 async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(&StatsdSocketError::bind(error)))

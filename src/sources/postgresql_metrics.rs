@@ -874,7 +874,7 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, tls, Pipeline};
+    use crate::{test_util::trace_init, tls, SourceSender};
 
     async fn test_postgresql_metrics(
         endpoint: String,
@@ -892,7 +892,7 @@ mod integration_tests {
             Host::Unix(path) => path.to_string_lossy().to_string(),
         };
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             PostgresqlMetricsConfig {

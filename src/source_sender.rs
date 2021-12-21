@@ -18,7 +18,7 @@ pub struct ClosedError;
 
 impl fmt::Display for ClosedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Pipeline is closed.")
+        f.write_str("Sender is closed.")
     }
 }
 
@@ -52,11 +52,11 @@ impl<E> std::error::Error for StreamSendError<E> where E: std::error::Error {}
 
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
-pub struct Pipeline {
+pub struct SourceSender {
     inner: mpsc::Sender<Event>,
 }
 
-impl Pipeline {
+impl SourceSender {
     pub async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
         let byte_size = event.size_of();
         self.inner.send(event).await?;

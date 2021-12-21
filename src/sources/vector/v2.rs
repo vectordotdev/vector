@@ -20,12 +20,12 @@ use crate::{
     shutdown::ShutdownSignalToken,
     sources::{util::AfterReadExt as _, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Clone)]
 pub struct Service {
-    pipeline: Pipeline,
+    pipeline: SourceSender,
     acknowledgements: bool,
 }
 
@@ -209,7 +209,7 @@ mod tests {
         config::SinkContext,
         sinks::vector::v2::VectorConfig as SinkConfig,
         test_util::{self, components},
-        Pipeline,
+        SourceSender,
     };
 
     #[tokio::test]
@@ -219,7 +219,7 @@ mod tests {
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         components::init_test();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
         test_util::wait_for_tcp(addr).await;

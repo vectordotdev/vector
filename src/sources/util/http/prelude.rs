@@ -26,7 +26,7 @@ use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[async_trait]
@@ -153,14 +153,14 @@ impl warp::reject::Reject for RejectShuttingDown {}
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
             out.send_all(&mut futures::stream::iter(events))
-                .map_err(move |error: crate::pipeline::ClosedError| {
+                .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
                     error!(message = "Failed to forward events, downstream is closed.");

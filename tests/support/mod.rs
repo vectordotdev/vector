@@ -34,8 +34,8 @@ use vector::{
         metric::{self, MetricData, MetricValue},
         Event, Value,
     },
-    pipeline::{Pipeline, ReceiverStream},
     sinks::{util::StreamSink, Healthcheck, VectorSink},
+    source_sender::{ReceiverStream, SourceSender},
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
@@ -43,7 +43,7 @@ use vector::{
 use vector_core::buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
@@ -52,7 +52,7 @@ pub fn sink_with_data(
     channel_size: usize,
     data: &str,
 ) -> (impl Stream<Item = Event>, MockSinkConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new_with_data(tx, true, data);
     (rx, sink)
 }
@@ -60,7 +60,7 @@ pub fn sink_with_data(
 pub fn sink_failing_healthcheck(
     channel_size: usize,
 ) -> (impl Stream<Item = Event>, MockSinkConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
@@ -69,21 +69,21 @@ pub fn sink_dead() -> MockSinkConfig {
     MockSinkConfig::new_dead(false)
 }
 
-pub fn source() -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(1);
+pub fn source() -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
 
-pub fn source_with_data(data: &str) -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(1);
+pub fn source_with_data(data: &str) -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new_with_data(rx, data);
     (tx, source)
 }
 
-pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsize>) {
+pub fn source_with_event_counter() -> (SourceSender, MockSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = Pipeline::new_with_buffer(1);
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
     (tx, source, event_counter)
 }
@@ -323,7 +323,7 @@ pub struct MockSinkConfig {
 
 #[derive(Debug, Clone)]
 enum Mode {
-    Normal(Pipeline),
+    Normal(SourceSender),
     Dead,
 }
 
@@ -334,7 +334,7 @@ impl Default for Mode {
 }
 
 impl MockSinkConfig {
-    pub fn new(sink: Pipeline, healthy: bool) -> Self {
+    pub fn new(sink: SourceSender, healthy: bool) -> Self {
         Self {
             sink: Mode::Normal(sink),
             healthy,
@@ -350,7 +350,7 @@ impl MockSinkConfig {
         }
     }
 
-    pub fn new_with_data(sink: Pipeline, healthy: bool, data: &str) -> Self {
+    pub fn new_with_data(sink: SourceSender, healthy: bool, data: &str) -> Self {
         Self {
             sink: Mode::Normal(sink),
             healthy,

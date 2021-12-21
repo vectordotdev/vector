@@ -7,7 +7,7 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -111,7 +111,7 @@ async fn run(
     pid_key: Option<&str>,
     controller: &Controller,
     interval: time::Duration,
-    mut out: Pipeline,
+    mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
@@ -169,7 +169,7 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -249,7 +249,7 @@ mod tests {
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
         let _ = crate::metrics::init_test();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             config

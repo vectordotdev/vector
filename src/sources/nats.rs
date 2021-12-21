@@ -18,7 +18,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -126,7 +126,7 @@ async fn nats_source(
     subscription: async_nats::Subscription,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
@@ -150,7 +150,7 @@ async fn nats_source(
 
                         out.send(event)
                             .await
-                            .map_err(|error: crate::pipeline::ClosedError| {
+                            .map_err(|error: crate::source_sender::ClosedError| {
                                 error!(message = "Error sending to sink.", %error);
                             })?;
                     }
@@ -219,7 +219,7 @@ mod integration_tests {
         let (nc, sub) = create_subscription(&conf).await.unwrap();
         let nc_pub = nc.clone();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
             .build()
             .unwrap();

@@ -31,7 +31,7 @@ use crate::{
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 pub mod sized_bytes_codec;
@@ -232,7 +232,7 @@ async fn run_scheduled(
     exec_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     debug!("Starting scheduled exec runs.");
     let schedule = Duration::from_secs(exec_interval_secs);
@@ -283,7 +283,7 @@ async fn run_streaming(
     respawn_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     if respawn_on_exit {
         let duration = Duration::from_secs(respawn_interval_secs);
@@ -338,7 +338,7 @@ async fn run_command(
     hostname: Option<String>,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
     debug!("Starting command run.");
     let mut command = build_command(&config);
@@ -667,7 +667,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
         let shutdown = ShutdownSignal::noop();
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = SourceSender::new_test();
 
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(

@@ -33,7 +33,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -169,7 +169,7 @@ async fn kafka_source(
     headers_key: String,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
@@ -422,7 +422,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
@@ -491,7 +491,7 @@ mod integration_test {
         .await;
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
             create_consumer(&config).unwrap(),
             config.key_field,

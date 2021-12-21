@@ -20,7 +20,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::StreamDecodingError, Source},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 /// UDP processes messages per packet, where messages are separated by newline.
@@ -64,7 +64,7 @@ pub fn udp(
     receive_buffer_bytes: Option<usize>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Source {
     Box::pin(async move {
         let socket = UdpSocket::bind(&address)

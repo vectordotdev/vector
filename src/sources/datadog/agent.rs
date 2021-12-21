@@ -39,7 +39,7 @@ use crate::{
         util::{ErrorMessage, StreamDecodingError},
     },
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -202,7 +202,7 @@ impl DatadogAgentSource {
     async fn handle_request(
         events: Result<Vec<Event>, ErrorMessage>,
         acknowledgements: bool,
-        mut out: Pipeline,
+        mut out: SourceSender,
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
@@ -235,7 +235,7 @@ impl DatadogAgentSource {
         }
     }
 
-    fn event_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(self, acknowledgements: bool, out: SourceSender) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
             .and(warp::path::full())
@@ -267,7 +267,11 @@ impl DatadogAgentSource {
             .boxed()
     }
 
-    fn series_v1_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn series_v1_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "v1" / "series" / ..))
             .and(warp::path::full())
@@ -315,7 +319,11 @@ impl DatadogAgentSource {
             .boxed()
     }
 
-    fn sketches_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn sketches_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "beta" / "sketches" / ..))
             .and(warp::path::full())
@@ -639,7 +647,7 @@ mod tests {
         },
         serde::{default_decoding, default_framing_message_based},
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     mod dd_proto {
@@ -704,7 +712,7 @@ mod tests {
         acknowledgements: bool,
         store_api_key: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender);
         tokio::spawn(async move {

@@ -23,7 +23,7 @@ use crate::{
     },
     internal_events::HostMetricsEventReceived,
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 #[cfg(target_os = "linux")]
@@ -135,7 +135,7 @@ impl HostMetricsConfig {
         self.scrape_interval_secs = value;
     }
 
-    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 

@@ -20,7 +20,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Pipeline,
+    SourceSender,
 };
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
@@ -187,7 +187,7 @@ fn prometheus(
     proxy: ProxyConfig,
     interval: u64,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> sources::Source {
     Box::pin(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
@@ -420,7 +420,7 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
@@ -470,7 +470,7 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
@@ -637,7 +637,7 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         event::{MetricKind, MetricValue},
-        test_util, Pipeline,
+        test_util, SourceSender,
     };
 
     #[tokio::test]
@@ -652,7 +652,7 @@ mod integration_tests {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

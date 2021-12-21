@@ -39,7 +39,7 @@ use crate::{
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 const DEFAULT_BATCH_SIZE: usize = 16;
@@ -214,7 +214,7 @@ struct JournaldSource {
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
-    out: Pipeline,
+    out: SourceSender,
     acknowledgements: bool,
 }
 
@@ -770,7 +770,7 @@ mod tests {
         cursor: Option<&str>,
     ) -> Vec<Event> {
         components::init_test();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
         let tempdir = tempdir().unwrap();
@@ -958,7 +958,7 @@ mod tests {
 
     #[tokio::test]
     async fn waits_for_acknowledgements() {
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
         let mut checkpoint_path = tempdir.path().to_path_buf();

@@ -250,12 +250,12 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
+    use crate::{config::ProxyConfig, test_util::trace_init, SourceSender};
 
     async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         let mut ctx = SourceContext::new_test(sender);
         ctx.proxy = proxy;

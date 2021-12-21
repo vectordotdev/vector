@@ -134,7 +134,7 @@ mod test {
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, components},
         tls::MaybeTlsSettings,
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -155,7 +155,7 @@ mod test {
     async fn receives_metrics(tls: Option<TlsConfig>) {
         components::init_test();
         let address = test_util::next_addr();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let proto = MaybeTlsSettings::from_config(&tls, true)
             .unwrap()
@@ -246,7 +246,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, test_util::components, Pipeline};
+    use crate::{test_util, test_util::components, SourceSender};
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
 
@@ -260,7 +260,7 @@ mod integration_tests {
             acknowledgements: AcknowledgementsConfig::default(),
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

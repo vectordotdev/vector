@@ -14,7 +14,7 @@ use crate::{
         AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 mod parser;
@@ -120,7 +120,7 @@ async fn aws_ecs_metrics(
     url: String,
     interval: u64,
     namespace: Option<String>,
-    mut out: Pipeline,
+    mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let interval = time::Duration::from_secs(interval);
@@ -511,7 +511,7 @@ mod test {
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{}", in_addr),
@@ -564,7 +564,7 @@ mod integration_tests {
     use crate::test_util::collect_ready;
 
     async fn scrape_metrics(endpoint: String, version: Version) {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
             endpoint,

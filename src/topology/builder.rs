@@ -38,7 +38,7 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    Pipeline,
+    SourceSender,
 };
 
 lazy_static! {
@@ -144,7 +144,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (pipeline, mut rx) = Pipeline::new_with_buffer(1000);
+        let (pipeline, mut rx) = SourceSender::new_with_buffer(1000);
 
         let typetag = source.inner.source_type();
 

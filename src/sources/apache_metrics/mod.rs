@@ -25,7 +25,7 @@ use crate::{
         ApacheMetricsRequestCompleted, ApacheMetricsResponseError, HttpClientBytesReceived,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 mod parser;
@@ -143,7 +143,7 @@ fn apache_metrics(
     interval: u64,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
     Box::pin(async move {
@@ -361,7 +361,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         components::init_test();
         let source = ApacheMetricsConfig {
@@ -425,7 +425,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
@@ -459,7 +459,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // will have nothing bound
         let in_addr = next_addr();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
