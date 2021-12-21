@@ -141,9 +141,9 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
         let mut new_inputs = original_inputs
             .intersection(&all_valid_inputs)
             .map(|input| input.clone())
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
         new_inputs.extend(route_inputs);
-        transform.inputs = new_inputs;
+        transform.inputs = new_inputs.into_iter().collect();
     }
 }
 
@@ -1504,5 +1504,89 @@ mod tests {
                     .to_owned()
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn test_dropped_branch() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.droptest]
+          type = "remap"
+          inputs = [ "ignored" ]
+          drop_on_error = true
+          drop_on_abort = true
+          reroute_dropped = true
+          source = "abort"
+
+        [transforms.another]
+          type = "remap"
+          inputs = [ "droptest.dropped" ]
+          source = """
+              .new_field = "a new field"
+          """
+
+        [[tests]]
+          name = "dropped branch test"
+          no_outputs_from = [ "droptest" ]
+
+          [[tests.inputs]]
+            type = "log"
+            insert_at = "droptest"
+
+            [tests.inputs.log_fields]
+              message = "test1"
+
+          [[tests.inputs]]
+            type = "log"
+            insert_at = "droptest"
+
+            [tests.inputs.log_fields]
+              message = "test2"
+
+          [[tests.outputs]]
+            extract_from = "droptest.dropped"
+
+            [[tests.outputs.conditions]]
+              type = "vrl"
+              source = """
+                  assert_eq!(.message, "test2", "incorrect message")
+              """
+
+        [[tests]]
+          name = "dropped branch test no_outputs_from on branch (should fail)"
+          no_outputs_from = [ "droptest.dropped" ]
+
+          [[tests.inputs]]
+            type = "log"
+            insert_at = "droptest"
+
+            [tests.inputs.log_fields]
+              message = "test1"
+
+        [[tests]]
+          name = "dropped branch test failure"
+          no_outputs_from = [ "droptest" ]
+
+          [[tests.inputs]]
+            type = "log"
+            insert_at = "droptest"
+
+            [tests.inputs.log_fields]
+              message = "test1"
+
+          [[tests.outputs]]
+            extract_from = "droptest.dropped"
+
+            [[tests.outputs.conditions]]
+              type = "vrl"
+              source = """
+                  assert_eq!(.message, "bad message", "incorrect message")
+              """
+      "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+        assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
     }
 }
