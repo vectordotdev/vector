@@ -18,12 +18,25 @@ Previously, Vector was limited to executing transforms on a single thread, which
 With this new release, Vector will perform faster when a transform is a bottleneck,
 assuming that more CPUs are available to share their work. This works by Vector
 determine whether an individual transform will be processed in parallel when there
-is a sufficient load to the environment.
+is a sufficient load to the environment. 
 
-To expand, this improvement works by spinning up multiple short-lived tasks
-that concurrently run the same transform logic on separate batches of events.
-In other words, they perform the processing for chunks of events at a time and
-allowing a certain number of those tasks to be active at a time.
+This improvement works by spinning up multiple short-lived tasks that concurrently
+run the same transform logic on separate batches of events. No configuration
+changes are necessary to start taking advantage of this feature. The current list of
+transforms that support parallelization are:
+```
+src/transforms/tokenizer.rs
+src/transforms/regex_parser.rs
+src/transforms/metric_to_log.rs
+src/transforms/filter.rs
+src/transforms/grok_parser.rs
+src/transforms/key_value_parser.rs
+src/transforms/json_parser.rs
+src/transforms/logfmt_parser.rs
+src/transforms/log_to_metric.rs
+src/transforms/remap.rs
+src/transforms/aws_cloudwatch_logs_subscription_parser.rs
+```
 
 
 If you any feedback for us, let us know on our [Discord chat] or on [Twitter].
