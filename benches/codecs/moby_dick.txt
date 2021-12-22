@@ -309,7 +309,7 @@ for the British pound, a unit of currency.
 
 
 
-MOBY DICK; OR THE WHALE 
+MOBY DICK; OR THE WHALE
 
 by Herman Melville
 
@@ -23241,4 +23241,3 @@ orphan.
 
 
 End of this Project Gutenberg etext of Moby Dick, by Herman Melville
-
