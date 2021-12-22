@@ -106,7 +106,6 @@ impl SourceSender {
     ) -> Result<(), StreamSendError<E>> {
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(results) = stream.next().await {
-            metrics::histogram!("chunk_size", results.len() as f64);
             let mut stream_error = None;
             let mut to_forward = Vec::with_capacity(results.len());
             for result in results {
