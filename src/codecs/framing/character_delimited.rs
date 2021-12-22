@@ -212,7 +212,6 @@ mod tests {
         let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
-        buf.reserve(200);
         // limit is 6 so it will skip longer lines
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
@@ -221,12 +220,12 @@ mod tests {
 
         let buf = &mut BytesMut::new();
 
-        buf.reserve(200);
         // limit is 6 so it will skip longer lines
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
     }
 
     // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)

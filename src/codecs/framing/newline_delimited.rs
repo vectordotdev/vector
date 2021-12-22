@@ -135,6 +135,7 @@ mod tests {
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "baz");
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
     #[test]
