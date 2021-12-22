@@ -17,6 +17,7 @@ token passthrough routing.
 ## Indexer Acknowledgements
 
 With the new support for Splunk HEC indexer acknowledgement, Vector now provides a
+<<<<<<< HEAD
 better end-to-end experience to ensure that no data is lost. As you may be
 aware, Splunk HEC does not guarantee that data is successfully written and saved
 if it responds to the incoming request successfully. To address this, Vector now
@@ -27,6 +28,7 @@ is now integrated into Vector's end-to-end acknowledgements so that it only ackn
 events that have been processed by sinks or disk buffers. To learn more about
 how it works, check out the short explanation in the Vector [`splunk_hec` sinks][indexer how it works]
 reference page.
+
 
 ## Passthrough Token Routing
 
