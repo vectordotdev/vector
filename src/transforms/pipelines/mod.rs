@@ -295,8 +295,7 @@ impl GenerateConfig for PipelinesConfig {
 #[cfg(test)]
 impl PipelinesConfig {
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 }
 

@@ -41,11 +41,11 @@ impl Format {
 /// Parse the string represented in the specified format.
 /// If the format is unknown - fallback to the default format and attempt
 /// parsing using that.
-pub fn deserialize<T>(content: &str, format: FormatHint) -> Result<T, Vec<String>>
+pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
 {
-    match format.unwrap_or_default() {
+    match format {
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),

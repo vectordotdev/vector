@@ -67,10 +67,11 @@ pub(super) fn open_file(path: &Path) -> Option<File> {
 
 fn load_from_file<T: serde::de::DeserializeOwned>(
     path: &Path,
+    format: Format,
 ) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
     let name = component_name(path)?;
     if let Some(file) = open_file(path) {
-        let (component, warnings): (T, Vec<String>) = load(file, Format::from_path(path).ok())?;
+        let (component, warnings): (T, Vec<String>) = load(file, format)?;
         Ok(Some((name, component, warnings)))
     } else {
         Ok(None)
@@ -89,13 +90,16 @@ fn load_files_from_dir<T: serde::de::DeserializeOwned>(
             Ok(direntry) => {
                 let entry_path = direntry.path();
                 if entry_path.is_file() {
-                    match load_from_file::<T>(&entry_path) {
-                        Ok(Some((name, file, warns))) => {
-                            result.insert(ComponentKey::from(name), file);
-                            warnings.extend(warns);
+                    // skip any unknown file formats
+                    if let Ok(format) = Format::from_path(direntry.path()) {
+                        match load_from_file::<T>(&entry_path, format) {
+                            Ok(Some((name, file, warns))) => {
+                                result.insert(ComponentKey::from(name), file);
+                                warnings.extend(warns);
+                            }
+                            Ok(None) => {}
+                            Err(errs) => errors.extend(errs),
                         }
-                        Ok(None) => {}
-                        Err(errs) => errors.extend(errs),
                     }
                 }
             }
@@ -215,9 +219,10 @@ pub async fn load_from_paths_with_provider(
 
 fn load_builder_from_file(
     path: &Path,
+    format: Format,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    match load_from_file(path)? {
+    match load_from_file(path, format)? {
         Some((_, loaded, warnings)) => {
             builder.append(loaded)?;
             Ok(warnings)
@@ -238,9 +243,12 @@ fn load_builder_from_dir(
             Ok(direntry) => {
                 let entry_path = direntry.path();
                 if entry_path.is_file() {
-                    match load_builder_from_file(&direntry.path(), builder) {
-                        Ok(warns) => warnings.extend(warns),
-                        Err(errs) => errors.extend(errs),
+                    // skip any unknown file formats
+                    if let Ok(format) = Format::from_path(direntry.path()) {
+                        match load_builder_from_file(&direntry.path(), format, builder) {
+                            Ok(warns) => warnings.extend(warns),
+                            Err(errs) => errors.extend(errs),
+                        }
                     }
                 }
             }
@@ -331,8 +339,14 @@ pub fn load_builder_from_paths(
 
     for config_path in config_paths {
         match config_path {
-            ConfigPath::File(path, _) => {
-                match load_builder_from_file(path, &mut result) {
+            ConfigPath::File(path, format_hint) => {
+                match load_builder_from_file(
+                    path,
+                    format_hint
+                        .or_else(move || Format::from_path(&path).ok())
+                        .unwrap_or_default(),
+                    &mut result,
+                ) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };
@@ -372,7 +386,7 @@ fn load_from_inputs(
     let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|(n, warn)| {
+        if let Err(errs) = load(input, format.unwrap_or_default()).and_then(|(n, warn)| {
             warnings.extend(warn);
             config.append(n)
         }) {
@@ -403,10 +417,7 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
     Ok(vars::interpolate(&source_string, &vars))
 }
 
-pub fn load<R: std::io::Read, T>(
-    input: R,
-    format: FormatHint,
-) -> Result<(T, Vec<String>), Vec<String>>
+pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
@@ -420,7 +431,9 @@ where
     feature = "sinks-elasticsearch",
     feature = "transforms-pipelines",
     feature = "transforms-regex_parser",
-    feature = "transforms-sample"
+    feature = "transforms-sample",
+    feature = "sources-demo_logs",
+    feature = "sinks-console"
 ))]
 mod tests {
     use std::path::PathBuf;
@@ -476,5 +489,13 @@ mod tests {
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warns) = load_builder_from_paths(&configs).unwrap();
         assert!(warns.is_empty());
+    }
+
+    #[test]
+    fn load_directory_ignores_unknown_file_formats() {
+        let path = PathBuf::from(".").join("tests").join("config-dir");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
     }
 }
