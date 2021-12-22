@@ -21,7 +21,7 @@ better end-to-end acknowledgement to ensure that no data is lost. As you may be
 aware, Splunk HEC does not guarantee that a data is successfully written and saved
 if it receives a 200. Vector will now check [Splunk HEC indexer acknowledgements][Splunk indexer]
 protocol to verify that data has been successfully delivered. To learn more about
-how it works, check out the short explanation in the Vector [sinks reference page][indexer how it works].
+how it works, check out the short explanation in the Vector [`splunk_hec` sink reference page][indexer how it works].
 
 ## Passthrough Token Routing
 
