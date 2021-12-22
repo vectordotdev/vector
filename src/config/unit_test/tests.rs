@@ -229,8 +229,8 @@ async fn parse_broken_topology() {
     let mut errs_broken_test_2 = tests.remove(0).run().await.1;
     errs_broken_test_2.sort();
     let expected_errs = vec![
-        r#"Check transform "baz" failed, no events received. Topology may be disconnected or this transform is missing inputs."#,
-        r#"Check transform "quz" failed, no events received. Topology may be disconnected or this transform is missing inputs."#,
+        r#"checks for transform "baz" failed: no events received. Topology may be disconnected or transform is missing inputs."#,
+        r#"checks for transform "quz" failed: no events received. Topology may be disconnected or transform is missing inputs."#,
     ];
     assert_eq!(errs_broken_test, expected_errs);
     assert_eq!(errs_broken_test_2, expected_errs);

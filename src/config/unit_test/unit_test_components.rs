@@ -58,12 +58,12 @@ pub enum UnitTestSinkCheck {
     // Check that no events were received
     NoOutputs,
     // Do nothing
-    Noop,
+    NoOp,
 }
 
 impl Default for UnitTestSinkCheck {
     fn default() -> Self {
-        UnitTestSinkCheck::Noop
+        UnitTestSinkCheck::NoOp
     }
 }
 
@@ -141,45 +141,72 @@ impl StreamSink for UnitTestSink {
                 if output_events.is_empty() {
                     result
                         .test_errors
-                        .push(format!("Check transform {:?} failed, no events received. Topology may be disconnected or this transform is missing inputs.", self.transform_id));
-                }
-                for check in checks {
-                    if check.is_empty() {
-                        // todo: implement inspections
-                        continue;
-                    }
-
-                    let mut check_errors = Vec::new();
-                    for condition in check {
-                        let mut condition_errors = Vec::new();
-                        for event in output_events.iter() {
-                            match condition.check_with_context(event) {
-                                Ok(_) => {
-                                    condition_errors.clear();
-                                    break;
-                                }
-                                Err(error) => {
-                                    condition_errors.push(error);
+                        .push(format!("checks for transform {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_id));
+                } else {
+                    for (i, check) in checks.iter().enumerate() {
+                        let mut check_errors = Vec::new();
+                        for (j, condition) in check.iter().enumerate() {
+                            let mut condition_errors = Vec::new();
+                            for event in output_events.iter() {
+                                match condition.check_with_context(event) {
+                                    Ok(_) => {
+                                        condition_errors.clear();
+                                        break;
+                                    }
+                                    Err(error) => {
+                                        condition_errors.push(format!("  condition[{}]: {}", j, error));
+                                    }
                                 }
                             }
+                            check_errors.extend(condition_errors);
                         }
-                        check_errors.extend(condition_errors);
+                        // If there are errors, add a preamble to the output
+                        if !check_errors.is_empty() {
+                            check_errors.insert(
+                                0,
+                                format!("check[{}] for transform {:?} failed conditions:", i, self.transform_id),
+                            );
+                        }
+
+                        result.test_errors.extend(check_errors);
                     }
 
-                    result.test_errors.extend(check_errors);
+                    // If there are errors, add a summary of events received
+                    if !result.test_errors.is_empty() {
+                        result.test_errors.push(format!(
+                            "output payloads from {:?} (events encoded as JSON):\n  {}",
+                            self.transform_id,
+                            events_to_string(&output_events)
+                        ));
+                    }
                 }
+
             }
             UnitTestSinkCheck::NoOutputs => {
                 if !output_events.is_empty() {
-                    result.test_errors.push("expected no outputs".to_string());
+                    result.test_errors.push(format!(
+                        "check for transform {:?} failed: expected no outputs",
+                        self.transform_id
+                    ));
                 }
             }
-            UnitTestSinkCheck::Noop => {}
+            UnitTestSinkCheck::NoOp => {}
         }
 
-        if let Err(_) = self.result_tx.send(result) {
+        if self.result_tx.send(result).is_err() {
             error!(message = "Sending unit test results failed in unit test sink.");
         }
         Ok(())
     }
+}
+
+fn events_to_string(events: &Vec<Event>) -> String {
+    events
+        .iter()
+        .map(|event| match event {
+            Event::Log(log) => serde_json::to_string(log).unwrap_or("{}".to_string()),
+            Event::Metric(metric) => serde_json::to_string(metric).unwrap_or("{}".to_string()),
+        })
+        .collect::<Vec<_>>()
+        .join("\n  ")
 }

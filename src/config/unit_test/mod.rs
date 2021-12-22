@@ -37,6 +37,13 @@ pub struct UnitTest {
     sink_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
+// This maps a transform id to its corresponding source and sink
+pub struct UnitTestBuildMetadata {
+    transforms: HashSet<String>,
+    sources: IndexMap<String, String>,
+    sinks: IndexMap<String, String>,
+}
+
 impl UnitTest {
     pub async fn run(self) -> (Vec<String>, Vec<String>) {
         let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces)
@@ -59,6 +66,14 @@ impl UnitTest {
     }
 }
 
+// impl UnitTestBuildMetadata {
+//     pub fn new(transforms: ) -> Self {
+//       Self {
+//       }
+//     }
+
+// }
+
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
@@ -68,6 +83,7 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
 }
 
 async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+    sanitize_config(&mut config_builder);
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -152,7 +168,6 @@ async fn build_unit_test(
     test: TestDefinition,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    sanitize_config(&mut config_builder);
     let mut build_errors = Vec::new();
 
     let available_insert_targets = config_builder
@@ -250,7 +265,7 @@ async fn build_unit_test(
             test_name: test.name.clone(),
             transform_id: transform_id.to_string(),
             result_tx: Arc::new(Mutex::new(Some(tx))),
-            check: UnitTestSinkCheck::Noop,
+            check: UnitTestSinkCheck::NoOp,
         };
         test_sinks.insert(transform_id.clone(), sink_config);
         sink_rxs.push(rx);
