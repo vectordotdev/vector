@@ -18,7 +18,7 @@ Previously, Vector was limited to executing transforms on a single thread, which
 With this new release, Vector will perform faster when a transform is a bottleneck,
 assuming that more CPUs are available to share their work. This works by Vector
 determine whether an individual transform will be processed in parallel when there
-is a sufficient load to the environment. 
+is a sufficient load to the environment.
 
 This improvement works by spinning up multiple short-lived tasks that concurrently
 run the same transform logic on separate batches of events. No configuration
