@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::time::Duration;
 
-use crate::config::{SinkConfig, SinkOuter};
+use crate::config::SinkOuter;
 
 use crate::topology::builder::PIPELINE_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
@@ -192,7 +192,7 @@ mod test_source {
     use crate::event::Event;
     use crate::sources::Source;
     use async_trait::async_trait;
-    use futures::{FutureExt, SinkExt, StreamExt};
+    use futures::{FutureExt, SinkExt};
     use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -211,7 +211,7 @@ mod test_source {
             let counter = self.counter.clone();
             Ok(async move {
                 for i in 0.. {
-                    cx.out.send(Event::from(format!("event-{}", i))).await;
+                    let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::Relaxed);
                 }
                 Ok(())
