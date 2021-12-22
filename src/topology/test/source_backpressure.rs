@@ -1,29 +1,13 @@
-use async_graphql::futures_util::stream::BoxStream;
-use futures::{FutureExt, StreamExt};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
-use tokio::time::{timeout, Duration};
-use vrl::prelude::fmt::{Debug, Formatter};
 
-use crate::config::{DataType, SinkConfig, SinkContext, SinkOuter};
-use crate::event::Event;
-use crate::sinks::blackhole::BlackholeConfig;
-use crate::sinks::util::StreamSink;
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::sources::demo_logs::OutputFormat;
+use tokio::time::Duration;
+
+use crate::config::{SinkConfig, SinkOuter};
+
 use crate::topology::builder::PIPELINE_BUFFER_SIZE;
-use crate::{
-    config::Config,
-    sinks::{
-        console::{ConsoleSinkConfig, Target},
-        util::encoding::StandardEncodings,
-    },
-    sources::demo_logs::DemoLogsConfig,
-    test_util::start_topology,
-};
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use crate::{config::Config, test_util::start_topology};
+
 use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
 
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize = 500;
@@ -185,7 +169,7 @@ mod test_sink {
     #[async_trait]
     #[typetag::serde(name = "test-backpressure-sink")]
     impl SinkConfig for TestBackpressureSinkConfig {
-        async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
             let sink = TestBackpressureSink {
                 num_to_consume: self.num_to_consume,
             };
@@ -204,8 +188,6 @@ mod test_sink {
 }
 
 mod test_source {
-    use std::sync::Arc;
-    // use std::cmp::Ordering;
     use crate::config::{DataType, SourceConfig, SourceContext};
     use crate::event::Event;
     use crate::sources::Source;
@@ -213,6 +195,7 @@ mod test_source {
     use futures::{FutureExt, SinkExt, StreamExt};
     use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct TestBackpressureSourceConfig {
