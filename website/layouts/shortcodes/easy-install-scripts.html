@@ -1,6 +1,6 @@
 {{ $commands := site.Data.docs.administration.install_commands }}
 {{ $defaultCommand := (index $commands 0).title }}
-<div x-data="{ command: '{{ $defaultCommand }}' }" class="no-prose">
+<div x-data="{ command: '{{ $defaultCommand }}' }" class="not-prose">
   <div class="flex space-x-5" role="tablist" aria-orientation="horizontal">
     {{ range $commands }}
     <button @click="command = '{{ .title }}'" :class="{ 'text-secondary dark:text-primary font-bold': command === '{{ .title }}' }" role="tab" tabindex="0" class="cursor-pointer font-light tracking-tight text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">

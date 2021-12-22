@@ -1,7 +1,7 @@
 {{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.)
 */}}
 {{ $ctx := . }}
-<div class="relative no-prose border dark:border-gray-700 rounded-md shadow">
+<div class="relative not-prose border dark:border-gray-700 rounded-md shadow">
   {{/* Source/transform/sink config */}}
   {{ with .component_config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
@@ -55,7 +55,7 @@
         </span>
       </span>
 
-      <div class="mt-6 prose dark:prose-dark max-w-none leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-6 prose dark:prose-invert max-w-none leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
@@ -76,7 +76,7 @@
             </svg>
           </div>
 
-          <div class="prose dark:prose-dark max-w-none leading-snug">
+          <div class="prose dark:prose-invert max-w-none leading-snug">
             {{ . | markdownify }}
           </div>
         </div>
@@ -140,7 +140,7 @@
           </span>
         </span>
 
-        <div class="mt-4 prose dark:prose-dark max-w-none">
+        <div class="mt-4 prose dark:prose-invert max-w-none">
           {{ template "enum-options-table" . }}
         </div>
       </div>
@@ -183,7 +183,7 @@
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <div class="prose dark:prose-dark max-w-none leading-normal">
+      <div class="prose dark:prose-invert max-w-none leading-normal">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -238,7 +238,7 @@
   {{ with .component_examples }}
   {{ $formats := slice "toml" "yaml" "json" }}
   {{ $defaultFormat := index $formats 0 }}
-  <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
+  <div class="not-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
     {{ $configs := .configuration }}
     {{ $id := printf "examples-%s" .title | urlize }}
@@ -325,7 +325,7 @@
 
   {{/* Source/transform/sink warnings */}}
   {{ with .component_warnings }}
-  <div class="no-prose py-4 px-6 flex items-center">
+  <div class="not-prose py-4 px-6 flex items-center">
     <div class="mr-8 flex-shrink-0">
       <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24"
         stroke="currentColor">
@@ -335,7 +335,7 @@
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <div class="prose dark:prose-dark max-w-none leading-normal">
+      <div class="prose dark:prose-invert max-w-none leading-normal">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -345,7 +345,7 @@
 
   {{/* Source/transform/sink environment variables */}}
   {{ with .component_env_vars }}
-  <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
+  <div class="not-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
     <div class="py-4 px-6">
       <span class="flex justify-between items-center">
@@ -372,7 +372,7 @@
         </span>
       </span>
 
-      <div class="my-4 prose prose-sm dark:prose-dark max-w-none">
+      <div class="my-4 prose prose-sm dark:prose-invert max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
@@ -415,7 +415,7 @@
   {{/* Data schemas (logs and metrics) */}}
   {{ with .data_schema }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
-    <div class="prose dark:prose-dark max-w-none py-4 px-6">
+    <div class="prose dark:prose-invert max-w-none py-4 px-6">
       {{ .description | markdownify }}
     </div>
 
@@ -501,7 +501,7 @@
                     </span>
                   </span>
 
-                  <div class="prose dark:prose-dark max-w-none">
+                  <div class="prose dark:prose-invert max-w-none">
                     {{ $v.description | markdownify }}
                   </div>
 
@@ -582,7 +582,7 @@
       </span>
 
       {{/* Function description */}}
-      <div class="mt-6 prose prose-md dark:prose-dark max-w-none">
+      <div class="mt-6 prose prose-md dark:prose-invert max-w-none">
         {{ $func.description | markdownify }}
       </div>
 
@@ -631,7 +631,7 @@
 
         {{/* Function arguments */}}
         {{ with $args }}
-        <div class="mt-6 prose dark:prose-dark max-w-none">
+        <div class="mt-6 prose dark:prose-invert max-w-none">
           {{ template "vrl-function-args" . }}
         </div>
         {{ end }}
@@ -644,7 +644,7 @@
             {{ partial "heading.html" (dict "text" "Notices" "level" 4 "id" $id "toc_hide" true) }}
           </span>
 
-          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
+          <span class="mt-2 text-sm prose prose-md dark:prose-invert max-w-none">
             This function has special behavior that you should be aware of.
           </span>
 
@@ -660,7 +660,7 @@
                 </svg>
               </div>
 
-              <div class="prose prose-sm dark:prose-dark max-w-none leading-snug">
+              <div class="prose prose-sm dark:prose-invert max-w-none leading-snug">
                 {{ . | markdownify }}
               </div>
             </div>
@@ -677,7 +677,7 @@
             {{ partial "heading.html" (dict "text" "Errors" "level" 4 "id" $id "toc_hide" true) }}
           </span>
 
-          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
+          <span class="mt-2 text-sm prose prose-md dark:prose-invert max-w-none">
             The <code>{{ $name }}</code> function is <strong>fallible</strong>, which means that
             <a href="/docs/reference/vrl/errors">error handling</a> is required for these errors:
           </span>
@@ -694,7 +694,7 @@
                 </svg>
               </div>
 
-              <div class="prose prose-sm dark:prose-dark max-w-none leading-snug">
+              <div class="prose prose-sm dark:prose-invert max-w-none leading-snug">
                 {{ . | markdownify }}
               </div>
             </div>
@@ -945,7 +945,7 @@
         {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
       </span>
 
-      <div class="mt-6 prose dark:prose-dark max-w-none leading-snug">
+      <div class="mt-6 prose dark:prose-invert max-w-none leading-snug">
         {{ $v.description | markdownify }}
       </div>
 
@@ -963,7 +963,7 @@
         </div>
 
         {{ with .definitions }}
-        <div class="mt-3 prose dark:prose-dark max-w-none">
+        <div class="mt-3 prose dark:prose-invert max-w-none">
           <table>
             <thead>
               <tr>
@@ -1002,7 +1002,7 @@
           {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
         </span>
 
-        <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+        <div class="mt-3 not-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
           {{ range . }}
           {{ template "vrl-data-example" (dict "name" $k "ctx" .) }}
           {{ end }}
@@ -1025,7 +1025,7 @@
         {{ partial "heading.html" (dict "text" $name "level" 3) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
+      <div class="my-4 prose dark:prose-invert max-w-none leading-snug">
         {{ .description | markdownify }}
       </div>
 
@@ -1091,7 +1091,7 @@
       {{ partial "heading.html" (dict "text" .title "level" 3) }}
 
       {{ with .description }}
-      <div class="mt-2 prose dark:prose-dark max-w-none">
+      <div class="mt-2 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -1125,7 +1125,7 @@
       </span>
 
       {{ with $v.description }}
-      <div class="mt-2 prose dark:prose-dark max-w-none leading-6">
+      <div class="mt-2 prose dark:prose-invert max-w-none leading-6">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -1158,7 +1158,7 @@
             {{ partial "heading.html" (dict "text" .title "level" 5 "icon" false) }}
 
             {{ with .description }}
-            <div class="mt-1 prose prose-sm dark:prose-dark max-w-none">
+            <div class="mt-1 prose prose-sm dark:prose-invert max-w-none">
               {{ . | markdownify }}
             </div>
             {{ end }}
@@ -1169,7 +1169,7 @@
                 Enum options
               </span>
 
-              <div class="prose dark:prose-dark max-w-none">
+              <div class="prose dark:prose-invert max-w-none">
                 {{ template "enum-options-table" . }}
               </div>
             </div>
@@ -1194,7 +1194,7 @@
         {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
       </span>
 
-      <div class="mt-2 prose dark:prose-dark max-w-none">
+      <div class="mt-2 prose dark:prose-invert max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
@@ -1212,7 +1212,7 @@
               {{ partial "heading.html" (dict "text" .title "level" 5) }}
             </span>
 
-            <div class="mt-2 prose prose-sm dark:prose-dark max-w-none">
+            <div class="mt-2 prose prose-sm dark:prose-invert max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -1235,7 +1235,7 @@
         {{ partial "heading.html" (dict "text" .title "level" 3) }}
       </span>
 
-      <div class="mt-3 prose dark:prose-dark max-w-none">
+      <div class="mt-3 prose dark:prose-invert max-w-none">
         {{ .description | markdownify }}
       </div>
 
@@ -1251,7 +1251,7 @@
           <div>
             {{ partial "heading.html" (dict "text" .title "level" 5) }}
 
-            <div class="mt-2 prose prose-sm dark:prose-dark max-w-none">
+            <div class="mt-2 prose prose-sm dark:prose-invert max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -1273,7 +1273,7 @@
         {{ partial "heading.html" (dict "text" .title "level" 3) }}
       </span>
 
-      <div class="mt-3 prose dark:prose-dark max-w-none">
+      <div class="mt-3 prose dark:prose-invert max-w-none">
         {{ .description | markdownify }}
       </div>
     </div>
@@ -1290,11 +1290,11 @@
         {{ partial "heading.html" (dict "text" "Signals" "level" 3 "anchor" true) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
+      <div class="my-4 prose dark:prose-invert max-w-none leading-snug">
         {{ .process_signals.description | markdownify }}
       </div>
 
-      <div class="mt-2 prose dark:prose-dark max-w-none">
+      <div class="mt-2 prose dark:prose-invert max-w-none">
         <table>
           <thead>
             <tr>
@@ -1328,11 +1328,11 @@
         {{ partial "heading.html" (dict "text" "Exit codes" "level" 3 "anchor" true) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
+      <div class="my-4 prose dark:prose-invert max-w-none leading-snug">
         {{ .exit_codes.description | markdownify }}
       </div>
 
-      <div class="prose dark:prose-dark max-w-none">
+      <div class="prose dark:prose-invert max-w-none">
         <table>
           <thead>
             <tr>
@@ -1381,7 +1381,7 @@
           Relevant policies
         </span>
 
-        <div class="p-3 prose dark:prose-dark max-w-none">
+        <div class="p-3 prose dark:prose-invert max-w-none">
           <table>
             <thead>
               <tr>
@@ -1561,7 +1561,7 @@
   </span>
 
   {{ with $v.description }}
-  <div class="mt-3 prose dark:prose-dark">
+  <div class="mt-3 prose dark:prose-invert">
     {{ . | markdownify }}
   </div>
   {{ end }}
@@ -1607,7 +1607,7 @@
       </span>
 
       {{ with $v.description }}
-      <div class="mt-2 prose dark:prose-dark">
+      <div class="mt-2 prose dark:prose-invert">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -1647,7 +1647,7 @@
   </span>
 
   {{ with $v.description }}
-  <div class="my-3 prose dark:prose-dark max-w-none">
+  <div class="my-3 prose dark:prose-invert max-w-none">
     {{ . | markdownify }}
   </div>
   {{ end }}
@@ -1672,7 +1672,7 @@
         </span>
 
         {{ with $v.description }}
-        <div class="prose dark:prose-dark">
+        <div class="prose dark:prose-invert">
           {{ . | markdownify }}
         </div>
         {{ end }}
@@ -1893,7 +1893,7 @@
       </span>
     </div>
 
-    <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
+    <div class="mt-4 prose dark:prose-invert max-w-none leading-snug">
       {{ $v.description | markdownify }}
     </div>
 
@@ -1918,7 +1918,7 @@
         Enum options
       </span>
 
-      <div class="mt-2 prose dark:prose-dark max-w-none">
+      <div class="mt-2 prose dark:prose-invert max-w-none">
         {{ template "enum-options-table" . }}
       </div>
     </div>

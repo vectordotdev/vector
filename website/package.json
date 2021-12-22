@@ -22,7 +22,7 @@
     "@iarna/toml": "^2.2.5",
     "@ryangjchandler/spruce": "^2.6.3",
     "@tailwindcss/forms": "^0.3.2",
-    "@tailwindcss/typography": "^0.5.0-alpha.3",
+    "@tailwindcss/typography": "^0.5.0",
     "@types/dotenv-defaults": "^2.0.1",
     "@types/lodash.chunk": "^4.2.6",
     "@types/node": "^16.0.1",

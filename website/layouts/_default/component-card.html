@@ -3,7 +3,7 @@
 {{ $kind := .Params.kind }}
 <div>
   <a href="{{ .RelPermalink }}">
-    <div class="no-prose border hover:border-4 rounded dark:border-gray-700 p-4 shadow-sm hover:border-secondary dark:hover:border-primary">
+    <div class="not-prose border hover:border-4 rounded dark:border-gray-700 p-4 shadow-sm hover:border-secondary dark:hover:border-primary">
       <span class="flex justify-between items-center text-sm">
         <span class="text-gray-600 dark:text-gray-300">
           {{ $title }}
@@ -19,7 +19,7 @@
       </div>
 
       {{ with .Description }}
-      <div class="mt-3.5 prose-sm dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-3.5 prose-sm dark:prose-invert leading-snug text-gray-600 dark:text-gray-300">
         {{ . | markdownify | plainify | safeHTML }}
       </div>
       {{ end }}

@@ -8,7 +8,7 @@
 {{ $color := index $types .type }}
 {{ $dimension := 6 }}
 {{ $viewBox := cond (eq .type "requirement") 24 20 }}
-<div class="admonition no-prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-{{ $color }}">
+<div class="admonition not-prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-{{ $color }}">
   <div class="flex items-center">
     <div class="flex-shrink-0">
       <svg class="h-{{ $dimension }} w-{{ $dimension }} text-{{ $color }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{ $viewBox }} {{ $viewBox }}" fill="currentColor" aria-hidden="true"{{ if eq .type "requirement" }} stroke="currentColor"{{ end }}>
@@ -49,7 +49,7 @@
       </span>
       {{ end }}
 
-      <div class="tracking-tight leading-snug dark:prose-dark prose max-w-none">
+      <div class="tracking-tight leading-snug dark:prose-invert prose max-w-none">
         {{ .content | markdownify }}
       </div>
     </div>

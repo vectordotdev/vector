@@ -27,7 +27,7 @@
         </h1>
 
         {{ with .Description }}
-        <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-dark max-w-none">
+        <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-invert max-w-none">
           {{ . | markdownify }}
         </p>
         {{ end }}
@@ -40,9 +40,9 @@
           {{ partial "page-actions.html" . }}
         </div>
 
-        <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight pb-32">
+        <div class="mt-12 prose dark:prose-invert max-w-none tracking-tight pb-32">
           {{ with $config.description }}
-          <div class="prose dark:prose-dark max-w-none">
+          <div class="prose dark:prose-invert max-w-none">
             {{ . | markdownify }}
           </div>
           {{ end }}
@@ -106,7 +106,7 @@
 
           {{/* How it works */}}
           {{ with $config.how_it_works }}
-          <div class="no-prose mt-12">
+          <div class="not-prose mt-12">
             <span>
               {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
             </span>
@@ -122,7 +122,7 @@
                 {{ partial "svg.html" (dict "src" .) }}
                 {{ end }}
 
-                <div class="mt-2 prose dark:prose-dark max-w-none">
+                <div class="mt-2 prose dark:prose-invert max-w-none">
                   {{ $v.body | markdownify }}
                 </div>
 
@@ -137,7 +137,7 @@
                   {{ partial "svg.html" (dict "src" .) }}
                   {{ end }}
 
-                  <div class="mt-2 prose dark:prose-dark max-w-none">
+                  <div class="mt-2 prose dark:prose-invert max-w-none">
                     {{ .body | markdownify }}
                   </div>
                   {{ end }}

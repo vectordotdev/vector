@@ -10,7 +10,7 @@
   </h1>
 
   {{ with .Description }}
-  <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 dark:prose-dark">
+  <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 dark:prose-invert">
     {{ . | markdownify }}
   </p>
   {{ end }}
@@ -31,7 +31,7 @@
     {{ partial "blog/authors.html" . }}
   </div>
 
-  <div class="mt-12 prose dark:prose-dark tracking-tight">
+  <div class="mt-12 prose dark:prose-invert tracking-tight">
     {{ .Content }}
   </div>
 </div>

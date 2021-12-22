@@ -1,7 +1,7 @@
 {{ $api := site.Data.docs.api }}
 {{ $endpoints := $api.endpoints }}
 {{ $colors := dict "GET" "text-green-500" "POST" "text-indigo-400" }}
-<div class="no-prose flex flex-col divide-y dark:divide-gray-700 border dark:border-gray-700 rounded-md">
+<div class="not-prose flex flex-col divide-y dark:divide-gray-700 border dark:border-gray-700 rounded-md">
   {{ range $path, $info := $endpoints }}
   {{ range $method, $v := $info }}
   {{ $color := index $colors $method }}

@@ -19,12 +19,12 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
       {{ range $columnedSections }}
       <div>
-        <span class="prose dark:prose-dark">
+        <span class="prose dark:prose-invert">
           {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
         </span>
 
         {{ with .Description }}
-        <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
+        <div class="mt-4 text-lg leading-tight prose dark:prose-invert">
           {{ . | markdownify }}
         </div>
         {{ end }}
@@ -38,12 +38,12 @@
 
     {{ range $fullWidthSections }}
     <div class="mt-12">
-      <span class="prose dark:prose-dark">
+      <span class="prose dark:prose-invert">
         {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
       </span>
 
       {{ with .Description }}
-        <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
+        <div class="mt-4 text-lg leading-tight prose dark:prose-invert">
           {{ . | markdownify }}
         </div>
         {{ end }}
@@ -51,12 +51,12 @@
       <div class="mt-4 grid grid-cols-1 md:grid-cols-2">
         {{ range .Sections }}
         <div>
-          <span class="prose dark:prose-dark">
+          <span class="prose dark:prose-invert">
             {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink "icon" false) }}
           </span>
 
           {{ with .Description }}
-          <div class="mt-2 prose-xl dark:prose-dark leading-snug">
+          <div class="mt-2 prose-xl dark:prose-invert leading-snug">
             {{ . | markdownify }}
           </div>
           {{ end }}
@@ -75,12 +75,12 @@
       <div class="grid grid-cols-2">
         {{ range . }}
         <div>
-          <span class="prose dark:prose-dark">
+          <span class="prose dark:prose-invert">
             {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink "icon" false) }}
           </span>
 
           {{ with .Description }}
-          <div class="mt-2 prose-xl dark:prose-dark leading-snug">
+          <div class="mt-2 prose-xl dark:prose-invert leading-snug">
             {{ . | markdownify }}
           </div>
           {{ end }}

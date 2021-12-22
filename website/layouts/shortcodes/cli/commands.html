@@ -1,6 +1,6 @@
 {{ $cli := site.Data.docs.cli }}
 
-<div class="no-prose flex flex-col border dark:border-gray-700 rounded-md divide-y dark:divide-gray-700">
+<div class="not-prose flex flex-col border dark:border-gray-700 rounded-md divide-y dark:divide-gray-700">
   <div class="py-4 px-6">
     <span class="flex justify-between items-center">
       <h3 id="{{ $cli.name }}" class="font-mono">
@@ -200,7 +200,7 @@
       </td>
       {{ end }}
       <td>
-        <div class="prose dark:prose-dark">
+        <div class="prose dark:prose-invert">
           {{ .description | markdownify }}
         </div>
 

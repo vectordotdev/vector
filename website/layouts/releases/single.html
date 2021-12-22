@@ -27,14 +27,14 @@
       {{ end }}
 
       {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-dark max-w-none">
+      <div class="mt-8 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
 
       {{ with $highlights }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark">
+        <div class="prose dark:prose-invert">
           {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
         </div>
 
@@ -48,7 +48,7 @@
 
       {{ with $release.whats_next }}
       <div class="mt-8">
-        <span class="prose dark:prose-dark max-w-none">
+        <span class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
         </span>
 
@@ -59,7 +59,7 @@
               {{ .title }}
             </span>
 
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+            <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -71,7 +71,7 @@
       {{ with $release.commits }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
 
@@ -82,7 +82,7 @@
           {{ $numCommits := len $commits }}
           {{ $heading := printf "%d %s" $numCommits $v }}
           <div>
-            <div class="prose dark:prose-dark max-w-none">
+            <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
@@ -114,7 +114,7 @@
     </span>
 
     {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+    <span class="prose dark:prose-invert leading-snug flex-shrink prose-sm">
       {{ .description | markdownify }}
     </span>
   </span>

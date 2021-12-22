@@ -83,24 +83,6 @@ module.exports = {
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
               'margin-top': '1rem',
             },
-            '.no-prose': {
-              a: {
-                color: theme('colors.primary-dark', 'currentColor'),
-                '&:hover': {
-                  color: theme('colors.secondary'),
-                },
-              },
-              'p + .highlight': {
-                'margin-top': '0.75rem',
-              },
-              'h1, h2, h3, h4, h5, h6': {
-                margin: 0,
-                padding: 0,
-              },
-              '.highlight, pre.chroma': {
-                margin: 0,
-              },
-            },
           }
         },
         dark: {
