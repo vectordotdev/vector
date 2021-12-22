@@ -14,6 +14,8 @@ We're excited to share that we've made a couple improvements to Vector's support
 for Splunk HEC; Vector now supports Splunk HEC indexer acknowledgements and
 token passthrough routing.
 
+## Indexer Acknowledgements
+
 With the new support for Splunk HEC indexer acknowledgement, Vector now provides a
 better end-to-end acknowledgement to ensure that no data is lost. As you may be
 aware, Splunk HEC does not guarantee that a data is successfully written and saved
