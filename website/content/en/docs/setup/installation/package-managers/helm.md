@@ -4,7 +4,7 @@ short: Helm
 weight: 3
 ---
 
-[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector agent chart and the Vector aggregator chart from the Helm package repository. The agent chart and the aggregator chart are made available by adding the Vector Helm repository but are installed and configured separately.
+[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector chart.
 
 ## Adding the Helm repo
 
