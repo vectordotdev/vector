@@ -45,6 +45,14 @@ apt install --yes \
     wget \
     yarn
 
+# LLVM
+TEMP=$(mktemp -d)
+curl \
+    -L https://apt.llvm.org/llvm.sh \
+    -o "${TEMP}/llvm.sh"
+chmod +x "${TEMP}/llvm.sh"
+"${TEMP}/llvm.sh" 13
+
 # Cue
 TEMP=$(mktemp -d)
 curl \
