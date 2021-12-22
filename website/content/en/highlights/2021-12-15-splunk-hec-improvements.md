@@ -25,7 +25,11 @@ interacts with the [Splunk HEC indexer acknowledgements][indexer] protocol to
 acknowledge and verify that data has been successfully delivered. This allows Vector
 to notify that data has been successfully processed. In addition, `splunk_hec` source
 is now integrated into Vector's end-to-end acknowledgements so that it only acknowledges
-events that have been processed by sinks or disk buffers. To learn more about
+events that have been processed by sinks or disk buffers. 
+
+Using this feature is as simple as flipping on `acknowledgements.enabled = true` in the
+source component. Similarly, for the sink, though it's `true` by default, the configuration
+is `acknowledgements.indexer_acknowledgements_enabled = true`. To learn more about
 how it works, check out the short explanation in the Vector [`splunk_hec` sinks][indexer how it works]
 reference page.
 
