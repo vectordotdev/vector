@@ -58,7 +58,6 @@ impl Opts {
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let aggregated_test_inspections: Vec<(String, Vec<String>)> = Vec::new();
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
@@ -101,25 +100,6 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errors) => {
             error!("Failed to execute tests:\n{}", errors.join("\n"));
             return exitcode::CONFIG;
-        }
-    }
-
-    if !aggregated_test_inspections.is_empty() {
-        #[allow(clippy::print_stdout)]
-        {
-            println!("\ninspections:");
-        }
-        for (test_name, inspection) in aggregated_test_inspections {
-            #[allow(clippy::print_stdout)]
-            {
-                println!("\ntest {}:\n", test_name);
-            }
-            for inspect in inspection {
-                #[allow(clippy::print_stdout)]
-                {
-                    println!("{}\n", inspect);
-                }
-            }
         }
     }
 
