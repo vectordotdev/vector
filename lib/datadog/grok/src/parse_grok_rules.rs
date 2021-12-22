@@ -61,6 +61,7 @@ pub fn parse_grok_rules(
 ) -> Result<Vec<GrokRule>, Error> {
     let mut parsed_aliases: HashMap<String, ParsedGrokRule> = HashMap::new();
     let mut inflight_parsed_aliases = vec![];
+    let mut grok_name_generator = generate_grok_compliant_name();
 
     for (name, alias) in &aliases {
         if !alias.is_empty() {
@@ -68,6 +69,7 @@ pub fn parse_grok_rules(
                 name,
                 alias,
                 &aliases,
+                &mut grok_name_generator,
                 &mut parsed_aliases,
                 &mut inflight_parsed_aliases,
             )?;
@@ -77,11 +79,20 @@ pub fn parse_grok_rules(
 
     let mut grok = initialize_grok();
 
-    patterns
+    let a = patterns
         .iter()
         .filter(|&r| !r.is_empty())
-        .map(|r| parse_pattern(r, &aliases, &mut parsed_aliases, &mut grok))
-        .collect::<Result<Vec<GrokRule>, Error>>()
+        .map(|r| {
+            parse_pattern(
+                r,
+                &aliases,
+                &mut grok_name_generator,
+                &mut parsed_aliases,
+                &mut grok,
+            )
+        })
+        .collect::<Result<Vec<GrokRule>, Error>>();
+    a
 }
 
 /// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
@@ -106,12 +117,14 @@ pub struct GrokField {
 ///
 /// - `name` - the name of the alias
 /// - `definition` - the definition of the alias
+/// - `field_path_to_grok_name` - an idempotent function that converts field paths to grok-compliant names
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn parse_alias(
     name: &str,
     definition: &str,
     aliases: &BTreeMap<String, String>,
+    field_path_to_grok_name: &mut dyn FnMut(&LookupBuf) -> String,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<ParsedGrokRule, Error> {
@@ -124,7 +137,13 @@ fn parse_alias(
         inflight_parsed_aliases.push(name.to_string());
     }
 
-    let parsed = parse_grok_rule(definition, aliases, parsed_aliases, inflight_parsed_aliases)?;
+    let parsed = parse_grok_rule(
+        definition,
+        aliases,
+        field_path_to_grok_name,
+        parsed_aliases,
+        inflight_parsed_aliases,
+    )?;
 
     inflight_parsed_aliases.pop();
 
@@ -137,15 +156,23 @@ fn parse_alias(
 /// # Arguments
 ///
 /// - `pattern` - the definition of the pattern
+/// - `field_path_to_grok_name` - an idempotent function that converts field paths to grok-compliant names
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `grok` - an instance of Grok parser
 fn parse_pattern(
     pattern: &str,
     aliases: &BTreeMap<String, String>,
+    field_path_to_grok_name: &mut dyn FnMut(&LookupBuf) -> String,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
-    let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases, &mut Vec::new())?;
+    let parsed_pattern = parse_grok_rule(
+        pattern,
+        aliases,
+        field_path_to_grok_name,
+        parsed_aliases,
+        &mut Vec::new(),
+    )?;
     let mut pattern = String::new();
     pattern.push('^');
     pattern.push_str(parsed_pattern.definition.as_str());
@@ -169,11 +196,13 @@ fn parse_pattern(
 ///
 /// - `rule` - the definition of a grok rule(can be a pattern or an alias)
 /// - `aliases` - all aliases and their definitions
+/// - `field_path_to_grok_name` - an idempotent function that converts field paths to grok-compliant names
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn parse_grok_rule(
     rule: &str,
     aliases: &BTreeMap<String, String>,
+    field_path_to_grok_name: &mut dyn FnMut(&LookupBuf) -> String,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<ParsedGrokRule, Error> {
@@ -204,6 +233,7 @@ fn parse_grok_rule(
             purify_grok_pattern(
                 pattern,
                 &mut fields,
+                field_path_to_grok_name,
                 aliases,
                 parsed_aliases,
                 inflight_parsed_aliases,
@@ -231,7 +261,7 @@ fn parse_grok_rule(
                 } => {
                     let filter = GrokFilter::try_from(filter)?;
                     fields
-                        .entry(destination.to_grok_field_name())
+                        .entry(field_path_to_grok_name(path))
                         .and_modify(|v| v.filters.push(filter.clone()))
                         .or_insert_with(|| GrokField {
                             lookup: path.clone(),
@@ -242,10 +272,12 @@ fn parse_grok_rule(
                     filter_fn: None,
                     path,
                 } => {
-                    fields.entry(path.to_string()).or_insert_with(|| GrokField {
-                        lookup: path.clone(),
-                        filters: vec![],
-                    });
+                    fields
+                        .entry(field_path_to_grok_name(path))
+                        .or_insert_with(|| GrokField {
+                            lookup: path.clone(),
+                            filters: vec![],
+                        });
                 }
             }
         }
@@ -255,6 +287,21 @@ fn parse_grok_rule(
         definition: rule_definition,
         fields,
     })
+}
+
+/// Generates a grok-safe name for a given field(grok0, grok1 ...)
+fn generate_grok_compliant_name() -> impl FnMut(&LookupBuf) -> String {
+    let mut names: HashMap<LookupBuf, String> = HashMap::new();
+    move |field_path| {
+        let index = names.len();
+        names
+            .entry(field_path.to_owned())
+            .or_insert_with_key(|path| match path {
+                p if p.is_empty() => ".".to_string(),
+                _ => format!("grok{}", index),
+            })
+            .to_owned()
+    }
 }
 
 /// Replaces repeated field names with indexed versions, e.g. : field.name, field.name -> field.name.0, field.name.1 to avoid collisions in grok.
@@ -299,12 +346,14 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 ///
 /// - `pattern` - a parsed grok pattern
 /// - `fields` - grok fields with their filters
+/// - `field_path_to_grok_name` - an idempotent function that converts field paths to grok-compliant names
 /// - `aliases` - all aliases and their definitions
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     fields: &mut HashMap<String, GrokField>,
+    field_path_to_grok_name: &mut dyn FnMut(&LookupBuf) -> String,
     aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
@@ -322,6 +371,7 @@ fn purify_grok_pattern(
                         pattern.match_fn.name.as_str(),
                         alias_def,
                         aliases,
+                        field_path_to_grok_name,
                         parsed_aliases,
                         inflight_parsed_aliases,
                     )?;
@@ -335,8 +385,8 @@ fn purify_grok_pattern(
                 .expect("alias was not found")
                 .fields
                 .iter()
-                .for_each(|(path, field)| {
-                    fields.insert(path.clone(), field.clone());
+                .for_each(|(_path, field)| {
+                    fields.insert(field_path_to_grok_name(&field.lookup), field.clone());
                 });
         }
         None if pattern.match_fn.name == "regex"
@@ -346,25 +396,31 @@ fn purify_grok_pattern(
             // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
             if let Some(destination) = &pattern.destination {
                 res.push_str("(?<");
-                res.push_str(destination.to_grok_field_name().as_str());
+                res.push_str(&field_path_to_grok_name(&destination.path));
                 res.push('>');
             } else {
                 res.push_str("(?:"); // non-capturing group
             }
-            res.push_str(resolves_match_function(fields, pattern)?.as_str());
+            res.push_str(
+                resolves_match_function(fields, field_path_to_grok_name, pattern)?.as_str(),
+            );
             res.push(')');
         }
         None => {
             // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
             res.push_str("%{");
 
-            res.push_str(resolves_match_function(fields, pattern)?.as_str());
+            res.push_str(
+                resolves_match_function(fields, field_path_to_grok_name, pattern)?.as_str(),
+            );
 
             if let Some(destination) = &pattern.destination {
                 if destination.path.is_empty() {
-                    write!(res, r#":."#).unwrap(); // root
+                    // root
+                    write!(res, r#":."#).expect("couldn't write grok field name");
                 } else {
-                    write!(res, ":{}", destination.path).unwrap();
+                    write!(res, ":{}", field_path_to_grok_name(&destination.path))
+                        .expect("couldn't write grok field name");
                 }
             }
             res.push('}');
@@ -373,20 +429,11 @@ fn purify_grok_pattern(
     Ok(res)
 }
 
-impl Destination {
-    fn to_grok_field_name(&self) -> String {
-        match &self.path {
-            p if p.is_empty() => ".".to_string(), // grok does not support empty field names,
-            p => p.to_string(),
-        }
-    }
-}
-
-/// Process a match function from a given pattern:
 /// - returns a grok expression(a grok pattern or a regular expression) corresponding to a given match function
 /// - some match functions(e.g. number) implicitly introduce a filter to be applied to an extracted value - stores it to `fields`.
 fn resolves_match_function(
     fields: &mut HashMap<String, GrokField>,
+    field_path_to_grok_name: &mut dyn FnMut(&LookupBuf) -> String,
     pattern: &ast::GrokPattern,
 ) -> Result<String, Error> {
     let match_fn = &pattern.match_fn;
@@ -403,7 +450,7 @@ fn resolves_match_function(
         "integer" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.to_grok_field_name(),
+                    field_path_to_grok_name(&destination.path),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::Integer],
@@ -415,7 +462,7 @@ fn resolves_match_function(
         "integerExt" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.to_grok_field_name(),
+                    field_path_to_grok_name(&destination.path),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::IntegerExt],
@@ -427,7 +474,7 @@ fn resolves_match_function(
         "number" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.to_grok_field_name(),
+                    field_path_to_grok_name(&destination.path),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::Number],
@@ -439,7 +486,7 @@ fn resolves_match_function(
         "numberExt" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.to_grok_field_name(),
+                    field_path_to_grok_name(&destination.path),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::NumberExt],
@@ -491,7 +538,7 @@ fn resolves_match_function(
                             })?;
                         if let Some(destination) = &pattern.destination {
                             fields.insert(
-                                destination.to_grok_field_name(),
+                                field_path_to_grok_name(&destination.path),
                                 GrokField {
                                     lookup: destination.path.clone(),
                                     filters: vec![filter],
