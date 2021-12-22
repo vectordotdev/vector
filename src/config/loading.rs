@@ -367,7 +367,7 @@ pub fn load_builder_from_paths(
     }
 }
 
-pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
+pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
@@ -379,14 +379,14 @@ pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<Stri
 }
 
 fn load_from_inputs(
-    inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
+    inputs: impl IntoIterator<Item = (impl std::io::Read, Format)>,
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format.unwrap_or_default()).and_then(|(n, warn)| {
+        if let Err(errs) = load(input, format).and_then(|(n, warn)| {
             warnings.extend(warn);
             config.append(n)
         }) {
