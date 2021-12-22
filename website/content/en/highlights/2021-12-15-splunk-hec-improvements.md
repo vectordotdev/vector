@@ -23,6 +23,8 @@ if it receives a 200. Vector will now check [Splunk HEC indexer acknowledgements
 protocol to verify that data has been successfully delivered. To learn more about
 how it works, check out the short explanation in the Vector [sinks reference page][indexer how it works].
 
+## Passthrough Token Routing
+
 Vector now also supports new token passthrough routing. You can now use these tokens,
 which can be found in `splunk_hec` source requests, downstream `splunk_hec` sink
 requests. With the ability to record Splunk token that the events came in with, you
