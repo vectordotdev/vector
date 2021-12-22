@@ -9,6 +9,7 @@ use crate::{
         ConfigPath, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
+    test_util::random_string,
     topology::{
         self,
         builder::{self, Pieces},
@@ -34,14 +35,7 @@ pub struct UnitTest {
     config: Config,
     diff: ConfigDiff,
     pieces: Pieces,
-    sink_rxs: Vec<Receiver<UnitTestSinkResult>>,
-}
-
-// This maps a transform id to its corresponding source and sink
-pub struct UnitTestBuildMetadata {
-    transforms: HashSet<String>,
-    sources: IndexMap<String, String>,
-    sinks: IndexMap<String, String>,
+    test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
 impl UnitTest {
@@ -52,7 +46,10 @@ impl UnitTest {
         let _ = topology.sources_finished().await;
         let _stop_complete = topology.stop();
 
-        let mut in_flight = self.sink_rxs.into_iter().collect::<FuturesUnordered<_>>();
+        let mut in_flight = self
+            .test_result_rxs
+            .into_iter()
+            .collect::<FuturesUnordered<_>>();
 
         let mut errors = Vec::new();
         while let Some(partial_result) = in_flight.next().await {
@@ -65,14 +62,6 @@ impl UnitTest {
         (Vec::new(), errors)
     }
 }
-
-// impl UnitTestBuildMetadata {
-//     pub fn new(transforms: ) -> Self {
-//       Self {
-//       }
-//     }
-
-// }
 
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
@@ -87,16 +76,17 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
-    // todo: generate random id for inserted components
+    let metadata = UnitTestBuildMetadata::initialize(&mut config_builder)?;
 
     for mut test_definition in test_definitions {
         let test_name = test_definition.name.clone();
-        // Move the legacy single input into the inputs list if it exists
+        // Move the legacy single test input into the inputs list if it exists
         let legacy_input = std::mem::take(&mut test_definition.input);
         if let Some(input) = legacy_input {
             test_definition.inputs.push(input);
         }
-        match build_unit_test(test_definition, config_builder.clone()).await {
+        // match build_unit_test(test_definition, config_builder.clone()).await {
+        match build_unit_test(&metadata, test_definition, config_builder.clone()).await {
             Ok(test) => tests.push(test),
             Err(errors) => {
                 let mut test_error = errors.join("\n");
@@ -164,150 +154,197 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
     }
 }
 
+pub struct UnitTestBuildMetadata {
+    pub available_insert_targets: HashSet<ComponentKey>,
+    source_ids: HashMap<ComponentKey, String>,
+    template_sources: IndexMap<ComponentKey, UnitTestSourceConfig>,
+    sink_ids: HashMap<ComponentKey, String>,
+}
+
+impl UnitTestBuildMetadata {
+    pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
+        // A unique id used to name test sources and sinks to avoid name clashes
+        let random_id = random_string(15);
+
+        let available_insert_targets = config_builder
+            .transforms
+            .keys()
+            .map(|key| key.clone())
+            .collect::<HashSet<_>>();
+
+        // Mapping from transform name to unit test source name
+        let source_ids = available_insert_targets
+            .iter()
+            .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
+            .collect::<HashMap<_, _>>();
+
+        // Connect a test source to every transform
+        let mut template_sources = IndexMap::new();
+        for (key, transform) in config_builder.transforms.iter_mut() {
+            let test_source_id = source_ids
+                .get(key)
+                .expect("Missing test source for a transform")
+                .clone();
+            transform.inputs.push(test_source_id);
+
+            template_sources.insert(key.clone(), UnitTestSourceConfig::default());
+        }
+
+        // In order to attach a sink to every valid extraction point, we need to
+        // expand any relevant transforms
+        let mut builder = config_builder.clone();
+        let _ = expand_macros(&mut builder)?;
+        let available_extract_targets = builder
+            .transforms
+            .iter()
+            .flat_map(|(key, transform)| {
+                let mut extract_targets = vec![key.clone()];
+                extract_targets.extend(
+                    transform
+                        .inner
+                        .named_outputs()
+                        .iter()
+                        .map(|port| ComponentKey::from(format!("{}.{}", key, port)))
+                        .collect::<Vec<_>>(),
+                );
+                extract_targets
+            })
+            .collect::<HashSet<_>>();
+
+        // Mapping from transform name to unit test sink name
+        let sink_ids = available_extract_targets
+            .iter()
+            .map(|key| {
+                (
+                    key.clone(),
+                    format!(
+                        "{}-{}-{}",
+                        key.to_string().replace(".", "-"),
+                        "sink",
+                        random_id
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        Ok(Self {
+            available_insert_targets,
+            source_ids,
+            template_sources,
+            sink_ids,
+        })
+    }
+
+    pub fn hydrate_into_sources(
+        &self,
+        inputs: HashMap<ComponentKey, Vec<Event>>,
+    ) -> IndexMap<ComponentKey, SourceOuter> {
+        let mut template_sources = self.template_sources.clone();
+        for (insert_at, events) in inputs {
+            let source_config = template_sources.get_mut(&insert_at).expect(
+                format!(
+                    "Invalid input: cannot insert at {:?}",
+                    insert_at.to_string()
+                )
+                .as_ref(),
+            );
+            source_config.events.extend(events);
+        }
+        template_sources
+            .into_iter()
+            .map(|(transform_key, source_config)| {
+                let source_key: &str = self
+                    .source_ids
+                    .get(&transform_key)
+                    .expect("Corresponding source must exist")
+                    .as_ref();
+                (
+                    ComponentKey::from(source_key),
+                    SourceOuter::new(source_config),
+                )
+            })
+            .collect::<IndexMap<_, _>>()
+    }
+
+    pub fn hydrate_into_sinks(
+        &self,
+        test_name: &str,
+        outputs: IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>,
+        no_outputs_from: Vec<ComponentKey>,
+    ) -> (
+        Vec<Receiver<UnitTestSinkResult>>,
+        IndexMap<ComponentKey, SinkOuter<String>>,
+    ) {
+        let mut test_result_rxs = Vec::new();
+        // Connect a sink to every transform output
+        let mut template_sinks = IndexMap::new();
+        for (transform_id, _) in self.sink_ids.iter() {
+            let (tx, rx) = oneshot::channel();
+            let sink_config = UnitTestSinkConfig {
+                test_name: test_name.to_string(),
+                transform_id: transform_id.to_string(),
+                result_tx: Arc::new(Mutex::new(Some(tx))),
+                check: UnitTestSinkCheck::NoOp,
+            };
+            template_sinks.insert(transform_id.clone(), sink_config);
+            test_result_rxs.push(rx);
+        }
+
+        // Add checks to sinks associated with an extract_from
+        for (transform_id, checks) in outputs {
+            let sink_config = template_sinks
+                .get_mut(&transform_id)
+                .expect("Sink does not exist");
+            sink_config.check = UnitTestSinkCheck::Checks(checks);
+        }
+
+        // Add no outputs assertion to relevant sinks
+        for transform_id in no_outputs_from {
+            let sink_config = template_sinks
+                .get_mut(&transform_id)
+                .expect("Sink does not exist");
+            sink_config.check = UnitTestSinkCheck::NoOutputs;
+        }
+
+        let sinks = template_sinks
+            .into_iter()
+            .map(|(transform_id, sink_config)| {
+                let sink_id = self
+                    .sink_ids
+                    .get(&transform_id)
+                    .expect("Sink does not exist")
+                    .as_ref();
+                (
+                    ComponentKey::from(sink_id),
+                    SinkOuter::new(vec![transform_id.to_string()], Box::new(sink_config)),
+                )
+            })
+            .collect::<IndexMap<_, _>>();
+
+        (test_result_rxs, sinks)
+    }
+}
+
 async fn build_unit_test(
+    metadata: &UnitTestBuildMetadata,
     test: TestDefinition,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let mut build_errors = Vec::new();
-
-    let available_insert_targets = config_builder
-        .transforms
-        .keys()
-        .map(|key| key.clone())
-        .collect::<HashSet<_>>();
-    let inputs = build_and_validate_inputs(&test.inputs, &available_insert_targets)?;
-
-    // Mapping from transform name to unit test source name
-    let source_ids = available_insert_targets
-        .iter()
-        .map(|key| (key.clone(), format!("{}-{}", key, "source")))
-        .collect::<HashMap<_, _>>();
-
-    // Connect a test source to every transform
-    let mut test_sources = IndexMap::new();
-    for (key, transform) in config_builder.transforms.iter_mut() {
-        let test_source_id = source_ids
-            .get(key)
-            .expect("Missing test source for a transform")
-            .clone();
-        transform.inputs.push(test_source_id.clone());
-
-        test_sources.insert(key.clone(), UnitTestSourceConfig::default());
-    }
-
-    for (input, events) in inputs {
-        let source_config = test_sources
-            .get_mut(&input)
-            .expect("Earlier validation of inputs was incorrect");
-        source_config.events.extend(events);
-    }
-    let sources = test_sources
-        .into_iter()
-        .map(|(transform_key, source_config)| {
-            let source_key: &str = source_ids
-                .get(&transform_key)
-                .expect("Corresponding source must exist")
-                .as_ref();
-            (
-                ComponentKey::from(source_key),
-                SourceOuter::new(source_config),
-            )
-        })
-        .collect::<IndexMap<_, _>>();
+    let inputs = build_and_validate_inputs(&test.inputs, &metadata.available_insert_targets)?;
+    let sources = metadata.hydrate_into_sources(inputs);
 
     if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
-        build_errors.push(
+        return Err(vec![
             "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_string(),
-        );
-        return Err(build_errors);
+        ]);
     }
 
-    let mut builder = config_builder.clone();
-    let _ = expand_macros(&mut builder)?;
-    let available_extract_targets = builder
-        .transforms
-        .iter()
-        .flat_map(|(key, transform)| {
-            let mut extract_targets = vec![key.clone()];
-            extract_targets.extend(
-                transform
-                    .inner
-                    .named_outputs()
-                    .iter()
-                    .map(|port| ComponentKey::from(format!("{}.{}", key, port)))
-                    .collect::<Vec<_>>(),
-            );
-            extract_targets
-        })
-        .collect::<HashSet<_>>();
-
-    // Mapping from transform name to unit test sink name
-    let sink_ids = available_extract_targets
-        .iter()
-        .map(|key| {
-            (
-                key.clone(),
-                format!("{}-{}", key.to_string().replace(".", "-"), "sink"),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    let outputs = build_outputs(&test.outputs).unwrap_or_else(|errors| {
-        build_errors.extend(errors);
-        Default::default()
-    });
-
-    let mut sink_rxs = Vec::new();
-    // Connect a sink to every transform output
-    let mut test_sinks = IndexMap::new();
-    for (transform_id, _) in sink_ids.iter() {
-        let (tx, rx) = oneshot::channel();
-        let sink_config = UnitTestSinkConfig {
-            test_name: test.name.clone(),
-            transform_id: transform_id.to_string(),
-            result_tx: Arc::new(Mutex::new(Some(tx))),
-            check: UnitTestSinkCheck::NoOp,
-        };
-        test_sinks.insert(transform_id.clone(), sink_config);
-        sink_rxs.push(rx);
-    }
-
-    // Add checks to sinks associated with an extract_from
-    for (transform_id, checks) in outputs {
-        let sink_config = test_sinks
-            .get_mut(&transform_id)
-            .expect("Sink does not exist");
-        sink_config.check = UnitTestSinkCheck::Checks(checks);
-    }
-
-    // Add no outputs assertion to relevant sinks
-    for transform_id in test.no_outputs_from {
-        let sink_config = test_sinks
-            .get_mut(&transform_id)
-            .expect("Sink does not exist");
-        sink_config.check = UnitTestSinkCheck::NoOutputs;
-    }
-
-    let sinks = test_sinks
-        .into_iter()
-        .map(|(transform_id, sink_config)| {
-            let sink_id = sink_ids
-                .get(&transform_id)
-                .expect("Sink does not exist")
-                .as_ref();
-            (
-                ComponentKey::from(sink_id),
-                SinkOuter::new(vec![transform_id.to_string()], Box::new(sink_config)),
-            )
-        })
-        .collect::<IndexMap<_, _>>();
+    let outputs = build_outputs(&test.outputs)?;
+    let (test_result_rxs, sinks) =
+        metadata.hydrate_into_sinks(test.name.as_ref(), outputs, test.no_outputs_from.clone());
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
-
-    if !build_errors.is_empty() {
-        return Err(build_errors);
-    }
-
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
@@ -317,7 +354,7 @@ async fn build_unit_test(
         config,
         diff,
         pieces,
-        sink_rxs,
+        test_result_rxs,
     })
 }
 

@@ -20,7 +20,7 @@ use crate::{
     sources,
 };
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct UnitTestSourceConfig {
     #[serde(skip)]
     pub events: Vec<Event>,
@@ -57,7 +57,9 @@ pub enum UnitTestSinkCheck {
     Checks(Vec<Vec<Box<dyn Condition>>>),
     // Check that no events were received
     NoOutputs,
-    // Do nothing
+    // Do nothing. Some sinks in a unit test topology serve only to simplify
+    // building a valid topology. They receive no events and are irrelevant to
+    // the test, so run no checks.
     NoOp,
 }
 
@@ -154,7 +156,8 @@ impl StreamSink for UnitTestSink {
                                         break;
                                     }
                                     Err(error) => {
-                                        condition_errors.push(format!("  condition[{}]: {}", j, error));
+                                        condition_errors
+                                            .push(format!("  condition[{}]: {}", j, error));
                                     }
                                 }
                             }
@@ -164,7 +167,10 @@ impl StreamSink for UnitTestSink {
                         if !check_errors.is_empty() {
                             check_errors.insert(
                                 0,
-                                format!("check[{}] for transform {:?} failed conditions:", i, self.transform_id),
+                                format!(
+                                    "check[{}] for transform {:?} failed conditions:",
+                                    i, self.transform_id
+                                ),
                             );
                         }
 
@@ -180,7 +186,6 @@ impl StreamSink for UnitTestSink {
                         ));
                     }
                 }
-
             }
             UnitTestSinkCheck::NoOutputs => {
                 if !output_events.is_empty() {
