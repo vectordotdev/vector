@@ -68,6 +68,10 @@ impl PodMetadataAnnotator {
             fields_spec,
         }
     }
+
+    pub fn fields_spec(&self) -> &FieldsSpec {
+        &self.fields_spec
+    }
 }
 
 impl PodMetadataAnnotator {

@@ -300,14 +300,24 @@ impl Source {
                     .unwrap()
                     .entry(podname.to_string())
                     .or_insert(GroupWatcher::new(rule.limit));
+
+                group_rules_hash
+                    .get_mut(namespace)
+                    .unwrap()
+                    .entry(DEFAULT_PODNAME.to_string())
+                    .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
             }
-        } else {
-            group_rules_hash.insert(DEFAULT_NAMESPACE.to_string(), HashMap::new());
-            group_rules_hash.get_mut(DEFAULT_NAMESPACE).unwrap().insert(
-                DEFAULT_PODNAME.to_string(),
-                GroupWatcher::new(DEFAULT_LIMIT),
-            );
         }
+
+        group_rules_hash
+            .entry(DEFAULT_NAMESPACE.to_string())
+            .or_insert(HashMap::new());
+
+        group_rules_hash
+            .get_mut(DEFAULT_NAMESPACE)
+            .unwrap()
+            .entry(DEFAULT_PODNAME.to_string())
+            .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
 
         Ok(Self {
             client,
@@ -476,6 +486,7 @@ impl Source {
                 &line.filename,
                 ingestion_timestamp_field.as_deref(),
             );
+
             let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(&KubernetesLogsEventReceived {
@@ -499,12 +510,20 @@ impl Source {
             }
 
             checkpoints.update(line.file_id, line.offset);
-
             if file_info.is_some() {
                 let (namespace, pod_name) = file_info
                     .as_ref()
-                    .map(|info| (info.pod_namespace, info.pod_name))
-                    .unwrap();
+                    .map(|info| (info.pod_namespace, info.pod_name))?;
+
+                let key = format!("{}.pod-template-hash", annotator.fields_spec().pod_labels);
+
+                let pod_name = match &event.as_log().get(key) {
+                    Some(template_hash) => {
+                        let pod_template_hash = format!("-{}-", template_hash.to_string_lossy());
+                        pod_name.split(&pod_template_hash).next().unwrap()
+                    }
+                    None => pod_name,
+                };
 
                 let ns_group = match rules.get_mut(namespace) {
                     Some(group) => group,
@@ -517,28 +536,23 @@ impl Source {
                 };
 
                 if group_watcher.get(&line.filename).is_none() {
-
                     group_watcher.add(&line.filename);
-                    group_watcher.incr_event(&line.filename);
+                }
 
-                    Some(event)
-                } else {
-                    if group_watcher.line_limit_reached(&line.filename) {
-                        if group_watcher.time_elapsed(&line.filename) > rate_window_secs {
-                            // lines read took time greater than rate_window_secs
-                            group_watcher.reset(&line.filename);
-                            group_watcher.incr_event(&line.filename);
-
-                            Some(event)
-                        } else {
-                            // lines read within rate_window_secs
-                            // update checkpoint and ignore line
-                            None
-                        }
-                    } else {
+                if group_watcher.line_limit_reached(&line.filename) {
+                    if group_watcher.time_elapsed(&line.filename) > rate_window_secs {
+                        // lines read took time greater than rate_window_secs
+                        group_watcher.reset(&line.filename);
                         group_watcher.incr_event(&line.filename);
                         Some(event)
+                    } else {
+                        // lines read within rate_window_secs
+                        // update checkpoint and ignore line
+                        None
                     }
+                } else {
+                    group_watcher.incr_event(&line.filename);
+                    Some(event)
                 }
             } else {
                 None

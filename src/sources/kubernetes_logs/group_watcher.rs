@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FileCounter {
     start_time: Instant,
     lines_read: usize,
@@ -27,7 +27,7 @@ impl FileCounter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GroupWatcher {
     limit: usize,
     current_paths: HashMap<String, FileCounter>,
