@@ -2,7 +2,6 @@ use std::{fmt, pin::Pin};
 
 use futures::{
     channel::mpsc,
-    stream,
     task::{Context, Poll},
     SinkExt, Stream, StreamExt,
 };
@@ -73,25 +72,30 @@ impl SourceSender {
     ) -> Result<(), ClosedError> {
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(events) = stream.next().await {
-            let mut count = 0;
-            let mut byte_size = 0;
+            self.send_batch(events).await?;
+        }
+        Ok(())
+    }
 
-            for event in events {
-                let event_size = event.size_of();
-                match self.inner.send(event).await {
-                    Ok(()) => {
-                        count += 1;
-                        byte_size += event_size;
-                    }
-                    Err(error) => {
-                        emit!(&EventsSent { count, byte_size });
-                        return Err(error.into());
-                    }
+    pub async fn send_batch(&mut self, events: Vec<Event>) -> Result<(), ClosedError> {
+        let mut count = 0;
+        let mut byte_size = 0;
+
+        for event in events {
+            let event_size = event.size_of();
+            match self.inner.send(event).await {
+                Ok(()) => {
+                    count += 1;
+                    byte_size += event_size;
+                }
+                Err(error) => {
+                    emit!(&EventsSent { count, byte_size });
+                    return Err(error.into());
                 }
             }
-
-            emit!(&EventsSent { count, byte_size });
         }
+
+        emit!(&EventsSent { count, byte_size });
 
         Ok(())
     }
@@ -102,6 +106,7 @@ impl SourceSender {
     ) -> Result<(), StreamSendError<E>> {
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(results) = stream.next().await {
+            metrics::histogram!("chunk_size", results.len() as f64);
             let mut stream_error = None;
             let mut to_forward = Vec::with_capacity(results.len());
             for result in results {
@@ -113,7 +118,7 @@ impl SourceSender {
                     }
                 }
             }
-            if let Err(closed_err) = self.send_all(&mut stream::iter(to_forward)).await {
+            if let Err(closed_err) = self.send_batch(to_forward).await {
                 return Err(StreamSendError::Closed(closed_err));
             }
             if let Some(error) = stream_error {
