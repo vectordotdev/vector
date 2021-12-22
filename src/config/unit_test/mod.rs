@@ -151,7 +151,7 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
             .collect::<Vec<_>>();
         let mut new_inputs = original_inputs
             .intersection(&all_valid_inputs)
-            .map(|input| input.clone())
+            .cloned()
             .collect::<HashSet<_>>();
         new_inputs.extend(route_inputs);
         transform.inputs = new_inputs.into_iter().collect();
@@ -173,7 +173,7 @@ impl UnitTestBuildMetadata {
         let available_insert_targets = config_builder
             .transforms
             .keys()
-            .map(|key| key.clone())
+            .cloned()
             .collect::<HashSet<_>>();
 
         // Mapping from transform name to unit test source name
@@ -245,13 +245,12 @@ impl UnitTestBuildMetadata {
     ) -> IndexMap<ComponentKey, SourceOuter> {
         let mut template_sources = self.template_sources.clone();
         for (insert_at, events) in inputs {
-            let source_config = template_sources.get_mut(&insert_at).expect(
-                format!(
+            let source_config = template_sources.get_mut(&insert_at).unwrap_or_else(|| {
+                panic!(
                     "Invalid input: cannot insert at {:?}",
                     insert_at.to_string()
                 )
-                .as_ref(),
-            );
+            });
             source_config.events.extend(events);
         }
         template_sources
@@ -363,7 +362,7 @@ async fn build_unit_test(
 }
 
 fn build_and_validate_inputs(
-    test_inputs: &Vec<TestInput>,
+    test_inputs: &[TestInput],
     available_insert_targets: &HashSet<ComponentKey>,
 ) -> Result<HashMap<ComponentKey, Vec<Event>>, Vec<String>> {
     let mut inputs = HashMap::new();
@@ -375,14 +374,14 @@ fn build_and_validate_inputs(
 
     for (index, input) in test_inputs.iter().enumerate() {
         if available_insert_targets.contains(&input.insert_at) {
-            match build_input_event(&input) {
+            match build_input_event(input) {
                 Ok(input_event) => {
                     inputs
                         .entry(input.insert_at.clone())
                         .and_modify(|events: &mut Vec<Event>| {
                             events.push(input_event.clone());
                         })
-                        .or_insert(vec![input_event]);
+                        .or_insert_with(|| vec![input_event]);
                 }
                 Err(error) => errors.push(error),
             }
@@ -402,9 +401,9 @@ fn build_and_validate_inputs(
 }
 
 fn build_outputs(
-    test_outputs: &Vec<TestOutput>,
+    test_outputs: &[TestOutput],
 ) -> Result<IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs = IndexMap::new();
+    let mut outputs: IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -412,7 +411,7 @@ fn build_outputs(
         for (index, condition) in output
             .conditions
             .clone()
-            .unwrap_or(Vec::new())
+            .unwrap_or_default()
             .iter()
             .enumerate()
         {
@@ -427,9 +426,7 @@ fn build_outputs(
 
         outputs
             .entry(output.extract_from.clone())
-            .and_modify(|existing_conditions: &mut Vec<Vec<Box<dyn Condition>>>| {
-                existing_conditions.push(conditions.clone())
-            })
+            .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
             .or_insert(vec![conditions]);
     }
 

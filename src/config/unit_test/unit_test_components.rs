@@ -205,12 +205,14 @@ impl StreamSink for UnitTestSink {
     }
 }
 
-fn events_to_string(events: &Vec<Event>) -> String {
+fn events_to_string(events: &[Event]) -> String {
     events
         .iter()
         .map(|event| match event {
-            Event::Log(log) => serde_json::to_string(log).unwrap_or("{}".to_string()),
-            Event::Metric(metric) => serde_json::to_string(metric).unwrap_or("{}".to_string()),
+            Event::Log(log) => serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string()),
+            Event::Metric(metric) => {
+                serde_json::to_string(metric).unwrap_or_else(|_| "{}".to_string())
+            }
         })
         .collect::<Vec<_>>()
         .join("\n  ")
