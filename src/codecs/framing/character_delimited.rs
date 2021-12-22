@@ -91,9 +91,8 @@ impl Decoder for CharacterDelimitedDecoder {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let newline_pos = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| *b as char == self.delimiter);
+            // TODO this coercion to u8 is not always safe.
+            let newline_pos = memchr::memchr(self.delimiter as u8, &buf[self.next_index..read_to]);
 
             match (self.is_discarding, newline_pos) {
                 (true, Some(offset)) => {
