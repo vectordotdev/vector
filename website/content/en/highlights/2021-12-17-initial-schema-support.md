@@ -76,7 +76,7 @@ In this case, data is received by the `datadog_agent` source and decoded into th
   "hostname": "string", // semantic host
   "service": "string", // semantic service
   "source": "string", // semantic source
-  "tags": "string" // semantic tags
+  "tags": "string"// semantic tags
 }
 ```
 
@@ -91,7 +91,7 @@ can see, the semantic message field (i.e. `message`), is decoded according to th
   "hostname": "string", // semantic host
   "service": "string", // semantic service
   "source": "string", // semantic source
-  "tags": "string",// semantic tags
+  "tags": "string", //semantic tags
   "syslog": {
     "hostname": "string",
     "appname": "string",
@@ -136,7 +136,7 @@ Datadog schema:
   "hostname": "string", // semantic host
   "service": "string", // semantic service
   "source": "string", // semantic source
-  "tags": "string" // semantic tags
+  "tags": "string"// semantic tags
 }
 ```
 
