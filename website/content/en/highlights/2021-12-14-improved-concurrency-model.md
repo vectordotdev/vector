@@ -13,9 +13,7 @@ badges:
 We've released an improved concurrency model that provides measurable performance
 improvements and enables more efficient vertical scaling.
 
-Previously, Vector set the limit to active tasks to the number of available CPUs
-in a given environment. Transforms were run sequentially, which made transforms
-a bottleneck in Vector pipelines.
+Previously, Vector was limited to executing transforms on a single thread, which led to them often being the bottleneck in Vector pipelines.
 
 With this new release, Vector will perform faster when a transform is a bottleneck,
 assuming that more CPUs are available to share their work. This works by Vector
