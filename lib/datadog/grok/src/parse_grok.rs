@@ -788,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_unconventional_field_names() {
+    fn parses_grok_unsafe_field_names() {
         test_full_grok(vec![
             (
                 r#"%{data:field["quoted name"]}"#,
