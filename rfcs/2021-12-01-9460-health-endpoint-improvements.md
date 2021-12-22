@@ -1,11 +1,14 @@
-# RFC 9460 - 2021-12-01 - Healthcheck endpoint improvements
+# RFC 9460 - 2021-12-01 - Health endpoint improvements
 
-Our existing health endpoint is too limited and additional features are required
-to properly interact with load balancers or Kubernetes service discovery.
+Our existing `/health' endpoint is limited and additional information should be
+exposed for both operators and load balancers/service discovery.
 
 ## Context
 
 - [Additional response for api health endpoint](https://github.com/vectordotdev/vector/issues/9160)
+- [Formalize component health to include statuses and runtime health](https://github.com/vectordotdev/vector/issues/10555)
+- [Add specification for the `/health` endpoint](https://github.com/vectordotdev/vector/issues/10556)
+- [Add component health status the `/heath` endpoint](https://github.com/vectordotdev/vector/issues/9469)
 
 ## Scope
 
@@ -13,35 +16,41 @@ to properly interact with load balancers or Kubernetes service discovery.
 
 - Update health endpoint to improve Vector's reliability in production deployments
 - Update default configurations to improve Vector's out-of-the-box reliability
+- Improve visibility of high level status at runtime
 
 ### Out of scope
 
-- Moving the health endpoint out of our existing API
-- Adding user facing configuration to adjust endpoint behavior or responses
+- ...
 
 ## Pain
 
 - Today's health endpoint causes 502's when running behind a loadbalancer
 - The healthcheck isn't integrated with any components and only represents if Vector
 itself is running
+- Operators don't have visibility into the state of specific components, ex. is
+backpressure being applied to upstream components
 
 ## Proposal
 
 ### User Experience
 
-The existing health endpoint on Vector's API is enhanced to return 503's
+The existing health endpoint on Vector's API is updated to return 503's
 when Vector is shutting down. This additional response will allow load balancers
 and service discovery to better integrate with Vector, sources already begin
 rejecting requests received during the shutdown process and updating the health
 check will allow for removing the instance from available backends and avoid
 routing traffic to an instance that will end up rejecting the request regardless.
 
+The API will not start until the topology is build and validated as functional,
+this isn't precisely when Vector's configured sources _can_ actually process
+events but it's a reasonable first step to ensure graceful startups.
+
 ### Implementation
 
 We have existing logic in place for other components to handle Vector's shutdown.
 The [health handler](https://github.com/vectordotdev/vector/blob/master/src/api/handler.rs#L7)
 can be updated to respond 503 if shutdown has started and 200 otherwise. This
-should be a minor change and not negatively impact existing deployments.
+should not negatively impact existing deployments.
 
 ## Rationale
 
@@ -52,10 +61,7 @@ to implement this.
 
 ## Drawbacks
 
-This is a minor change overall and does not add any real engineering burden.
-It does open the door for further health check improvements which are more
-complex. Any further improvements to the check need to be planned and discussed
-to avoid unwanted complexity.
+N/A
 
 ## Prior Art
 
@@ -63,6 +69,11 @@ to avoid unwanted complexity.
   - [Liveness and Readiness Probes](https://github.com/elastic/helm-charts/blob/715eeda8a45b8c3d8542921f5485aa502c238d93/filebeat/values.yaml#L174-L198)
 - [FluentBit](https://docs.fluentbit.io/manual/administration/monitoring#rest-api-interface)
   - [Liveness and Readiness Probes](https://github.com/fluent/helm-charts/blob/355575c5b2a5bd858bcadeaa9d8d5d7f15a7816d/charts/fluent-bit/values.yaml#L132-L140)
+- [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/7.16/cluster-health.html)
+  - [Readiness Probe](https://github.com/elastic/helm-charts/blob/715eeda8a45b8c3d8542921f5485aa502c238d93/elasticsearch/templates/statefulset.yaml#L227-L291)
+- [Datadog Agent]
+  - [Liveness and Readiness Probes](https://github.com/DataDog/helm-charts/blob/d5e1f4370442bdc5e457468ac7ff0ff943f528d5/charts/datadog/templates/_container-agent.yaml#L193-L199)
+  - [agent health](https://docs.datadoghq.com/agent/guide/agent-commands/?tab=agentv6v7#other-commands)
 
 ## Alternatives
 
@@ -74,42 +85,33 @@ shutting down. Those requests will already be rejected by sources and this
 behaviour reflects poorly on zero downtime deployments, even though events
 shouldn't be dropped.
 
-### Aggregate per component health
+### `vector health` subcommand
 
-We could instead look to define "healthiness" per component and aggregate/blend
-these for the global health endpoint. Looking at a single Vector instance from
-a high level this is similar to calculating a simple up/down metric for a
-distributed system. We would need to determine how many errors/failures per
-component cause them to be "unhealthy", and depending on the component and config
-this could be very situational. This would require user provided configuration
-and increase operational complexity, something we intentionally avoid when possible.
+While not suitable for general load balancer usage, it's very easy to `exec`
+commands in Kubernetes to determine health. For prior art we don't have to look
+further than the Datadog Agent which has a subcommand that outputs current
+health information that can be used by operators/systems.
 
 ## Outstanding Questions
 
+- Do we need to update the `{ health }` GraphQL query at the same time?
 - ~~Should we assign a unique error code for "shutting down"?~~
-- Do we want to return "unhealthy" if some number of components are "unhealthy"
-  - Depending on deployment and configuration this could push durability concerns
-to an agent layer, which wouldn't necessarily be ideal
-  - This could be introduced down the line as a configurable option
-- Related to the previous, should sinks (or other components) regularly rerun
-their configured healthchecks or should it continue to be at startup only
-- Using `vector validate` as a Kubernetes Readiness Probe could take an instance
-out of service discovery and push buffering and durability to a less optimal layer
-  - This is probably a better startup check but may not be ideal for a regular
-runtime check, if that's the case we should use a Startup Probe
 
 ## Plan Of Attack
 
-- [ ] Integrate health endpoint with our shutdown sequence, letting the API return
-an unhealthy code and take the shutting down instance out of load balancing/service
-discovery
+- [ ] Integrate health endpoint with our shutdown sequence, having the API return
+a `503` and take the shutting down instance out of load balancing/service discovery
+- [ ] Verify the `/health` endpoint is unavaible until Vector's topology is build
+and valid to run
 
 ## Future Improvements
 
+- Expand Vector's concept of "health" to a component level, and define a spec for
+both the `/health` endpoint as well as component "health"
 - Add routes/optional params to health endpoint to query the health of specific
 components
 - Add a "tiered" health status (Green/Yellow/Red) to better represent the "distributed"
 nature of Vector's runtime (Elasticsearch health endpoints as an example)
-- Add a built-in command similar to `validate` intended to check instance health at runtime.
-- Add healthchecks for sources as well as sinks, to better determine Vector's ability
-to receive events
+- Add healthchecks for `sources` (and `transforms`), to better determine Vector's
+ability to receive and process events
+- Update sinks (and other components) regularly rerun their configured healthchecks
