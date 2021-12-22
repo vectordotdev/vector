@@ -664,7 +664,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                 "#};
 
                 let parsed =
-                    config::format::deserialize(toml_cfg, Some(config::Format::Toml)).unwrap();
+                    config::format::deserialize(toml_cfg, config::Format::Toml).unwrap();
                 config.append(parsed).unwrap();
 
                 config.add_sink(
