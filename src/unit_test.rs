@@ -1,9 +1,8 @@
+use crate::config::{self, UnitTestResult};
 use std::path::PathBuf;
 
 use colored::*;
 use structopt::StructOpt;
-
-use crate::config;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -80,8 +79,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             } else {
                 for test in tests {
                     let name = test.name.clone();
-                    let (_inspections, errors) = test.run().await;
-                    // todo: add test_inspections
+                    let UnitTestResult { errors } = test.run().await;
                     if !errors.is_empty() {
                         #[allow(clippy::print_stdout)]
                         {

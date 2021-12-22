@@ -224,9 +224,9 @@ async fn parse_broken_topology() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    let mut errs_broken_test = tests.remove(0).run().await.1;
+    let mut errs_broken_test = tests.remove(0).run().await.errors;
     errs_broken_test.sort();
-    let mut errs_broken_test_2 = tests.remove(0).run().await.1;
+    let mut errs_broken_test_2 = tests.remove(0).run().await.errors;
     errs_broken_test_2.sort();
     let expected_errs = vec![
         r#"checks for transform "baz" failed: no events received. Topology may be disconnected or transform is missing inputs."#,
@@ -234,7 +234,7 @@ async fn parse_broken_topology() {
     ];
     assert_eq!(errs_broken_test, expected_errs);
     assert_eq!(errs_broken_test_2, expected_errs);
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -367,7 +367,7 @@ async fn test_success_multi_inputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -431,7 +431,7 @@ async fn test_success() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -492,7 +492,7 @@ async fn test_route() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -525,7 +525,7 @@ async fn test_fail_no_outputs() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -599,8 +599,8 @@ async fn test_fail_two_output_events() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -636,8 +636,8 @@ async fn test_no_outputs_from() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -679,8 +679,8 @@ async fn test_no_outputs_from_chained() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -718,7 +718,7 @@ async fn test_log_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -756,7 +756,7 @@ async fn test_metric_input() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -801,7 +801,7 @@ async fn test_success_over_gap() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -861,7 +861,7 @@ async fn test_success_tree() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -940,8 +940,8 @@ async fn test_fails() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -1113,9 +1113,9 @@ async fn test_dropped_branch() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }
 
 #[tokio::test]
@@ -1195,6 +1195,6 @@ async fn test_task_transform() {
     .unwrap();
 
     let mut tests = build_unit_tests(config).await.unwrap();
-    assert_eq!(tests.remove(0).run().await.1, Vec::<String>::new());
-    assert_ne!(tests.remove(0).run().await.1, Vec::<String>::new());
+    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(!tests.remove(0).run().await.errors.is_empty());
 }

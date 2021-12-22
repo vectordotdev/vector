@@ -38,8 +38,12 @@ pub struct UnitTest {
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
+pub struct UnitTestResult {
+    pub errors: Vec<String>,
+}
+
 impl UnitTest {
-    pub async fn run(self) -> (Vec<String>, Vec<String>) {
+    pub async fn run(self) -> UnitTestResult {
         let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces)
             .await
             .unwrap();
@@ -53,13 +57,13 @@ impl UnitTest {
 
         let mut errors = Vec::new();
         while let Some(partial_result) = in_flight.next().await {
-            let partial_result = partial_result.unwrap();
-            if !partial_result.test_errors.is_empty() {
-                errors.extend(partial_result.test_errors);
-            }
+            let partial_result = partial_result.expect(
+                "An unexpected error occurred while executing unit tests. Please try again.",
+            );
+            errors.extend(partial_result.test_errors);
         }
 
-        (Vec::new(), errors)
+        UnitTestResult { errors }
     }
 }
 
