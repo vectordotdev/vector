@@ -10,8 +10,9 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use futures_util::future::ready;
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, StreamConsumer},
+    consumer::{CommitMode, Consumer, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
+    Offset, TopicPartitionList,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -134,7 +135,9 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let consumer = create_consumer(self)?;
+        let acknowledgements = self.acknowledgements.enabled;
+        let consumer = create_consumer(self, !acknowledgements)?;
+
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(kafka_source(
@@ -147,7 +150,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            self.acknowledgements.enabled,
+            acknowledgements,
         )))
     }
 
@@ -251,11 +254,7 @@ async fn kafka_source(
                         Err(e) => {
                             // Error is logged by `crate::codecs::Decoder`, no further handling
                             // is needed here.
-                            if !e.can_continue() {
-                                Some(None)
-                            } else {
-                                None
-                            }
+                            (!e.can_continue()).then(|| None)
                         }
                     })
                     .take_while(|x| ready(x.is_some()))
@@ -312,7 +311,11 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 
 fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
     move |entry| {
-        if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+        let mut tpl = TopicPartitionList::new();
+        tpl.add_partition(&entry.topic, entry.partition)
+            .set_offset(Offset::from_raw(entry.offset + 1)) // Not sure why this needs a +1
+            .expect("Setting topic offset failed");
+        if let Err(error) = consumer.commit(&tpl, CommitMode::Sync) {
             emit!(&KafkaOffsetUpdateFailed { error });
         }
     }
@@ -320,6 +323,7 @@ fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(F
 
 fn create_consumer(
     config: &KafkaSourceConfig,
+    auto_commit: bool,
 ) -> crate::Result<StreamConsumer<KafkaStatisticsContext>> {
     let mut client_config = ClientConfig::new();
     client_config
@@ -330,7 +334,10 @@ fn create_consumer(
         .set("socket.timeout.ms", &config.socket_timeout_ms.to_string())
         .set("fetch.wait.max.ms", &config.fetch_wait_max_ms.to_string())
         .set("enable.partition.eof", "false")
-        .set("enable.auto.commit", "true")
+        .set(
+            "enable.auto.commit",
+            if auto_commit { "true" } else { "false" },
+        )
         .set(
             "auto.commit.interval.ms",
             &config.commit_interval_ms.to_string(),
@@ -389,7 +396,7 @@ mod test {
     #[tokio::test]
     async fn consumer_create_ok() {
         let config = make_config("topic", "group");
-        assert!(create_consumer(&config).is_ok());
+        assert!(create_consumer(&config, true).is_ok());
     }
 
     #[tokio::test]
@@ -398,7 +405,7 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config("topic", "group")
         };
-        assert!(create_consumer(&config).is_err());
+        assert!(create_consumer(&config, true).is_err());
     }
 }
 
@@ -493,7 +500,7 @@ mod integration_test {
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
-            create_consumer(&config).unwrap(),
+            create_consumer(&config, !acknowledgements).unwrap(),
             config.key_field,
             config.topic_key,
             config.partition_key,
