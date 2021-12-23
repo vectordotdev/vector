@@ -34,6 +34,8 @@ impl SourceConfig for UnitTestSourceConfig {
 
         Ok(Box::pin(async move {
             let mut out = cx.out;
+            // To appropriately shut down the topology after the source is done
+            // sending events, we need to hold on to this shutdown trigger. 
             let _shutdown = cx.shutdown;
             out.send_all(&mut stream::iter(events))
                 .await
