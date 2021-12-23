@@ -140,6 +140,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   types.level = "string"
                   types.message = "string"
                   types.msgid = "string"
+                  types.version = "int"
                   types.procid = "int"
                   types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
             "#},
