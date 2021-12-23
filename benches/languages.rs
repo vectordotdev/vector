@@ -140,6 +140,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   types.level = "string"
                   types.message = "string"
                   types.msgid = "string"
+                  types.version = "int"
                   types.procid = "int"
                   types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
             "#},
@@ -156,7 +157,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
                     local priority, version, timestamp, hostname, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-                    return {priority = priority, version = version, timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
+                    return {priority = priority, version = tonumber(version), timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
                   end
 
                   function process(event, emit)
