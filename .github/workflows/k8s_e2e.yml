@@ -160,7 +160,6 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
       - run: make slim-builds
-      - uses: mxschmitt/action-tmate@v3
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
