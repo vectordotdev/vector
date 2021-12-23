@@ -32,7 +32,7 @@ async fn serial_backpressure() {
     config.add_source(
         "in",
         test_source::TestBackpressureSourceConfig {
-            counter: source_counter.clone(),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -70,7 +70,7 @@ async fn default_fan_out() {
     config.add_source(
         "in",
         test_source::TestBackpressureSourceConfig {
-            counter: source_counter.clone(),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -117,7 +117,7 @@ async fn buffer_drop_fan_out() {
     config.add_source(
         "in",
         test_source::TestBackpressureSourceConfig {
-            counter: source_counter.clone(),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -170,13 +170,13 @@ async fn multiple_inputs_backpressure() {
     config.add_source(
         "in1",
         test_source::TestBackpressureSourceConfig {
-            counter: source_counter_1.clone(),
+            counter: Arc::clone(&source_counter_1),
         },
     );
     config.add_source(
         "in2",
         test_source::TestBackpressureSourceConfig {
-            counter: source_counter_2.clone(),
+            counter: Arc::clone(&source_counter_2),
         },
     );
     config.add_sink(
@@ -271,7 +271,7 @@ mod test_source {
     #[typetag::serde(name = "test-backpressure-source")]
     impl SourceConfig for TestBackpressureSourceConfig {
         async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
-            let counter = self.counter.clone();
+            let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
                     let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
