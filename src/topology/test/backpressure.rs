@@ -9,9 +9,14 @@ use crate::topology::builder::PIPELINE_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
 
 use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
-pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize = 500;
+// Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.
+// https://docs.rs/futures/0.3.19/futures/channel/mpsc/fn.channel.html
+pub const EXTRA_SENDER_EVENTS: usize = 3;
 
+/// Connects a single source to a single sink and makes sure the sink backpressure is propagated
+/// to the source.
 #[tokio::test]
 async fn serial_backpressure() {
     let mut config = Config::builder();
@@ -46,6 +51,8 @@ async fn serial_backpressure() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
+/// Connects a single source to two sinks test and makes sure that the source is only able
+/// to emit events that the slower sink accepts.
 #[tokio::test]
 async fn default_fan_out() {
     let mut config = Config::builder();
@@ -88,6 +95,9 @@ async fn default_fan_out() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
+/// Connects a single source to two sinks. One of the sinks is configured to drop events that exceed
+/// the buffer size. Asserts that the sink that drops events does not cause backpressure, but the
+/// other one does.
 #[tokio::test]
 async fn buffer_drop_fan_out() {
     let mut config = Config::builder();
@@ -136,6 +146,8 @@ async fn buffer_drop_fan_out() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
+/// Connects 2 sources to a single sink, and asserts that the sum of the events produced
+/// by the sources is how many the single sink accepted.
 #[tokio::test]
 async fn multiple_inputs_backpressure() {
     let mut config = Config::builder();
