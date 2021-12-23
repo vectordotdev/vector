@@ -9,7 +9,6 @@ use crate::{
         ConfigPath, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
-    test_util::random_string,
     topology::{
         self,
         builder::{self, Pieces},
@@ -25,6 +24,7 @@ use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
 };
+use uuid::Uuid;
 
 use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -173,7 +173,7 @@ pub struct UnitTestBuildMetadata {
 impl UnitTestBuildMetadata {
     pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
         // A unique id used to name test sources and sinks to avoid name clashes
-        let random_id = random_string(15);
+        let random_id = Uuid::new_v4().to_string();
 
         let available_insert_targets = config_builder
             .transforms

@@ -291,7 +291,7 @@ toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
-uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
+uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false, optional = true }
 tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
@@ -396,7 +396,7 @@ vendor-libz = ["libz-sys/static"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
-docker = ["bollard", "dirs-next", "uuid"]
+docker = ["bollard", "dirs-next"]
 
 # API
 api = [
@@ -406,7 +406,6 @@ api = [
   "itertools",
   "vector_core/api",
   "warp",
-  "uuid",
 ]
 
 # API client
@@ -472,7 +471,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
-sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs", "zstd"]
+sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "zstd"]
 sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs"]
 sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
@@ -480,7 +479,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
-sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs", "uuid"]
+sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
 sources-demo_logs = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
@@ -653,9 +652,9 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
-sinks-azure_blob = ["azure_core", "azure_storage", "reqwest", "uuid"]
+sinks-azure_blob = ["azure_core", "azure_storage", "reqwest"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
@@ -666,14 +665,14 @@ sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = []
-sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "uuid"]
+sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["rdkafka", "zstd"]
 sinks-logdna = []
-sinks-loki = ["uuid"]
+sinks-loki = []
 sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-papertrail = ["syslog"]
@@ -682,7 +681,7 @@ sinks-pulsar = ["avro-rs", "pulsar"]
 sinks-redis = ["redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
-sinks-splunk_hec = ["uuid"]
+sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
@@ -756,14 +755,14 @@ datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
-fluent-integration-tests = ["docker", "sources-fluent", "uuid"]
+fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
-logstash-integration-tests = ["docker", "sources-logstash", "uuid"]
+logstash-integration-tests = ["docker", "sources-logstash"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
