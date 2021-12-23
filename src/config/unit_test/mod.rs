@@ -134,25 +134,26 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
 
     for (_, transform) in config_builder.transforms.iter_mut() {
         let original_inputs = transform.inputs.clone().into_iter().collect::<HashSet<_>>();
-        // Route is not covered by named outputs, so explicitly preserve inputs that start with a transform key + '.'
-        let route_inputs = original_inputs
+        // Expanded transforms are not covered by named outputs, so explicitly
+        // preserve inputs that start with a valid transform key + '.'
+        let expanded_inputs = original_inputs
             .iter()
             .filter_map(|input| {
-                let mut route_input = None;
+                let mut expanded_input = None;
                 for valid_input in all_valid_inputs.iter() {
                     if input.starts_with::<&str>(format!("{}.", valid_input).as_ref()) {
-                        route_input = Some(input.clone());
+                        expanded_input = Some(input.clone());
                         break;
                     }
                 }
-                route_input
+                expanded_input
             })
             .collect::<Vec<_>>();
         let mut new_inputs = original_inputs
             .intersection(&all_valid_inputs)
             .cloned()
             .collect::<HashSet<_>>();
-        new_inputs.extend(route_inputs);
+        new_inputs.extend(expanded_inputs);
         transform.inputs = new_inputs.into_iter().collect();
     }
 }
