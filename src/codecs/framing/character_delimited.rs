@@ -118,7 +118,15 @@ impl Decoder for CharacterDelimitedDecoder {
         match self.decode(buf)? {
             Some(frame) => Ok(Some(frame)),
             None => {
-                if buf.is_empty() || buf.len() > self.max_length {
+                if buf.is_empty() {
+                    Ok(None)
+                } else if buf.len() > self.max_length {
+                    warn!(
+                        message = "Discarding frame larger than max_length.",
+                        buf_len = buf.len(),
+                        max_length = self.max_length,
+                        internal_log_rate_secs = 30
+                    );
                     Ok(None)
                 } else {
                     let bytes: Bytes = buf.split_to(buf.len()).freeze();
