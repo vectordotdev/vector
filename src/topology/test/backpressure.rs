@@ -136,6 +136,49 @@ async fn buffer_drop_fan_out() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
+#[tokio::test]
+async fn multiple_inputs_backpressure() {
+    let mut config = Config::builder();
+
+    let events_to_sink = 100;
+
+    let expected_sourced_events =
+        events_to_sink + MEMORY_BUFFER_DEFAULT_MAX_EVENTS + PIPELINE_BUFFER_SIZE * 2 + 3 * 2;
+
+    let source_counter_1 = Arc::new(AtomicUsize::new(0));
+    let source_counter_2 = Arc::new(AtomicUsize::new(0));
+    config.add_source(
+        "in1",
+        test_source::TestBackpressureSourceConfig {
+            counter: source_counter_1.clone(),
+        },
+    );
+    config.add_source(
+        "in2",
+        test_source::TestBackpressureSourceConfig {
+            counter: source_counter_2.clone(),
+        },
+    );
+    config.add_sink(
+        "out",
+        &["in1", "in2"],
+        test_sink::TestBackpressureSinkConfig {
+            num_to_consume: events_to_sink,
+        },
+    );
+
+    let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    // allow the topology to run
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let sourced_events_1 = source_counter_1.load(Ordering::Relaxed);
+    let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
+    let sourced_events_sum = sourced_events_1 + sourced_events_2;
+
+    assert_eq!(sourced_events_sum, expected_sourced_events);
+}
+
 mod test_sink {
     use crate::config::{DataType, SinkConfig, SinkContext};
     use crate::event::Event;

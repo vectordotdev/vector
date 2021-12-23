@@ -25,4 +25,4 @@ mod reload;
 mod doesnt_reload;
 
 //TODO: feature flags
-mod source_backpressure;
+mod backpressure;
