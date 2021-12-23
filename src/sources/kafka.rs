@@ -1,3 +1,23 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Cursor,
+    sync::Arc,
+};
+
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures_util::future::ready;
+use once_cell::sync::OnceCell;
+use rdkafka::{
+    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    message::{BorrowedMessage, Headers, Message},
+    ClientConfig, ClientContext, Offset, Statistics, TopicPartitionList,
+};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::FramedRead;
+
 use super::util::{finalizer::OrderedFinalizer, StreamDecodingError};
 use crate::{
     codecs::{
@@ -15,24 +35,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures_util::future::ready;
-use once_cell::sync::OnceCell;
-use rdkafka::{
-    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
-    message::{BorrowedMessage, Headers, Message},
-    ClientConfig, ClientContext, Offset, Statistics, TopicPartitionList,
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::sync::Arc;
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::Cursor,
-};
-use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -444,12 +446,14 @@ mod integration_test {
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
-        test_util::{collect_n, collect_ready, random_string},
+        test_util::{collect_n, random_string},
         Pipeline,
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use futures::stream::Stream;
     use rdkafka::{
+        admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+        client::DefaultClientContext,
         config::{ClientConfig, FromClientConfig},
         consumer::BaseConsumer,
         message::OwnedHeaders,
@@ -479,7 +483,7 @@ mod integration_test {
         client.create().expect("Producer creation error")
     }
 
-    async fn send_events(topic: String, count: u64) -> DateTime<Utc> {
+    async fn send_events(topic: String, count: usize) -> DateTime<Utc> {
         let now = Utc::now();
         let timestamp = now.timestamp_millis();
 
@@ -487,9 +491,10 @@ mod integration_test {
 
         for i in 0..count {
             let text = format!("{} {}", TEXT, i);
+            let key = format!("{} {}", KEY, i);
             let record = FutureRecord::to(&topic)
                 .payload(&text)
-                .key(KEY)
+                .key(&key)
                 .timestamp(timestamp)
                 .headers(OwnedHeaders::new().add(HEADER_KEY, HEADER_VALUE));
 
@@ -522,13 +527,8 @@ mod integration_test {
         drop(trigger_shutdown);
         shutdown_done.await;
 
-        let tpl = fetch_tpl(&group_id, &topic);
-        assert_eq!(
-            tpl.find_partition(&topic, 0)
-                .expect("TPL is missing topic")
-                .offset(),
-            Offset::from_raw(10)
-        );
+        let offset = fetch_tpl_offset(&group_id, &topic, 0);
+        assert_eq!(offset, Offset::from_raw(10));
 
         assert_eq!(events.len(), 10);
         for (i, event) in events.into_iter().enumerate() {
@@ -536,7 +536,10 @@ mod integration_test {
                 event.as_log()[log_schema().message_key()],
                 format!("{} {}", TEXT, i).into()
             );
-            assert_eq!(event.as_log()["message_key"], KEY.into());
+            assert_eq!(
+                event.as_log()["message_key"],
+                format!("{} {}", KEY, i).into()
+            );
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "kafka".into()
@@ -568,7 +571,7 @@ mod integration_test {
     ) -> (Pipeline, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Pipeline::new_with_buffer(100, vec![]);
         let recv = recv.then(move |mut event| async move {
-            eprintln!("{} {:?}", id, &event.as_log()["message"]);
+            event.as_mut_log().insert("pipeline_id", id.to_string());
             sleep(delay).await;
             let metadata = event.metadata_mut();
             metadata.update_status(status);
@@ -599,15 +602,37 @@ mod integration_test {
         (trigger_shutdown, shutdown_done)
     }
 
-    fn fetch_tpl(group_id: &str, topic: &str) -> TopicPartitionList {
+    fn fetch_tpl_offset(group_id: &str, topic: &str, partition: i32) -> Offset {
         let client: BaseConsumer = client_config(Some(&group_id));
         client.subscribe(&[topic]).expect("Subscribing failed");
 
         let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(topic, 0);
+        tpl.add_partition(topic, partition);
         client
             .committed_offsets(tpl, Duration::from_secs(1))
             .expect("Getting committed offsets failed")
+            .find_partition(topic, partition)
+            .expect("Missing topic/partition")
+            .offset()
+    }
+
+    async fn create_topic(group_id: &str, topic: &str, partitions: i32) {
+        let client: AdminClient<DefaultClientContext> = client_config(Some(&group_id));
+        for result in client
+            .create_topics(
+                [&NewTopic {
+                    name: topic,
+                    num_partitions: partitions,
+                    replication: TopicReplication::Fixed(1),
+                    config: vec![],
+                }],
+                &AdminOptions::default(),
+            )
+            .await
+            .expect("create_topics failed")
+        {
+            result.expect("Creating a topic failed");
+        }
     }
 
     #[tokio::test]
@@ -618,21 +643,25 @@ mod integration_test {
         // - Wait further until all events will have been pulled down.
         // - Verify that all events are captured by the two sources, and that offsets are set right, etc.
 
+        const NEVENTS: usize = 100;
+        const DELAY: u64 = 100;
+
         let (topic, group_id, config) = make_rand_config();
+        create_topic(&group_id, &topic, 2).await;
 
-        let now = send_events(topic.clone(), 200).await;
+        let _now = send_events(topic.clone(), NEVENTS).await;
 
-        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(100), EventStatus::Delivered);
+        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(DELAY), EventStatus::Delivered);
         let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
-        let events1 = tokio::spawn(collect_n(rx1, 100));
+        let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
-        sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(1)).await;
 
-        let (tx, rx2) = delay_pipeline(2, Duration::from_millis(100), EventStatus::Delivered);
+        let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
         let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
-        let events2 = tokio::spawn(collect_n(rx2, 100));
+        let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
-        sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(1)).await;
 
         drop(trigger_shutdown1);
         let events1 = events1.await.unwrap();
@@ -644,38 +673,7 @@ mod integration_test {
         shutdown_done2.await;
         dbg!(events2.len());
 
-        let tpl = fetch_tpl(&group_id, &topic);
-        dbg!(tpl.find_partition(&topic, 0).unwrap().offset());
-
-        /*
-        assert_eq!(
-            tpl.find_partition(&topic, 0)
-                .expect("TPL is missing topic")
-                .offset(),
-            Offset::from_raw(10)
-        );
-
-        assert_eq!(events.len(), 10);
-        for (i, event) in events.into_iter().enumerate() {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                format!("{} {}", TEXT, i).into()
-            );
-            assert_eq!(event.as_log()["message_key"], KEY.into());
-            assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
-                "kafka".into()
-            );
-            assert_eq!(
-                event.as_log()[log_schema().timestamp_key()],
-                now.trunc_subsecs(3).into()
-            );
-            assert_eq!(event.as_log()["topic"], topic.clone().into());
-            assert!(event.as_log().contains("partition"));
-            assert!(event.as_log().contains("offset"));
-            let mut expected_headers = BTreeMap::new();
-            expected_headers.insert(HEADER_KEY.to_string(), Value::from(HEADER_VALUE));
-            assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
-        }*/
+        dbg!(fetch_tpl_offset(&group_id, &topic, 0));
+        dbg!(fetch_tpl_offset(&group_id, &topic, 1));
     }
 }
