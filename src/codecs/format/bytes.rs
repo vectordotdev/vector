@@ -35,6 +35,12 @@ pub struct BytesDeserializer {
     log_schema_message_key: &'static str,
 }
 
+impl Default for BytesDeserializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BytesDeserializer {
     /// Creates a new `BytesDeserializer`.
     pub fn new() -> Self {
@@ -47,7 +53,7 @@ impl BytesDeserializer {
 impl Deserializer for BytesDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let mut log = LogEvent::default();
-        log.insert_flat(self.log_schema_message_key, bytes);
+        log.insert(self.log_schema_message_key, bytes);
         Ok(smallvec![log.into()])
     }
 }

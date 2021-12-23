@@ -87,7 +87,7 @@ impl Decoder for CharacterDelimitedDecoder {
             // `self.max_length` we discard it, else we return it. At the end of
             // the buffer if the delimiter is not present the remainder of the
             // buffer is discarded.
-            match memchr(self.delimiter, &buf) {
+            match memchr(self.delimiter, buf) {
                 None => return Ok(None),
                 Some(next_delimiter_idx) => {
                     if next_delimiter_idx > self.max_length {
@@ -118,11 +118,9 @@ impl Decoder for CharacterDelimitedDecoder {
         match self.decode(buf)? {
             Some(frame) => Ok(Some(frame)),
             None => {
-                if buf.is_empty() {
+                if buf.is_empty() || buf.len() > self.max_length {
                     Ok(None)
                 } else {
-                    // TODO why do we do this? We drop all but the final byte of
-                    // the incoming buffer?
                     let bytes: Bytes = buf.split_to(buf.len()).freeze();
                     Ok(Some(bytes))
                 }
