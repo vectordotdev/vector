@@ -26,7 +26,7 @@ start_podman () {
   podman run -d --pod=vector-test-integration-kafka --name vector_zookeeper $ZOOKEEPER
    # pinned to 2.6.0 due to https://github.com/wurstmeister/kafka-docker/issues/669
   podman run -d --pod=vector-test-integration-kafka -e KAFKA_BROKER_ID=1 \
-	 -e KAFKA_ZOOKEEPER_CONNECT=vector_zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
+	 -e KAFKA_ZOOKEEPER_CONNECT=localhost:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
 	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
 	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
 	 -e KAFKA_SSL_TRUSTSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_TRUSTSTORE_PASSWORD=NOPASS \
