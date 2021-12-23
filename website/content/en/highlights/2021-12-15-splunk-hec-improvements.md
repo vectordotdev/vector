@@ -35,8 +35,7 @@ Now, you can configure the `splunk_hec` source to use the indexer acknowledgemen
 acknowledgements = true
 ```
 
-In addition to this configuring the source to expose `/services/collector/ack`
-for querying for ack status by clients, this also wires into Vector's
+When enabled, responses to incoming requests will include an ID that can be used to query for acknowledgement status at the newly exposed `/services/collector/ack` endpoint ([learn more here][indexer how it works]). The acknowledgement status is wired into Vector's
 forthcoming end-to-end acknowledgement feature. This feature will require that
 events be sent by sinks or persisted into disk buffers before sources will
 acknowledge them.
