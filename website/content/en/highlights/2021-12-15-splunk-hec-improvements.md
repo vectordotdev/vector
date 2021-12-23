@@ -61,8 +61,7 @@ Vector now also supports Splunk HEC token passthrough routing. When
 `store_hec_token` is enabled in a `splunk_hec` source, tokens included in
 requests to the source will be stored and used by downstream `splunk_hec` sinks.
 Any passed through token takes precedence over the `default_token` configuration
-set in the sink. With this update, you can now partition event batches in the
-`splunk_hec` sinks by token.
+set in the sink.
 
 We hope that these improvements can make your experience using Vector with
 Splunk better! If you any feedback for us, let us know on our [Discord chat] or
