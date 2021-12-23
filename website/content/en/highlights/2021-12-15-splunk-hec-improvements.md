@@ -45,7 +45,7 @@ acknowledge them.
 Previously, the `splunk_hec` sink simply treated successful HEC requests as the
 events being acknowledged by the Spunk receiver and so Vector would drop them
 from any buffers. Now, it is possible to configure the sink to wait until the
-Splunk reciever acknowledges the events via the [index
+Splunk receiver acknowledges the events via the [index
 acknowledgements][indexer] part of the HEC protocol.
 
 This has defaulted to on to provide higher guarantees, but can be disabled to
