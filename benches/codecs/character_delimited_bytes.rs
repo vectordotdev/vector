@@ -47,8 +47,8 @@ fn decoding(c: &mut Criterion) {
                         let framer = Box::new(
                             param
                                 .max_length
-                                .map(|ml| CharacterDelimitedDecoder::new_with_max_length('a', ml))
-                                .unwrap_or(CharacterDelimitedDecoder::new('a')),
+                                .map(|ml| CharacterDelimitedDecoder::new_with_max_length(b'a', ml))
+                                .unwrap_or(CharacterDelimitedDecoder::new(b'a')),
                         );
                         let deserializer = Box::new(BytesDeserializer::new());
                         let decoder = codecs::Decoder::new(framer, deserializer);

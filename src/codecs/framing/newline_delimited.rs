@@ -71,7 +71,7 @@ pub struct NewlineDelimitedDecoder(CharacterDelimitedDecoder);
 impl NewlineDelimitedDecoder {
     /// Creates a new `NewlineDelimitedDecoder`.
     pub const fn new() -> Self {
-        Self(CharacterDelimitedDecoder::new('\n'))
+        Self(CharacterDelimitedDecoder::new(b'\n'))
     }
 
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
@@ -79,7 +79,7 @@ impl NewlineDelimitedDecoder {
     /// Any frames longer than `max_length` bytes will be discarded entirely.
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedDecoder::new_with_max_length(
-            '\n', max_length,
+            b'\n', max_length,
         ))
     }
 }
