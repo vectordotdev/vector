@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn parse_bytes() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer;
+        let deserializer = BytesDeserializer::new();
 
         let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();
