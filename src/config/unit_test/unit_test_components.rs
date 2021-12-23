@@ -73,7 +73,6 @@ impl Default for UnitTestSinkCheck {
 pub struct UnitTestSinkResult {
     pub test_name: String,
     pub test_errors: Vec<String>,
-    pub test_inspections: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Derivative)]
@@ -131,7 +130,6 @@ impl StreamSink for UnitTestSink {
         let mut result = UnitTestSinkResult {
             test_name: self.test_name,
             test_errors: Vec::new(),
-            test_inspections: Vec::new(),
         };
 
         while let Some(event) = input.next().await {

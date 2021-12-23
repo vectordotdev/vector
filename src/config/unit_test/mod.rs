@@ -89,7 +89,6 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
         if let Some(input) = legacy_input {
             test_definition.inputs.push(input);
         }
-        // match build_unit_test(test_definition, config_builder.clone()).await {
         match build_unit_test(&metadata, test_definition, config_builder.clone()).await {
             Ok(test) => tests.push(test),
             Err(errors) => {
@@ -159,9 +158,14 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
 }
 
 pub struct UnitTestBuildMetadata {
+    // A set of all valid insert_at targets, used to validate test inputs.
     pub available_insert_targets: HashSet<ComponentKey>,
+    // A mapping from transform name to unit test source name.
     source_ids: HashMap<ComponentKey, String>,
+    // A base setup of all necessary unit test sources that can be "hydrated"
+    // with test input events to produces sources used in a particular test.
     template_sources: IndexMap<ComponentKey, UnitTestSourceConfig>,
+    // A mapping from transform name to unit test sink name.
     sink_ids: HashMap<ComponentKey, String>,
 }
 
@@ -176,7 +180,6 @@ impl UnitTestBuildMetadata {
             .cloned()
             .collect::<HashSet<_>>();
 
-        // Mapping from transform name to unit test source name
         let source_ids = available_insert_targets
             .iter()
             .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
@@ -215,7 +218,6 @@ impl UnitTestBuildMetadata {
             })
             .collect::<HashSet<_>>();
 
-        // Mapping from transform name to unit test sink name
         let sink_ids = available_extract_targets
             .iter()
             .map(|key| {
@@ -246,6 +248,9 @@ impl UnitTestBuildMetadata {
         let mut template_sources = self.template_sources.clone();
         for (insert_at, events) in inputs {
             let source_config = template_sources.get_mut(&insert_at).unwrap_or_else(|| {
+                // At this point, all inputs should have been validated to
+                // correspond with valid transforms, and all valid transforms
+                // have a source attached.
                 panic!(
                     "Invalid input: cannot insert at {:?}",
                     insert_at.to_string()
@@ -279,7 +284,6 @@ impl UnitTestBuildMetadata {
         IndexMap<ComponentKey, SinkOuter<String>>,
     ) {
         let mut test_result_rxs = Vec::new();
-        // Connect a sink to every transform output
         let mut template_sinks = IndexMap::new();
         for (transform_id, _) in self.sink_ids.iter() {
             let (tx, rx) = oneshot::channel();
