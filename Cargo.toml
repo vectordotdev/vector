@@ -805,6 +805,7 @@ statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
 
 [[bench]]
@@ -856,3 +857,10 @@ path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
+
+[[bench]]
+name = "codecs"
+path = "benches/codecs/main.rs"
+harness = false
+test = false
+required-features = ["codecs-benches"]
