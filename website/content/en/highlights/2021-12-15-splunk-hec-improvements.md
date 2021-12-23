@@ -29,8 +29,7 @@ Previously, the `splunk_hec`  source did not support [indexer
 acknowledgements][indexer] and so would provide weaker delivery guarantees and
 would not work with Splunk senders that required them.
 
-Now, you can configure the `splunk_hec` source to responding to indexer
-acknowledgement requests from clients by configuring:
+Now, you can configure the `splunk_hec` source to use the indexer acknowledgements protocol by configuring:
 
 ```toml
 acknowledgements = true
