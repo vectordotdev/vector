@@ -13,7 +13,8 @@ badges:
 We've released an improved concurrency model that provides measurable performance
 improvements and enables more efficient vertical scaling.
 
-Previously, Vector was limited to executing transforms on a single thread, which led to them often being the bottleneck in Vector pipelines.
+Previously, Vector was limited to executing transforms on a single thread per
+transform, which led to them often being the bottleneck in Vector pipelines.
 
 With this new release, Vector will perform faster when a transform is a bottleneck,
 assuming that more CPUs are available to share their work. This works by Vector
@@ -24,20 +25,13 @@ This improvement works by spinning up multiple short-lived tasks that concurrent
 run the same transform logic on separate batches of events. No configuration
 changes are necessary to start taking advantage of this feature. The current list of
 transforms that support parallelization are:
-```
-src/transforms/tokenizer.rs
-src/transforms/regex_parser.rs
-src/transforms/metric_to_log.rs
-src/transforms/filter.rs
-src/transforms/grok_parser.rs
-src/transforms/key_value_parser.rs
-src/transforms/json_parser.rs
-src/transforms/logfmt_parser.rs
-src/transforms/log_to_metric.rs
-src/transforms/remap.rs
-src/transforms/aws_cloudwatch_logs_subscription_parser.rs
-```
 
+* `metric_to_log`
+* `filter`
+* `log_to_metric`
+* `remap`
+
+But we will be rolling this out this support to more transforms soon.
 
 If you any feedback for us, let us know on our [Discord chat] or on [Twitter].
 
