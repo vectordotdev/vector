@@ -279,12 +279,23 @@ impl UnitTestBuildMetadata {
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,
-        outputs: IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>,
-        no_outputs_from: Vec<ComponentKey>,
-    ) -> (
-        Vec<Receiver<UnitTestSinkResult>>,
-        IndexMap<ComponentKey, SinkOuter<String>>,
-    ) {
+        outputs: &[TestOutput],
+        no_outputs_from: &[ComponentKey],
+    ) -> Result<
+        (
+            Vec<Receiver<UnitTestSinkResult>>,
+            IndexMap<ComponentKey, SinkOuter<String>>,
+        ),
+        Vec<String>,
+    > {
+        if outputs.is_empty() && no_outputs_from.is_empty() {
+            return Err(vec![
+                "unit test must contain at least one of `outputs` or `no_outputs_from`."
+                    .to_string(),
+            ]);
+        }
+        let outputs = build_outputs(outputs)?;
+
         let mut test_result_rxs = Vec::new();
         let mut template_sinks = IndexMap::new();
         for (transform_id, _) in self.sink_ids.iter() {
@@ -310,7 +321,7 @@ impl UnitTestBuildMetadata {
         // Add no outputs assertion to relevant sinks
         for transform_id in no_outputs_from {
             let sink_config = template_sinks
-                .get_mut(&transform_id)
+                .get_mut(transform_id)
                 .expect("Sink does not exist");
             sink_config.check = UnitTestSinkCheck::NoOutputs;
         }
@@ -330,7 +341,7 @@ impl UnitTestBuildMetadata {
             })
             .collect::<IndexMap<_, _>>();
 
-        (test_result_rxs, sinks)
+        Ok((test_result_rxs, sinks))
     }
 }
 
@@ -340,16 +351,8 @@ async fn build_unit_test(
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
-
-    if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
-        return Err(vec![
-            "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_string(),
-        ]);
-    }
-
-    let outputs = build_outputs(&test.outputs)?;
     let (test_result_rxs, sinks) =
-        metadata.hydrate_into_sinks(test.name.as_ref(), outputs, test.no_outputs_from.clone());
+        metadata.hydrate_into_sinks(&test.name, &test.outputs, &test.no_outputs_from)?;
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
