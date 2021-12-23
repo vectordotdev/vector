@@ -16,7 +16,7 @@ pub struct CharacterDelimitedDecoderConfig {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
-    delimiter: char,
+    delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
@@ -44,7 +44,7 @@ impl FramingConfig for CharacterDelimitedDecoderConfig {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: char,
+    delimiter: u8,
     /// The maximum length of the byte buffer.
     max_length: usize,
     /// Whether the `max_length` has been exceeded, resulting in discarding all
@@ -56,7 +56,7 @@ pub struct CharacterDelimitedDecoder {
 
 impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
-    pub const fn new(delimiter: char) -> Self {
+    pub const fn new(delimiter: u8) -> Self {
         CharacterDelimitedDecoder {
             delimiter,
             max_length: usize::MAX,
@@ -68,7 +68,7 @@ impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
+    pub const fn new_with_max_length(delimiter: u8, max_length: usize) -> Self {
         CharacterDelimitedDecoder {
             max_length,
             ..CharacterDelimitedDecoder::new(delimiter)
@@ -93,7 +93,7 @@ impl Decoder for CharacterDelimitedDecoder {
 
             let newline_pos = buf[self.next_index..read_to]
                 .iter()
-                .position(|b| *b as char == self.delimiter);
+                .position(|b| *b == self.delimiter);
 
             match (self.is_discarding, newline_pos) {
                 (true, Some(offset)) => {
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn character_delimited_decode() {
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
         buf.put_slice(b"abc\n");
         assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
 
         let mut buf = BytesMut::new();
         codec.encode(b"abc", &mut buf).unwrap();
@@ -209,7 +209,7 @@ mod tests {
     fn decode_max_length() {
         const MAX_LENGTH: usize = 6;
 
-        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
         // limit is 6 so it will skip longer lines
@@ -234,7 +234,7 @@ mod tests {
     fn decoder_discard_repeat() {
         const MAX_LENGTH: usize = 1;
 
-        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
         buf.reserve(200);
@@ -253,7 +253,7 @@ mod tests {
         let mut bytes = serde_json::to_vec(&input).unwrap();
         bytes.push(b'\n');
 
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
 
         buf.reserve(bytes.len());
@@ -321,7 +321,7 @@ mod tests {
             {"log":"2019-01-18 07:53:06.419 [               ]  INFO 1 --- [vent-bus.prod-1] c.t.listener.CommonListener              : warehousing Dailywarehousing.daily\n","stream":"stdout","time":"2019-01-18T07:53:06.420527437Z"}
         "#};
 
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
 
         buf.extend(events.to_string().as_bytes());

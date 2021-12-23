@@ -426,7 +426,7 @@ fn start_journalctl(
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        CharacterDelimitedDecoder::new('\n'),
+        CharacterDelimitedDecoder::new(b'\n'),
     )
     .boxed();
 
