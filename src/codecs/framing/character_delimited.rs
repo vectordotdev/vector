@@ -141,7 +141,6 @@ impl Decoder for CharacterDelimitedDecoder {
                         max_length = self.max_length,
                         internal_log_rate_secs = 30
                     );
-                    return Ok(None);
                 }
                 (false, None) => {
                     // We didn't find the delimiter and didn't
@@ -213,14 +212,20 @@ mod tests {
         let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
-        buf.reserve(200);
-        // limit is 6 so this should fail
+        // limit is 6 so it will skip longer lines
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
-        assert!(codec.decode(buf).unwrap().is_none());
-        assert!(codec.decode(buf).unwrap().is_some());
-        assert!(codec.decode_eof(buf).unwrap().is_none());
-        assert!(codec.decode_eof(buf).unwrap().is_some());
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode(buf).unwrap(), None);
+
+        let buf = &mut BytesMut::new();
+
+        // limit is 6 so it will skip longer lines
+        buf.put_slice(b"1234567\n123456\n123412314\n123");
+
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
     }
 
     // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
