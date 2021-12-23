@@ -21,9 +21,7 @@ to provide higher guarantees that no data is lost when using the `splunk_hec`
 source and sink.
 
 As you may be aware, Splunk HEC does not guarantee that data is successfully
-written when responds to the incoming request successfully, but rather specifies
-that the acknowledgement status of sent events is provided via a [separate
-endpoint][indexer].
+written when it responds to an incoming request successfully. To confirm that data has been persisted, the [indexer acknowledgements][indexer] feature must be enabled. The status of sent events can then be queried via a separate endpoint.
 
 ### `splunk_hec` source acknowledgements
 
