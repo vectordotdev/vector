@@ -160,7 +160,7 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
 
 pub struct UnitTestBuildMetadata {
     // A set of all valid insert_at targets, used to validate test inputs.
-    pub available_insert_targets: HashSet<ComponentKey>,
+    available_insert_targets: HashSet<ComponentKey>,
     // A mapping from transform name to unit test source name.
     source_ids: HashMap<ComponentKey, String>,
     // A base setup of all necessary unit test sources that can be "hydrated"
@@ -244,8 +244,9 @@ impl UnitTestBuildMetadata {
 
     pub fn hydrate_into_sources(
         &self,
-        inputs: HashMap<ComponentKey, Vec<Event>>,
-    ) -> IndexMap<ComponentKey, SourceOuter> {
+        inputs: &[TestInput],
+    ) -> Result<IndexMap<ComponentKey, SourceOuter>, Vec<String>> {
+        let inputs = build_and_validate_inputs(inputs, &self.available_insert_targets)?;
         let mut template_sources = self.template_sources.clone();
         for (insert_at, events) in inputs {
             let source_config = template_sources.get_mut(&insert_at).unwrap_or_else(|| {
@@ -259,7 +260,7 @@ impl UnitTestBuildMetadata {
             });
             source_config.events.extend(events);
         }
-        template_sources
+        Ok(template_sources
             .into_iter()
             .map(|(transform_key, source_config)| {
                 let source_key: &str = self
@@ -272,7 +273,7 @@ impl UnitTestBuildMetadata {
                     SourceOuter::new(source_config),
                 )
             })
-            .collect::<IndexMap<_, _>>()
+            .collect::<IndexMap<_, _>>())
     }
 
     pub fn hydrate_into_sinks(
@@ -338,8 +339,7 @@ async fn build_unit_test(
     test: TestDefinition,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let inputs = build_and_validate_inputs(&test.inputs, &metadata.available_insert_targets)?;
-    let sources = metadata.hydrate_into_sources(inputs);
+    let sources = metadata.hydrate_into_sources(&test.inputs)?;
 
     if test.outputs.is_empty() && test.no_outputs_from.is_empty() {
         return Err(vec![
