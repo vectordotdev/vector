@@ -1,6 +1,7 @@
-use std::{cmp, io, usize};
+use std::{io, usize};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -47,11 +48,6 @@ pub struct CharacterDelimitedDecoder {
     delimiter: u8,
     /// The maximum length of the byte buffer.
     max_length: usize,
-    /// Whether the `max_length` has been exceeded, resulting in discarding all
-    /// subsequent bytes.
-    is_discarding: bool,
-    /// The index from where to continue reading the buffer.
-    next_index: usize,
 }
 
 impl CharacterDelimitedDecoder {
@@ -60,8 +56,6 @@ impl CharacterDelimitedDecoder {
         CharacterDelimitedDecoder {
             delimiter,
             max_length: usize::MAX,
-            is_discarding: false,
-            next_index: 0,
         }
     }
 
@@ -87,80 +81,53 @@ impl Decoder for CharacterDelimitedDecoder {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         loop {
-            // Determine how far into the buffer we'll search for a newline. If
-            // there's no max_length set, we'll read to the end of the buffer.
-            let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
-
-            let newline_pos = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| *b == self.delimiter);
-
-            match (self.is_discarding, newline_pos) {
-                (true, Some(offset)) => {
-                    // If we found a newline, discard up to that offset and
-                    // then stop discarding. On the next iteration, we'll try
-                    // to read a line normally.
-                    buf.advance(offset + self.next_index + 1);
-                    self.is_discarding = false;
-                    self.next_index = 0;
-                }
-                (true, None) => {
-                    // Otherwise, we didn't find a newline, so we'll discard
-                    // everything we read. On the next iteration, we'll continue
-                    // discarding up to max_len bytes unless we find a newline.
-                    buf.advance(read_to);
-                    self.next_index = 0;
-                    if buf.is_empty() {
-                        return Ok(None);
+            // This function has the following goal: we are searching for
+            // sub-buffers delimited by `self.delimiter` with size no more than
+            // `self.max_length`. If a sub-buffer is found that exceeds
+            // `self.max_length` we discard it, else we return it. At the end of
+            // the buffer if the delimiter is not present the remainder of the
+            // buffer is discarded.
+            match memchr(self.delimiter, &buf) {
+                None => return Ok(None),
+                Some(next_delimiter_idx) => {
+                    if next_delimiter_idx > self.max_length {
+                        // The discovered sub-buffer is too big, so we discard
+                        // it, taking care to also discard the delimiter.
+                        warn!(
+                            message = "Discarding frame larger than max_length.",
+                            buf_len = buf.len(),
+                            max_length = self.max_length,
+                            internal_log_rate_secs = 30
+                        );
+                        buf.advance(next_delimiter_idx + 1);
+                    } else {
+                        let frame = buf.split_to(next_delimiter_idx).freeze();
+                        trace!(
+                            message = "Decoding the frame.",
+                            bytes_proccesed = frame.len()
+                        );
+                        buf.advance(1); // scoot past the delimiter
+                        return Ok(Some(frame));
                     }
-                }
-                (false, Some(pos)) => {
-                    // We found a correct frame
-
-                    let newpos_index = pos + self.next_index;
-                    self.next_index = 0;
-                    let mut frame = buf.split_to(newpos_index + 1);
-
-                    trace!(
-                        message = "Decoding the frame.",
-                        bytes_proccesed = frame.len()
-                    );
-
-                    let frame = frame.split_to(frame.len() - 1);
-
-                    return Ok(Some(frame.freeze()));
-                }
-                (false, None) if buf.len() > self.max_length => {
-                    // We reached the max length without finding the
-                    // delimiter so must discard the rest until we
-                    // reach the next delimiter
-                    self.is_discarding = true;
-                    warn!(
-                        message = "Discarding frame larger than max_length.",
-                        buf_len = buf.len(),
-                        max_length = self.max_length,
-                        internal_log_rate_secs = 30
-                    );
-                }
-                (false, None) => {
-                    // We didn't find the delimiter and didn't
-                    // reach the max frame length.
-                    self.next_index = read_to;
-                    return Ok(None);
                 }
             }
         }
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
-        let frame = self.decode(buf)?.or_else(|| {
-            (!buf.is_empty() && !self.is_discarding).then(|| {
-                self.next_index = 0;
-                buf.split_to(buf.len()).into()
-            })
-        });
-
-        Ok(frame)
+        match self.decode(buf)? {
+            Some(frame) => Ok(Some(frame)),
+            None => {
+                if buf.is_empty() {
+                    Ok(None)
+                } else {
+                    // TODO why do we do this? We drop all but the final byte of
+                    // the incoming buffer?
+                    let bytes: Bytes = buf.split_to(buf.len()).freeze();
+                    Ok(Some(bytes))
+                }
+            }
+        }
     }
 }
 
