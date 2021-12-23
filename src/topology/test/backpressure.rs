@@ -242,7 +242,7 @@ mod test_source {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct TestBackpressureSourceConfig {
-        // The number of events to send. Can be read to see the current progress
+        // The number of events that have been sent.
         #[serde(skip)]
         pub counter: Arc<AtomicUsize>,
     }

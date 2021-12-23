@@ -88,7 +88,7 @@ Sink 3: Can send at 1000 events/sec  (`buffer.when_full = block`)
 
 If there are multiple sources configured for a single component, Vector currently makes no guarantees
 which source will have priority during backpressure. To make sure all inputs are fully processed, make
-sure the downstream components are able to handle the volume of all the sources.
+sure the downstream components are able to handle the volume of all the connected sources.
 
 
 ## Roles
