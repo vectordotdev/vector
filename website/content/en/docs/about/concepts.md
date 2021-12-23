@@ -54,6 +54,45 @@ A **pipeline** is a [directed acyclic graph][dag] of [components]. Each componen
 
 {{< jump "/docs/about/under-the-hood/architecture/pipeline-model" >}}
 
+
+## Buffers
+
+Sinks try to send events as fast as possible. If they are unable to keep up, they have a configurable buffer that will hold events until they can be sent.
+By default, Vector uses an in-memory buffer, but a disk-buffer is also available. Once a buffer fills up, the behavior is configurable.
+
+`buffer.when_full = block`
+This is the default behavior. When a buffer fills up, backpressure will be applied to previous components in the graph.
+
+`buffer.when_full = drop_newest`
+When a buffer fills up, new events will be dropped. This does _not_ provide backpressure.
+
+View the full configuration options for buffers [here](/docs/reference/configuration/sinks/vector/#buffer).
+
+## Backpressure
+
+If a sink's buffer fills up and is configured to provide backpressure, that backpressure will propagate to any connected
+transforms, which will also propagate to the sources. The sources attempt to propagate backpressure to
+whichever system is providing data. The exact mechanism varies with the source. For example, HTTP sources may
+reject requests with an HTTP 429 error (Too Many Requests), or pull-based sources such as Kafka may slow down fetching new events.
+
+Since Vector allows configuring components as a directed acyclic graph, understanding how backpressure works when there
+are multiple sinks or sources involved is important.
+
+A source only sends events as fast as the _slowest_ sink that is configured to provide backpressure (`buffer.when_full = block`).
+
+For example, if you have a single source sending to 3 sinks in this configuration, the source will start providing
+backpressure from sink 2 (500 events/sec) since that is the slowest sink configured to provide backpressure.
+Sink 1 will drop up to 250 events/sec, and sink 3 will be underutilized.
+
+- Sink 1: Can send at 250 events/sec (`buffer.when_full = drop_newest`)
+- Sink 2: Can send at 500 events/sec  (`buffer.when_full = block`)
+- Sink 3: Can send at 1000 events/sec  (`buffer.when_full = block`)
+
+If there are multiple sources configured for a single component, Vector currently makes no guarantees
+which source will have priority during backpressure. To make sure all inputs are fully processed, make
+sure the downstream components are able to handle the volume of all the connected sources.
+
+
 ## Roles
 
 A **role** is a deployment role that Vector fills in order to create end-to-end pipelines.

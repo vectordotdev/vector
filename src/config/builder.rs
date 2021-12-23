@@ -154,7 +154,10 @@ impl ConfigBuilder {
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
+        self.add_sink_outer(id, sink);
+    }
 
+    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
