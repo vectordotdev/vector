@@ -99,7 +99,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.21.0",
+              "v1.24.0",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },
