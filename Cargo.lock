@@ -8290,6 +8290,7 @@ dependencies = [
  "matches",
  "maxminddb",
  "md-5 0.10.0",
+ "memchr",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
