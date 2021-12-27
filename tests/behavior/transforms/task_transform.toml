@@ -41,7 +41,7 @@
     [tests.inputs.log_fields]
       message = "some message"
       another_field = 1234
-  
+
   [[tests.outputs]]
     extract_from = "multi_input_reduce"
 
