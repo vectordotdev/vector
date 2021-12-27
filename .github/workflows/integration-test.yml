@@ -110,7 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
-      - run: docker-compose -f scripts/integration/docker-compose.${{ matrix.test }}.yml rm -fsv
+      - run: make test-integration-${{ matrix.text }}-cleanup
         if: ${{ always() }}
 
   test-integration-check:
