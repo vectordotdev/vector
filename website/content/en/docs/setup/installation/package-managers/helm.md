@@ -27,7 +27,7 @@ To check available Helm chart configuration options:
 helm show values vector/vector
 ```
 
-This example configuration file lets you use Vector as an Agent to send Pod logs to standard output, Vector also collects host and internal metrics and exposes them via a Prometheus exporter. For more information about configuration options, see the [configuration] docs page.
+This example configuration file deploys Vector as an Agent, the full default configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [configuration] docs page.
 
 ```yaml
 cat <<-'VALUES' > values.yaml
@@ -69,36 +69,7 @@ To check available Helm chart configuration options:
 helm show values vector/vector
 ```
 
-An Aggregator, by default, is configured to accept events from a variety of common sources and writes them to standard output, it also reports internal metrics via a Prometheus exporter. For more information about configuration options, see the [Configuration] docs page.
-
-The default sources and their associated ports are listed below:
-
-```yaml
-datadog_agent:
-  address: 0.0.0.0:8282
-  type: datadog_agent
-fluent:
-  address: 0.0.0.0:24224
-  type: fluent
-logstash:
-  address: 0.0.0.0:5044
-  type: logstash
-splunk_hec:
-  address: 0.0.0.0:8080
-  type: splunk_hec
-statsd:
-  address: 0.0.0.0:8125
-  mode: tcp
-  type: statsd
-syslog:
-  address: 0.0.0.0:9000
-  mode: tcp
-  type: syslog
-vector:
-  address: 0.0.0.0:6000
-  type: vector
-  version: "2"
-```
+The chart deploys an Aggragator by default, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
 
 ### Installing
 
