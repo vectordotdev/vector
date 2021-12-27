@@ -1,6 +1,7 @@
 data "template_file" "soak-observer" {
   template = file("${path.module}/observer.yaml.tpl")
   vars = {
+    experiment_target  = var.experiment_target
     experiment_name    = var.experiment_name
     experiment_variant = var.variant
     vector_id          = var.vector_image

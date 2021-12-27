@@ -50,6 +50,8 @@ impl FromStr for Variant {
 pub struct Output<'a> {
     #[serde(borrow)]
     pub experiment: Cow<'a, str>,
+    #[serde(borrow)]
+    pub target: Cow<'a, str>,
     pub variant: Variant,
     #[serde(borrow)]
     pub vector_id: Cow<'a, str>,

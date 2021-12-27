@@ -1,5 +1,6 @@
 prometheus: "http://prometheus:9090"
 experiment_name: "${experiment_name}"
+target: "${experiment_target}"
 variant: "${experiment_variant}"
 vector_id: "${vector_id}"
 queries:

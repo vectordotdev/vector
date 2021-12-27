@@ -36,6 +36,8 @@ pub struct Config {
     pub prometheus: String,
     /// The name of the experiment being observed
     pub experiment_name: String,
+    /// The target platform of the experiment being observed
+    pub target: String,
     /// The variant of the experiment, generally 'baseline' or 'comparison'
     pub variant: soak::Variant,
     /// The vector ID associated with the experiment
@@ -125,6 +127,7 @@ struct QueryResponse {
 struct Worker {
     vector_id: String,
     experiment_name: String,
+    target: String,
     variant: soak::Variant,
     queries: Vec<(Query, Url)>,
     capture_path: String,
@@ -142,6 +145,7 @@ impl Worker {
         Self {
             vector_id: config.vector_id,
             experiment_name: config.experiment_name,
+            target: config.target,
             variant: config.variant,
             queries,
             capture_path: config.capture_path,
@@ -168,6 +172,7 @@ impl Worker {
                     let value = body.data.result[0].value.value.parse::<f64>()?;
                     let output = soak::Output {
                         experiment: Cow::Borrowed(&self.experiment_name),
+                        target: Cow::Borrowed(&self.target),
                         variant: self.variant,
                         vector_id: Cow::Borrowed(&self.vector_id),
                         time,
