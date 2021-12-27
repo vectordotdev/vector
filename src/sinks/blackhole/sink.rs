@@ -21,6 +21,8 @@ use crate::{
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
+const MAX_CHUNK_SIZE: usize = 1024;
+
 pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
@@ -71,8 +73,11 @@ impl StreamSink for BlackholeSink {
                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
             }, "Total events collected");
         });
-
-        let mut chunks = input.ready_chunks(1024);
+        let chunk_size = match self.config.rate {
+            None => MAX_CHUNK_SIZE,
+            Some(rate) => rate.min(MAX_CHUNK_SIZE),
+        };
+        let mut chunks = input.ready_chunks(chunk_size);
         while let Some(events) = chunks.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;

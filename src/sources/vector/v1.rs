@@ -66,6 +66,7 @@ impl VectorConfig {
             self.receive_buffer_bytes,
             cx,
             false.into(),
+            None,
         )
     }
 
@@ -117,7 +118,7 @@ impl TcpSource for VectorSource {
         )
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }

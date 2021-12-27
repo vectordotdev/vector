@@ -32,6 +32,7 @@ pub struct LogstashConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -46,6 +47,7 @@ impl GenerateConfig for LogstashConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: None,
         })
         .unwrap()
     }
@@ -68,6 +70,7 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            self.connection_limit,
         )
     }
 
@@ -120,21 +123,32 @@ impl TcpSource for LogstashSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
-        LogstashAcker::new(frame)
+    fn build_acker(&self, frames: &[Self::Item]) -> Self::Acker {
+        LogstashAcker::new(frames)
     }
 }
 
 struct LogstashAcker {
-    protocol: LogstashProtocolVersion,
     sequence_number: u32,
+    protocol_version: Option<LogstashProtocolVersion>,
 }
 
 impl LogstashAcker {
-    const fn new(frame: &LogstashEventFrame) -> Self {
+    fn new(frames: &[LogstashEventFrame]) -> Self {
+        let mut sequence_number = 0;
+        let mut protocol_version = None;
+
+        for frame in frames {
+            sequence_number = std::cmp::max(sequence_number, frame.sequence_number);
+            // We assume that it's valid to ack via any of the protocol versions that we've seen in
+            // a set of frames from a single stream, so here we just take the last. In reality, we
+            // do not expect stream with multiple protocol versions to occur.
+            protocol_version = Some(frame.protocol);
+        }
+
         Self {
-            protocol: frame.protocol,
-            sequence_number: frame.sequence_number,
+            sequence_number,
+            protocol_version,
         }
     }
 }
@@ -142,10 +156,10 @@ impl LogstashAcker {
 impl TcpSourceAcker for LogstashAcker {
     // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
-        match ack {
-            TcpSourceAck::Ack => {
+        match (ack, self.protocol_version) {
+            (TcpSourceAck::Ack, Some(protocol_version)) => {
                 let mut bytes: Vec<u8> = Vec::with_capacity(6);
-                bytes.push(self.protocol.into());
+                bytes.push(protocol_version.into());
                 bytes.push(LogstashFrameType::Ack.into());
                 bytes.extend(self.sequence_number.to_be_bytes().iter());
                 Some(Bytes::from(bytes))
@@ -580,6 +594,7 @@ mod test {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
@@ -789,6 +804,7 @@ output {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await

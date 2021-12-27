@@ -8,7 +8,6 @@ mod lua;
 mod metrics_snapshot;
 mod regex;
 mod template;
-mod topology;
 
 criterion_main!(
     batch::benches,
@@ -19,5 +18,4 @@ criterion_main!(
     metrics_snapshot::benches,
     regex::benches,
     template::benches,
-    topology::benches,
 );
