@@ -53,7 +53,7 @@ tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.3.4", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
-twox-hash = { version = "1.6.1", default-features = false }
+twox-hash = { version = "1.6.2", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]
