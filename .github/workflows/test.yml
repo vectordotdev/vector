@@ -91,6 +91,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
       - uses: actions/checkout@v2.4.0
       - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
@@ -127,6 +128,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
       - uses: actions/cache@v2.1.7
@@ -244,6 +246,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.ps1
       - uses: actions/checkout@v2.4.0
       - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
@@ -268,6 +271,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -292,6 +296,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -317,6 +322,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh

@@ -6,9 +6,6 @@ rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 rustup run stable cargo install cargo-deb --version 1.29.2
 rustup run stable cargo install cross --version 0.2.1
 
-# self-hosted CI runners accrue artifacts in `target/`
-cargo clean
-
 cd scripts
 bundle install
 cd ..

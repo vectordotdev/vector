@@ -157,6 +157,8 @@ jobs:
             tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
             ref: "${{ needs.compute-soak-meta.outputs.comparison-sha }}"
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
+
       - uses: actions/checkout@v2.3.5
 
       - uses: actions/checkout@v2.3.5
@@ -206,6 +208,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
+      - run: bash scripts/environment/bootstrap-self-hosted.sh
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
