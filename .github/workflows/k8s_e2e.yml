@@ -111,7 +111,8 @@ jobs:
             const container_runtime = [
               "docker",
               "containerd",
-              "crio",
+              // https://github.com/kubernetes/minikube/issues/12928
+              // "crio",
             ]
             const ci_condition_label = 'ci-condition: k8s e2e all targets'
 
