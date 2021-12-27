@@ -559,6 +559,9 @@ endif
 .PHONY: test-integration-redis
 test-integration-redis: ## Runs Redis integration tests
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml run --rm runner
+
+.PHONY: test-integration-redis-cleanup
+test-integration-redis-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml rm -fsv
 
 .PHONY: test-integration-splunk
