@@ -1,17 +1,11 @@
-use std::{
-    fmt, io,
-    mem::drop,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
+use std::net::{IpAddr, SocketAddr};
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -22,6 +16,7 @@ use tracing_futures::Instrument;
 
 use super::{AfterReadExt as _, StreamDecodingError};
 use crate::{
+    codecs::ReadyFrames,
     config::{AcknowledgementsConfig, Resource, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
@@ -92,8 +87,13 @@ where
 {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + StreamDecodingError + std::fmt::Debug + std::fmt::Display + Send;
-    type Item: Into<SmallVec<[Event; 1]>> + Send;
+    type Error: From<io::Error>
+        + StreamDecodingError
+        + std::fmt::Debug
+        + std::fmt::Display
+        + Send
+        + Unpin;
+    type Item: Into<SmallVec<[Event; 1]>> + Send + Unpin;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
     type Acker: TcpSourceAcker + Send;
 
@@ -101,7 +101,7 @@ where
 
     fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
 
-    fn build_acker(&self, item: &Self::Item) -> Self::Acker;
+    fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
     fn run(
         self,
@@ -112,6 +112,7 @@ where
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
+        max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
         let out = cx
             .out
@@ -144,9 +145,9 @@ where
             let shutdown_clone = cx.shutdown.clone();
 
             listener
-                .accept_stream()
+                .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
-                .for_each(move |connection| {
+                .for_each(move |(connection, permit)| {
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
@@ -196,7 +197,11 @@ where
                             );
 
                             tokio::spawn(
-                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                                fut.map(move |()| {
+                                    drop(open_token);
+                                    drop(permit);
+                                })
+                                .instrument(span.clone()),
                             );
                         });
                     }
@@ -251,7 +256,8 @@ async fn handle_stream<T>(
             peer_addr
         });
     });
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let reader = FramedRead::new(socket, source.decoder());
+    let mut reader = ReadyFrames::new(reader);
     let host = Bytes::from(peer_addr.to_string());
 
     loop {
@@ -261,7 +267,7 @@ async fn handle_stream<T>(
                 debug!("Start graceful shutdown.");
                 // Close our write part of TCP socket to signal the other side
                 // that it should stop writing and close the channel.
-                let socket = reader.get_ref().get_ref();
+                let socket = reader.get_ref().get_ref().get_ref();
                 if let Some(stream) = socket.get_ref() {
                     let socket = SockRef::from(stream);
                     if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
@@ -275,11 +281,11 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok((item, byte_size))) => {
-                        let acker = source.build_acker(&item);
+                    Some(Ok((frames, byte_size))) => {
+                        let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
-                        let mut events = item.into();
-                        if let Some(batch) = batch{
+                        let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+                        if let Some(batch) = batch {
                             for event in &mut events {
                                 event.add_batch_notifier(Arc::clone(&batch));
                             }
@@ -305,7 +311,7 @@ async fn handle_stream<T>(
                                         }
                                 };
                                 if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut();
+                                    let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
                                         emit!(&TcpSendAckError{ error });
                                         break;

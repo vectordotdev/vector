@@ -429,7 +429,7 @@ impl IngestorProcess {
                 // the case that the same vector instance processes the same message.
                 let mut read_error = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, CharacterDelimitedDecoder::new('\n'))
+                    FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);

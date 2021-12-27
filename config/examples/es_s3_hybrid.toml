@@ -21,7 +21,7 @@ data_dir = "/var/lib/vector"
 [sinks.es_cluster]
   inputs       = ["apache_logs"]
   type         = "elasticsearch"
-  host         = "79.12.221.222:9200"
+  endpoint      = "79.12.221.222:9200"
   doc_type     = "_doc"
 
 # Send structured data to S3, a durable long-term storage

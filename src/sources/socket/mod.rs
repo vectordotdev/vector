@@ -112,6 +112,7 @@ impl SourceConfig for SocketConfig {
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
+                    config.connection_limit,
                 )
             }
             Mode::Udp(config) => {

@@ -42,7 +42,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
 
     #[cfg(feature = "tokio-console")]
     let subscriber = {
-        let (tasks_layer, tasks_server) = console_subscriber::TasksLayer::new();
+        let (tasks_layer, tasks_server) = console_subscriber::ConsoleLayer::new();
         tokio::spawn(tasks_server.serve());
 
         tracing_subscriber::registry::Registry::default()

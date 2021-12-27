@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
 use super::*;
+use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{SinkConfig, SinkContext},
@@ -74,7 +75,10 @@ async fn firehose_put_records() {
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: "http://localhost:4571".into(),
-        index: Some(stream.clone()),
+        bulk: Some(BulkConfig {
+            index: Some(stream.clone()),
+            action: None,
+        }),
         ..Default::default()
     };
     let common = ElasticSearchCommon::parse_config(&config).expect("Config error");

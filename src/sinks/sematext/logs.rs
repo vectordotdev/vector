@@ -4,6 +4,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use super::Region;
+use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -69,8 +70,15 @@ impl SinkConfig for SematextLogsConfig {
         let (sink, healthcheck) = ElasticSearchConfig {
             endpoint,
             compression: Compression::None,
-            doc_type: Some("logs".to_string()),
-            index: Some(self.token.clone()),
+            doc_type: Some(
+                "\
+            logs"
+                    .to_string(),
+            ),
+            bulk: Some(BulkConfig {
+                action: None,
+                index: Some(self.token.clone()),
+            }),
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,

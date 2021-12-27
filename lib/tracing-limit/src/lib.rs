@@ -76,7 +76,7 @@ where
     }
 
     // keep track of any span fields we use for grouping rate limiting
-    fn new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+    fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
         {
             let span = ctx.span(id).expect("Span not found, this is a bug");
             let mut extensions = span.extensions_mut();
@@ -87,7 +87,7 @@ where
                 extensions.insert(fields);
             };
         }
-        self.inner.new_span(attrs, id, ctx);
+        self.inner.on_new_span(attrs, id, ctx);
     }
 
     // keep track of any span fields we use for grouping rate limiting

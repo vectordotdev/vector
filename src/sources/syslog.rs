@@ -49,6 +49,7 @@ pub enum Mode {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
+        connection_limit: Option<u32>,
     },
     Udp {
         address: SocketAddr,
@@ -80,6 +81,7 @@ impl GenerateConfig for SyslogConfig {
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,
+                connection_limit: None,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -103,6 +105,7 @@ impl SourceConfig for SyslogConfig {
                 keepalive,
                 tls,
                 receive_buffer_bytes,
+                connection_limit,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -118,6 +121,7 @@ impl SourceConfig for SyslogConfig {
                     receive_buffer_bytes,
                     cx,
                     false.into(),
+                    connection_limit,
                 )
             }
             Mode::Udp {
@@ -192,7 +196,7 @@ impl TcpSource for SyslogTcpSource {
         handle_events(events, &self.host_key, Some(host), byte_size);
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }
@@ -258,13 +262,9 @@ fn handle_events(
     default_host: Option<Bytes>,
     byte_size: usize,
 ) {
-    assert_eq!(
-        events.len(),
-        1,
-        "Syslog parser parses exactly one message from a byte string.",
-    );
-
-    enrich_syslog_event(&mut events[0], host_key, default_host, byte_size);
+    for event in events {
+        enrich_syslog_event(event, host_key, default_host.clone(), byte_size);
+    }
 }
 
 fn enrich_syslog_event(

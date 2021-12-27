@@ -98,7 +98,7 @@ uri = "http://{address2}/"
             address1 = address1,
             address2 = address2,
         ),
-        Some(Format::Toml),
+        Format::Toml,
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
