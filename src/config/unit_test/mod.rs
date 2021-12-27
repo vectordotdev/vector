@@ -16,6 +16,7 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+use regex::RegexSet;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -76,7 +77,7 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
 }
 
 async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
-    sanitize_config(&mut config_builder);
+    sanitize_config(&mut config_builder)?;
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -110,7 +111,7 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
 
 // Remove any existing sources and sinks
 // Retain only transform inputs that are other transforms
-fn sanitize_config(config_builder: &mut ConfigBuilder) {
+fn sanitize_config(config_builder: &mut ConfigBuilder) -> Result<(), Vec<String>> {
     config_builder.sources = Default::default();
     config_builder.sinks = Default::default();
 
@@ -119,7 +120,9 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
         .iter()
         .flat_map(|(key, transform)| {
             // A transform and any of its named outputs
-            let mut keys = vec![key.to_string()];
+            // Expanded transforms are not covered by named outputs, so explicitly
+            // preserve inputs that start with a valid transform key + '.'
+            let mut keys = vec![format!(r"{}\.?", key.to_string())];
             keys.extend(
                 transform
                     .inner
@@ -132,30 +135,22 @@ fn sanitize_config(config_builder: &mut ConfigBuilder) {
         })
         .collect::<HashSet<_>>();
 
+    let all_valid_inputs = RegexSet::new(all_valid_inputs).map_err(|error| {
+        vec![format!(
+            "Failed to prepare configuration for testing: {}",
+            error
+        )]
+    })?;
+
     for (_, transform) in config_builder.transforms.iter_mut() {
-        let original_inputs = transform.inputs.clone().into_iter().collect::<HashSet<_>>();
-        // Expanded transforms are not covered by named outputs, so explicitly
-        // preserve inputs that start with a valid transform key + '.'
-        let expanded_inputs = original_inputs
-            .iter()
-            .filter_map(|input| {
-                let mut expanded_input = None;
-                for valid_input in all_valid_inputs.iter() {
-                    if input.starts_with::<&str>(format!("{}.", valid_input).as_ref()) {
-                        expanded_input = Some(input.clone());
-                        break;
-                    }
-                }
-                expanded_input
-            })
+        let inputs = std::mem::take(&mut transform.inputs);
+        transform.inputs = inputs
+            .into_iter()
+            .filter(|input| all_valid_inputs.is_match(input.as_str()))
             .collect::<Vec<_>>();
-        let mut new_inputs = original_inputs
-            .intersection(&all_valid_inputs)
-            .cloned()
-            .collect::<HashSet<_>>();
-        new_inputs.extend(expanded_inputs);
-        transform.inputs = new_inputs.into_iter().collect();
     }
+
+    Ok(())
 }
 
 pub struct UnitTestBuildMetadata {
