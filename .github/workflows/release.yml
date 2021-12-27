@@ -19,7 +19,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -36,7 +36,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -61,7 +61,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -79,7 +79,7 @@ jobs:
   build-aarch64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -105,7 +105,7 @@ jobs:
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -130,7 +130,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.sh
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -178,7 +178,6 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
-      - run: bash scripts/environment/bootstrap-self-hosted.ps1
       - uses: actions/checkout@v2.4.0
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
