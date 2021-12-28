@@ -122,6 +122,10 @@ components: {
 			output: #OutputData
 		}
 
+		if Kind == "transform" {
+			outputs: #Outputs
+		}
+
 		// `support` communicates the varying levels of support of the component.
 		support: #Support & {_args: kind: Kind}
 
@@ -442,6 +446,21 @@ components: {
 	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#Output: {
+		name:        string
+		description: string
+	}
+
+	#Outputs: {
+		_default_output: #Output & {
+			name:        ""
+			description: "This component has a default output. You can use this component's ID as an input to downstream transforms and sinks."
+		}
+
+		default_output: *_default_output | #Output | null
+		named_outputs: [...#Output]
 	}
 
 	#IAM: {
