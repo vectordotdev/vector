@@ -339,6 +339,12 @@ async fn build_unit_test(
     let sources = config_builder.sources.keys().clone().collect::<Vec<_>>();
 
     let mut valid_components = get_relevant_test_components(sources.as_ref(), &graph)?;
+    if valid_components.is_empty() {
+        return Err(vec![
+            "No path(s) found from inputs to outputs. Topology is disconnected.".to_string(),
+        ]);
+    }
+
     // Preserve the original unexpanded transform(s) which are valid test insertion points
     let unexpanded_transforms = valid_components
         .iter()
