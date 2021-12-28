@@ -384,7 +384,11 @@ endif
 
 .PHONY: test-integration-datadog-logs
 test-integration-datadog-logs: ## Runs Docker Logs integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-logs-integration-tests --lib ::datadog::logs::
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-logs.yml run --rm runner
+
+.PHONY: test-integration-datadog-logs-cleanup
+test-integration-datadog-logs-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-logs.yml rm -fsv
 
 .PHONY: test-integration-datadog-metrics
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
