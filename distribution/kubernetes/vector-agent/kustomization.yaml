@@ -1,4 +1,10 @@
 namespace: vector
 
-resources:
-  - resources.yaml
+helmCharts:
+- name: vector
+  includeCRDs: false
+  valuesInline:
+    role: Agent
+  version: 0.3.0
+  releaseName: vector
+  repo: https://helm.vector.dev
