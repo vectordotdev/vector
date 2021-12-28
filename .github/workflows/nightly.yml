@@ -200,7 +200,6 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
