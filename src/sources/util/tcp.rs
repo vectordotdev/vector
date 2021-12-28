@@ -1,17 +1,11 @@
-use std::{
-    fmt, io,
-    mem::drop,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
+use std::net::{IpAddr, SocketAddr};
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -118,6 +112,7 @@ where
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
+        max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
         let out = cx
             .out
@@ -150,9 +145,9 @@ where
             let shutdown_clone = cx.shutdown.clone();
 
             listener
-                .accept_stream()
+                .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
-                .for_each(move |connection| {
+                .for_each(move |(connection, permit)| {
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
@@ -202,7 +197,11 @@ where
                             );
 
                             tokio::spawn(
-                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                                fut.map(move |()| {
+                                    drop(open_token);
+                                    drop(permit);
+                                })
+                                .instrument(span.clone()),
                             );
                         });
                     }

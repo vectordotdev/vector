@@ -22,6 +22,7 @@ releases: "0.18.0": {
 		"The new automatic namespacing feature broke running Vector from the published RPM due to it trying to load directories from `/etc/vector` that are not valid. Fixed in v0.18.1.",
 		"The new `reroute_dropped` feature of `remap` always creates the `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.",
 		"The `headers_key` option for the `kafka` sink was inadvertantly changed to `headers_field`. Fixed in v0.19.0.",
+		"If `--config-dir` is used, Vector incorrectly tries to load files with unknown extensions. Fixed in v0.19.0.",
 	]
 
 	changelog: [

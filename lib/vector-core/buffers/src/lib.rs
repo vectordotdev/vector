@@ -17,7 +17,7 @@ pub use acknowledgements::{Ackable, Acker};
 
 mod buffer_usage_data;
 
-mod config;
+pub mod config;
 pub use config::{BufferConfig, BufferType};
 
 pub mod encoding;

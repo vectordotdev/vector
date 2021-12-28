@@ -211,7 +211,7 @@ impl Serialize for BufferConfig {
     }
 }
 
-const fn memory_buffer_default_max_events() -> usize {
+pub const fn memory_buffer_default_max_events() -> usize {
     500
 }
 
@@ -317,7 +317,7 @@ impl BufferType {
 /// documentation to correctly reflect the internal structure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
-    stages: Vec<BufferType>,
+    pub stages: Vec<BufferType>,
 }
 
 impl Default for BufferConfig {

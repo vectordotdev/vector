@@ -55,29 +55,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-       include:
-         - test: 'aws'
-         - test: 'azure'
-         - test: 'clickhouse'
-         - test: 'datadog-metrics'
-         - test: 'docker-logs'
-         - test: 'elasticsearch'
-         - test: 'eventstoredb_metrics'
-         - test: 'fluent'
-         - test: 'gcp'
-         - test: 'humio'
-         - test: 'influxdb'
-         - test: 'kafka'
-         - test: 'logstash'
-         - test: 'loki'
-         - test: 'mongodb_metrics'
-         - test: 'nginx'
-         - test: 'postgresql_metrics'
-         - test: 'prometheus'
-         - test: 'pulsar'
-         - test: 'redis'
-         - test: 'splunk'
-         - test: 'dnstap'
+        include:
+          - test: 'aws'
+          - test: 'azure'
+          - test: 'clickhouse'
+          - test: 'datadog-agent'
+          - test: 'datadog-metrics'
+          - test: 'docker-logs'
+          - test: 'elasticsearch'
+          - test: 'eventstoredb_metrics'
+          - test: 'fluent'
+          - test: 'gcp'
+          - test: 'humio'
+          - test: 'influxdb'
+          - test: 'kafka'
+          - test: 'logstash'
+          - test: 'loki'
+          - test: 'mongodb_metrics'
+          - test: 'nginx'
+          - test: 'postgresql_metrics'
+          - test: 'prometheus'
+          - test: 'pulsar'
+          - test: 'splunk'
+          - test: 'dnstap'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
@@ -95,11 +95,30 @@ jobs:
         env:
           CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
 
+  # just keep both during migration
+  test-integration-docker-compose:
+    name: Integration - Linux, ${{ matrix.test }}
+    runs-on: ubuntu-20.04
+    if: |
+      !github.event.pull_request
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
+    strategy:
+      fail-fast: false
+      matrix:
+       include:
+         - test: 'redis'
+    steps:
+      - uses: actions/checkout@v2.4.0
+      - run: make test-integration-${{ matrix.test }}
+      - run: make test-integration-${{ matrix.test }}-cleanup
+        if: ${{ always() }}
+
   test-integration-check:
     name: test-integration-check
     runs-on: ubuntu-latest
     needs:
       - test-integration
+      - test-integration-docker-compose
     steps:
       - name: validate
         run: echo "OK"

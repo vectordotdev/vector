@@ -45,6 +45,8 @@ lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
+pub const PIPELINE_BUFFER_SIZE: usize = 1000;
+
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
         .get()
@@ -144,7 +146,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (tx, rx) = futures::channel::mpsc::channel(1000);
+        let (tx, rx) = futures::channel::mpsc::channel(PIPELINE_BUFFER_SIZE);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.inner.source_type();

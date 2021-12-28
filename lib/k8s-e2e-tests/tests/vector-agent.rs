@@ -1853,7 +1853,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             // This allows us to read and checkpoint the first log
             // then ensure we just read the new marker after restarting Vector
-            "echo CHECKED_MARKER; sleep 60; echo MARKER",
+            "echo CHECKED_MARKER; sleep 90; echo MARKER",
             vec![],
             vec![],
         ))?)
