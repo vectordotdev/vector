@@ -30,8 +30,9 @@ releases: "0.19.0": {
 	description: """
 		The Vector team is pleased to announce version 0.19.0!
 
-		We've been hard at work improving Vector's performance and were able to
-		move the needle 10-100% for most configurations in our [soak test
+		In addition to the below features, enhancements, and fixes, we've been
+		hard at work improving Vector's performance and were able to move the
+		needle 10-100% for most configurations in our [soak test
 		framework](https://github.com/vectordotdev/vector/tree/master/soaks/tests)
 		from the last release, `v0.18`.
 
@@ -124,7 +125,8 @@ releases: "0.19.0": {
 				ns.vector,metric_type=foo,host=example.com message="hello world",size=10 {timestamp}
 				```
 				"""
-			pr_numbers: [10082]
+			pr_numbers: [10082, 10217],
+			contributors: ["juvenn"],
 		},
 		{
 			type: "enhancement"
