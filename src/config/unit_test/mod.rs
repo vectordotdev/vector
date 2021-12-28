@@ -306,10 +306,12 @@ fn get_relevant_test_components(
     Ok(sources
         .iter()
         .flat_map(|source| {
-            graph
-                .paths_to_sink_from(source)
-                .into_iter()
-                .map(|key| key.to_string())
+            let paths = graph.paths_to_sink_from(source);
+            let mut components = HashSet::new();
+            for path in paths {
+                components.extend(path.into_iter().map(|key| key.to_string()));
+            }
+            components
         })
         .collect())
 }

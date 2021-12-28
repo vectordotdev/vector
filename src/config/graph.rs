@@ -289,7 +289,7 @@ impl Graph {
     /// components are relevant in a Vector unit test.
     ///
     /// Caller must check for cycles before calling this function.
-    pub fn paths_to_sink_from(&self, root: &ComponentKey) -> HashSet<ComponentKey> {
+    pub fn paths_to_sink_from(&self, root: &ComponentKey) -> Vec<Vec<ComponentKey>> {
         let mut traversal: VecDeque<(ComponentKey, Vec<_>)> = VecDeque::new();
         let mut paths = Vec::new();
 
@@ -314,16 +314,16 @@ impl Graph {
         }
 
         // Keep only components from paths that end at a sink
-        let mut valid_components = HashSet::new();
-        for path in paths.into_iter() {
-            if let Some(key) = path.last() {
-                if let Some(Node::Sink { ty: _ }) = self.nodes.get(key) {
-                    valid_components.extend(path);
+        paths
+            .into_iter()
+            .filter(|path| {
+                if let Some(key) = path.last() {
+                    matches!(self.nodes.get(key), Some(Node::Sink { ty: _ }))
+                } else {
+                    false
                 }
-            }
-        }
-
-        valid_components
+            })
+            .collect()
     }
 }
 
@@ -621,5 +621,77 @@ mod test {
                 String::from("Input specifier foo.bar is ambiguous"),
             ]
         );
+    }
+
+    #[test]
+    fn paths_to_sink_simple() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
+        graph.add_sink("out", DataType::Log, vec!["three"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("in"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"])
+    }
+
+    #[test]
+    fn paths_to_sink_non_existent_root() {
+        let graph = Graph::default();
+        let paths = graph.paths_to_sink_from(&ComponentKey::from("in"));
+
+        assert_eq!(paths.len(), 0);
+    }
+
+    #[test]
+    fn paths_to_sink_irrelevant_transforms() {
+        let mut graph = Graph::default();
+        graph.add_source("source", DataType::Log);
+        // These transforms do not link to a sink
+        graph.add_transform("t1", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t2", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_transform("t3", DataType::Log, DataType::Log, vec!["t1"]);
+        // These transforms do link to a sink
+        graph.add_transform("t4", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t5", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_sink("sink1", DataType::Log, vec!["t4"]);
+        graph.add_sink("sink2", DataType::Log, vec!["t5"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("source"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], vec!["source", "t5", "sink2"]);
+        assert_eq!(paths[1], vec!["source", "t4", "sink1"]);
+    }
+
+    #[test]
+    fn paths_to_sink_multiple_inputs_into_sink() {
+        let mut graph = Graph::default();
+        graph.add_source("source", DataType::Log);
+        graph.add_transform("t1", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t2", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_transform("t3", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_sink("sink1", DataType::Log, vec!["t2", "t3"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("source"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], vec!["source", "t1", "t3", "sink1"]);
+        assert_eq!(paths[1], vec!["source", "t1", "t2", "sink1"]);
     }
 }
