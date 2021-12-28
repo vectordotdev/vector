@@ -82,7 +82,7 @@
 
           {{/* Component log/metric output */}}
           {{ with $config.output }}
-          {{ partial "heading.html" (dict "text" "Output" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Output Data" "level" 2) }}
           {{ partial "data.html" (dict "component_output" . ) }}
           {{ end }}
 

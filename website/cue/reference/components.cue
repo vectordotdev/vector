@@ -119,7 +119,7 @@ components: {
 		if Kind != "sink" {
 			// `output` documents output of the component. This is very important
 			// as it communicate which events and fields are emitted.
-			output: #Output
+			output: #OutputData
 		}
 
 		// `support` communicates the varying levels of support of the component.
@@ -439,7 +439,7 @@ components: {
 		default_namespace: string
 	}
 
-	#Output: {
+	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
 	}
