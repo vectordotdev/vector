@@ -392,15 +392,11 @@ test-integration-docker-logs: ## Runs Docker Logs integration tests
 
 .PHONY: test-integration-elasticsearch
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-	@scripts/setup_integration_env.sh elasticsearch start
-	sleep 60 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-endif
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.elasticsearch.yml run --rm runner
+
+.PHONY: test-integration-elasticsearch-cleanup
+test-integration-elasticsearch-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.elasticsearch.yml rm -fsv
 
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
