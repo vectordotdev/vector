@@ -37,7 +37,7 @@ releases: "0.19.0": {
 		from the last release, `v0.18`.
 
 		Be sure to check out the [upgrade
-		guide](/highlights/2021-12-28-0-19-0-upgrade-guide.md) for breaking
+		guide](/highlights/2021-12-28-0-19-0-upgrade-guide) for breaking
 		changes in this release.
 		"""
 
@@ -245,7 +245,7 @@ releases: "0.19.0": {
 				a transform could be a significant bottleneck since only one
 				copy of it was ran which would result Vector under-utilizing
 				available CPU resources. See [the highlight
-				article](/highlights/2021-11-18-implicit-namespacing.md) for
+				article](/highlights/2021-11-18-implicit-namespacing) for
 				more details.
 				"""
 			pr_numbers: [10265]
