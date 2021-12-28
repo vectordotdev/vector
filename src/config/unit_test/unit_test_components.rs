@@ -59,9 +59,7 @@ pub enum UnitTestSinkCheck {
     Checks(Vec<Vec<Box<dyn Condition>>>),
     // Check that no events were received
     NoOutputs,
-    // Do nothing. Some sinks in a unit test topology serve only to simplify
-    // building a valid topology. They receive no events and are irrelevant to
-    // the test, so run no checks.
+    // Do nothing
     NoOp,
 }
 
