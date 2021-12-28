@@ -16,7 +16,6 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
-use regex::RegexSet;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -30,6 +29,8 @@ use uuid::Uuid;
 use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
+
+use super::graph::Graph;
 
 pub struct UnitTest {
     pub name: String,
@@ -77,7 +78,10 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
 }
 
 async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
-    sanitize_config(&mut config_builder)?;
+    // Sanitize config by removing existing sources and sinks
+    config_builder.sources = Default::default();
+    config_builder.sinks = Default::default();
+
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -109,50 +113,6 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
     }
 }
 
-// Remove any existing sources and sinks
-// Retain only transform inputs that are other transforms
-fn sanitize_config(config_builder: &mut ConfigBuilder) -> Result<(), Vec<String>> {
-    config_builder.sources = Default::default();
-    config_builder.sinks = Default::default();
-
-    let all_valid_inputs = config_builder
-        .transforms
-        .iter()
-        .flat_map(|(key, transform)| {
-            // A transform and any of its named outputs
-            // Expanded transforms are not covered by named outputs, so explicitly
-            // preserve inputs that start with a valid transform key + '.'
-            let mut keys = vec![format!(r"{}\.?", key.to_string())];
-            keys.extend(
-                transform
-                    .inner
-                    .named_outputs()
-                    .iter()
-                    .map(|port| format!("{}.{}", key, port))
-                    .collect::<Vec<_>>(),
-            );
-            keys
-        })
-        .collect::<HashSet<_>>();
-
-    let all_valid_inputs = RegexSet::new(all_valid_inputs).map_err(|error| {
-        vec![format!(
-            "Failed to prepare configuration for testing: {}",
-            error
-        )]
-    })?;
-
-    for (_, transform) in config_builder.transforms.iter_mut() {
-        let inputs = std::mem::take(&mut transform.inputs);
-        transform.inputs = inputs
-            .into_iter()
-            .filter(|input| all_valid_inputs.is_match(input.as_str()))
-            .collect::<Vec<_>>();
-    }
-
-    Ok(())
-}
-
 pub struct UnitTestBuildMetadata {
     // A set of all valid insert_at targets, used to validate test inputs.
     available_insert_targets: HashSet<ComponentKey>,
@@ -181,7 +141,7 @@ impl UnitTestBuildMetadata {
             .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
             .collect::<HashMap<_, _>>();
 
-        // Connect a test source to every transform
+        // Map a test source to every transform
         let mut template_sources = IndexMap::new();
         for (key, transform) in config_builder.transforms.iter_mut() {
             let test_source_id = source_ids
@@ -193,8 +153,8 @@ impl UnitTestBuildMetadata {
             template_sources.insert(key.clone(), UnitTestSourceConfig::default());
         }
 
-        // In order to attach a sink to every valid extraction point, we need to
-        // expand any relevant transforms
+        // In order to attach a sink to any valid extraction point, we need to
+        // expand relevant transforms
         let mut builder = config_builder.clone();
         let _ = expand_macros(&mut builder)?;
         let available_extract_targets = builder
@@ -237,40 +197,37 @@ impl UnitTestBuildMetadata {
         })
     }
 
+    /// Convert test inputs into sources for use in a unit testing topology
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
     ) -> Result<IndexMap<ComponentKey, SourceOuter>, Vec<String>> {
         let inputs = build_and_validate_inputs(inputs, &self.available_insert_targets)?;
         let mut template_sources = self.template_sources.clone();
-        for (insert_at, events) in inputs {
-            let source_config = template_sources.get_mut(&insert_at).unwrap_or_else(|| {
-                // At this point, all inputs should have been validated to
-                // correspond with valid transforms, and all valid transforms
-                // have a source attached.
-                panic!(
-                    "Invalid input: cannot insert at {:?}",
-                    insert_at.to_string()
-                )
-            });
-            source_config.events.extend(events);
-        }
-        Ok(template_sources
+        Ok(inputs
             .into_iter()
-            .map(|(transform_key, source_config)| {
-                let source_key: &str = self
+            .map(|(insert_at, events)| {
+                let mut source_config = template_sources.remove(&insert_at).unwrap_or_else(|| {
+                    // At this point, all inputs should have been validated to
+                    // correspond with valid transforms, and all valid transforms
+                    // have a source attached.
+                    panic!(
+                        "Invalid input: cannot insert at {:?}",
+                        insert_at.to_string()
+                    )
+                });
+                source_config.events.extend(events);
+                let id: &str = self
                     .source_ids
-                    .get(&transform_key)
+                    .get(&insert_at)
                     .expect("Corresponding source must exist")
                     .as_ref();
-                (
-                    ComponentKey::from(source_key),
-                    SourceOuter::new(source_config),
-                )
+                (ComponentKey::from(id), SourceOuter::new(source_config))
             })
             .collect::<IndexMap<_, _>>())
     }
 
+    /// Convert test outputs into sinks for use in a unit testing topology
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,
@@ -291,34 +248,34 @@ impl UnitTestBuildMetadata {
         }
         let outputs = build_outputs(outputs)?;
 
-        let mut test_result_rxs = Vec::new();
         let mut template_sinks = IndexMap::new();
-        for (transform_id, _) in self.sink_ids.iter() {
+        let mut test_result_rxs = Vec::new();
+        // Add sinks with checks
+        for (id, checks) in outputs {
             let (tx, rx) = oneshot::channel();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_id: transform_id.to_string(),
+                transform_id: id.to_string(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
-                check: UnitTestSinkCheck::NoOp,
+                check: UnitTestSinkCheck::Checks(checks),
             };
-            template_sinks.insert(transform_id.clone(), sink_config);
+
             test_result_rxs.push(rx);
+            template_sinks.insert(id.clone(), sink_config);
         }
 
-        // Add checks to sinks associated with an extract_from
-        for (transform_id, checks) in outputs {
-            let sink_config = template_sinks
-                .get_mut(&transform_id)
-                .expect("Sink does not exist");
-            sink_config.check = UnitTestSinkCheck::Checks(checks);
-        }
+        // Add sinks with no outputs check
+        for id in no_outputs_from {
+            let (tx, rx) = oneshot::channel();
+            let sink_config = UnitTestSinkConfig {
+                test_name: test_name.to_string(),
+                transform_id: id.to_string(),
+                result_tx: Arc::new(Mutex::new(Some(tx))),
+                check: UnitTestSinkCheck::NoOutputs,
+            };
 
-        // Add no outputs assertion to relevant sinks
-        for transform_id in no_outputs_from {
-            let sink_config = template_sinks
-                .get_mut(transform_id)
-                .expect("Sink does not exist");
-            sink_config.check = UnitTestSinkCheck::NoOutputs;
+            test_result_rxs.push(rx);
+            template_sinks.insert(id.clone(), sink_config);
         }
 
         let sinks = template_sinks
@@ -340,6 +297,23 @@ impl UnitTestBuildMetadata {
     }
 }
 
+// Find all components that participate in the test
+fn get_relevant_test_components(
+    sources: &[&ComponentKey],
+    graph: &Graph,
+) -> Result<HashSet<String>, Vec<String>> {
+    let _ = graph.check_for_cycles().map_err(|error| vec![error])?;
+    Ok(sources
+        .iter()
+        .flat_map(|source| {
+            graph
+                .paths_to_sink_from(source)
+                .into_iter()
+                .map(|key| key.to_string())
+        })
+        .collect())
+}
+
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
     test: TestDefinition,
@@ -351,6 +325,47 @@ async fn build_unit_test(
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
+
+    // To properly identify all components relevant to the test, expand relevant
+    // transforms
+    let mut expanded_config = config_builder.clone();
+    let _ = expand_macros(&mut expanded_config);
+
+    let graph = Graph::new_unchecked(
+        &expanded_config.sources,
+        &expanded_config.transforms,
+        &expanded_config.sinks,
+    );
+    let sources = config_builder.sources.keys().clone().collect::<Vec<_>>();
+
+    let mut valid_components = get_relevant_test_components(sources.as_ref(), &graph)?;
+    // Preserve the original unexpanded transform(s) which are valid test insertion points
+    let unexpanded_transforms = valid_components
+        .iter()
+        .filter_map(|component| {
+            component
+                .split_once(".")
+                .map(|(original_name, _)| original_name.to_string())
+        })
+        .collect::<Vec<_>>();
+    valid_components.extend(unexpanded_transforms);
+
+    // Remove all transforms that are not relevant to the current test
+    config_builder.transforms = config_builder
+        .transforms
+        .into_iter()
+        .filter(|(key, _)| valid_components.contains(&key.to_string()))
+        .collect();
+
+    // Sanitize the inputs of all relevant transforms
+    for (_, transform) in config_builder.transforms.iter_mut() {
+        let inputs = std::mem::take(&mut transform.inputs);
+        transform.inputs = inputs
+            .into_iter()
+            .filter(|input| valid_components.contains(input))
+            .collect::<Vec<_>>();
+    }
+
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;

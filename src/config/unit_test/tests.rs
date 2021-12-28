@@ -223,18 +223,7 @@ async fn parse_broken_topology() {
     "#})
     .unwrap();
 
-    let mut tests = build_unit_tests(config).await.unwrap();
-    let mut errs_broken_test = tests.remove(0).run().await.errors;
-    errs_broken_test.sort();
-    let mut errs_broken_test_2 = tests.remove(0).run().await.errors;
-    errs_broken_test_2.sort();
-    let expected_errs = vec![
-        r#"checks for transform "baz" failed: no events received. Topology may be disconnected or transform is missing inputs."#,
-        r#"checks for transform "quz" failed: no events received. Topology may be disconnected or transform is missing inputs."#,
-    ];
-    assert_eq!(errs_broken_test, expected_errs);
-    assert_eq!(errs_broken_test_2, expected_errs);
-    assert!(tests.remove(0).run().await.errors.is_empty());
+    assert!(build_unit_tests(config).await.is_err());
 }
 
 #[tokio::test]

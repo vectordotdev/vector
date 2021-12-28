@@ -37,13 +37,22 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks)
+        Self::new_inner(sources, transforms, sinks, false)
+    }
+
+    pub fn new_unchecked(
+        sources: &IndexMap<ComponentKey, SourceOuter>,
+        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
+        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    ) -> Self {
+        Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        ignore_errors: bool,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -98,7 +107,7 @@ impl Graph {
             }
         }
 
-        if errors.is_empty() {
+        if ignore_errors || errors.is_empty() {
             Ok(graph)
         } else {
             Err(errors)
@@ -273,6 +282,48 @@ impl Graph {
             .filter(|edge| &edge.to == node)
             .map(|edge| edge.from.clone())
             .collect()
+    }
+
+    /// From a given root node, get all paths from the root node to leaf nodes
+    /// where the leaf node must be a sink. This is useful for determining which
+    /// components are relevant in a Vector unit test.
+    ///
+    /// Caller must check for cycles before calling this function.
+    pub fn paths_to_sink_from(&self, root: &ComponentKey) -> HashSet<ComponentKey> {
+        let mut traversal: VecDeque<(ComponentKey, Vec<_>)> = VecDeque::new();
+        let mut paths = Vec::new();
+
+        traversal.push_back((root.to_owned(), Vec::new()));
+        while !traversal.is_empty() {
+            let (n, mut path) = traversal.pop_back().expect("can't be empty").clone();
+            path.push(n.clone());
+            let neighbors = self
+                .edges
+                .iter()
+                .filter(|e| e.from.component == n)
+                .map(|e| e.to.clone())
+                .collect::<Vec<_>>();
+
+            if neighbors.is_empty() {
+                paths.push(path.clone());
+            } else {
+                for neighbor in neighbors {
+                    traversal.push_back((neighbor, path.clone()));
+                }
+            }
+        }
+
+        // Keep only components from paths that end at a sink
+        let mut valid_components = HashSet::new();
+        for path in paths.into_iter() {
+            if let Some(key) = path.last() {
+                if let Some(Node::Sink { ty: _ }) = self.nodes.get(key) {
+                    valid_components.extend(path);
+                }
+            }
+        }
+
+        valid_components
     }
 }
 
