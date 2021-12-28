@@ -32,6 +32,7 @@ pub struct LogstashConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -46,6 +47,7 @@ impl GenerateConfig for LogstashConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: None,
         })
         .unwrap()
     }
@@ -68,6 +70,7 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            self.connection_limit,
         )
     }
 
@@ -591,6 +594,7 @@ mod test {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
@@ -800,6 +804,7 @@ output {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await

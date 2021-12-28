@@ -24,7 +24,6 @@ impl Framework {
         &self,
         namespace: &str,
         helm_chart: &str,
-        release_name: &str,
         helm_repo: &str,
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
@@ -33,7 +32,6 @@ impl Framework {
             self.interface.deploy_chart_command.as_str(),
             namespace,
             helm_chart,
-            release_name,
             config,
             Some(env),
         )?;

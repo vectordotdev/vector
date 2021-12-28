@@ -128,7 +128,7 @@ tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
-tracing-subscriber = { version = "0.3.3", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
+tracing-subscriber = { version = "0.3.4", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -185,7 +185,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.17", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.18", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.17", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -253,8 +253,9 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.1", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
+memchr = { version = "2.4", default-features = false, optional = true }
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
@@ -265,7 +266,7 @@ openssl = { version = "0.10.38", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.8", default-features = false }
+pin-project = { version = "1.0.9", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
@@ -289,7 +290,7 @@ tikv-jemallocator = { version = "0.4.1", default-features = false, optional = tr
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
-twox-hash = { version = "1.6.1", default-features = false }
+twox-hash = { version = "1.6.2", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false, optional = true }
@@ -426,7 +427,7 @@ enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Codecs
-codecs = ["smallvec"]
+codecs = ["smallvec", "memchr"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -702,6 +703,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
+  "datadog-agent-integration-tests",
   "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
@@ -751,6 +753,7 @@ aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
+datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
@@ -804,6 +807,7 @@ statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
 
 [[bench]]
@@ -855,3 +859,10 @@ path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
+
+[[bench]]
+name = "codecs"
+path = "benches/codecs/main.rs"
+harness = false
+test = false
+required-features = ["codecs-benches"]

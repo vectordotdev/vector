@@ -30,7 +30,7 @@ pub fn get_namespace() -> String {
         .map(|num| (num as char).to_ascii_lowercase())
         .collect();
 
-    format!("vector-{}", id)
+    format!("test-vector-{}", id)
 }
 
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
@@ -236,9 +236,9 @@ pub async fn smoke_check_first_line(log_reader: &mut Reader) {
         .read_line()
         .await
         .expect("unable to read first line");
-    let expected_pat = "INFO vector::app: Log level is enabled.";
+    let expected_pat = "INFO vector::app: Log level is enabled. level=\"info\"\n";
     assert!(
-        first_line.contains(expected_pat),
+        first_line.ends_with(expected_pat),
         "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
         expected_pat,
         first_line

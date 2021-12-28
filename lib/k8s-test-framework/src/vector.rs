@@ -11,7 +11,6 @@ pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
     helm_chart: String,
-    release_name: String,
     custom_helm_values_files: Vec<HelmValuesFile>,
     custom_resource_file: Option<ResourceFile>,
     custom_env: Option<Vec<(String, String)>>,
@@ -27,7 +26,6 @@ impl up_down::CommandBuilder for CommandBuilder {
             })
             .arg(&self.namespace)
             .arg(&self.helm_chart)
-            .arg(&self.release_name)
             .stdin(Stdio::null());
 
         command.env(
@@ -70,7 +68,6 @@ pub fn manager(
     interface_command: &str,
     namespace: &str,
     helm_chart: &str,
-    release_name: &str,
     config: Config<'_>,
     custom_env: Option<Vec<(String, String)>>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
@@ -91,7 +88,6 @@ pub fn manager(
         interface_command: interface_command.to_owned(),
         namespace: namespace.to_owned(),
         helm_chart: helm_chart.to_owned(),
-        release_name: release_name.to_owned(),
         custom_helm_values_files,
         custom_resource_file,
         custom_env,

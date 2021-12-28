@@ -3,6 +3,27 @@ use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};
 use serde_json::Value;
 
+const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
+    service:
+      type: ClusterIP
+      ports:
+        - name: datadog
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+    sources:
+      datadog-agent:
+        type: datadog_agent
+        address: 0.0.0.0:8080
+
+    sinks:
+      stdout:
+        type: console
+        inputs: ["datadog-agent"]
+        target: stdout
+        encoding: json
+"#};
+
 /// This test validates that vector-aggregator can deploy with the default
 /// settings and a dummy topology.
 #[tokio::test]
@@ -39,7 +60,8 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             kubelet_tls_verify: false
             logs_config.use_http: true
             logs_config.logs_no_ssl: true
-            logs_config.logs_dd_url: {}:8282
+            logs_config.logs_dd_url: {}:8080
+            logs_config.use_v2_api: false
             listeners:
               - name: kubelet
             config_providers:
@@ -54,11 +76,13 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _vector = framework
         .helm_chart(
             &namespace,
-            "vector",
-            "vector",
-            "https://helm.vector.dev",
+            "vector-aggregator",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
-                custom_helm_values: vec![&config_override_name(&override_name, false)],
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, false),
+                    HELM_VALUES_DDOG_AGG_TOPOLOGY,
+                ],
                 ..Default::default()
             },
         )
@@ -74,7 +98,6 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _datadog_agent = framework
         .helm_chart(
             &datadog_namespace,
-            "datadog",
             "datadog",
             "https://helm.datadoghq.com",
             // VectorConfig is a generic config container
