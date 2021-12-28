@@ -125,8 +125,8 @@ releases: "0.19.0": {
 				ns.vector,metric_type=foo,host=example.com message="hello world",size=10 {timestamp}
 				```
 				"""
-			pr_numbers: [10082, 10217],
-			contributors: ["juvenn"],
+			pr_numbers: [10082, 10217]
+			contributors: ["juvenn"]
 		},
 		{
 			type: "enhancement"
