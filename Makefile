@@ -59,6 +59,8 @@ export VERSION ?= $(shell scripts/version.sh)
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
+export RUST_VERSION ?= $(shell grep channel rust-toolchain.toml | cut -d '"' -f 2)
+
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
@@ -560,15 +562,11 @@ endif
 
 .PHONY: test-integration-redis
 test-integration-redis: ## Runs Redis integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
-	@scripts/setup_integration_env.sh redis start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
-endif
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml run --rm runner
+
+.PHONY: test-integration-redis-cleanup
+test-integration-redis-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml rm -fsv
 
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
