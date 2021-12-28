@@ -67,7 +67,7 @@ releases: "0.19.0": {
 			type: "enhancement"
 			scopes: ["vrl"]
 			description: """
-				VRL now allows for writing multi-line string literals by ending the line with a backslash (\\).
+				VRL now allows for writing multi-line string literals by ending the line with a backslash (\\\\).
 
 				Example:
 
