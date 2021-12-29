@@ -49,6 +49,12 @@ where
 
 impl<E> std::error::Error for StreamSendError<E> where E: std::error::Error {}
 
+impl<E> From<ClosedError> for StreamSendError<E> {
+    fn from(e: ClosedError) -> Self {
+        StreamSendError::Closed(e)
+    }
+}
+
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct SourceSender {
@@ -102,26 +108,36 @@ impl SourceSender {
 
     pub async fn send_result_stream<E>(
         &mut self,
-        events: impl Stream<Item = Result<Event, E>> + Unpin,
+        mut stream: impl Stream<Item = Result<Event, E>> + Unpin,
     ) -> Result<(), StreamSendError<E>> {
-        let mut stream = events.ready_chunks(CHUNK_SIZE);
-        while let Some(results) = stream.next().await {
-            let mut stream_error = None;
-            let mut to_forward = Vec::with_capacity(results.len());
-            for result in results {
-                match result {
-                    Ok(event) => to_forward.push(event),
-                    Err(e) => {
-                        stream_error = Some(e);
-                        break;
+        let mut to_forward = Vec::with_capacity(CHUNK_SIZE);
+        loop {
+            tokio::select! {
+                next = stream.next(), if to_forward.len() <= CHUNK_SIZE => {
+                    match next {
+                        Some(Ok(event)) => {
+                            to_forward.push(event);
+                        }
+                        Some(Err(error)) => {
+                            if !to_forward.is_empty() {
+                                self.send_batch(to_forward).await?;
+                            }
+                            return Err(StreamSendError::Stream(error));
+                        }
+                        None => {
+                            if !to_forward.is_empty() {
+                                self.send_batch(to_forward).await?;
+                            }
+                            break;
+                        }
                     }
                 }
-            }
-            if let Err(closed_err) = self.send_batch(to_forward).await {
-                return Err(StreamSendError::Closed(closed_err));
-            }
-            if let Some(error) = stream_error {
-                return Err(StreamSendError::Stream(error));
+                else => {
+                    if !to_forward.is_empty() {
+                        let out = std::mem::replace(&mut to_forward, Vec::with_capacity(CHUNK_SIZE));
+                        self.send_batch(out).await?;
+                    }
+                }
             }
         }
         Ok(())

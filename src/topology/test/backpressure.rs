@@ -13,7 +13,7 @@ use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 // Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.
 // https://docs.rs/futures/0.3.19/futures/channel/mpsc/fn.channel.html
-pub const EXTRA_SENDER_EVENTS: usize = 3;
+pub const EXTRA_SENDER_EVENTS: usize = 2;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
