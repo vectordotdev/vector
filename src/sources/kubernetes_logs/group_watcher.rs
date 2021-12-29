@@ -72,4 +72,9 @@ impl GroupWatcher {
     pub fn incr_event(&mut self, filename: &str) {
         self.get_mut(filename).unwrap().incr();
     }
+
+    #[allow(dead_code)]
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
 }

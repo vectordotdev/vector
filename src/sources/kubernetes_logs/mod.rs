@@ -277,47 +277,7 @@ impl Source {
                 .expect("unable to convert rate_window_secs from usize to u64 without data loss"),
         );
 
-        let mut group_rules_hash = GroupRuleHash::new();
-
-        if let Some(rules) = &config.rules {
-            for rule in rules.iter() {
-                let namespace = match &rule.namespace {
-                    Some(ns) => ns,
-                    None => DEFAULT_NAMESPACE,
-                };
-
-                let podname = match &rule.podname {
-                    Some(pod) => pod,
-                    None => DEFAULT_PODNAME,
-                };
-
-                group_rules_hash
-                    .entry(namespace.to_string())
-                    .or_insert(HashMap::new());
-
-                group_rules_hash
-                    .get_mut(namespace)
-                    .unwrap()
-                    .entry(podname.to_string())
-                    .or_insert(GroupWatcher::new(rule.limit));
-
-                group_rules_hash
-                    .get_mut(namespace)
-                    .unwrap()
-                    .entry(DEFAULT_PODNAME.to_string())
-                    .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
-            }
-        }
-
-        group_rules_hash
-            .entry(DEFAULT_NAMESPACE.to_string())
-            .or_insert(HashMap::new());
-
-        group_rules_hash
-            .get_mut(DEFAULT_NAMESPACE)
-            .unwrap()
-            .entry(DEFAULT_PODNAME.to_string())
-            .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
+        let group_rules_hash = prepare_group_rule_hash(config);
 
         Ok(Self {
             client,
@@ -763,6 +723,56 @@ fn prepare_label_selector(config: &Config) -> String {
     format!("{},{}", BUILT_IN, config.extra_label_selector)
 }
 
+
+// This function populates the GroupRuleHash object 
+// using the specified configuration
+fn prepare_group_rule_hash(config: &Config) -> GroupRuleHash {
+
+    let mut group_rules_hash = GroupRuleHash::new();
+
+    if let Some(rules) = &config.rules {
+        for rule in rules.iter() {
+            let namespace = match &rule.namespace {
+                Some(ns) => ns,
+                None => DEFAULT_NAMESPACE,
+            };
+
+            let podname = match &rule.podname {
+                Some(pod) => pod,
+                None => DEFAULT_PODNAME,
+            };
+
+            group_rules_hash
+                .entry(namespace.to_string())
+                .or_insert(HashMap::new());
+
+            group_rules_hash
+                .get_mut(namespace)
+                .unwrap()
+                .entry(podname.to_string())
+                .or_insert(GroupWatcher::new(rule.limit));
+
+            group_rules_hash
+                .get_mut(namespace)
+                .unwrap()
+                .entry(DEFAULT_PODNAME.to_string())
+                .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
+        }
+    }
+
+    group_rules_hash
+        .entry(DEFAULT_NAMESPACE.to_string())
+        .or_insert(HashMap::new());
+
+    group_rules_hash
+        .get_mut(DEFAULT_NAMESPACE)
+        .unwrap()
+        .entry(DEFAULT_PODNAME.to_string())
+        .or_insert(GroupWatcher::new(DEFAULT_LIMIT));
+
+    group_rules_hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::Config;
@@ -875,4 +885,54 @@ mod tests {
             assert_eq!(expected, output, "expected left, actual right");
         }
     }
+
+    #[test]
+    fn prepare_group_rule_hash(){
+        use crate::sources::kubernetes_logs::{DEFAULT_NAMESPACE, DEFAULT_PODNAME, DEFAULT_LIMIT};
+
+        let config = toml::from_str::<Config>(
+            r#"
+            rate_window_secs=30
+            
+            [[rules]]
+                namespace = "namespace-a"
+                limit = 100
+            
+            [[rules]]
+                podname = "podname-b"
+                limit = 200
+            
+            [[rules]]
+                namespace = "namespace-c"
+                podname = "podname-d" 
+                limit = 300   
+            "#
+        )
+        .unwrap();
+
+        let output = super::prepare_group_rule_hash(&config);
+
+        assert_eq!(output.contains_key("namespace-a"), true);
+        assert_eq!(output[DEFAULT_NAMESPACE].contains_key("podname-b"), true);
+        assert_eq!(output["namespace-c"].contains_key("podname-d"), true);
+
+        assert_eq!(output["namespace-a"][DEFAULT_PODNAME].limit(), 100);
+        assert_eq!(output[DEFAULT_NAMESPACE]["podname-b"].limit(), 200);
+        assert_eq!(output["namespace-c"]["podname-d"].limit(), 300);
+
+        assert_eq!(output.contains_key(DEFAULT_NAMESPACE), true);
+        assert_eq!(output[DEFAULT_NAMESPACE].contains_key(DEFAULT_PODNAME), true);
+        assert_eq!(output[DEFAULT_NAMESPACE][DEFAULT_PODNAME].limit(), DEFAULT_LIMIT);
+    
+        
+        let config = Config::default();
+
+        let output = super::prepare_group_rule_hash(&config);
+
+        assert_eq!(output.contains_key(DEFAULT_NAMESPACE), true);
+        assert_eq!(output[DEFAULT_NAMESPACE].contains_key(DEFAULT_PODNAME), true);
+        assert_eq!(output[DEFAULT_NAMESPACE][DEFAULT_PODNAME].limit(), DEFAULT_LIMIT);
+    
+    }
+
 }
