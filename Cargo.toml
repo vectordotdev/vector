@@ -376,6 +376,7 @@ target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enric
 target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # currently doesn't build due to lack of support for 64-bit atomics
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-freebsd = []
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
