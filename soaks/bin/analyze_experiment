@@ -21,6 +21,19 @@ def human_bytes(b):
         s = -s
     return "%s%s" % (s, names[i])
 
+# Use Tukey's method to detect values that sit 1.5 times outside the IQR.
+def total_outliers(df):
+    q1 = df['value'].quantile(0.25)
+    q3 = df['value'].quantile(0.75)
+    iqr = q3 - q1
+    scaled_iqr = 1.5 * iqr
+
+    outside_range = lambda b: (b < (q1 - scaled_iqr)) or (b > (q3 + scaled_iqr))
+    return df['value'].apply(outside_range).sum()
+
+def confidence(p):
+    c = (1.0 - p) * 100
+    return "{confidence:.{digits}f}%".format(confidence=c, digits=2)
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
 parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
@@ -41,23 +54,26 @@ for f in capture_paths:
     captures.append(pd.read_csv(f))
 csv = pd.concat(captures)
 
-fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
-csv = csv[fetch_index_past_warmup]
-csv['value'] = csv['value'].div(args.vector_cpus)
+# Skip past any data collected before the warmup period elapsed.
+csv = csv.loc[csv['fetch_index'] > args.warmup_seconds]
 
-# Use Tukey's method to detect values that sit 1.5 times outside the IQR.
-def total_outliers(df):
-    q1 = df['value'].quantile(0.25)
-    q3 = df['value'].quantile(0.75)
-    iqr = q3 - q1
-    scaled_iqr = 1.5 * iqr
+# Extract cumulative bytes_written data. We're only interested in the last
+# collected value.
+cumulative_bytes = csv.loc[csv['query_id'] == 'cumulative_bytes_written']
+cumulative_bytes = cumulative_bytes.groupby(['experiment', 'variant']).tail(1)
+cumulative_bytes = cumulative_bytes.drop(columns=['unit', 'query_id', 'query', 'vector_id', 'time', 'fetch_index'])
+cumulative_bytes['value'] = cumulative_bytes['value'].apply(human_bytes)
 
-    outside_range = lambda b: (b < (q1 - scaled_iqr)) or (b > (q3 + scaled_iqr))
-    return df['value'].apply(outside_range).sum()
+# Remove 'throughput' data from the bulk collection, drop unwanted columns and
+# scale throughput down to per-core range. Vector's throughput concerns are
+# per-core.
+throughput = csv.loc[csv['query_id'] == 'throughput']
+throughput = throughput.drop(columns=['unit', 'query_id', 'query', 'vector_id', 'time'])
+throughput['value'] = throughput['value'].div(args.vector_cpus)
 
 ttest_results = []
-for exp in csv.experiment.unique():
-    experiment = csv[csv['experiment'] == exp]
+for exp in throughput['experiment'].unique():
+    experiment = throughput[throughput['experiment'] == exp]
 
     baseline = experiment[experiment['variant'] == 'baseline']
     comparison = experiment[experiment['variant'] == 'comparison']
@@ -132,9 +148,6 @@ interesting changes are observed.
 </details>
 ''')
 
-def confidence(p):
-    c = (1.0 - p) * 100
-    return "{confidence:.{digits}f}%".format(confidence=c, digits=2)
 
 p_value_violation = ttest_results['p-value'] < args.p_value
 changes = ttest_results[p_value_violation].copy(deep=True)
@@ -168,10 +181,10 @@ print("</details>")
 print("<details>")
 print("<summary>Fine details of each soak run.</summary>")
 print()
-describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
+describe = throughput.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe = describe.sort_values('mean', ascending=False)
-describe['skewness'] = csv.groupby(['experiment', 'variant'])['value'].skew()
+describe['skewness'] = throughput.groupby(['experiment', 'variant'])['value'].skew()
 describe['mean'] = describe['mean'].apply(human_bytes)
 describe['std'] = describe['std'].apply(human_bytes)
 describe['min'] = describe['min'].apply(human_bytes)
@@ -180,9 +193,16 @@ describe['p90'] = describe['p90'].apply(human_bytes)
 describe['p95'] = describe['p95'].apply(human_bytes)
 describe['p99'] = describe['p99'].apply(human_bytes)
 describe['max'] = describe['max'].apply(human_bytes)
+print("## Throughput in bytes/second per core")
+print()
 print(describe.to_markdown(index=True,
                            tablefmt='github',
                            headers=['(experiment, variant)', 'total samples',
                                     'mean', 'std', 'min', 'average',
                                     'p90', 'p95', 'p99', 'max', 'skewness']))
+print()
+print("## Cumulative bytes written into Vector")
+print()
+cumulative_bytes = cumulative_bytes.rename(columns={'value': 'bytes written'})
+print(cumulative_bytes.to_markdown(index=False, tablefmt='github'))
 print("</details>")

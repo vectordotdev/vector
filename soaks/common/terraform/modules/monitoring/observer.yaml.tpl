@@ -6,4 +6,7 @@ queries:
   - query: sum(rate((bytes_written[2s])))
     id: throughput
     unit: bytes
+  - query: sum(bytes_written)
+    id: cumulative_bytes_written
+    unit: bytes
 capture_path: "/captures/${experiment_variant}.captures"
