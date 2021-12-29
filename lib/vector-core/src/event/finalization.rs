@@ -5,6 +5,7 @@ use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use tokio::sync::oneshot;
 
 use super::Event;
@@ -13,7 +14,7 @@ use crate::ByteSizeOf;
 /// Wrapper type for an array of event finalizers. This is the primary
 /// public interface to event finalization metadata.
 #[derive(Clone, Debug, Default)]
-pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
+pub struct EventFinalizers(SmallVec<[Arc<EventFinalizer>; 1]>);
 
 impl Eq for EventFinalizers {}
 
@@ -45,7 +46,7 @@ impl ByteSizeOf for EventFinalizers {
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
     pub fn new(finalizer: EventFinalizer) -> Self {
-        Self(vec![Arc::new(finalizer)])
+        Self(smallvec![Arc::new(finalizer)])
     }
 
     /// Add a single finalizer to this array.

@@ -8494,6 +8494,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "smallvec",
  "snafu",
  "substring",
  "tokio",
