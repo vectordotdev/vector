@@ -10,9 +10,9 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use futures_util::future::ready;
 use once_cell::sync::OnceCell;
 use rdkafka::{
-    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
-    ClientConfig, ClientContext, Offset, Statistics, TopicPartitionList,
+    ClientConfig, ClientContext, Statistics,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -134,9 +134,7 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let acknowledgements = self.acknowledgements.enabled;
         let consumer = create_consumer(self)?;
-
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(kafka_source(
@@ -149,7 +147,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            acknowledgements,
+            self.acknowledgements.enabled,
         )))
     }
 
