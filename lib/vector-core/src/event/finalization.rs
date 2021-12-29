@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
+use std::{cmp, collections::HashSet, future::Future, hash, mem, pin::Pin, sync::Arc, task::Poll};
 
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
@@ -13,16 +13,13 @@ use crate::ByteSizeOf;
 /// Wrapper type for an array of event finalizers. This is the primary
 /// public interface to event finalization metadata.
 #[derive(Clone, Debug, Default)]
-pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
+pub struct EventFinalizers(HashSet<SharedEventFinalizer>);
 
 impl Eq for EventFinalizers {}
 
 impl PartialEq for EventFinalizers {
     fn eq(&self, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(other.0.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
+        self.0.len() == other.0.len() && (self.0.iter()).zip(other.0.iter()).all(|(a, b)| a.eq(b))
     }
 }
 
@@ -38,19 +35,44 @@ impl PartialOrd for EventFinalizers {
 
 impl ByteSizeOf for EventFinalizers {
     fn allocated_bytes(&self) -> usize {
-        self.0.iter().fold(0, |acc, arc| acc + arc.size_of())
+        self.0.iter().fold(0, |acc, ef| acc + ef.0.size_of())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SharedEventFinalizer(Arc<EventFinalizer>);
+
+impl PartialEq for SharedEventFinalizer {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SharedEventFinalizer {}
+
+impl From<EventFinalizer> for SharedEventFinalizer {
+    fn from(that: EventFinalizer) -> Self {
+        Self(Arc::new(that))
+    }
+}
+
+impl hash::Hash for SharedEventFinalizer {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+        Arc::as_ptr(&self.0).hash(hasher);
     }
 }
 
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
     pub fn new(finalizer: EventFinalizer) -> Self {
-        Self(vec![Arc::new(finalizer)])
+        let mut set = HashSet::with_capacity(1);
+        set.insert(finalizer.into());
+        Self(set)
     }
 
     /// Add a single finalizer to this array.
     pub fn add(&mut self, finalizer: EventFinalizer) {
-        self.0.push(Arc::new(finalizer));
+        self.0.insert(finalizer.into());
     }
 
     /// Merge the given list of finalizers into this array.
@@ -61,7 +83,7 @@ impl EventFinalizers {
     /// Update the status of all finalizers in this set.
     pub fn update_status(&self, status: EventStatus) {
         for finalizer in &self.0 {
-            finalizer.update_status(status);
+            finalizer.0.update_status(status);
         }
     }
 
@@ -71,7 +93,7 @@ impl EventFinalizers {
     pub fn update_sources(&mut self) {
         let finalizers = mem::take(&mut self.0);
         for finalizer in &finalizers {
-            finalizer.update_batch();
+            finalizer.0.update_batch();
         }
     }
 
@@ -414,7 +436,6 @@ mod tests {
         assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    #[ignore] // The current implementation does not deduplicate finalizers
     #[test]
     fn clone_and_merge_events() {
         let (mut fin1, mut receiver) = make_finalizer();
