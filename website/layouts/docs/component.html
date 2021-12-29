@@ -80,6 +80,12 @@
           {{ partial "data.html" (dict "component_env_vars" . ) }}
           {{ end }}
 
+          {{/* Component outputs */}}
+          {{ with $config.outputs }}
+          {{ partial "heading.html" (dict "text" "Outputs" "level" 2) }}
+          {{ partial "data.html" (dict "component_outputs" . ) }}
+          {{ end }}
+
           {{/* Component log/metric output */}}
           {{ with $config.output }}
           {{ partial "heading.html" (dict "text" "Output Data" "level" 2) }}

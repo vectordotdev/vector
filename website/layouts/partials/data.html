@@ -300,6 +300,42 @@
   </div>
   {{ end }}
 
+  {{/* Transform outputs */}}
+  {{ with .component_outputs }}
+  <div class="py-4 px-6">
+    {{ with .default_output }}
+      <span>
+        {{ partial "heading.html" (dict "text" "Default Output" "level" 3 "id" "outputs-default-output" "href" "#outputs-default-output") }}
+      </span>
+      <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+        <div class="py-3 px-5">
+          <div class="my-3 prose dark:prose-dark max-w-none">
+            {{ .description | markdownify }}
+          </div>
+        </div>
+      </div>
+    {{ end }}
+
+    {{ with .named_outputs }}
+      <span>
+        {{ partial "heading.html" (dict "text" "Named Outputs" "level" 3 "id" "outputs-named-outputs" "href" "#outputs-named-outputs") }}
+      </span>
+      <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+          {{ range . }}
+          <div class="py-3 px-5">
+                <span>
+                  {{ partial "heading.html" (dict "text" .name "level" 4) }}
+                </span>
+                <div class="my-3 prose dark:prose-dark max-w-none">
+                  {{ .description | markdownify }}
+                </div>
+          </div>
+          {{ end }}
+      </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
   {{ $formats := slice "toml" "yaml" "json" }}
