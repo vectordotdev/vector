@@ -72,7 +72,6 @@ jobs:
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongodb_metrics'
-          - test: 'nginx'
           - test: 'postgresql_metrics'
           - test: 'prometheus'
           - test: 'pulsar'
@@ -105,8 +104,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-       include:
-         - test: 'redis'
+        include:
+          - test: 'nginx'
+          - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
