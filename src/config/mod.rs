@@ -714,7 +714,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -737,7 +737,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -770,7 +770,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -792,7 +792,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -821,7 +821,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -850,7 +850,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -871,7 +871,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -903,7 +903,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -936,7 +936,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -980,7 +980,7 @@ mod test {
                     target = "stdout"
                     encoding.codec = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -1014,7 +1014,7 @@ mod test {
                 [api]
                     enabled = true
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -1158,7 +1158,7 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .is_err());
     }
@@ -1205,7 +1205,7 @@ mod pipelines_tests {
                   inputs = ["processing"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         );
         assert!(res.is_err(), "should error");
     }

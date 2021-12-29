@@ -20,18 +20,14 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 ### kubectl
 
-[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] role.
+[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [Agent] and [Aggregator] roles.
 
-{{< warning title="Aggregator role in public beta" >}}
-Support for the [aggregator] role is currently in public beta. We're seeking beta testers! If deploying the aggregator, please [join our chat][chat] and let us know how it went.
-
+[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
-[chat]: https://chat.vector.dev
-{{< /warning >}}
 
 #### Agent
 
-The [agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
+The [Agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
 
 ##### Define Vector's namespace
 
@@ -285,7 +281,7 @@ We recommend the resource limits listed below when running Vector on Kubernetes.
 
 #### Agent resource limits
 
-If you deploy Vector as an [agent] (collecting data for each of your Kubernetes [Nodes][node]), we recommend the following limits:
+If you deploy Vector as an [Agent] (collecting data for each of your Kubernetes [Nodes][node]), we recommend the following limits:
 
 ```yaml
 resources:
@@ -309,7 +305,7 @@ The [`kubernetes_logs`][kubernetes_logs] component is stateless, which means tha
 
 #### Agent state management
 
-For the [agent] role, Vector stores its state in the host-mapped directory with a static path. If it's redeployed, it's able to continue from where it was interrupted.
+For the [Agent] role, Vector stores its state in the host-mapped directory with a static path. If it's redeployed, it's able to continue from where it was interrupted.
 
 ### Testing and reliability
 

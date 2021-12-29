@@ -154,7 +154,10 @@ impl ConfigBuilder {
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
+        self.add_sink_outer(id, sink);
+    }
 
+    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
@@ -295,14 +298,12 @@ impl ConfigBuilder {
 
     #[cfg(test)]
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
     #[cfg(test)]
     pub fn from_json(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }
 }
 

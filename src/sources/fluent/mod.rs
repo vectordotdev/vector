@@ -34,6 +34,7 @@ pub struct FluentConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -48,6 +49,7 @@ impl GenerateConfig for FluentConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: Some(2),
         })
         .unwrap()
     }
@@ -68,6 +70,7 @@ impl SourceConfig for FluentConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            self.connection_limit,
         )
     }
 
@@ -306,20 +309,14 @@ impl Decoder for FluentDecoder {
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
             // check for unexpected EOF to indicate that we need more data
-            match res {
-                // can use or-patterns in 1.53
-                // https://github.com/rust-lang/rust/pull/79278
-                Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+            if let Err(DecodeError::Decode(
+                decode::Error::InvalidDataRead(ref custom)
+                | decode::Error::InvalidMarkerRead(ref custom),
+            )) = res
+            {
+                if custom.kind() == io::ErrorKind::UnexpectedEof {
+                    return Ok(None);
                 }
-                Err(DecodeError::Decode(decode::Error::InvalidMarkerRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
-                }
-                _ => {}
             }
 
             (des.position() as usize, res)
@@ -809,6 +806,7 @@ mod tests {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
@@ -1053,6 +1051,7 @@ mod integration_tests {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await

@@ -45,6 +45,8 @@ lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
+pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
         .get()
@@ -144,7 +146,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (pipeline, mut rx) = SourceSender::new_with_buffer(1000);
+        let (pipeline, mut rx) = SourceSender::new_with_buffer(SOURCE_SENDER_BUFFER_SIZE);
 
         let typetag = source.inner.source_type();
 

@@ -40,6 +40,7 @@ pub struct TcpConfig {
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
     decoding: Box<dyn DeserializerConfig>,
+    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -57,6 +58,7 @@ impl TcpConfig {
         receive_buffer_bytes: Option<usize>,
         framing: Option<Box<dyn FramingConfig>>,
         decoding: Box<dyn DeserializerConfig>,
+        connection_limit: Option<u32>,
     ) -> Self {
         Self {
             address,
@@ -68,6 +70,7 @@ impl TcpConfig {
             receive_buffer_bytes,
             framing,
             decoding,
+            connection_limit,
         }
     }
 
@@ -82,6 +85,7 @@ impl TcpConfig {
             receive_buffer_bytes: None,
             framing: None,
             decoding: default_decoding(),
+            connection_limit: None,
         }
     }
 }
