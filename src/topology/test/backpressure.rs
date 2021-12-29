@@ -255,7 +255,7 @@ mod test_source {
     use crate::event::Event;
     use crate::sources::Source;
     use async_trait::async_trait;
-    use futures::{FutureExt, SinkExt};
+    use futures::FutureExt;
     use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
