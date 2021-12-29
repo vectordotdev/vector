@@ -110,6 +110,16 @@ components: transforms: route: {
 		},
 	]
 
+	outputs: {
+		default_output: null
+		named_outputs: [
+			{
+				name:        "<route_id>"
+				description: "Each route can be referenced as an input by other components with the name <transform_name>.<route_id>."
+			},
+		]
+	}
+
 	telemetry: metrics: {
 		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
