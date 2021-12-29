@@ -1,8 +1,9 @@
+use std::pin::Pin;
+
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{stream, SinkExt, Stream, StreamExt};
 use indexmap::IndexMap;
 use indoc::indoc;
-use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig, TransformContext},

@@ -432,13 +432,8 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
-    use crate::{
-        shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
-        Pipeline,
-    };
+    use std::time::Duration;
+
     use chrono::{DateTime, SubsecRound, Utc};
     use futures::stream::Stream;
     use rdkafka::{
@@ -451,10 +446,16 @@ mod integration_test {
         util::Timeout,
         Offset, TopicPartitionList,
     };
-    use std::time::Duration;
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
     use vector_core::event::EventStatus;
+
+    use super::{test::*, *};
+    use crate::{
+        shutdown::ShutdownSignal,
+        test_util::{collect_n, random_string},
+        Pipeline,
+    };
 
     const KEY: &str = "my key";
     const TEXT: &str = "my message";

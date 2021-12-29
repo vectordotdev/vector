@@ -1,8 +1,10 @@
-use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream, SslBuildError};
-use snafu::ResultExt;
 use std::{net::SocketAddr, pin::Pin};
+
+use snafu::ResultExt;
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
+
+use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream, SslBuildError};
 
 impl MaybeTlsSettings {
     pub(crate) async fn connect(

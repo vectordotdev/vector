@@ -1,7 +1,9 @@
-use crate::log_util;
-use regex::Regex;
 use std::collections::BTreeMap;
+
+use regex::Regex;
 use vrl::prelude::*;
+
+use crate::log_util;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseNginxLog;
@@ -173,9 +175,10 @@ fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_combined_log => ParseNginxLog;

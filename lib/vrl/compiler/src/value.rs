@@ -8,15 +8,15 @@ mod regex;
 mod serde;
 mod target;
 
+use std::{collections::BTreeMap, fmt};
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use ordered_float::NotNan;
-use std::collections::BTreeMap;
-use std::fmt;
-
-pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
+use ordered_float::NotNan;
+
+pub use self::regex::Regex;
 
 #[derive(Debug, Clone, Hash, PartialEq)]
 pub enum Value {
@@ -95,13 +95,14 @@ impl From<serde_json::Value> for Value {
 
 #[cfg(test)]
 mod test {
-    use super::Value;
     use bytes::Bytes;
     use chrono::DateTime;
     use indoc::indoc;
     use ordered_float::NotNan;
     use regex::Regex;
     use shared::btreemap;
+
+    use super::Value;
 
     #[test]
     fn test_display_string() {

@@ -1,11 +1,12 @@
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, LogEvent},
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 
 /// Config used to build a `BytesDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -21,7 +22,7 @@ impl BytesDeserializerConfig {
 #[typetag::serde(name = "bytes")]
 impl DeserializerConfig for BytesDeserializerConfig {
     fn build(&self) -> crate::Result<BoxedDeserializer> {
-        Ok(Box::new(BytesDeserializer))
+        Ok(Box::new(BytesDeserializer::new()))
     }
 }
 
@@ -30,19 +31,29 @@ impl DeserializerConfig for BytesDeserializerConfig {
 /// This deserializer can be considered as the no-op action for input where no
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
-pub struct BytesDeserializer;
+pub struct BytesDeserializer {
+    log_schema_message_key: &'static str,
+}
+
+impl Default for BytesDeserializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl BytesDeserializer {
     /// Creates a new `BytesDeserializer`.
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self {
+            log_schema_message_key: log_schema().message_key(),
+        }
     }
 }
 
 impl Deserializer for BytesDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let mut log = LogEvent::default();
-        log.insert(log_schema().message_key(), bytes);
+        log.insert(self.log_schema_message_key, bytes);
         Ok(smallvec![log.into()])
     }
 }
@@ -55,7 +66,7 @@ mod tests {
     #[test]
     fn parse_bytes() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer;
+        let deserializer = BytesDeserializer::new();
 
         let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();

@@ -1,3 +1,12 @@
+use std::{io, thread};
+
+use async_stream::stream;
+use bytes::Bytes;
+use chrono::Utc;
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use tokio_util::{codec::FramedRead, io::StreamReader};
+
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
@@ -7,13 +16,6 @@ use crate::{
     sources::util::StreamDecodingError,
     Pipeline,
 };
-use async_stream::stream;
-use bytes::Bytes;
-use chrono::Utc;
-use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{io, thread};
-use tokio_util::{codec::FramedRead, io::StreamReader};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -166,9 +168,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use std::io::Cursor;
 
     #[test]
     fn generate_config() {

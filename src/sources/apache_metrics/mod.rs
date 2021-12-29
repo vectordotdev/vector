@@ -1,7 +1,24 @@
+use std::{
+    collections::BTreeMap,
+    future::ready,
+    time::{Duration, Instant},
+};
+
+use chrono::Utc;
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use http::uri::Scheme;
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
+
 use crate::{
     config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
@@ -10,19 +27,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use chrono::Utc;
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use http::uri::Scheme;
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use std::{
-    collections::BTreeMap,
-    future::ready,
-    time::{Duration, Instant},
-};
-use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
 
 mod parser;
 
@@ -271,19 +275,23 @@ fn apache_metrics(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        config::SourceConfig,
-        test_util::components::{self, HTTP_PULL_SOURCE_TAGS, SOURCE_TESTS},
-        test_util::{collect_ready, next_addr, wait_for_tcp},
-        Error,
-    };
     use hyper::{
         service::{make_service_fn, service_fn},
-        {Body, Response, Server},
+        Body, Response, Server,
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{sleep, Duration};
+
+    use super::*;
+    use crate::{
+        config::SourceConfig,
+        test_util::{
+            collect_ready,
+            components::{self, HTTP_PULL_SOURCE_TAGS, SOURCE_TESTS},
+            next_addr, wait_for_tcp,
+        },
+        Error,
+    };
 
     #[test]
     fn generate_config() {

@@ -1,5 +1,4 @@
-use vrl::prelude::*;
-use vrl::value::Regex;
+use vrl::{prelude::*, value::Regex};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
@@ -118,8 +117,9 @@ impl Expression for FindFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         find => Find;

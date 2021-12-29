@@ -65,8 +65,9 @@ impl Expression for IsRegexFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         is_regex => IsRegex;

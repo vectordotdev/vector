@@ -17,7 +17,7 @@ pub use acknowledgements::{Ackable, Acker};
 
 mod buffer_usage_data;
 
-mod config;
+pub mod config;
 pub use config::{BufferConfig, BufferType};
 
 pub mod encoding;
@@ -32,12 +32,14 @@ pub mod topology;
 
 pub(crate) mod variant;
 
-use crate::encoding::{DecodeBytes, EncodeBytes};
+use std::fmt::Debug;
+
 use core_common::byte_size_of::ByteSizeOf;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+
+use crate::encoding::{DecodeBytes, EncodeBytes};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]

@@ -1,11 +1,13 @@
 #![deny(missing_docs)]
 
-use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::ByteSizeOf;
+use std::sync::Arc;
+
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
-use std::sync::Arc;
+
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use crate::ByteSizeOf;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.

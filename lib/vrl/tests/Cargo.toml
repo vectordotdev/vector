@@ -17,9 +17,11 @@ chrono = "0.4"
 chrono-tz = "0.6"
 glob = "0.3"
 prettydiff = "0.5"
-jemallocator = { version = "0.3.0" }
 regex = "1"
 serde = "1"
 serde_json = "1"
 structopt = { version = "0.3", default-features = false }
-tracing-subscriber = { version = "0.2.25", default-features = false, features = ["fmt"] }
+tracing-subscriber = { version = "0.3.4", default-features = false, features = ["fmt"] }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.4.1" }

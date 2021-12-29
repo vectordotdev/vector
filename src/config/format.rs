@@ -2,8 +2,9 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-use serde::de;
 use std::path::Path;
+
+use serde::de;
 
 /// A type alias to better capture the semantics.
 pub type FormatHint = Option<Format>;
@@ -40,11 +41,11 @@ impl Format {
 /// Parse the string represented in the specified format.
 /// If the format is unknown - fallback to the default format and attempt
 /// parsing using that.
-pub fn deserialize<T>(content: &str, format: FormatHint) -> Result<T, Vec<String>>
+pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
 {
-    match format.unwrap_or_default() {
+    match format {
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
@@ -154,24 +155,18 @@ mod tests {
 
         let cases = vec![
             // Valid empty inputs should resolve to default.
-            ("", None, Ok("")),
-            ("", Some(Format::Toml), Ok("")),
-            ("{}", Some(Format::Yaml), Ok("")),
-            ("{}", Some(Format::Json), Ok("")),
+            ("", Format::Toml, Ok("")),
+            ("{}", Format::Yaml, Ok("")),
+            ("{}", Format::Json, Ok("")),
             // Invalid "empty" inputs should resolve to an error.
+            ("", Format::Yaml, Err(vec!["EOF while parsing a value"])),
             (
                 "",
-                Some(Format::Yaml),
-                Err(vec!["EOF while parsing a value"]),
-            ),
-            (
-                "",
-                Some(Format::Json),
+                Format::Json,
                 Err(vec!["EOF while parsing a value at line 1 column 0"]),
             ),
             // Sample config.
-            (SAMPLE_TOML, None, Ok(SAMPLE_TOML)),
-            (SAMPLE_TOML, Some(Format::Toml), Ok(SAMPLE_TOML)),
+            (SAMPLE_TOML, Format::Toml, Ok(SAMPLE_TOML)),
             (
                 // YAML is sensitive to leading whitespace and linebreaks.
                 concat_with_newlines!(
@@ -200,7 +195,7 @@ mod tests {
                     r#"    encoding: "text""#,
                     r#"    address: "127.0.0.1:9999""#,
                 ),
-                Some(Format::Yaml),
+                Format::Yaml,
                 Ok(SAMPLE_TOML),
             ),
             (
@@ -242,7 +237,7 @@ mod tests {
                     }
                 }
                 "#,
-                Some(Format::Json),
+                Format::Json,
                 Ok(SAMPLE_TOML),
             ),
         ];
@@ -260,7 +255,7 @@ mod tests {
                         format, input
                     ));
                     let output_json = serde_json::to_value(output).unwrap();
-                    let expected_output: ConfigBuilder = deserialize(expected, Some(Format::Toml))
+                    let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
                     assert_eq!(expected_json, output_json, "{}", input)

@@ -5,16 +5,20 @@ mod recorder;
 
 use std::sync::Arc;
 
-use crate::event::Metric;
-pub use crate::metrics::ddsketch::{AgentDDSketch, BinMap};
-pub use crate::metrics::handle::{Counter, Handle};
-use crate::metrics::label_filter::VectorLabelFilter;
-use crate::metrics::recorder::VectorRecorder;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked};
 use once_cell::sync::OnceCell;
 use snafu::Snafu;
+
+pub use crate::metrics::{
+    ddsketch::{AgentDDSketch, BinMap},
+    handle::{Counter, Handle},
+};
+use crate::{
+    event::Metric,
+    metrics::{label_filter::VectorLabelFilter, recorder::VectorRecorder},
+};
 
 pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
 

@@ -1,19 +1,18 @@
-use std::sync::Arc;
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::partition::Partitioner;
-use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
+    partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
+use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
     sinks::{
@@ -22,8 +21,6 @@ use crate::{
     },
     template::Template,
 };
-
-use super::request_builder::HecLogsRequestBuilder;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,

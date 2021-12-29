@@ -1,3 +1,34 @@
+use std::{
+    collections::{HashMap, HashSet},
+    io::SeekFrom,
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    process::Stdio,
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
+
+use bytes::Bytes;
+use chrono::TimeZone;
+use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
+use lazy_static::lazy_static;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{Error as JsonError, Value as JsonValue};
+use snafu::{ResultExt, Snafu};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    process::Command,
+    time::sleep,
+};
+use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
+
 use crate::{
     codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
@@ -10,35 +41,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::TimeZone;
-use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
-use lazy_static::lazy_static;
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
-use serde::{Deserialize, Serialize};
-use serde_json::{Error as JsonError, Value as JsonValue};
-use snafu::{ResultExt, Snafu};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::{
-    collections::{HashMap, HashSet},
-    io::SeekFrom,
-    iter::FromIterator,
-    process::Stdio,
-    str::FromStr,
-    time::Duration,
-};
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-    process::Command,
-    time::sleep,
-};
-use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -424,7 +426,7 @@ fn start_journalctl(
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        CharacterDelimitedDecoder::new('\n'),
+        CharacterDelimitedDecoder::new(b'\n'),
     )
     .boxed();
 
@@ -639,9 +641,10 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod checkpointer_tests {
-    use super::*;
     use tempfile::tempdir;
     use tokio::fs::read_to_string;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -683,16 +686,18 @@ mod checkpointer_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::EventStatus, test_util::components};
-    use futures::Stream;
-    use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
+        pin::Pin,
         task::{Context, Poll},
     };
+
+    use futures::Stream;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
+
+    use super::*;
+    use crate::{event::EventStatus, test_util::components};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}

@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::Arc;
+use std::{collections::BTreeMap, fmt, sync::Arc};
+
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -158,8 +157,9 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_grok => ParseGrok;

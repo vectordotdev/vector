@@ -1,16 +1,3 @@
-use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
-    topology::{self, RunningTopology},
-    trace,
-};
-use flate2::read::MultiGzDecoder;
-use futures::{
-    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
-};
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-use portpicker::pick_unused_port;
-use rand::{thread_rng, Rng};
-use rand_distr::Alphanumeric;
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -27,6 +14,15 @@ use std::{
     },
     task::{Context, Poll},
 };
+
+use flate2::read::MultiGzDecoder;
+use futures::{
+    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+};
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
+use rand::{thread_rng, Rng};
+use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
@@ -40,6 +36,12 @@ use tokio_stream::wrappers::TcpListenerStream;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_core::event::{BatchNotifier, Event, LogEvent};
+
+use crate::{
+    config::{Config, ConfigDiff, GenerateConfig},
+    topology::{self, RunningTopology},
+    trace,
+};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
@@ -440,11 +442,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::retry_until;
     use std::{
         sync::{Arc, RwLock},
         time::Duration,
     };
+
+    use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
     async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {

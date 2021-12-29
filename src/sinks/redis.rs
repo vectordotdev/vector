@@ -1,3 +1,17 @@
+use std::{
+    convert::TryFrom,
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use redis::{aio::ConnectionManager, RedisError, RedisResult};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 use crate::{
     config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -12,19 +26,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
-use redis::{aio::ConnectionManager, RedisError, RedisResult};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    convert::TryFrom,
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::{Service, ServiceBuilder};
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 inventory::submit! {
     SinkDescription::new::<RedisSinkConfig>("redis")
@@ -350,9 +351,9 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use super::*;
-    use std::collections::HashMap;
-    use std::convert::TryFrom;
 
     #[test]
     fn generate_config() {
@@ -420,12 +421,15 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use rand::Rng;
     use redis::AsyncCommands;
 
-    const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
+    use super::*;
+    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+
+    fn redis_server() -> String {
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
+    }
 
     #[tokio::test]
     async fn redis_sink_list_lpush() {
@@ -438,7 +442,7 @@ mod integration_tests {
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
-            url: REDIS_SERVER.to_owned(),
+            url: redis_server(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataTypeConfig::List,
@@ -497,7 +501,7 @@ mod integration_tests {
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
-            url: REDIS_SERVER.to_owned(),
+            url: redis_server(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataTypeConfig::List,
@@ -554,7 +558,7 @@ mod integration_tests {
         let num_events = rng.gen_range(10000..20000);
         debug!("Test events num: {}.", num_events);
 
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_server()).unwrap();
         debug!("Get Redis async connection.");
         let conn = client
             .get_async_connection()
@@ -571,7 +575,7 @@ mod integration_tests {
         let mut pubsub_stream = pubsub_conn.on_message();
 
         let cnf = RedisSinkConfig {
-            url: REDIS_SERVER.to_owned(),
+            url: redis_server(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataTypeConfig::Channel,

@@ -1,6 +1,6 @@
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::AwsCredentialsProvider;
 use rusoto_core::Region;
+
+use crate::aws::{auth::AwsAuthentication, rusoto::AwsCredentialsProvider};
 
 const AWS_DEFAULT_PROFILE: &str = "default";
 
@@ -57,11 +57,12 @@ impl AwsAuthentication {
 }
 #[cfg(test)]
 mod test {
+    use std::{fs::File, io::Write};
+
+    use rusoto_core::Region;
+
     use super::*;
     use crate::aws::auth::AwsAuthentication;
-    use rusoto_core::Region;
-    use std::fs::File;
-    use std::io::Write;
 
     #[test]
     fn parsing_credentials_file() {

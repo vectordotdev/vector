@@ -1,5 +1,24 @@
-use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
+use std::{
+    convert::{TryFrom, TryInto},
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use rusoto_core::RusotoError;
+use rusoto_sqs::{
+    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
+    SendMessageResult, Sqs, SqsClient,
+};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::Service;
+use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 use crate::{
+    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
@@ -13,24 +32,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
-    SendMessageResult, Sqs, SqsClient,
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    convert::{TryFrom, TryInto},
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::Service;
-use tracing_futures::Instrument;
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -334,9 +335,10 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::event::LogEvent;
-    use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
@@ -385,12 +387,14 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    use std::collections::HashMap;
+
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
-    use std::collections::HashMap;
     use tokio::time::{sleep, Duration};
+
+    use super::*;
+    use crate::test_util::{random_lines_with_stream, random_string};
 
     #[tokio::test]
     async fn sqs_send_message_batch() {

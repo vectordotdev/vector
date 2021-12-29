@@ -1,6 +1,8 @@
-use crate::internal_events::Heartbeat;
 use std::time::{Duration, Instant};
+
 use tokio::time::interval;
+
+use crate::internal_events::Heartbeat;
 
 /// Emits Heartbeat event every second.
 pub async fn heartbeat() {

@@ -1,7 +1,5 @@
-use crate::{
-    config::log_schema,
-    event::{EventRef, Metric, Value},
-};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -14,11 +12,11 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 use snafu::Snafu;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
-use std::hash::Hash;
-use std::path::PathBuf;
+
+use crate::{
+    config::log_schema,
+    event::{EventRef, Metric, Value},
+};
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
@@ -239,10 +237,11 @@ impl Serialize for Template {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{Event, MetricKind, MetricValue};
     use chrono::TimeZone;
     use shared::btreemap;
+
+    use super::*;
+    use crate::event::{Event, MetricKind, MetricValue};
 
     #[test]
     fn get_fields() {

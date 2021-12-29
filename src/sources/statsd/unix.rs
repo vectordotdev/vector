@@ -1,13 +1,14 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
 use super::StatsdDeserializer;
 use crate::{
     codecs::{Decoder, NewlineDelimitedDecoder},
     shutdown::ShutdownSignal,
-    sources::util::build_unix_stream_source,
-    sources::Source,
+    sources::{util::build_unix_stream_source, Source},
     Pipeline,
 };
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UnixConfig {

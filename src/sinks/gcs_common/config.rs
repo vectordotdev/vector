@@ -1,16 +1,20 @@
-use crate::sinks::gcs_common::service::GcsResponse;
-use crate::sinks::util::retries::{RetryAction, RetryLogic};
-use crate::{
-    http::{HttpClient, HttpError},
-    sinks::{gcp::GcpCredentials, Healthcheck, HealthcheckError},
-    template::TemplateParseError,
-};
 use futures::FutureExt;
 use goauth::{auth::TokenErr, GoErr};
 use http::{StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+
+use crate::{
+    http::{HttpClient, HttpError},
+    sinks::{
+        gcp::GcpCredentials,
+        gcs_common::service::GcsResponse,
+        util::retries::{RetryAction, RetryLogic},
+        Healthcheck, HealthcheckError,
+    },
+    template::TemplateParseError,
+};
 
 pub const BASE_URL: &str = "https://storage.googleapis.com/";
 

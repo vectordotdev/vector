@@ -4,16 +4,6 @@
 #![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
-use async_trait::async_trait;
-use futures::{
-    channel::mpsc,
-    future,
-    stream::{self, BoxStream},
-    task::Poll,
-    FutureExt, Sink, SinkExt, StreamExt,
-};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     collections::BTreeSet,
     fs::{create_dir, OpenOptions},
@@ -26,6 +16,17 @@ use std::{
     },
     task::Context,
 };
+
+use async_trait::async_trait;
+use futures::{
+    channel::mpsc,
+    future,
+    stream::{self, BoxStream},
+    task::Poll,
+    FutureExt, Sink, SinkExt, StreamExt,
+};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{

@@ -1,7 +1,7 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use super::{Error, Value};
 use crate::ExpressionError;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).

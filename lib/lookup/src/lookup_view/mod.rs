@@ -1,11 +1,19 @@
-use crate::{Look, LookupBuf, LookupError, SegmentBuf};
 use core::fmt;
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+    iter::IntoIterator,
+    ops::{Index, IndexMut},
+    str,
+};
+
 use inherent::inherent;
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::ops::{Index, IndexMut};
-use std::{collections::VecDeque, iter::IntoIterator, str};
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+
+use crate::{Look, LookupBuf, LookupError, SegmentBuf};
 
 #[cfg(test)]
 mod test;

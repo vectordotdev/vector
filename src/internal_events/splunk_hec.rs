@@ -5,13 +5,14 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
+    use metrics::{counter, decrement_gauge, increment_gauge};
+    use serde_json::Error;
+    use vector_core::internal_event::InternalEvent;
+
     use crate::{
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use metrics::{counter, decrement_gauge, increment_gauge};
-    use serde_json::Error;
-    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
@@ -130,9 +131,10 @@ mod sink {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use crate::sources::splunk_hec::ApiError;
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
+
+    use crate::sources::splunk_hec::ApiError;
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {

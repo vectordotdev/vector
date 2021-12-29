@@ -1,8 +1,10 @@
 #![cfg(test)]
 
-use std::fmt::{self, Display, Formatter};
-use std::ops::Deref;
-use std::time::Instant;
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Deref,
+    time::Instant,
+};
 
 use ordered_float::OrderedFloat;
 use vector_core::event::metric::Bucket;

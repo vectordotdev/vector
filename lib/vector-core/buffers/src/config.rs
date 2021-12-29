@@ -1,3 +1,9 @@
+use std::{fmt, path::PathBuf};
+
+use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use snafu::{ResultExt, Snafu};
+use tracing::Span;
+
 use crate::{
     topology::{
         builder::{TopologyBuilder, TopologyError},
@@ -6,10 +12,6 @@ use crate::{
     variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
     Acker, Bufferable, WhenFull,
 };
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
-use snafu::{ResultExt, Snafu};
-use std::{fmt, path::PathBuf};
-use tracing::Span;
 
 #[derive(Debug, Snafu)]
 pub enum BufferBuildError {
@@ -42,7 +44,7 @@ impl BufferTypeVisitor {
     {
         let mut kind: Option<BufferTypeKind> = None;
         let mut max_events: Option<usize> = None;
-        let mut max_size: Option<usize> = None;
+        let mut max_size: Option<u64> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
@@ -209,7 +211,7 @@ impl Serialize for BufferConfig {
     }
 }
 
-const fn memory_buffer_default_max_events() -> usize {
+pub const fn memory_buffer_default_max_events() -> usize {
     500
 }
 
@@ -237,14 +239,14 @@ pub enum BufferType {
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
     #[serde(rename = "disk")]
     DiskV1 {
-        max_size: usize,
+        max_size: u64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
     #[serde(rename = "disk_v2")]
     DiskV2 {
-        max_size: usize,
+        max_size: u64,
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -290,6 +292,7 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
+                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
@@ -314,7 +317,7 @@ impl BufferType {
 /// documentation to correctly reflect the internal structure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
-    stages: Vec<BufferType>,
+    pub stages: Vec<BufferType>,
 }
 
 impl Default for BufferConfig {

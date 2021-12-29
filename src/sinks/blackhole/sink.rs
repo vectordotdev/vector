@@ -1,20 +1,27 @@
-use crate::event::Event;
-use crate::internal_events::BlackholeEventReceived;
-use crate::sinks::blackhole::config::BlackholeConfig;
-use crate::sinks::util::StreamSink;
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::select;
-use tokio::sync::watch;
-use tokio::time::interval;
-use tokio::time::sleep_until;
-use vector_core::buffers::Acker;
-use vector_core::internal_event::EventsSent;
-use vector_core::ByteSizeOf;
+use futures::{stream::BoxStream, StreamExt};
+use tokio::{
+    select,
+    sync::watch,
+    time::{interval, sleep_until},
+};
+use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+
+use crate::{
+    event::Event,
+    internal_events::BlackholeEventReceived,
+    sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
+};
+
+const MAX_CHUNK_SIZE: usize = 1024;
 
 pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
@@ -66,8 +73,11 @@ impl StreamSink for BlackholeSink {
                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
             }, "Total events collected");
         });
-
-        let mut chunks = input.ready_chunks(1024);
+        let chunk_size = match self.config.rate {
+            None => MAX_CHUNK_SIZE,
+            Some(rate) => rate.min(MAX_CHUNK_SIZE),
+        };
+        let mut chunks = input.ready_chunks(chunk_size);
         while let Some(events) = chunks.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;

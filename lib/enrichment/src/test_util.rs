@@ -1,10 +1,12 @@
-use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
-use shared::btreemap;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
 };
+
+use shared::btreemap;
 use vrl_core::Value;
+
+use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {

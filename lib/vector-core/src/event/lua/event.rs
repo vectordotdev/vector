@@ -1,5 +1,6 @@
-use crate::event::{Event, LogEvent, Metric};
 use mlua::prelude::*;
+
+use crate::event::{Event, LogEvent, Metric};
 
 impl<'a> ToLua<'a> for Event {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua

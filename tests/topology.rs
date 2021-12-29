@@ -1,10 +1,5 @@
 mod support;
 
-use crate::support::{
-    sink, sink_failing_healthcheck, sink_with_data, source, source_with_data, transform,
-    MockSourceConfig,
-};
-use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
     iter,
@@ -13,8 +8,15 @@ use std::{
         Arc,
     },
 };
+
+use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use tokio::time::{sleep, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
+
+use crate::support::{
+    sink, sink_failing_healthcheck, sink_with_data, source, source_with_data, transform,
+    MockSourceConfig,
+};
 
 fn basic_config() -> Config {
     let mut config = Config::builder();

@@ -1,3 +1,15 @@
+use std::{
+    collections::VecDeque,
+    io::{self, Read},
+};
+
+use bytes::{Buf, Bytes, BytesMut};
+use flate2::read::MultiGzDecoder;
+use rmp_serde::{decode, Deserializer};
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use tokio_util::codec::Decoder;
+
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -10,16 +22,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::MultiGzDecoder;
-use rmp_serde::{decode, Deserializer};
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use std::{
-    collections::VecDeque,
-    io::{self, Read},
-};
-use tokio_util::codec::Decoder;
 
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
@@ -32,6 +34,7 @@ pub struct FluentConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -46,6 +49,7 @@ impl GenerateConfig for FluentConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: Some(2),
         })
         .unwrap()
     }
@@ -66,6 +70,7 @@ impl SourceConfig for FluentConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            self.connection_limit,
         )
     }
 
@@ -105,7 +110,7 @@ impl TcpSource for FluentSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, frame: &[Self::Item]) -> Self::Acker {
         FluentAcker::new(frame)
     }
 }
@@ -304,20 +309,14 @@ impl Decoder for FluentDecoder {
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
             // check for unexpected EOF to indicate that we need more data
-            match res {
-                // can use or-patterns in 1.53
-                // https://github.com/rust-lang/rust/pull/79278
-                Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+            if let Err(DecodeError::Decode(
+                decode::Error::InvalidDataRead(ref custom)
+                | decode::Error::InvalidMarkerRead(ref custom),
+            )) = res
+            {
+                if custom.kind() == io::ErrorKind::UnexpectedEof {
+                    return Ok(None);
                 }
-                Err(DecodeError::Decode(decode::Error::InvalidMarkerRead(ref custom))) => {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
-                }
-                _ => {}
             }
 
             (des.position() as usize, res)
@@ -378,23 +377,32 @@ impl Decoder for FluentEntryStreamDecoder {
 }
 
 struct FluentAcker {
-    chunk: Option<String>,
+    chunks: Vec<String>,
 }
 
 impl FluentAcker {
-    fn new(frame: &FluentFrame) -> Self {
+    fn new(frames: &[FluentFrame]) -> Self {
         Self {
-            chunk: frame.chunk.clone(),
+            chunks: frames.iter().filter_map(|f| f.chunk.clone()).collect(),
         }
     }
 }
 
 impl TcpSourceAcker for FluentAcker {
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
-        self.chunk.map(|chunk| match ack {
-            TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
-            _ => "{}".into(),
-        })
+        if self.chunks.is_empty() {
+            return None;
+        }
+
+        let mut acks = String::new();
+        for chunk in self.chunks {
+            let ack = match ack {
+                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
+                _ => String::from("{}"),
+            };
+            acks.push_str(&ack);
+        }
+        Some(acks.into())
     }
 }
 
@@ -440,18 +448,24 @@ impl From<FluentFrame> for LogEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::{message::FluentMessageOptions, *};
-    use crate::config::{SourceConfig, SourceContext};
-    use crate::test_util::{self, next_addr, trace_init, wait_for_tcp};
-    use crate::{event::EventStatus, Pipeline};
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
     use shared::{assert_event_data_eq, btreemap};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::time::{error::Elapsed, timeout, Duration};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        time::{error::Elapsed, timeout, Duration},
+    };
     use tokio_util::codec::Decoder;
     use vector_core::event::{LogEvent, Value};
+
+    use super::{message::FluentMessageOptions, *};
+    use crate::{
+        config::{SourceConfig, SourceContext},
+        event::EventStatus,
+        test_util::{self, next_addr, trace_init, wait_for_tcp},
+        Pipeline,
+    };
 
     #[test]
     fn generate_config() {
@@ -792,6 +806,7 @@ mod tests {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
@@ -849,17 +864,21 @@ mod tests {
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
 mod integration_tests {
-    use crate::config::{SourceConfig, SourceContext};
-    use crate::docker::Container;
-    use crate::sources::fluent::FluentConfig;
-    use crate::test_util::{
-        collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
-    };
-    use crate::Pipeline;
-    use futures::Stream;
     use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
+
+    use futures::Stream;
     use tokio::time::sleep;
     use vector_core::event::{Event, EventStatus};
+
+    use crate::{
+        config::{SourceConfig, SourceContext},
+        docker::Container,
+        sources::fluent::FluentConfig,
+        test_util::{
+            collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
+        },
+        Pipeline,
+    };
 
     const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
     const FLUENT_BIT_TAG: &str = "1.7";
@@ -1032,6 +1051,7 @@ mod integration_tests {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await

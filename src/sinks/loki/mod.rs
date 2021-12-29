@@ -21,13 +21,12 @@ mod sink;
 #[cfg(test)]
 mod tests;
 
-use crate::config::SinkDescription;
-use config::LokiConfig;
-
-pub use config::OutOfOrderAction;
-
 #[cfg(feature = "loki-benches")]
 pub use config::valid_label_name;
+use config::LokiConfig;
+pub use config::OutOfOrderAction;
+
+use crate::config::SinkDescription;
 
 inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")

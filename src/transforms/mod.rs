@@ -86,8 +86,9 @@ enum BuildError {
 
 #[cfg(test)]
 mod test {
-    use crate::event::Event;
     use vector_core::transform::FunctionTransform;
+
+    use crate::event::Event;
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///

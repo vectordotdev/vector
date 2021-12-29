@@ -1,5 +1,6 @@
-use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 use std::collections::HashMap;
+
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {

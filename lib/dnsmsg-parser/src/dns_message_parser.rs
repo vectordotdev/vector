@@ -1,9 +1,6 @@
-use super::dns_message::{
-    self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
-    QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
-};
-use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use std::str::Utf8Error;
+
+use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use thiserror::Error;
 use trust_dns_proto::{
     error::ProtoError,
@@ -21,6 +18,11 @@ use trust_dns_proto::{
         Name, RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
+};
+
+use super::dns_message::{
+    self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
+    QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
 };
 
 /// Error type for DNS message parsing
@@ -1245,11 +1247,11 @@ fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
     };
+
     use trust_dns_proto::{
         rr::{
             dnssec::{
@@ -1262,13 +1264,16 @@ mod tests {
             domain::Name,
             rdata::{
                 caa::KeyValue,
+                null,
                 sshfp::{Algorithm, FingerprintType},
                 tlsa::{CertUsage, Matching, Selector},
+                CAA, NAPTR, SSHFP, TLSA, TXT,
             },
-            rdata::{null, CAA, NAPTR, SSHFP, TLSA, TXT},
         },
         serialize::binary::Restrict,
     };
+
+    use super::*;
 
     impl DnsMessageParser {
         pub fn raw_message_for_rdata_parsing(&self) -> Option<&Vec<u8>> {

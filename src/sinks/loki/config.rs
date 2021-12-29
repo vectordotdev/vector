@@ -1,16 +1,21 @@
-use super::healthcheck::healthcheck;
-use super::sink::LokiSink;
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde};
-use crate::sinks::VectorSink;
-use crate::template::Template;
-use crate::tls::{TlsOptions, TlsSettings};
+use std::{collections::HashMap, num::NonZeroU64};
+
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::num::NonZeroU64;
+
+use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    http::{Auth, HttpClient, MaybeAuth},
+    sinks::{
+        util::{
+            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
+        },
+        VectorSink,
+    },
+    template::Template,
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -144,8 +149,9 @@ pub fn valid_label_name(label: &Template) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::valid_label_name;
     use std::convert::TryInto;
+
+    use super::valid_label_name;
 
     #[test]
     fn valid_label_names() {

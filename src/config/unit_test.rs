@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use indexmap::IndexMap;
+
 use super::{
     graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
     TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext,
@@ -9,8 +13,6 @@ use crate::{
     topology::builder::load_enrichment_tables,
     transforms::{Transform, TransformOutputsBuf},
 };
-use indexmap::IndexMap;
-use std::collections::HashMap;
 
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
@@ -596,9 +598,10 @@ async fn build_unit_test(
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::config::ConfigBuilder;
-    use indoc::indoc;
 
     #[tokio::test]
     async fn parse_no_input() {

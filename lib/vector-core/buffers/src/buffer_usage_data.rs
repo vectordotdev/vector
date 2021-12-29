@@ -1,13 +1,19 @@
+use std::{
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
 use core_common::internal_event::emit;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::{sync::Arc, time::Duration};
 use tokio::time::interval;
 use tracing::{Instrument, Span};
 
-use crate::internal_events::{
-    BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped,
+use crate::{
+    internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped},
+    WhenFull,
 };
-use crate::WhenFull;
 
 #[derive(Clone, Debug)]
 pub struct BufferUsageHandle {
@@ -28,7 +34,7 @@ impl BufferUsageHandle {
     ///
     /// Limits are exposed as gauges to provide stable values when superimposed on dashboards/graphs
     /// with the "actual" usage amounts.
-    pub fn set_buffer_limits(&self, max_bytes: Option<usize>, max_events: Option<usize>) {
+    pub fn set_buffer_limits(&self, max_bytes: Option<u64>, max_events: Option<usize>) {
         if let Some(max_bytes) = max_bytes {
             self.state
                 .max_size_bytes
@@ -45,7 +51,7 @@ impl BufferUsageHandle {
     /// Increments the number of events (and their total size) received by this buffer component.
     ///
     /// This represents the events being sent into the buffer.
-    pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
+    pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
         self.state
             .received_event_count
             .fetch_add(count, Ordering::Relaxed);
@@ -57,7 +63,7 @@ impl BufferUsageHandle {
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
-    pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
+    pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
         self.state
             .sent_event_count
             .fetch_add(count, Ordering::Relaxed);
@@ -80,11 +86,11 @@ impl BufferUsageHandle {
 pub struct BufferUsageData {
     idx: usize,
     received_event_count: AtomicU64,
-    received_byte_size: AtomicUsize,
+    received_byte_size: AtomicU64,
     sent_event_count: AtomicU64,
-    sent_byte_size: AtomicUsize,
+    sent_byte_size: AtomicU64,
     dropped_event_count: Option<AtomicU64>,
-    max_size_bytes: AtomicUsize,
+    max_size_bytes: AtomicU64,
     max_size_events: AtomicUsize,
 }
 
@@ -98,11 +104,11 @@ impl BufferUsageData {
         Self {
             idx,
             received_event_count: AtomicU64::new(0),
-            received_byte_size: AtomicUsize::new(0),
+            received_byte_size: AtomicU64::new(0),
             sent_event_count: AtomicU64::new(0),
-            sent_byte_size: AtomicUsize::new(0),
+            sent_byte_size: AtomicU64::new(0),
             dropped_event_count,
-            max_size_bytes: AtomicUsize::new(0),
+            max_size_bytes: AtomicU64::new(0),
             max_size_events: AtomicUsize::new(0),
         }
     }
@@ -149,7 +155,6 @@ impl BufferUsage {
                 loop {
                     interval.tick().await;
 
-                    // TODO: actually push the labels into the events!
                     for stage in &stages {
                         let max_size_bytes = match stage.max_size_bytes.load(Ordering::Relaxed) {
                             0 => None,

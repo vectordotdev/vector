@@ -1,16 +1,16 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::discriminant::Discriminant,
-    event::merge_state::LogEventMergeState,
-    event::{self, Event},
-    transforms::{TaskTransform, Transform},
-};
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map, HashMap},
     future::ready,
     pin::Pin,
+};
+
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
+    transforms::{TaskTransform, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

@@ -1,6 +1,7 @@
-use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+
+use crate::event::{Metric, MetricValue};
 
 pub struct Uptime(Metric);
 

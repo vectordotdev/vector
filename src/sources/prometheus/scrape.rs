@@ -1,8 +1,18 @@
+use std::{
+    future::ready,
+    time::{Duration, Instant},
+};
+
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio_stream::wrappers::IntervalStream;
+
 use super::parser;
 use crate::{
     config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    http::Auth,
-    http::HttpClient,
+    http::{Auth, HttpClient},
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -12,15 +22,6 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     Pipeline,
 };
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
-use tokio_stream::wrappers::IntervalStream;
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
 // gave up trying to format, but reported no error
@@ -368,6 +369,14 @@ fn prometheus(
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        Body, Client, Response, Server,
+    };
+    use pretty_assertions::assert_eq;
+    use tokio::time::{sleep, Duration};
+    use warp::Filter;
+
     use super::*;
     use crate::{
         config,
@@ -375,13 +384,6 @@ mod test {
         test_util::{self, next_addr, start_topology},
         Error,
     };
-    use hyper::{
-        service::{make_service_fn, service_fn},
-        {Body, Client, Response, Server},
-    };
-    use pretty_assertions::assert_eq;
-    use tokio::time::{sleep, Duration};
-    use warp::Filter;
 
     #[test]
     fn generate_config() {
@@ -621,13 +623,14 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::SourceContext,
         event::{MetricKind, MetricValue},
         test_util, Pipeline,
     };
-    use tokio::time::Duration;
 
     #[tokio::test]
     async fn scrapes_metrics() {

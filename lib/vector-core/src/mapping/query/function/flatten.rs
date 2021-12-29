@@ -1,5 +1,6 @@
-use super::prelude::*;
 use std::collections::btree_map;
+
+use super::prelude::*;
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
@@ -156,9 +157,10 @@ impl TryFrom<ArgumentList> for FlattenFn {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::mapping::query::path::Path;
-    use serde_json::json;
 
     #[test]
     #[allow(clippy::too_many_lines)]

@@ -1,20 +1,19 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::aws::rusoto::RegionOrEndpoint;
-use crate::config::SinkConfig;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::{BatchConfig, Compression};
-use crate::test_util::components;
-use crate::{
-    config::SinkContext,
-    test_util::{random_lines_with_stream, random_string},
-};
+use std::sync::Arc;
+
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
-use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+
+use super::*;
+use crate::{
+    aws::rusoto::RegionOrEndpoint,
+    config::{SinkConfig, SinkContext},
+    sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
+    test_util::{components, random_lines_with_stream, random_string},
+};
 
 #[tokio::test]
 async fn kinesis_put_records() {

@@ -1,3 +1,30 @@
+use std::{
+    collections::HashMap,
+    future::ready,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+
+use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
+use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
+use tokio::{
+    select,
+    time::{timeout, Duration},
+};
+use vector_core::{
+    buffers::{
+        topology::{
+            builder::TopologyBuilder,
+            channel::{BufferReceiver, BufferSender},
+        },
+        BufferType, WhenFull,
+    },
+    internal_event::EventsSent,
+    ByteSizeOf,
+};
+
 use super::{
     fanout::{self, Fanout},
     task::{Task, TaskOutput},
@@ -13,32 +40,12 @@ use crate::{
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     Pipeline,
 };
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
-use once_cell::sync::Lazy;
-use std::{
-    collections::HashMap,
-    future::ready,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
-use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{
-    select,
-    time::{timeout, Duration},
-};
-use vector_core::{
-    buffers::topology::{
-        builder::TopologyBuilder,
-        channel::{BufferReceiver, BufferSender},
-    },
-    ByteSizeOf,
-};
-use vector_core::{buffers::BufferType, internal_event::EventsSent};
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
+
+pub const PIPELINE_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -139,7 +146,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (tx, rx) = futures::channel::mpsc::channel(1000);
+        let (tx, rx) = futures::channel::mpsc::channel(PIPELINE_BUFFER_SIZE);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.inner.source_type();
@@ -224,7 +231,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100).await;
+        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 

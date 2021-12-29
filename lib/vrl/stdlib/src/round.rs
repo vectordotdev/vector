@@ -1,5 +1,6 @@
-use crate::util::round_to_precision;
 use vrl::prelude::*;
+
+use crate::util::round_to_precision;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Round;

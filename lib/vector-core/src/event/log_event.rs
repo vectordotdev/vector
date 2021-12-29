@@ -1,24 +1,25 @@
-use super::{
-    finalization::{BatchNotifier, EventFinalizer},
-    legacy_lookup::Segment,
-    metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
+use std::{
+    collections::{btree_map::Entry, BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    fmt::{Debug, Display},
+    iter::FromIterator,
+    sync::Arc,
 };
-use crate::event::MaybeAsLogMut;
-use crate::{config::log_schema, ByteSizeOf};
+
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
-use std::sync::Arc;
-use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
-    convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
-    iter::FromIterator,
+
+use super::{
+    finalization::{BatchNotifier, EventFinalizer},
+    legacy_lookup::Segment,
+    metadata::EventMetadata,
+    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
 };
+use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
@@ -489,10 +490,12 @@ impl tracing::field::Visit for MakeLogEvent {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
+    use serde_json::json;
+
     use super::*;
     use crate::test_util::open_fixture;
-    use serde_json::json;
-    use std::str::FromStr;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.

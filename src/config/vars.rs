@@ -1,5 +1,6 @@
-use regex::{Captures, Regex};
 use std::collections::HashMap;
+
+use regex::{Captures, Regex};
 
 /// (result, warnings)
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {

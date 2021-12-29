@@ -1,9 +1,11 @@
-use super::EventEncodingType;
-use crate::config::OutputId;
-use crate::event::{self, Value};
-
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+
+use super::EventEncodingType;
+use crate::{
+    config::OutputId,
+    event::{self, Value},
+};
 
 #[derive(Debug)]
 pub struct Log {

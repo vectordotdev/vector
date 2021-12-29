@@ -152,8 +152,9 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use env_test_util::TempEnvVar;
+
+    use super::*;
 
     #[test]
     fn merge_simple() {
