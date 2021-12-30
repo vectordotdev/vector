@@ -112,7 +112,7 @@ jobs:
       - run: make test-integration-${{ matrix.test }}
         env:
           CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-      - run: make test-integration-${{ matrix.text }}-cleanup
+      - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 
   test-integration-check:
