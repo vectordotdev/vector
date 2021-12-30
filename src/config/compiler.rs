@@ -215,8 +215,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-            TransformContext,
+            DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -243,8 +243,8 @@ mod test {
             "mock"
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 

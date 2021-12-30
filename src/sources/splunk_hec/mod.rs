@@ -24,7 +24,9 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -149,8 +151,8 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

@@ -30,8 +30,8 @@ use crate::{
     },
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue},
@@ -145,8 +145,8 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn source_type(&self) -> &'static str {

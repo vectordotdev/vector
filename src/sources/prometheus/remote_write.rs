@@ -9,7 +9,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
@@ -68,8 +68,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn output_type(&self) -> crate::config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

@@ -11,7 +11,9 @@ use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
-    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
@@ -122,8 +124,8 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

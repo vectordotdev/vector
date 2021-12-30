@@ -11,7 +11,8 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
+        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
+        SourceDescription,
     },
     event::Event,
     internal_events::NatsEventsReceived,
@@ -78,8 +79,8 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{DnstapEventReceived, DnstapParseDataError},
     Result,
@@ -97,8 +97,8 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

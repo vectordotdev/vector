@@ -61,7 +61,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    outputs: vec![Output::default(config.inner.output_type())],
+                    outputs: config.inner.outputs(),
                 },
             );
         }

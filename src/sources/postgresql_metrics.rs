@@ -26,7 +26,7 @@ use tokio_postgres::{
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -172,8 +172,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

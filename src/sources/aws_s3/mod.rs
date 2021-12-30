@@ -15,7 +15,7 @@ use crate::{
         rusoto::{self, RegionOrEndpoint},
     },
     config::{
-        AcknowledgementsConfig, DataType, ProxyConfig, SourceConfig, SourceContext,
+        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
         SourceDescription,
     },
     line_agg,
@@ -92,8 +92,8 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

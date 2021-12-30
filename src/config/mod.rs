@@ -180,7 +180,7 @@ impl SourceOuter {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
-    fn output_type(&self) -> DataType;
+    fn outputs(&self) -> Vec<Output>;
 
     fn source_type(&self) -> &'static str;
 

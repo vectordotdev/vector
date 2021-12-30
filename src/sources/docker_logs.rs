@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     docker::{docker, DockerTlsConfig},
     event::{
         self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
@@ -162,8 +162,8 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -186,8 +186,8 @@ impl SourceConfig for DockerCompatConfig {
         self.config.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.config.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.config.outputs()
     }
 
     fn source_type(&self) -> &'static str {

@@ -19,7 +19,7 @@ use tokio::task::spawn_blocking;
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
@@ -245,8 +245,8 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

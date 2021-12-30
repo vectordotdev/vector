@@ -24,7 +24,7 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
@@ -152,8 +152,8 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

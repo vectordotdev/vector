@@ -260,7 +260,10 @@ pub fn update_config(config: &Config) {
             Component::Source(source::Source(source::Data {
                 component_key: component_key.clone(),
                 component_type: source.inner.source_type().to_string(),
-                output_type: source.inner.output_type(),
+                // TODO: This is obviously wrong, but there are a lot of assumptions in the API
+                // modules about `output_type` as it's a sortable field, etc. This is a stopgap
+                // until we decide how we want to change the rest of the usages.
+                output_type: source.inner.outputs().pop().unwrap().ty,
             })),
         );
     }

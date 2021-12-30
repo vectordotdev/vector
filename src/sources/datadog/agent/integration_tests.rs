@@ -1,5 +1,5 @@
 use super::DatadogAgentConfig;
-use crate::config::{GenerateConfig, SourceConfig, SourceContext};
+use crate::config::{GenerateConfig, Output, SourceConfig, SourceContext};
 use crate::event::EventStatus;
 use crate::test_util::spawn_collect_n;
 use crate::SourceSender;

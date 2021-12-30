@@ -27,7 +27,7 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
         TransformContext,
     },
     event::{
@@ -211,8 +211,8 @@ impl SourceConfig for MockSourceConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        self.data_type.unwrap()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.data_type.unwrap())]
     }
 
     fn source_type(&self) -> &'static str {

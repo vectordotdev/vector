@@ -32,8 +32,7 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext,
+        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
     },
     event::Event,
     internal_events::EventsReceived,
@@ -148,7 +147,7 @@ pub async fn build_pieces(
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
         let typetag = source.inner.source_type();
-        let source_outputs = vec![Output::default(source.inner.output_type())];
+        let source_outputs = source.inner.outputs();
 
         let mut builder = SourceSender::builder();
         let mut pumps = Vec::new();

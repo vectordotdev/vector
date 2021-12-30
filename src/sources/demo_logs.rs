@@ -15,7 +15,7 @@ use crate::{
         self,
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::DemoLogsEventProcessed,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -218,8 +218,8 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -238,8 +238,8 @@ impl SourceConfig for DemoLogsCompatConfig {
         self.0.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn source_type(&self) -> &'static str {
