@@ -418,7 +418,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(
             format!("{}", err),
-            "Circular dependency found in the alias 'pattern1'"
+            "Circular dependency found in the alias 'pattern2'"
         );
     }
 
@@ -785,5 +785,26 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
         ]);
+    }
+
+    #[test]
+    fn alias_and_main_rule_extract_same_fields_to_array() {
+        let rules = parse_grok_rules(
+            // patterns
+            &[r#"%{notSpace:field:number} %{alias}"#.to_string()],
+            // aliases
+            btreemap! {
+                "alias" => r#"%{notSpace:field:integer}"#.to_string()
+            },
+        )
+        .expect("couldn't parse rules");
+        let parsed = parse_grok("1 2", &rules, false).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                 "field" =>  Value::Array(vec![1.0.into(), 2.into()]),
+            })
+        );
     }
 }
