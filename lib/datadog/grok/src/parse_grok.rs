@@ -807,4 +807,34 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn parses_grok_unsafe_field_names() {
+        test_full_grok(vec![
+            (
+                r#"%{data:field["quoted name"]}"#,
+                "abc",
+                Ok(Value::from(btreemap! {
+                "field" => btreemap! {
+                    "quoted name" => "abc",
+                    }
+                })),
+            ),
+            (
+                r#"%{data:@field-name-with-symbols$}"#,
+                "abc",
+                Ok(Value::from(btreemap! {
+                "@field-name-with-symbols$" => "abc"})),
+            ),
+            (
+                r#"%{data:@parent.$child}"#,
+                "abc",
+                Ok(Value::from(btreemap! {
+                "@parent" => btreemap! {
+                    "$child" => "abc",
+                    }
+                })),
+            ),
+        ]);
+    }
 }
