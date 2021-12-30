@@ -12,6 +12,8 @@ use crate::ByteSizeOf;
 
 /// Wrapper type for an array of event finalizers. This is the primary
 /// public interface to event finalization metadata.
+/// The internal type is a `HashSet` to provide for array-like behavior
+/// and automatic deduplication.
 #[derive(Clone, Debug, Default)]
 pub struct EventFinalizers(BTreeSet<SharedEventFinalizer>);
 
@@ -36,35 +38,6 @@ impl PartialOrd for EventFinalizers {
 impl ByteSizeOf for EventFinalizers {
     fn allocated_bytes(&self) -> usize {
         self.0.iter().fold(0, |acc, ef| acc + ef.0.size_of())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SharedEventFinalizer(Arc<EventFinalizer>);
-
-impl PartialEq for SharedEventFinalizer {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for SharedEventFinalizer {}
-
-impl From<EventFinalizer> for SharedEventFinalizer {
-    fn from(that: EventFinalizer) -> Self {
-        Self(Arc::new(that))
-    }
-}
-
-impl PartialOrd for SharedEventFinalizer {
-    fn partial_cmp(&self, rhs: &Self) -> Option<cmp::Ordering> {
-        Arc::as_ptr(&self.0).partial_cmp(&Arc::as_ptr(&rhs.0))
-    }
-}
-
-impl Ord for SharedEventFinalizer {
-    fn cmp(&self, rhs: &Self) -> cmp::Ordering {
-        Arc::as_ptr(&self.0).cmp(&Arc::as_ptr(&rhs.0))
     }
 }
 
@@ -112,6 +85,36 @@ impl EventFinalizers {
 impl Finalizable for EventFinalizers {
     fn take_finalizers(&mut self) -> EventFinalizers {
         mem::take(self)
+    }
+}
+
+/// Wrapper newtype to provide the `Ord` implementation required by `BTreeSet`
+#[derive(Clone, Debug)]
+pub struct SharedEventFinalizer(Arc<EventFinalizer>);
+
+impl PartialEq for SharedEventFinalizer {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SharedEventFinalizer {}
+
+impl From<EventFinalizer> for SharedEventFinalizer {
+    fn from(that: EventFinalizer) -> Self {
+        Self(Arc::new(that))
+    }
+}
+
+impl PartialOrd for SharedEventFinalizer {
+    fn partial_cmp(&self, rhs: &Self) -> Option<cmp::Ordering> {
+        Arc::as_ptr(&self.0).partial_cmp(&Arc::as_ptr(&rhs.0))
+    }
+}
+
+impl Ord for SharedEventFinalizer {
+    fn cmp(&self, rhs: &Self) -> cmp::Ordering {
+        Arc::as_ptr(&self.0).cmp(&Arc::as_ptr(&rhs.0))
     }
 }
 
