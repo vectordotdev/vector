@@ -32,7 +32,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
+        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        TransformContext,
     },
     event::Event,
     internal_events::EventsReceived,
@@ -146,9 +147,23 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (pipeline, mut rx) = SourceSender::new_with_buffer(SOURCE_SENDER_BUFFER_SIZE);
-
         let typetag = source.inner.source_type();
+        let output = Output::default(source.inner.output_type());
+
+        let mut builder = SourceSender::builder();
+        let mut rx = builder.add_output(output);
+
+        let (mut output, control) = Fanout::new();
+        let pump = async move {
+            while let Some(event) = rx.next().await {
+                output.feed(event).await?;
+            }
+            output.flush().await?;
+            Ok(TaskOutput::Source)
+        };
+        let pump = Task::new(key.clone(), typetag, pump);
+
+        let pipeline = builder.build();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(key);
 
@@ -166,16 +181,6 @@ pub async fn build_pieces(
             }
             Ok(server) => server,
         };
-
-        let (mut output, control) = Fanout::new();
-        let pump = async move {
-            while let Some(event) = rx.next().await {
-                output.feed(event).await?;
-            }
-            output.flush().await?;
-            Ok(TaskOutput::Source)
-        };
-        let pump = Task::new(key.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
