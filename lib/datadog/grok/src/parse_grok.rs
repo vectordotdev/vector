@@ -559,6 +559,11 @@ mod tests {
                 Ok(Value::Array(vec!["1".into(), "2".into()])),
             ),
             (
+                r#"%{data:field:array("","-")}"#,
+                "1-2",
+                Ok(Value::Array(vec!["1".into(), "2".into()])),
+            ),
+            (
                 "%{data:field:array(integer)}",
                 "[1,2]",
                 Ok(Value::Array(vec![1.into(), 2.into()])),
