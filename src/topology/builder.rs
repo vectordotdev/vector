@@ -148,17 +148,41 @@ pub async fn build_pieces(
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
         let typetag = source.inner.source_type();
-        let output = Output::default(source.inner.output_type());
+        let source_outputs = vec![Output::default(source.inner.output_type())];
 
         let mut builder = SourceSender::builder();
-        let mut rx = builder.add_output(output);
+        let mut pumps = Vec::new();
+        let mut controls = HashMap::new();
+        for output in source_outputs {
+            let mut rx = builder.add_output(output.clone());
 
-        let (mut output, control) = Fanout::new();
+            let (mut fanout, control) = Fanout::new();
+            let pump = async move {
+                while let Some(event) = rx.next().await {
+                    fanout.feed(event).await?;
+                }
+                fanout.flush().await?;
+                Ok(TaskOutput::Source)
+            };
+
+            pumps.push(pump);
+            controls.insert(
+                OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                },
+                control,
+            );
+        }
+
         let pump = async move {
-            while let Some(event) = rx.next().await {
-                output.feed(event).await?;
+            let mut handles = Vec::new();
+            for pump in pumps {
+                handles.push(tokio::spawn(pump));
             }
-            output.flush().await?;
+            for handle in handles {
+                handle.await.expect("join error")?;
+            }
             Ok(TaskOutput::Source)
         };
         let pump = Task::new(key.clone(), typetag, pump);
@@ -207,7 +231,7 @@ pub async fn build_pieces(
         };
         let server = Task::new(key.clone(), typetag, server);
 
-        outputs.insert(OutputId::from(key), control);
+        outputs.extend(controls);
         tasks.insert(key.clone(), pump);
         source_tasks.insert(key.clone(), server);
     }
