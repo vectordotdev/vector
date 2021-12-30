@@ -12,6 +12,8 @@ use crate::ByteSizeOf;
 
 /// Wrapper type for an array of event finalizers. This is the primary
 /// public interface to event finalization metadata.
+/// The internal type is a `HashSet` to provide for array-like behavior
+/// and automatic deduplication.
 #[derive(Clone, Debug, Default)]
 pub struct EventFinalizers(HashSet<SharedEventFinalizer>);
 
@@ -36,29 +38,6 @@ impl PartialOrd for EventFinalizers {
 impl ByteSizeOf for EventFinalizers {
     fn allocated_bytes(&self) -> usize {
         self.0.iter().fold(0, |acc, ef| acc + ef.0.size_of())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SharedEventFinalizer(Arc<EventFinalizer>);
-
-impl PartialEq for SharedEventFinalizer {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for SharedEventFinalizer {}
-
-impl From<EventFinalizer> for SharedEventFinalizer {
-    fn from(that: EventFinalizer) -> Self {
-        Self(Arc::new(that))
-    }
-}
-
-impl hash::Hash for SharedEventFinalizer {
-    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-        Arc::as_ptr(&self.0).hash(hasher);
     }
 }
 
@@ -106,6 +85,30 @@ impl EventFinalizers {
 impl Finalizable for EventFinalizers {
     fn take_finalizers(&mut self) -> EventFinalizers {
         mem::take(self)
+    }
+}
+
+/// Wrapper newtype to provide the `Hash` implementation required by `HashSet`
+#[derive(Clone, Debug)]
+pub struct SharedEventFinalizer(Arc<EventFinalizer>);
+
+impl PartialEq for SharedEventFinalizer {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SharedEventFinalizer {}
+
+impl From<EventFinalizer> for SharedEventFinalizer {
+    fn from(that: EventFinalizer) -> Self {
+        Self(Arc::new(that))
+    }
+}
+
+impl hash::Hash for SharedEventFinalizer {
+    fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+        Arc::as_ptr(&self.0).hash(hasher);
     }
 }
 
