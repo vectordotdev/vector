@@ -3,13 +3,5 @@ kind: Kustomization
 
 namespace: vector
 
-helmCharts:
-- name: vector
-  includeCRDs: false
-  valuesInline:
-    role: Agent
-    service:
-      enabled: false
-  version: 0.3.0
-  releaseName: vector
-  repo: https://helm.vector.dev
+resources:
+  - resources.yaml
