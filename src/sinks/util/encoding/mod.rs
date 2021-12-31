@@ -57,6 +57,7 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+#[cfg(feature = "codecs")]
 mod adapter;
 mod codec;
 mod config;
