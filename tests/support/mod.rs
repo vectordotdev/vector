@@ -302,8 +302,8 @@ impl TransformConfig for MockTransformConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {

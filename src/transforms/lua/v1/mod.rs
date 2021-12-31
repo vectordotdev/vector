@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::DataType,
+    config::{DataType, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     transforms::{TaskTransform, Transform},
@@ -40,8 +40,8 @@ impl LuaConfig {
         DataType::Log
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Log
+    pub fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     pub const fn transform_type(&self) -> &'static str {

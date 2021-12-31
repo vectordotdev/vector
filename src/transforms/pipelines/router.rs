@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, ExpandType, TransformConfig, TransformContext},
+    config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -91,8 +91,8 @@ impl TransformConfig for EventRouterConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        self.filter.data_type()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.filter.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -118,8 +118,8 @@ impl TransformConfig for EventFilterConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        self.inner.data_type()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.inner.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {

@@ -9,7 +9,7 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{TaskTransform, Transform},
@@ -44,8 +44,8 @@ impl TransformConfig for AggregateConfig {
         DataType::Metric
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -58,8 +58,8 @@ impl TransformConfig for SplitConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

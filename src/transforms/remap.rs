@@ -11,7 +11,8 @@ use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Ter
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, TransformConfig, TransformContext, TransformDescription,
+        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -61,8 +62,8 @@ impl TransformConfig for RemapConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {

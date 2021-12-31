@@ -67,15 +67,11 @@ impl Graph {
         }
 
         for (id, config) in transforms.iter() {
-            let mut outputs = vec![Output::default(config.inner.output_type())];
-            for name in config.inner.named_outputs() {
-                outputs.push(Output::from((name, config.inner.output_type())));
-            }
             graph.nodes.insert(
                 id.clone(),
                 Node::Transform {
                     in_ty: config.inner.input_type(),
-                    outputs,
+                    outputs: config.inner.outputs(),
                 },
             );
         }

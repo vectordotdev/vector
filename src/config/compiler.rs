@@ -263,8 +263,8 @@ mod test {
             DataType::Any
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 
