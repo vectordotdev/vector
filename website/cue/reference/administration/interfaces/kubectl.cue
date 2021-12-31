@@ -19,7 +19,7 @@ administration: interfaces: kubectl: {
 	role_implementations: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
-			_vector_version:           "0.18"
+			_vector_version:           "0.19"
 			_namespace:                string | *"vector"
 			_controller_resource_type: string
 			_controller_resource_name: string | *_deployment_variant

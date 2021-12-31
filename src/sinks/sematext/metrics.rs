@@ -1,3 +1,13 @@
+use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
+
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use http::{StatusCode, Uri};
+use hyper::{Body, Request};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::ByteSizeOf;
+
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
@@ -7,23 +17,17 @@ use crate::{
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
-    sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
-    sinks::util::{
-        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-        http::{HttpBatchService, HttpRetryLogic},
-        sink, BatchConfig, EncodedEvent, TowerRequestConfig,
+    sinks::{
+        influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
+        util::{
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+            http::{HttpBatchService, HttpRetryLogic},
+            sink, BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, VectorSink,
     },
-    sinks::{util::SinkBatchSettings, Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::{StatusCode, Uri};
-use hyper::{Body, Request};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
-use tower::Service;
-use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct SematextMetricsService {
@@ -240,17 +244,17 @@ fn encode_events(
         // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = series.tags.unwrap_or_default();
         tags.insert("token".into(), token.into());
-
         let (metric_type, fields) = match data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
+        tags.insert("metric_type".into(), metric_type.into());
+
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
             &namespace,
-            metric_type,
             Some(tags),
             Some(fields),
             ts,
@@ -272,15 +276,16 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, Utc};
+    use futures::{stream, StreamExt};
+    use indoc::indoc;
+
     use super::*;
     use crate::{
         event::{metric::MetricKind, Event},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, test_generate_config, trace_init},
     };
-    use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
-    use indoc::indoc;
 
     #[test]
     fn generate_config() {

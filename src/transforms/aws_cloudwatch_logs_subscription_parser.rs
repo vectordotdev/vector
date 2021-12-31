@@ -1,3 +1,10 @@
+use std::iter;
+
+use serde::{Deserialize, Serialize};
+use shared::aws_cloudwatch_logs_subscription::{
+    AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
+};
+
 use super::Transform;
 use crate::{
     config::{
@@ -8,11 +15,6 @@ use crate::{
     internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
     transforms::FunctionTransform,
 };
-use serde::{Deserialize, Serialize};
-use shared::aws_cloudwatch_logs_subscription::{
-    AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
-};
-use std::iter;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -40,6 +42,10 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -127,10 +133,11 @@ fn subscription_event_to_events<'a>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{event::Event, log_event};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{event::Event, log_event};
 
     #[test]
     fn generate_config() {

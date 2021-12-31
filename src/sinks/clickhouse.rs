@@ -1,3 +1,11 @@
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -10,14 +18,6 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -276,15 +276,6 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "clickhouse-integration-tests")]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        config::{log_schema, SinkConfig, SinkContext},
-        sinks::util::encoding::TimestampFormat,
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{random_string, trace_init},
-    };
-    use futures::{future, stream};
-    use serde_json::Value;
     use std::{
         convert::Infallible,
         net::SocketAddr,
@@ -293,9 +284,22 @@ mod integration_tests {
             Arc,
         },
     };
+
+    use futures::{future, stream};
+    use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
     use warp::Filter;
+
+    use super::*;
+    use crate::{
+        config::{log_schema, SinkConfig, SinkContext},
+        sinks::util::encoding::TimestampFormat,
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            random_string, trace_init,
+        },
+    };
 
     #[tokio::test]
     async fn insert_events() {
@@ -659,6 +663,7 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct QueryResponse {
         data: Vec<Value>,
         meta: Vec<Value>,
@@ -667,6 +672,7 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct Stats {
         bytes_read: usize,
         elapsed: f64,

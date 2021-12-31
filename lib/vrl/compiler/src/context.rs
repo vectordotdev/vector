@@ -1,5 +1,6 @@
-use crate::{state::Runtime, Target};
 use shared::TimeZone;
+
+use crate::{state::Runtime, Target};
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,
@@ -34,7 +35,7 @@ impl<'a> Context<'a> {
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
     pub fn state_mut(&mut self) -> &mut Runtime {
-        &mut self.state
+        self.state
     }
 
     /// Get a reference to the [`TimeZone`]

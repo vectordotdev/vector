@@ -1,20 +1,21 @@
+use bytes::Bytes;
+use getset::Setters;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
     codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
     config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
-        util::{SocketListenAddr, TcpSource},
+        util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::Bytes;
-use getset::Setters;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -63,8 +64,9 @@ impl VectorConfig {
             self.shutdown_timeout_secs,
             tls,
             self.receive_buffer_bytes,
-            cx.shutdown,
-            cx.out,
+            cx,
+            false.into(),
+            None,
         )
     }
 
@@ -107,6 +109,7 @@ impl TcpSource for VectorSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
@@ -114,34 +117,24 @@ impl TcpSource for VectorSource {
             Box::new(VectorDeserializer),
         )
     }
+
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
+        TcpNullAcker
+    }
 }
 
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use super::VectorConfig;
-    use crate::shutdown::ShutdownSignal;
-    use crate::{
-        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
-        event::Event,
-        event::{
-            metric::{MetricKind, MetricValue},
-            Metric,
-        },
-        sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
-        Pipeline,
-    };
+    use std::net::SocketAddr;
+
     use futures::stream;
     use shared::assert_event_data_eq;
-    use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
-
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -149,6 +142,20 @@ mod test {
         futures::SinkExt,
         prost::Message,
         tokio_util::codec::{FramedWrite, LengthDelimitedCodec},
+    };
+
+    use super::VectorConfig;
+    use crate::{
+        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
+        event::{
+            metric::{MetricKind, MetricValue},
+            Event, Metric,
+        },
+        shutdown::ShutdownSignal,
+        sinks::vector::v1::VectorConfig as SinkConfig,
+        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        tls::{TlsConfig, TlsOptions},
+        Pipeline,
     };
 
     #[test]

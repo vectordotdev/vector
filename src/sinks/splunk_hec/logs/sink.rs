@@ -1,17 +1,18 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
+    partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
+use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
     sinks::{
@@ -20,8 +21,6 @@ use crate::{
     },
     template::Template,
 };
-
-use super::request_builder::HecLogsRequestBuilder;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -33,6 +32,7 @@ pub struct HecLogsSink<S> {
     pub index: Option<Template>,
     pub indexed_fields: Vec<String>,
     pub host: String,
+    pub timestamp_nanos_key: Option<String>,
 }
 
 impl<S> HecLogsSink<S>
@@ -48,6 +48,7 @@ where
         let index = self.index.as_ref();
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
+        let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -61,9 +62,10 @@ where
                     index,
                     host,
                     indexed_fields,
+                    timestamp_nanos_key,
                 ))
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -90,6 +92,18 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[derive(Default)]
+struct EventPartitioner;
+
+impl Partitioner for EventPartitioner {
+    type Item = HecProcessedEvent;
+    type Key = Option<Arc<str>>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        item.event.metadata().splunk_hec_token().clone()
     }
 }
 
@@ -124,6 +138,7 @@ pub fn process_log(
     index: Option<&Template>,
     host_key: &str,
     indexed_fields: &[String],
+    timestamp_nanos_key: Option<&str>,
 ) -> Option<HecProcessedEvent> {
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
@@ -138,6 +153,11 @@ pub fn process_log(
         Some(Value::Timestamp(ts)) => ts,
         _ => chrono::Utc::now(),
     };
+
+    if let Some(key) = timestamp_nanos_key {
+        log.try_insert_flat(key, timestamp.timestamp_subsec_nanos() % 1_000_000);
+    }
+
     let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
 
     let fields = indexed_fields

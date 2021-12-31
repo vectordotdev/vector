@@ -1,12 +1,15 @@
 //! Expiring Hash Map and related types. See [`ExpiringHashMap`].
 #![warn(missing_docs)]
 
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    fmt,
+    hash::Hash,
+    time::{Duration, Instant},
+};
+
 use futures::StreamExt;
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::fmt;
-use std::hash::Hash;
-use std::time::{Duration, Instant};
 use tokio::time::error::Error;
 use tokio_util::time::{delay_queue, DelayQueue};
 
@@ -215,9 +218,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::task::Poll;
+
     use tokio_test::{assert_pending, assert_ready, task};
+
+    use super::*;
 
     fn unwrap_ready<T>(poll: Poll<T>) -> T {
         assert_ready!(&poll);
@@ -239,7 +244,6 @@ mod tests {
         let mut map = ExpiringHashMap::<String, String>::default();
 
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-        map.remove("key");
 
         let mut fut = task::spawn(map.next_expired());
         assert_pending!(fut.poll());

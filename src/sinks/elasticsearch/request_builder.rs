@@ -1,12 +1,15 @@
-use crate::sinks::util::{Compression, RequestBuilder};
-
-use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-
-use crate::sinks::elasticsearch::service::ElasticSearchRequest;
-
-use crate::event::{EventFinalizers, Finalizable};
-use crate::sinks::util::encoding::EncodingConfigFixed;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    event::{EventFinalizers, Finalizable},
+    sinks::{
+        elasticsearch::{
+            encoder::{ElasticSearchEncoder, ProcessedEvent},
+            service::ElasticSearchRequest,
+        },
+        util::{encoding::EncodingConfigFixed, Compression, RequestBuilder},
+    },
+};
 
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,

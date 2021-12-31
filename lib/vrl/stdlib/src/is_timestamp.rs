@@ -65,8 +65,9 @@ impl Expression for IsTimestampFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
+
+    use super::*;
 
     test_function![
         is_timestamp => IsTimestamp;

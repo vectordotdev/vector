@@ -1,15 +1,24 @@
-use super::config::HecMetricsSinkConfig;
-use super::sink::{process_metric, HecProcessedEvent};
-use crate::event::{Metric, MetricKind, MetricValue};
-use crate::sinks::splunk_hec::metrics::encoder::HecMetricsEncoder;
-use crate::template::Template;
+use std::{collections::BTreeSet, sync::Arc};
+
 use chrono::{DateTime, Utc};
-use serde_json::json;
-use serde_json::Value as JsonValue;
+use futures_util::{stream, StreamExt};
+use serde_json::{json, Value as JsonValue};
 use shared::btreemap;
-use std::collections::BTreeSet;
-use std::convert::TryFrom;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::{Event, Metric, MetricKind, MetricValue},
+    ByteSizeOf,
+};
+
+use super::sink::{process_metric, HecProcessedEvent};
+use crate::{
+    config::{SinkConfig, SinkContext},
+    sinks::{
+        splunk_hec::metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
+        util::{test::build_test_server, Compression},
+    },
+    template::Template,
+    test_util::next_addr,
+};
 
 fn get_counter() -> Metric {
     let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
@@ -65,6 +74,14 @@ fn get_processed_event(
         default_namespace,
     )
     .unwrap()
+}
+
+fn get_event_with_token(token: &str) -> Event {
+    let mut event = Event::from(get_counter());
+    event
+        .metadata_mut()
+        .set_splunk_hec_token(Some(Arc::from(token)));
+    event
 }
 
 #[test]
@@ -297,4 +314,53 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
     .unwrap();
 
     assert_eq!(expected, actual);
+}
+
+#[tokio::test]
+async fn splunk_passthrough_token() {
+    let addr = next_addr();
+    let config = HecMetricsSinkConfig {
+        default_token: "token".into(),
+        endpoint: format!("http://{}", addr),
+        host_key: "host".into(),
+        index: None,
+        sourcetype: None,
+        source: None,
+        compression: Compression::None,
+        batch: Default::default(),
+        request: Default::default(),
+        tls: None,
+        acknowledgements: Default::default(),
+        default_namespace: None,
+    };
+    let cx = SinkContext::new_test();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server(addr);
+    tokio::spawn(server);
+
+    let events = vec![
+        get_event_with_token("passthrough-token-1"),
+        get_event_with_token("passthrough-token-2"),
+        Event::from(get_counter()),
+    ];
+
+    let _ = sink.run(stream::iter(events)).await.unwrap();
+
+    let mut tokens = rx
+        .take(3)
+        .map(|r| r.0.headers.get("Authorization").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    tokens.sort();
+    assert_eq!(
+        tokens,
+        vec![
+            "Splunk passthrough-token-1",
+            "Splunk passthrough-token-2",
+            "Splunk token"
+        ]
+    )
 }

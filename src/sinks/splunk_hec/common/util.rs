@@ -1,20 +1,23 @@
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, sync::Arc};
 
+use futures_util::future::BoxFuture;
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use snafu::{ResultExt, Snafu};
+use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+
+use super::{request::HecRequest, service::HttpRequestBuilder};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
     sinks::{
         self,
-        util::{Compression, SinkBatchSettings},
+        util::{http::HttpBatchService, SinkBatchSettings},
         UriParseError,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use snafu::{ResultExt, Snafu};
-use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -41,6 +44,24 @@ pub fn create_client(
     Ok(HttpClient::new(tls_settings, proxy_config)?)
 }
 
+pub fn build_http_batch_service(
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+) -> HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest> {
+    HttpBatchService::new(client, move |req: HecRequest| {
+        let request_builder = Arc::clone(&http_request_builder);
+        let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+            Box::pin(async move {
+                request_builder.build_request(
+                    req.body,
+                    "/services/collector/event",
+                    req.passthrough_token,
+                )
+            });
+        future
+    })
+}
+
 pub async fn build_healthcheck(
     endpoint: String,
     token: String,
@@ -61,25 +82,6 @@ pub async fn build_healthcheck(
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
         other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
-}
-
-pub async fn build_request(
-    endpoint: &str,
-    token: &str,
-    compression: Compression,
-    events: Vec<u8>,
-) -> crate::Result<Request<Vec<u8>>> {
-    let uri = build_uri(endpoint, "/services/collector/event").context(UriParseError)?;
-
-    let mut builder = Request::post(uri)
-        .header("Content-Type", "application/json")
-        .header("Authorization", format!("Splunk {}", token));
-
-    if let Some(ce) = compression.content_encoding() {
-        builder = builder.header("Content-Encoding", ce);
-    }
-
-    builder.body(events).map_err(Into::into)
 }
 
 pub fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
@@ -117,7 +119,7 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, build_request, create_client},
+        splunk_hec::common::{build_healthcheck, create_client, service::HttpRequestBuilder},
         util::Compression,
     };
 
@@ -204,9 +206,11 @@ mod tests {
         let token = "token";
         let compression = Compression::None;
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event", None)
             .unwrap();
 
         assert_eq!(
@@ -235,9 +239,11 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event", None)
             .unwrap();
 
         assert_eq!(
@@ -269,9 +275,11 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let err = build_request(endpoint, token, compression, events.clone())
-            .await
+        let err = http_request_builder
+            .build_request(events, "/services/collector/event", None)
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
@@ -279,12 +287,14 @@ mod tests {
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
-    use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
-    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
-    use http::StatusCode;
     use std::net::SocketAddr;
+
+    use http::StatusCode;
     use vector_core::config::proxy::ProxyConfig;
     use warp::Filter;
+
+    use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
+    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
@@ -334,9 +344,10 @@ mod integration_tests {
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 pub mod integration_test_helpers {
-    use crate::test_util::retry_until;
     use serde_json::Value as JsonValue;
     use tokio::time::Duration;
+
+    use crate::test_util::retry_until;
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";

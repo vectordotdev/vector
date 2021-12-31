@@ -1,3 +1,11 @@
+use std::{convert::Infallible, io};
+
+use bytes::{Buf, Bytes};
+use chrono::Utc;
+use flate2::read::MultiGzDecoder;
+use snafu::ResultExt;
+use warp::{http::StatusCode, Filter};
+
 use super::{
     errors::{Parse, RequestError},
     handlers,
@@ -9,12 +17,6 @@ use crate::{
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     Pipeline,
 };
-use bytes::{Buf, Bytes};
-use chrono::Utc;
-use flate2::read::MultiGzDecoder;
-use snafu::ResultExt;
-use std::{convert::Infallible, io};
-use warp::{http::StatusCode, Filter};
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(

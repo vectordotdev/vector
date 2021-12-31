@@ -1,7 +1,8 @@
-use crate::codecs::{decoding, encoding, CharacterDelimitedDecoder, CharacterDelimitedEncoder};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
+
+use crate::codecs::{decoding, encoding, CharacterDelimitedDecoder, CharacterDelimitedEncoder};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -67,7 +68,7 @@ pub struct NewlineDelimitedDecoder(CharacterDelimitedDecoder);
 impl NewlineDelimitedDecoder {
     /// Creates a new `NewlineDelimitedDecoder`.
     pub const fn new() -> Self {
-        Self(CharacterDelimitedDecoder::new('\n'))
+        Self(CharacterDelimitedDecoder::new(b'\n'))
     }
 
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
@@ -75,7 +76,7 @@ impl NewlineDelimitedDecoder {
     /// Any frames longer than `max_length` bytes will be discarded entirely.
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedDecoder::new_with_max_length(
-            '\n', max_length,
+            b'\n', max_length,
         ))
     }
 }
@@ -117,7 +118,7 @@ pub struct NewlineDelimitedEncoder(CharacterDelimitedEncoder);
 impl NewlineDelimitedEncoder {
     /// Creates a new `NewlineDelimitedEncoder`.
     pub const fn new() -> Self {
-        Self(CharacterDelimitedEncoder::new('\n'))
+        Self(CharacterDelimitedEncoder::new(b'\n'))
     }
 }
 
@@ -160,7 +161,6 @@ mod tests {
         let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
-        assert_eq!(decoder.decode(&mut input).unwrap(), None);
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "baz");
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
@@ -192,7 +192,6 @@ mod tests {
         let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "foo");
-        assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "baz");
         assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);
     }

@@ -1,14 +1,6 @@
-use crate::sinks::util::adaptive_concurrency::{
-    AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-};
-use crate::sinks::util::retries::{FixedRetryPolicy, RetryLogic};
-pub use crate::sinks::util::service::concurrency::{concurrency_is_none, Concurrency};
-pub use crate::sinks::util::service::map::Map;
-use crate::sinks::util::service::map::MapLayer;
-use crate::sinks::util::sink::{Response, ServiceLogic};
-use crate::sinks::util::{Batch, BatchSink, Partition, PartitionBatchSink};
-use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Duration};
+
+use serde::{Deserialize, Serialize};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -18,6 +10,20 @@ use tower::{
     Service, ServiceBuilder,
 };
 use vector_core::buffers::Acker;
+
+pub use crate::sinks::util::service::{
+    concurrency::{concurrency_is_none, Concurrency},
+    map::Map,
+};
+use crate::sinks::util::{
+    adaptive_concurrency::{
+        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+    },
+    retries::{FixedRetryPolicy, RetryLogic},
+    service::map::MapLayer,
+    sink::{Response, ServiceLogic},
+    Batch, BatchSink, Partition, PartitionBatchSink,
+};
 
 mod concurrency;
 mod map;
@@ -313,18 +319,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering::AcqRel},
+        Arc, Mutex,
+    };
+
+    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
+    use tokio::time::Duration;
+
     use super::*;
     use crate::sinks::util::{
         retries::{RetryAction, RetryLogic},
         sink::StdServiceLogic,
         BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
     };
-    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
-    use std::sync::{
-        atomic::{AtomicBool, Ordering::AcqRel},
-        Arc, Mutex,
-    };
-    use tokio::time::Duration;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -370,7 +378,7 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {

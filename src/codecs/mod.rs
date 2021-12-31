@@ -7,6 +7,7 @@ pub mod decoding;
 pub mod encoding;
 mod format;
 mod framing;
+mod ready_frames;
 
 pub use decoding::Decoder;
 pub use format::{
@@ -22,3 +23,4 @@ pub use framing::{
     NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, OctetCountingDecoder,
     OctetCountingDecoderConfig,
 };
+pub use ready_frames::ReadyFrames;

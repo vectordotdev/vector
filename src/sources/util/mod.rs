@@ -32,6 +32,22 @@ mod unix_stream;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
 mod wrappers;
 
+#[cfg(any(
+    all(feature = "sources-utils-tls", feature = "listenfd"),
+    feature = "codecs",
+))]
+pub use codecs::StreamDecodingError;
+pub use encoding_config::EncodingConfig;
+pub use multiline_config::MultilineConfig;
+#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
+pub use tcp::{SocketListenAddr, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
+#[cfg(all(unix, feature = "sources-socket",))]
+pub use unix_datagram::build_unix_datagram_source;
+#[cfg(all(unix, feature = "sources-utils-unix",))]
+pub use unix_stream::build_unix_stream_source;
+#[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
+pub use wrappers::AfterReadExt;
+
 #[cfg(any(feature = "sources-http"))]
 pub use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
@@ -47,18 +63,3 @@ pub use self::http::ErrorMessage;
 pub use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
 pub use self::http::HttpSourceAuthConfig;
-#[cfg(any(
-    all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "codecs",
-))]
-pub use codecs::StreamDecodingError;
-pub use encoding_config::EncodingConfig;
-pub use multiline_config::MultilineConfig;
-#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub use tcp::{SocketListenAddr, TcpSource};
-#[cfg(all(unix, feature = "sources-socket",))]
-pub use unix_datagram::build_unix_datagram_source;
-#[cfg(all(unix, feature = "sources-utils-unix",))]
-pub use unix_stream::build_unix_stream_source;
-#[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
-pub use wrappers::AfterReadExt;

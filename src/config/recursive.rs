@@ -1,7 +1,11 @@
-use super::loading::{component_name, load, open_file, read_dir};
-use super::Format;
 use std::path::Path;
+
 use toml::{value::Map, Value};
+
+use super::{
+    loading::{component_name, load, open_file, read_dir},
+    Format,
+};
 
 fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
     serde_toml_merge::merge(value, other).map_err(|err| vec![format!("{}", err)])
@@ -26,7 +30,7 @@ pub fn load_file(path: &Path) -> Result<Option<(String, toml::Value, Vec<String>
         open_file(path),
         Format::from_path(path),
     ) {
-        load(file, Some(format)).map(|(value, warnings)| Some((name, value, warnings)))
+        load(file, format).map(|(value, warnings)| Some((name, value, warnings)))
     } else {
         Ok(None)
     }
@@ -126,8 +130,9 @@ pub fn load_dir(path: &Path) -> Result<(Map<String, Value>, Vec<String>), Vec<St
 
 #[cfg(test)]
 mod tests {
-    use super::{load_dir, load_file_recursive};
     use std::fs;
+
+    use super::{load_dir, load_file_recursive};
 
     #[test]
     fn parse_dir_recursively() {

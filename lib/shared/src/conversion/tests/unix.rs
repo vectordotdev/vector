@@ -1,9 +1,11 @@
-use crate::conversion::tests::StubValue;
-use crate::conversion::{parse_timestamp, Conversion, Error};
-use crate::datetime::TimeZone;
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, TimeZone as _, Utc};
 use chrono_tz::{Australia, Tz};
+
+use crate::{
+    conversion::{parse_timestamp, tests::StubValue, Conversion, Error},
+    datetime::TimeZone,
+};
 
 const TIMEZONE_NAME: &str = "Australia/Brisbane";
 const TIMEZONE: Tz = Australia::Brisbane;

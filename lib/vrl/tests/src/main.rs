@@ -3,16 +3,20 @@
 
 mod test_enrichment;
 
+use std::str::FromStr;
+
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use glob::glob;
 use shared::TimeZone;
-use std::str::FromStr;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
-
 use vrl_tests::{docs, Test};
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -28,9 +32,6 @@ pub struct Cmd {
 
     #[structopt(short, long)]
     no_diff: bool,
-
-    #[structopt(long)]
-    skip_functions: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
@@ -120,7 +121,11 @@ fn main() {
             continue;
         }
 
-        let dots = 60 - test.name.len();
+        let dots = if test.name.len() >= 60 {
+            0
+        } else {
+            60 - test.name.len()
+        };
         print!(
             "  {}{}",
             test.name,

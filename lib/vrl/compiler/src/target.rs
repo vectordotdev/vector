@@ -1,5 +1,6 @@
-use crate::Value;
 use lookup::LookupBuf;
+
+use crate::Value;
 
 /// Any target object you want to remap using VRL has to implement this trait.
 pub trait Target: std::fmt::Debug {
@@ -51,4 +52,16 @@ pub trait Target: std::fmt::Debug {
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
     fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
+
+    fn get_metadata(&self, _key: &str) -> Result<Option<Value>, String> {
+        Err("metadata not available".to_string())
+    }
+
+    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
+        Err("metadata not available".to_string())
+    }
+
+    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+        Err("metadata not available".to_string())
+    }
 }

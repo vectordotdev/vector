@@ -9,10 +9,13 @@ import sys
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
-parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
-parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
 parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
 args = parser.parse_args()
+
+erratic_soaks = args.erratic_soaks.split(',')
 
 capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
 captures = []
@@ -68,7 +71,9 @@ for exp in csv.experiment.unique():
                           'Δ mean %': percent_change,
                           'baseline mean': baseline_mean,
                           'comparison mean': comparison_mean,
-                          'p-value': res.pvalue })
+                          'p-value': res.pvalue,
+                          'erratic': exp in erratic_soaks
+                          })
 ttest_results = pd.DataFrame.from_records(ttest_results)
 print("Table of test results:")
 print("")
@@ -77,6 +82,7 @@ print(ttest_results.to_markdown(index=False, tablefmt='github'))
 
 p_value_violation = ttest_results['p-value'] < args.p_value
 changes = ttest_results[p_value_violation]
+changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
 changes = changes[changes['Δ mean %'] <  -args.mean_drift_percentage]
 print("")
 print("Table normalized to only show regressions, {} p-value threshold, {} drift threshold:".format(args.p_value, args.mean_drift_percentage))

@@ -132,6 +132,12 @@ components: sources: splunk_hec: {
 				}
 			}
 		}
+		store_hec_token: {
+			common:      false
+			description: "When incoming requests contain a Splunk HEC token, if this setting is set to `true`, the token will kept in the event metadata and will be used if the event is sent to a Splunk HEC sink."
+			required:    false
+			type: bool: default: false
+		}
 	}
 
 	output: logs: event: {

@@ -1,12 +1,5 @@
-use crate::{
-    config::{self, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    internal_events::{
-        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
-        MongoDbMetricsRequestError,
-    },
-};
+use std::{collections::BTreeMap, time::Instant};
+
 use chrono::Utc;
 use futures::{
     future::{join_all, try_join_all},
@@ -20,9 +13,20 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, time::Instant};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{self, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::{
+        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
+        MongoDbMetricsRequestError,
+    },
+};
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -1034,10 +1038,11 @@ mod tests {
 
 #[cfg(all(test, feature = "mongodb_metrics-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{test_util::trace_init, Pipeline};
     use futures::StreamExt;
     use tokio::time::{timeout, Duration};
+
+    use super::*;
+    use crate::{test_util::trace_init, Pipeline};
 
     async fn test_instance(endpoint: &'static str) {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();

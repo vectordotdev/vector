@@ -1,19 +1,7 @@
-use super::util::MultilineConfig;
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    docker::{docker, DockerTlsConfig},
-    event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, PathComponent, PathIter, Value},
-    internal_events::{
-        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
-        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
-        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
-        DockerLogsTimestampParseFailed,
-    },
-    line_agg::{self, LineAgg},
-    shutdown::ShutdownSignal,
-    Pipeline,
+use std::{
+    collections::HashMap, convert::TryFrom, future::ready, pin::Pin, sync::Arc, time::Duration,
 };
+
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
     errors::Error as DockerError,
@@ -26,15 +14,25 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{
-    future::ready,
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
-    {collections::HashMap, convert::TryFrom},
-};
-
 use tokio::sync::mpsc;
+
+use super::util::MultilineConfig;
+use crate::{
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    docker::{docker, DockerTlsConfig},
+    event::{
+        self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
+    },
+    internal_events::{
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
+        DockerLogsTimestampParseFailed,
+    },
+    line_agg::{self, LineAgg},
+    shutdown::ShutdownSignal,
+    Pipeline,
+};
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -1046,11 +1044,6 @@ mod tests {
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        test_util::{collect_n, collect_ready, trace_init},
-        Pipeline,
-    };
     use bollard::{
         container::{
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
@@ -1059,6 +1052,12 @@ mod integration_tests {
         image::{CreateImageOptions, ListImagesOptions},
     };
     use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
+
+    use super::*;
+    use crate::{
+        test_util::{collect_n, collect_ready, trace_init},
+        Pipeline,
+    };
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(

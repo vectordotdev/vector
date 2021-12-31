@@ -1,11 +1,13 @@
-use super::state;
-use crate::config::ComponentKey;
 use std::sync::Arc;
+
 use tokio_stream::StreamExt;
 use vector_api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };
+
+use super::state;
+use crate::config::ComponentKey;
 
 /// Components that have been added
 async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {

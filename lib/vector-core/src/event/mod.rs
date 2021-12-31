@@ -1,5 +1,11 @@
-use crate::ByteSizeOf;
-use buffers::bytes::{DecodeBytes, EncodeBytes};
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    sync::Arc,
+};
+
+use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
@@ -12,15 +18,12 @@ pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
-use std::collections::{BTreeMap, HashMap};
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::sync::Arc;
-pub use util::log::PathComponent;
-pub use util::log::PathIter;
+pub use util::log::{PathComponent, PathIter};
 pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
+
+use crate::ByteSizeOf;
 
 pub mod discriminant;
 pub mod error;
@@ -417,6 +420,6 @@ impl DecodeBytes<Event> for Event {
     where
         B: Buf,
     {
-        proto::EventWrapper::decode(buffer).map(|wrp| wrp.into())
+        proto::EventWrapper::decode(buffer).map(Into::into)
     }
 }

@@ -1,13 +1,12 @@
 //! `observer` is a program that inspects a prometheus with a configured query,
 //! writes the result out to disk. It replaces curl-in-a-loop in our soak infra.
+use std::{borrow::Cow, fs, io::Read, time::Duration};
+
 use argh::FromArgs;
 use reqwest::Url;
 use serde::Deserialize;
 use snafu::Snafu;
-use std::time::Duration;
-use std::{borrow::Cow, fs, io::Read};
-use tokio::runtime::Builder;
-use tokio::time::sleep;
+use tokio::{runtime::Builder, time::sleep};
 use tracing::{debug, error, info};
 
 fn default_config_path() -> String {
@@ -114,14 +113,12 @@ struct QueryResult {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryData {
-    result_type: String,
     result: Vec<QueryResult>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryResponse {
-    status: Status,
     data: QueryData,
 }
 

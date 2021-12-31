@@ -1,3 +1,11 @@
+use std::convert::TryFrom;
+
+use async_trait::async_trait;
+use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use vector_core::buffers::Acker;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -8,12 +16,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-use async_trait::async_trait;
-use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
-use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -206,8 +208,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::{encode_event, Encoding, EncodingConfig};
+    use super::{encode_event, Encoding, EncodingConfig, *};
     use crate::event::{Event, Value};
 
     #[test]
@@ -241,9 +242,10 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::{thread, time::Duration};
+
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use std::{thread, time::Duration};
 
     #[tokio::test]
     async fn nats_happy() {
@@ -268,7 +270,7 @@ mod integration_tests {
         let sub = consumer.subscribe(&subject).await.unwrap();
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);

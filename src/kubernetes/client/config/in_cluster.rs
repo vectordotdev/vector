@@ -1,9 +1,10 @@
 //! Everything related to building in-cluster configuration.
 
-use super::Config;
-use crate::tls::TlsOptions;
 use http::Uri;
 use snafu::{ResultExt, Snafu};
+
+use super::Config;
+use crate::tls::TlsOptions;
 
 impl Config {
     /// Prepares a config suitable for use when running in k8s cluster.

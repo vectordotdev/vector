@@ -6,3 +6,4 @@ yum makecache
 
 yum install -y centos-release-scl
 yum install -y llvm-toolset-7
+yum install -y perl-core

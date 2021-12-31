@@ -17,6 +17,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -33,6 +34,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-debug-tarball:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -56,6 +58,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -80,6 +83,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -97,6 +101,7 @@ jobs:
   build-aarch64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -122,6 +127,7 @@ jobs:
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -146,6 +152,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -357,7 +364,7 @@ jobs:
       - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: Login to DockerHub
-        uses: docker/login-action@v1.10.0
+        uses: docker/login-action@v1.12.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}

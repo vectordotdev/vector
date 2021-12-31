@@ -1,19 +1,5 @@
-use super::util::finalizer::OrderedFinalizer;
-use super::util::{EncodingConfig, MultilineConfig};
-use crate::config::AcknowledgementsConfig;
-use crate::serde::bool_or_struct;
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
-    internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
-    },
-    line_agg::{self, LineAgg},
-    shutdown::ShutdownSignal,
-    trace::{current_span, Instrument},
-    Pipeline,
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
@@ -28,10 +14,25 @@ use futures::{
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
-use std::path::PathBuf;
-use std::time::Duration;
 use tokio::task::spawn_blocking;
+
+use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    encoding_transcode::{Decoder, Encoder},
+    event::{BatchNotifier, Event, LogEvent},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
+    line_agg::{self, LineAgg},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    trace::{current_span, Instrument},
+    Pipeline,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -331,7 +332,7 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
-        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+        let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -482,6 +483,18 @@ fn create_event(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        future::Future,
+        io::{Seek, Write},
+    };
+
+    use encoding_rs::UTF_16LE;
+    use pretty_assertions::assert_eq;
+    use tempfile::tempdir;
+    use tokio::time::{sleep, timeout, Duration};
+
     use super::*;
     use crate::{
         config::Config,
@@ -490,16 +503,6 @@ mod tests {
         sources::file,
         test_util::components::{self, SOURCE_TESTS},
     };
-    use encoding_rs::UTF_16LE;
-    use pretty_assertions::assert_eq;
-    use std::{
-        collections::HashSet,
-        fs::{self, File},
-        future::Future,
-        io::{Seek, Write},
-    };
-    use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -1146,8 +1149,10 @@ mod tests {
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
     async fn file_start_position_ignore_old_files() {
-        use std::os::unix::io::AsRawFd;
-        use std::time::{Duration, SystemTime};
+        use std::{
+            os::unix::io::AsRawFd,
+            time::{Duration, SystemTime},
+        };
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {

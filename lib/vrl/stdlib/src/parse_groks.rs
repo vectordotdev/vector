@@ -1,9 +1,9 @@
+use std::{collections::BTreeMap, fmt};
+
 use datadog_grok::{
     parse_grok,
     parse_grok_rules::{self, GrokRule},
 };
-use std::collections::BTreeMap;
-use std::fmt;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -191,8 +191,9 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_grok => ParseGroks;
@@ -325,7 +326,7 @@ mod test {
                     "_auth": r#"%{notSpace:http.auth:nullIf("-")}"#,
                     "_bytes_written": r#"%{integer:network.bytes_written}"#,
                     "_client_ip": r#"%{ipOrHost:network.client.ip}"#,
-                    "_version": r#"HTTP\/(?<http.version>\d+\.\d+)"#,
+                    "_version": r#"HTTP\/%{regex("\\d+\\.\\d+"):http.version}"#,
                     "_url": r#"%{notSpace:http.url}"#,
                     "_ident": r#"%{notSpace:http.ident}"#,
                     "_user_agent": r#"%{regex("[^\\\"]*"):http.useragent}"#,

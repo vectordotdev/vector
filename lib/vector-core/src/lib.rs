@@ -25,6 +25,7 @@
 pub mod api;
 pub mod config;
 pub mod event;
+pub mod fanout;
 pub mod mapping;
 pub mod metrics;
 pub mod sink;
@@ -37,13 +38,11 @@ pub mod partition;
 pub mod serde;
 pub mod stream;
 pub mod time;
-pub use core_common::byte_size_of::ByteSizeOf;
+use std::path::PathBuf;
 
 #[cfg(any(test, feature = "test"))]
 pub use core_common::event_test_util;
-pub use core_common::internal_event;
-
-use std::path::PathBuf;
+pub use core_common::{byte_size_of::ByteSizeOf, internal_event};
 
 #[macro_use]
 extern crate derivative;

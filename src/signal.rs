@@ -1,6 +1,7 @@
-use super::config::ConfigBuilder;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::{Stream, StreamExt};
+
+use super::config::ConfigBuilder;
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = mpsc::Sender<SignalTo>;
@@ -8,6 +9,7 @@ pub type SignalRx = mpsc::Receiver<SignalTo>;
 
 #[derive(Debug)]
 /// Control messages used by Vector to drive topology and shutdown events.
+#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum SignalTo {
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),

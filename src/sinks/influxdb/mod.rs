@@ -1,15 +1,16 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::http::HttpClient;
+use std::collections::{BTreeMap, HashMap};
+
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use snafu::Snafu;
-use std::collections::{BTreeMap, HashMap};
+use snafu::{ResultExt, Snafu};
 use tower::Service;
+
+use crate::http::HttpClient;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -171,7 +172,6 @@ fn healthcheck(
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
-    metric_type: &str,
     tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
@@ -188,8 +188,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
-    unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
+    let unwrapped_tags = tags.unwrap_or_default();
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
 
@@ -308,11 +307,12 @@ pub(in crate::sinks) fn encode_uri(
 #[cfg(test)]
 #[allow(dead_code)]
 pub mod test_util {
+    use std::{fs::File, io::Read};
+
+    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+
     use super::*;
     use crate::tls;
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
-    use std::fs::File;
-    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";

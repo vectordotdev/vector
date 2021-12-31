@@ -1,8 +1,9 @@
-use serde_json::{value::RawValue, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
     mem,
 };
+
+use serde_json::{value::RawValue, Value};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
@@ -48,7 +49,7 @@ where
     T: ByteSizeOf,
 {
     fn allocated_bytes(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.size_of())
+        self.iter().map(ByteSizeOf::size_of).sum()
     }
 }
 
@@ -57,7 +58,16 @@ where
     T: ByteSizeOf,
 {
     fn allocated_bytes(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.size_of())
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl<T> ByteSizeOf for &[T]
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
     }
 }
 
@@ -66,7 +76,7 @@ where
     T: ByteSizeOf,
 {
     fn allocated_bytes(&self) -> usize {
-        self.as_ref().map_or(0, |x| x.allocated_bytes())
+        self.as_ref().map_or(0, ByteSizeOf::allocated_bytes)
     }
 }
 

@@ -7,13 +7,17 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{self, Controller};
-use crate::sinks::VectorSink;
+use std::env;
+
 use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
-use std::env;
 use vector_core::event_test_util;
+
+use crate::{
+    event::{Event, Metric, MetricValue},
+    metrics::{self, Controller},
+    sinks::VectorSink,
+};
 
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];

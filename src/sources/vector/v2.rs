@@ -1,6 +1,19 @@
+use std::net::SocketAddr;
+
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use tokio::net::TcpStream;
+use tonic::{
+    transport::{server::Connected, Certificate, Server},
+    Request, Response, Status,
+};
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
+
 use crate::{
-    config::SourceContext,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceContext},
     internal_events::{EventsReceived, TcpBytesReceived},
     proto::vector as proto,
     serde::bool_or_struct,
@@ -9,17 +22,6 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use tokio::net::TcpStream;
-use tonic::{
-    transport::{server::Connected, Certificate, Server},
-    Request, Response, Status,
-};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
-use vector_core::ByteSizeOf;
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -200,12 +202,15 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::SinkContext;
-    use crate::sinks::vector::v2::VectorConfig as SinkConfig;
-    use crate::test_util::{self, components};
-    use crate::Pipeline;
     use shared::assert_event_data_eq;
+
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        sinks::vector::v2::VectorConfig as SinkConfig,
+        test_util::{self, components},
+        Pipeline,
+    };
 
     #[tokio::test]
     async fn receive_message() {

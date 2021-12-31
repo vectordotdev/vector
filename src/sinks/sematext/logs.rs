@@ -1,18 +1,22 @@
-use super::Region;
-use crate::sinks::elasticsearch::ElasticSearchEncoder;
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, StreamSink};
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::{http::RequestConfig, BatchConfig, Compression, TowerRequestConfig},
-    sinks::{Healthcheck, VectorSink},
-};
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+
+use super::Region;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    sinks::{
+        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -66,8 +70,15 @@ impl SinkConfig for SematextLogsConfig {
         let (sink, healthcheck) = ElasticSearchConfig {
             endpoint,
             compression: Compression::None,
-            doc_type: Some("logs".to_string()),
-            index: Some(self.token.clone()),
+            doc_type: Some(
+                "\
+            logs"
+                    .to_string(),
+            ),
+            bulk: Some(BulkConfig {
+                action: None,
+                index: Some(self.token.clone()),
+            }),
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,
@@ -123,15 +134,18 @@ fn map_timestamp(mut event: Event) -> Event {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use indoc::indoc;
+
     use super::*;
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server, load_sink},
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            next_addr, random_lines_with_stream,
+        },
     };
-    use futures::StreamExt;
-    use indoc::indoc;
 
     #[test]
     fn generate_config() {

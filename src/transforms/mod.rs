@@ -71,7 +71,8 @@ pub mod throttle;
 pub mod tokenizer;
 
 pub use vector_core::transform::{
-    FallibleFunctionTransform, FunctionTransform, TaskTransform, Transform,
+    FunctionTransform, SyncTransform, TaskTransform, Transform, TransformOutputs,
+    TransformOutputsBuf,
 };
 
 #[derive(Debug, Snafu)]
@@ -85,8 +86,9 @@ enum BuildError {
 
 #[cfg(test)]
 mod test {
-    use crate::event::Event;
     use vector_core::transform::FunctionTransform;
+
+    use crate::event::Event;
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///

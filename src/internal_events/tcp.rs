@@ -1,9 +1,11 @@
 // ## skip check-events ##
 
-use crate::tls::TlsError;
-use metrics::counter;
 use std::net::IpAddr;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use crate::tls::TlsError;
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {

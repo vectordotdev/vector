@@ -1,3 +1,19 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::ready,
+    num::NonZeroU64,
+    task::Poll,
+};
+
+use bytes::Bytes;
+use futures::{future::BoxFuture, stream, SinkExt};
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::{
+    event::metric::{MetricSketch, Quantile},
+    ByteSizeOf,
+};
+
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
@@ -22,18 +38,6 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
-use futures::{future::BoxFuture, stream, SinkExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    num::NonZeroU64,
-    task::Poll,
-};
-use tower::Service;
-use vector_core::event::metric::{MetricSketch, Quantile};
-use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct InfluxDbSvc {
@@ -258,11 +262,12 @@ fn encode_events(
         let tags = merge_tags(&event, tags);
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
+        let mut unwrapped_tags = tags.unwrap_or_default();
+        unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
         if let Err(error) = influx_line_protocol(
             protocol_version,
             &fullname,
-            metric_type,
-            tags,
+            Some(unwrapped_tags),
             fields,
             ts,
             &mut output,
@@ -400,14 +405,29 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts},
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<InfluxDbConfig>();
+    }
+
+    #[test]
+    fn test_config_with_tags() {
+        let config = indoc! {r#"
+            namespace = "vector"
+            endpoint = "http://localhost:9999"
+            tags = {region="us-west-1"}
+        "#};
+
+        toml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
     #[test]
@@ -875,10 +895,16 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use chrono::{SecondsFormat, Utc};
+    use futures::stream;
+    use pretty_assertions::assert_eq;
+
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::Event,
+        event::{
+            metric::{Metric, MetricKind, MetricValue},
+            Event,
+        },
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
@@ -890,9 +916,6 @@ mod integration_tests {
         },
         tls::{self, TlsOptions},
     };
-    use chrono::{SecondsFormat, Utc};
-    use futures::stream;
-    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {

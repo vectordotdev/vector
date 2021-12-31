@@ -1,23 +1,24 @@
-use crate::sources::statsd::parser::ParseError;
-use crate::udp;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+use bytes::Bytes;
+use futures::{SinkExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use tokio::net::UdpSocket;
+use tokio_util::udp::UdpFramed;
+
+use self::parser::ParseError;
+use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
-    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    udp, Pipeline,
 };
-use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use tokio::net::UdpSocket;
-use tokio_util::udp::UdpFramed;
 
 pub mod parser;
 #[cfg(unix)]
@@ -60,6 +61,7 @@ struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
+    connection_limit: Option<u32>,
 }
 
 impl TcpConfig {
@@ -72,6 +74,7 @@ impl TcpConfig {
             tls: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
+            connection_limit: None,
         }
     }
 }
@@ -109,8 +112,9 @@ impl SourceConfig for StatsdConfig {
                     config.shutdown_timeout_secs,
                     tls,
                     config.receive_buffer_bytes,
-                    cx.shutdown,
-                    cx.out,
+                    cx,
+                    false.into(),
+                    config.connection_limit,
                 )
             }
             #[cfg(unix)]
@@ -214,6 +218,7 @@ impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
@@ -221,21 +226,28 @@ impl TcpSource for StatsdTcpSource {
             Box::new(StatsdDeserializer),
         )
     }
+
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
+        TcpNullAcker
+    }
 }
 
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
+    use futures::channel::mpsc;
+    use hyper::body::to_bytes as body_to_bytes;
+    use tokio::{
+        io::AsyncWriteExt,
+        time::{sleep, Duration},
+    };
+
     use super::*;
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::channel::mpsc;
-    use hyper::body::to_bytes as body_to_bytes;
-    use tokio::io::AsyncWriteExt;
-    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {

@@ -34,7 +34,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v1.12.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -42,7 +42,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@a2e02890a0d28163b34ac2e4b575b9264a5ee3e2
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
         with:
           images: ghcr.io/${{ github.repository }}/soak-observer
           flavor: |

@@ -1,3 +1,9 @@
+use std::collections::BTreeMap;
+
+use async_stream::stream;
+use tokio::time::Duration;
+use tokio_stream::{Stream, StreamExt};
+
 use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
     SentEventsTotal,
@@ -7,10 +13,6 @@ use crate::{
     event::{Metric, MetricValue},
     metrics::Controller,
 };
-use async_stream::stream;
-use std::collections::BTreeMap;
-use tokio::time::Duration;
-use tokio_stream::{Stream, StreamExt};
 
 fn get_controller() -> &'static Controller {
     Controller::get().expect("Metrics system not initialized. Please report.")

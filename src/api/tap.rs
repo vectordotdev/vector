@@ -1,20 +1,21 @@
-use super::{ShutdownRx, ShutdownTx};
-use crate::topology::fanout::ControlChannel;
-use crate::{
-    config::{ComponentKey, OutputId},
-    event::{Event, LogEvent},
-    topology::{fanout, WatchRx},
-};
-use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
-use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     iter::FromIterator,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
+use itertools::Itertools;
 use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
 use uuid::Uuid;
+
+use super::{ShutdownRx, ShutdownTx};
+use crate::{
+    config::{ComponentKey, OutputId},
+    event::{Event, LogEvent},
+    topology::{fanout, fanout::ControlChannel, WatchRx},
+};
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
@@ -250,7 +251,7 @@ async fn tap_handler(
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
                                 .await
                             {
                                 Ok(_) => {
@@ -320,11 +321,11 @@ async fn tap_handler(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::event::{Metric, MetricKind, MetricValue};
     use futures::SinkExt;
     use tokio::sync::watch;
+
+    use super::*;
+    use crate::event::{Metric, MetricKind, MetricValue};
 
     #[test]
     /// Patterns should accept globbing.

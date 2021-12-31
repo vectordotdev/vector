@@ -75,7 +75,7 @@ jobs:
             cue:
               - 'website/cue/**'
             markdown:
-              - '*/**.md'
+              - '**/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -91,8 +91,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -127,9 +128,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -179,7 +181,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -219,7 +221,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.4.0
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -268,6 +270,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -292,6 +295,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -317,6 +321,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -346,7 +351,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -388,12 +393,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.6
+        uses: EmbarkStudios/cargo-deny-action@v1.2.9
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.6
+        uses: EmbarkStudios/cargo-deny-action@v1.2.9
         with:
           command: check licenses
       - name: Check Cue docs

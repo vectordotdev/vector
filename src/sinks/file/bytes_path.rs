@@ -1,7 +1,8 @@
 //! Fun little hack around bytes and OsStr
 
-use bytes::Bytes;
 use std::path::Path;
+
+use bytes::Bytes;
 
 #[derive(Debug, Clone)]
 pub struct BytesPath {

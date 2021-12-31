@@ -1,11 +1,13 @@
-use super::Value;
+use std::{collections::BTreeMap, convert::TryFrom, fmt};
+
 use bytes::Bytes;
 use chrono::SecondsFormat;
-use serde::de::{Error, MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::fmt;
+use serde::{
+    de::{Error, MapAccess, SeqAccess, Visitor},
+    Deserialize, Serialize, Serializer,
+};
+
+use super::Value;
 
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

@@ -1,5 +1,3 @@
-use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 #[cfg(target_os = "linux")]
@@ -9,6 +7,9 @@ use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
+
+use super::{filter_result, FilterList, HostMetrics};
+use crate::event::metric::Metric;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(super) struct NetworkConfig {
@@ -104,9 +105,13 @@ impl HostMetrics {
 // these tests to always fail.
 #[cfg(all(test, not(target_os = "windows")))]
 mod tests {
-    use super::super::tests::{all_counters, assert_filtered_metrics, count_tag};
-    use super::super::{HostMetrics, HostMetricsConfig};
-    use super::NetworkConfig;
+    use super::{
+        super::{
+            tests::{all_counters, assert_filtered_metrics, count_tag},
+            HostMetrics, HostMetricsConfig,
+        },
+        NetworkConfig,
+    };
 
     #[tokio::test]
     async fn generates_network_metrics() {

@@ -355,6 +355,7 @@ _values: {
 
 #Type: {
 	_args: {
+		name:     !=""
 		arrays:   true
 		required: bool
 	}
@@ -365,7 +366,66 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	{"array": #TypeArray & {_args: required: Args.required}} |
+	{"condition": #TypeCondition & {_args: required: Args.required}} |
 	#TypePrimitive
+}
+
+#TypeCondition: {
+	_args: {
+		required: bool
+	}
+	let Args = _args
+	required: Args.required
+
+	#Syntax: {
+		name:        !=""
+		description: !=""
+		example:     !=""
+	}
+
+	syntaxes: [#Syntax, ...#Syntax] & [
+			{
+			name:        "vrl"
+			description: """
+				A [Vector Remap Language](\(urls.vrl_reference)) (VRL) [Boolean
+				expression](\(urls.vrl_boolean_expression)).
+				"""
+			example:     #".status_code != 200 && !includes(["info", "debug"], .severity)"#
+		},
+		{
+			name:        "datadog_search"
+			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
+			example:     #"*stack"#
+		},
+	]
+
+	options: {
+		source: {
+			description: "The text of the condition. The syntax of the condition depends on the value of `type`."
+		}
+
+		type: {
+			description: """
+				The type of condition to supply. See **Available syntaxes** below for a list of available types for this
+				transform.
+				"""
+		}
+	}
+
+	shorthand_explainer: {
+		title:       "Shorthand for VRL"
+		description: """
+			If you opt for the [`vrl`](\(urls.vrl_reference)) syntax for this condition, you can set the condition
+			as a string via the `condition` parameter, without needing to specify both a `source` and a `type`. The
+			table below shows some examples:
+
+			Config format | Example
+			:-------------|:-------
+			[TOML](\(urls.toml)) | `condition = ".status == 200"`
+			[YAML](\(urls.yaml)) | `condition: .status == 200`
+			[JSON](\(urls.json)) | `"condition": ".status == 200"`
+			"""
+	}
 }
 
 #TypePrimitive: {
@@ -384,6 +444,7 @@ _values: {
 	{"float": #TypeFloat & {_args: required: Args.required}} |
 	{"object": #TypeObject & {_args: required: Args.required}} |
 	{"string": #TypeString & {_args: required: Args.required}} |
+	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
 	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
 	{"uint": #TypeUint & {_args: required: Args.required}}
 }
@@ -470,7 +531,19 @@ _values: {
 		]
 	}
 
-	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+}
+
+#TypeAsciiChar: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: string | null
+	}
+
+	examples?: [string, ...string]
 }
 
 #TypeTimestamp: {

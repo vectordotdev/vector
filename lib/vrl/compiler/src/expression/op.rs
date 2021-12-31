@@ -1,8 +1,12 @@
-use crate::expression::{self, Expr, Noop, Resolved};
-use crate::parser::{ast, Node};
-use crate::{value, Context, Expression, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use std::fmt;
+
+use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
+
+use crate::{
+    expression::{self, Expr, Noop, Resolved},
+    parser::{ast, Node},
+    value, Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Clone, PartialEq)]
 pub struct Op {
@@ -347,12 +351,17 @@ impl DiagnosticError for Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::expression::{Block, IfStatement, Literal, Predicate};
-    use crate::{test_type_def, value::Kind};
+    use std::convert::TryInto;
+
     use ast::Opcode::*;
     use ordered_float::NotNan;
-    use std::convert::TryInto;
+
+    use super::*;
+    use crate::{
+        expression::{Block, IfStatement, Literal, Predicate},
+        test_type_def,
+        value::Kind,
+    };
 
     fn op(
         opcode: ast::Opcode,

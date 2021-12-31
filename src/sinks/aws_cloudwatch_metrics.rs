@@ -1,6 +1,26 @@
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::{self, RegionOrEndpoint};
+use std::{
+    collections::BTreeMap,
+    convert::TryInto,
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use chrono::{DateTime, SecondsFormat, Utc};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
+use rusoto_cloudwatch::{
+    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
+};
+use rusoto_core::{Region, RusotoError};
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 use crate::{
+    aws::{
+        auth::AwsAuthentication,
+        rusoto::{self, RegionOrEndpoint},
+    },
     config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
@@ -14,28 +34,10 @@ use crate::{
         TowerRequestConfig,
     },
 };
-use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use rusoto_cloudwatch::{
-    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
-};
-use rusoto_core::{Region, RusotoError};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    convert::TryInto,
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::Service;
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudWatchClient,
-    config: CloudWatchMetricsSinkConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -146,7 +148,7 @@ impl CloudWatchMetricsSvc {
             ..Default::default()
         });
 
-        let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
+        let cloudwatch_metrics = CloudWatchMetricsSvc { client };
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
@@ -292,10 +294,11 @@ fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn generate_config() {
@@ -313,7 +316,7 @@ mod tests {
     fn svc() -> CloudWatchMetricsSvc {
         let config = config();
         let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        CloudWatchMetricsSvc { client, config }
+        CloudWatchMetricsSvc { client }
     }
 
     #[test]
@@ -439,14 +442,14 @@ mod tests {
 #[cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        event::metric::StatisticKind,
-        event::{Event, MetricKind},
-        test_util::random_string,
-    };
     use chrono::offset::TimeZone;
     use rand::seq::SliceRandom;
+
+    use super::*;
+    use crate::{
+        event::{metric::StatisticKind, Event, MetricKind},
+        test_util::random_string,
+    };
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {

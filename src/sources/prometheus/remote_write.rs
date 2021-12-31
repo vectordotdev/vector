@@ -1,3 +1,11 @@
+use std::{collections::HashMap, net::SocketAddr};
+
+use bytes::Bytes;
+use prometheus_parser::proto;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use warp::http::{HeaderMap, StatusCode};
+
 use super::parser;
 use crate::{
     config::{
@@ -13,12 +21,6 @@ use crate::{
     },
     tls::TlsConfig,
 };
-use bytes::Bytes;
-use prometheus_parser::proto;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
-use warp::http::{HeaderMap, StatusCode};
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
 
@@ -111,7 +113,7 @@ impl HttpSource for RemoteWriteSource {
         if header_map
             .get("Content-Encoding")
             .map(|header| header.as_ref())
-            != Some(b"snappy")
+            != Some(&b"snappy"[..])
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
@@ -122,6 +124,10 @@ impl HttpSource for RemoteWriteSource {
 
 #[cfg(test)]
 mod test {
+    use chrono::{SubsecRound as _, Utc};
+    use futures::stream;
+    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
+
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -130,9 +136,6 @@ mod test {
         tls::MaybeTlsSettings,
         Pipeline,
     };
-    use chrono::{SubsecRound as _, Utc};
-    use futures::stream;
-    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
     fn generate_config() {
@@ -240,9 +243,10 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{test_util, test_util::components, Pipeline};
-    use tokio::time::Duration;
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
 

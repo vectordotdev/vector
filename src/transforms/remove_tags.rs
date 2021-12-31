@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -69,10 +70,13 @@ impl FunctionTransform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::transforms::test::transform_one;
     use shared::btreemap;
+
+    use super::*;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue},
+        transforms::test::transform_one,
+    };
 
     #[test]
     fn generate_config() {

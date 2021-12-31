@@ -1,5 +1,6 @@
-use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use std::collections::BTreeMap;
+
+use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -121,8 +122,9 @@ fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
+
+    use super::*;
 
     test_function![
         parse_aws_cloudwatch_log_subscription_message => ParseAwsCloudWatchLogSubscriptionMessage;

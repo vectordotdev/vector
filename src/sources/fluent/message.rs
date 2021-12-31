@@ -1,8 +1,7 @@
-use chrono::serde::ts_seconds;
-use chrono::{DateTime, TimeZone, Utc};
-use serde::Deserialize;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::{collections::BTreeMap, convert::TryInto};
+
+use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
 use vector_core::event::Value;
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
@@ -14,7 +13,7 @@ use vector_core::event::Value;
 /// Not yet handled are the handshake messages.
 ///
 /// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#event-modes
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub(super) enum FluentMessage {
     Message(FluentTag, FluentTimestamp, FluentRecord),
@@ -39,18 +38,18 @@ pub(super) enum FluentMessage {
 /// Server options sent by client.
 ///
 /// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(super) struct FluentMessageOptions {
-    size: Option<u64>,     // client provided hint for the number of entries
-    chunk: Option<String>, // unused right now, would be used for acks
+    pub(super) size: Option<u64>, // client provided hint for the number of entries
+    pub(super) chunk: Option<String>, // client provided chunk identifier for acks
     pub(super) compressed: Option<String>, // this one is required if present
 }
 
 /// Fluent entry consisting of timestamp and record.
 ///
 /// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub(super) struct FluentEntry(pub(super) FluentTimestamp, pub(super) FluentRecord);
 
 /// Fluent record is just key/value pairs.
@@ -62,7 +61,7 @@ pub(super) type FluentTag = String;
 /// Custom decoder for Fluent's EventTime msgpack extension.
 ///
 /// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub(super) struct FluentEventTime(DateTime<Utc>);
 
 impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
@@ -128,8 +127,14 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
 /// Value for fluent record key.
 ///
 /// Used mostly just to implement value conversion.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub(super) struct FluentValue(rmpv::Value);
+
+impl From<rmpv::Value> for FluentValue {
+    fn from(value: rmpv::Value) -> Self {
+        Self(value)
+    }
+}
 
 impl From<FluentValue> for Value {
     fn from(value: FluentValue) -> Self {
@@ -187,7 +192,7 @@ impl From<FluentValue> for Value {
 /// Fluent message timestamp.
 ///
 /// Message timestamps can be a unix timestamp or EventTime messagepack ext.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub(super) enum FluentTimestamp {
     #[serde(with = "ts_seconds")]
@@ -207,11 +212,13 @@ impl From<FluentTimestamp> for Value {
 
 #[cfg(test)]
 mod test {
-    use crate::sources::fluent::message::FluentValue;
+    use std::collections::BTreeMap;
+
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
-    use std::collections::BTreeMap;
     use vector_core::event::Value;
+
+    use crate::sources::fluent::message::FluentValue;
 
     quickcheck! {
       fn from_bool(input: bool) -> () {
