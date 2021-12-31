@@ -11,7 +11,7 @@ use tokio::time::timeout;
 
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{log_schema, SourceConfig, SourceContext},
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
     test_util::random_string,
