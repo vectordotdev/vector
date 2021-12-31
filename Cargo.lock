@@ -445,9 +445,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bab175edd22a3f32cbdeb22ade3f0b2ad6831bf696992fbe7ae69b564849fdb"
+checksum = "0c0c5a1ac448dd37e43358dd06759578bd994dc0c3e7aeb003eddb374cc16e93"
 dependencies = [
  "atomig-macro",
  "serde",
