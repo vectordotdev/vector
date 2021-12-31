@@ -5,7 +5,6 @@ package metadata
 
 api: {
 	description:     !=""
-	playground_url:  !=""
 	schema_json_url: !=""
 	configuration:   #Schema
 	endpoints:       #Endpoints
@@ -17,7 +16,6 @@ api: {
 		running Vector instance, enabling introspection and management of
 		Vector in real-time.
 		"""
-	playground_url:  "https://playground.vector.dev:8686/playground"
 	schema_json_url: "https://github.com/vectordotdev/vector/blob/master/lib/vector-api-client/graphql/schema.json"
 	configuration: {
 		enabled: {
@@ -90,10 +88,6 @@ api: {
 					A bundled GraphQL playground that enables you
 					to explore the available queries and manually
 					run queries.
-
-					We offer a [public playground](\(playground_url))
-					that you can explore without hosting your own
-					Vector instance.
 					"""
 				responses: {
 					"200": {

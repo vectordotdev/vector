@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::HashSet};
 
 thread_local!(
     /// A buffer for recording internal events emitted by a single test.
@@ -18,6 +17,7 @@ pub fn clear_recorded_events() {
 pub fn debug_print_events() {
     EVENTS_RECORDED.with(|events| {
         for event in events.borrow().iter() {
+            #![allow(clippy::print_stdout)] // that is the purpose of this function
             println!("{}", event);
         }
     });

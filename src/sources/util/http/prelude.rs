@@ -1,25 +1,32 @@
+use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
+use warp::{
+    filters::{
+        path::{FullPath, Tail},
+        BoxedFilter,
+    },
+    http::{HeaderMap, StatusCode},
+    reject::Rejection,
+    Filter,
+};
+
 use super::{
     auth::{HttpSourceAuth, HttpSourceAuthConfig},
     encoding::decode,
     error::ErrorMessage,
 };
 use crate::{
-    config::SourceContext,
+    config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
-};
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
-use vector_core::ByteSizeOf;
-use warp::{
-    filters::{path::FullPath, path::Tail, BoxedFilter},
-    http::{HeaderMap, StatusCode},
-    reject::Rejection,
-    Filter,
 };
 
 #[async_trait]
@@ -40,6 +47,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
@@ -102,7 +110,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, cx.acknowledgements.enabled, cx.out.clone())
+                        handle_request(events, acknowledgements.enabled, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -183,7 +191,7 @@ async fn handle_batch_status(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),
             ))),
-            BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+            BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 "Contents failed to deliver to sink".into(),
             ))),

@@ -1,5 +1,10 @@
-variable "type" {
-  description = "The type of the vector install, whether 'baseline' or 'comparison'"
+variable "experiment_name" {
+  description = "The name of the experiment"
+  type        = string
+}
+
+variable "variant" {
+  description = "The variant of the vector experiment, whether 'baseline' or 'comparison'"
   type        = string
 }
 

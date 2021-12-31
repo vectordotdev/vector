@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::Arc;
+use std::{collections::BTreeMap, fmt, sync::Arc};
+
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -158,8 +157,9 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_grok => ParseGrok;
@@ -218,7 +218,7 @@ mod test {
 
         remove_empty {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:levell)",
+                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})",
                               remove_empty: true,
             ],
             want: Ok(Value::from(

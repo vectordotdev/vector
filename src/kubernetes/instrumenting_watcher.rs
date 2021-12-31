@@ -1,9 +1,10 @@
 //! A watcher that adds instrumentation.
 
-use super::watcher::{self, Watcher};
-use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, WatchOptional};
+
+use super::watcher::{self, Watcher};
+use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 
 /// A watcher that wraps another watcher with instrumentation calls.
 pub struct InstrumentingWatcher<T>

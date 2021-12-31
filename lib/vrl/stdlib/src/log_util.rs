@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
+
 use chrono::prelude::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use shared::TimeZone;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -21,7 +22,7 @@ lazy_static! {
         (?P<method>\w+)\s+                      # Match at least one word character and at least one whitespace.
         (?P<path>[[\\"][^"]]*?)\s+              # Match any character except `"`, but `\"` (non-greedily) and at least one whitespace.
         (?P<protocol>[[\\"][^"]]*?)\s*          # Match any character except `"`, but `\"` (non-greedily) and any number of whitespaces.
-        |[[\\"][^"]]*?))\s*))"                  # ...Or match any charater except `"`, but `\"`, and any amount of whitespaces.
+        |[[\\"][^"]]*?))\s*))"                  # ...Or match any character except `"`, but `\"`, and any amount of whitespaces.
         )\s+                                    # Match at least one whitespace.
         (-|(?P<status>\d+))\s+                  # Match `-` or at least one digit and at least one whitespace.
         (-|(?P<size>\d+))                       # Match `-` or at least one digit.
@@ -42,7 +43,7 @@ lazy_static! {
         (?P<method>\w+)\s+                      # Match at least one word character and at least one whitespace.
         (?P<path>[[\\"][^"]]*?)\s+              # Match any character except `"`, but `\"` (non-greedily) and at least one whitespace.
         (?P<protocol>[[\\"][^"]]*?)\s*          # Match any character except `"`, but `\"` (non-greedily) and any number of whitespaces.
-        |[[\\"][^"]]*?))\s*))"                  # ...Or match any charater except `"`, but `\"`, and any amount of whitespaces.
+        |[[\\"][^"]]*?))\s*))"                  # ...Or match any character except `"`, but `\"`, and any amount of whitespaces.
         )\s+                                    # Match at least one whitespace.
         (-|(?P<status>\d+))\s+                  # Match `-` or at least one digit and at least one whitespace.
         (-|(?P<size>\d+))\s+                    # Match `-` or at least one digit.

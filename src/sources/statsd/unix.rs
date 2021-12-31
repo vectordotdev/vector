@@ -1,13 +1,14 @@
-use super::StatsdParser;
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use super::StatsdDeserializer;
 use crate::{
-    codecs::{Decoder, NewlineDelimitedCodec},
+    codecs::{Decoder, NewlineDelimitedDecoder},
     shutdown::ShutdownSignal,
-    sources::util::build_unix_stream_source,
-    sources::Source,
+    sources::{util::build_unix_stream_source, Source},
     Pipeline,
 };
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UnixConfig {
@@ -16,8 +17,8 @@ pub struct UnixConfig {
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {
     let decoder = Decoder::new(
-        Box::new(NewlineDelimitedCodec::new()),
-        Box::new(StatsdParser),
+        Box::new(NewlineDelimitedDecoder::new()),
+        Box::new(StatsdDeserializer),
     );
 
     build_unix_stream_source(

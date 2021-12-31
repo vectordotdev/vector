@@ -1,19 +1,21 @@
-use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::StdinEventsReceived,
-    serde::{default_decoding, default_framing_stream_based},
-    shutdown::ShutdownSignal,
-    sources::util::TcpError,
-    Pipeline,
-};
+use std::{io, thread};
+
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{io, thread};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+
+use crate::{
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
+    internal_events::StdinEventsReceived,
+    serde::{default_decoding, default_framing_stream_based},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    Pipeline,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -24,7 +26,7 @@ pub struct StdinConfig {
     #[serde(default = "default_framing_stream_based")]
     pub framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn ParserConfig>,
+    pub decoding: Box<dyn DeserializerConfig>,
 }
 
 impl Default for StdinConfig {
@@ -166,9 +168,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use std::io::Cursor;
 
     #[test]
     fn generate_config() {

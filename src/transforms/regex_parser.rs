@@ -1,3 +1,11 @@
+use std::{collections::HashMap, str};
+
+use bytes::Bytes;
+use regex::bytes::{CaptureLocations, Regex, RegexSet};
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+use snafu::ResultExt;
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
@@ -8,13 +16,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
-use bytes::Bytes;
-use regex::bytes::{CaptureLocations, Regex, RegexSet};
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use snafu::ResultExt;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
@@ -58,6 +59,10 @@ impl TransformConfig for RegexParserConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "regex_parser"
     }
@@ -66,7 +71,7 @@ impl TransformConfig for RegexParserConfig {
 #[derive(Clone, Debug)]
 pub struct RegexParser {
     regexset: RegexSet,
-    patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
+    patterns: Vec<CompiledRegex>, // indexes correspond to RegexSet
     field: String,
     drop_field: bool,
     drop_failed: bool,

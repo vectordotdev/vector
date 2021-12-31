@@ -1,29 +1,36 @@
-use super::config::{Encoding, LokiConfig, OutOfOrderAction};
-use super::event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey};
-use super::service::{LokiRequest, LokiService};
-use crate::config::log_schema;
-use crate::config::SinkContext;
-use crate::http::HttpClient;
-use crate::internal_events::{
-    LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-    LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
-};
-use crate::sinks::util::builder::SinkBuilderExt;
-use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
-use crate::sinks::util::{BatchSettings, Compression, RequestBuilder};
-use crate::template::Template;
-use futures::stream::BoxStream;
-use futures::StreamExt;
+use std::{collections::HashMap, num::NonZeroUsize};
+
+use futures::{stream::BoxStream, StreamExt};
 use shared::encode_logfmt;
 use snafu::Snafu;
-use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use vector_core::buffers::Acker;
-use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
-use vector_core::partition::Partitioner;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    buffers::Acker,
+    event::{self, Event, EventFinalizers, Finalizable, Value},
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::BatcherSettings,
+    ByteSizeOf,
+};
+
+use super::{
+    config::{Encoding, LokiConfig, OutOfOrderAction},
+    event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
+    service::{LokiRequest, LokiService},
+};
+use crate::{
+    config::{log_schema, SinkContext},
+    http::HttpClient,
+    internal_events::{
+        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
+        LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
+    },
+    sinks::util::{
+        builder::SinkBuilderExt,
+        encoding::{EncodingConfig, EncodingConfiguration},
+        Compression, RequestBuilder,
+    },
+    template::Template,
+};
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -300,9 +307,7 @@ impl LokiSink {
                 remove_label_fields: config.remove_label_fields,
                 remove_timestamp: config.remove_timestamp,
             },
-            batch_settings: BatchSettings::<()>::default()
-                .parse_config(config.batch)?
-                .into_batcher_settings()?,
+            batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service: LokiService::new(client, config.endpoint, config.auth)?,
         })
@@ -322,7 +327,7 @@ impl LokiSink {
                 let res = filter.filter_record(record);
                 async { res }
             })
-            .batched(RecordPartitionner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitionner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -348,16 +353,21 @@ impl StreamSink for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use super::{EventEncoder, KeyPartitioner, RecordFilter};
-    use crate::config::log_schema;
-    use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
-    use crate::sinks::util::encoding::EncodingConfig;
-    use crate::template::Template;
-    use crate::test_util::random_lines;
+    use std::{collections::HashMap, convert::TryFrom};
+
     use futures::stream::StreamExt;
-    use std::collections::HashMap;
-    use std::convert::TryFrom;
     use vector_core::event::Event;
+
+    use super::{EventEncoder, KeyPartitioner, RecordFilter};
+    use crate::{
+        config::log_schema,
+        sinks::{
+            loki::config::{Encoding, OutOfOrderAction},
+            util::encoding::EncodingConfig,
+        },
+        template::Template,
+        test_util::random_lines,
+    };
 
     #[test]
     fn encoder_no_labels() {

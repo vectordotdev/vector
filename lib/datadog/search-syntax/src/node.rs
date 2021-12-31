@@ -1,6 +1,6 @@
-use crate::grammar::{unescape, DEFAULT_FIELD};
-
 use regex::Regex;
+
+use crate::grammar::{unescape, DEFAULT_FIELD};
 
 /// This enum represents value comparisons that Queries might perform
 #[derive(Debug, Copy, Clone)]
@@ -138,7 +138,7 @@ pub enum QueryNode {
     MatchAllDocs,
     /// Match no documents.
     MatchNoDocs,
-    /// Validate existance of an attribute within a document.
+    /// Validate existence of an attribute within a document.
     AttributeExists { attr: String },
     /// Validate lack of an attribute within a document.
     AttributeMissing { attr: String },

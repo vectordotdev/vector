@@ -1,20 +1,22 @@
-use buffers::bytes::{DecodeBytes, EncodeBytes};
-use buffers::topology::builder::IntoBuffer;
-use buffers::topology::channel::{BufferReceiver, BufferSender};
-use buffers::{self, MemoryBuffer, Variant, WhenFull};
+use std::{error, fmt, path::PathBuf};
+
+use buffers::{
+    encoding::{DecodeBytes, EncodeBytes},
+    topology::{
+        builder::TopologyBuilder,
+        channel::{BufferReceiver, BufferSender},
+    },
+    BufferType,
+};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::task::{noop_waker, Context, Poll};
-use futures::{Sink, SinkExt, Stream};
+use futures::{Sink, SinkExt, Stream, StreamExt};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::layers::Layer;
-use metrics_util::DebuggingRecorder;
-use std::fmt;
-use std::pin::Pin;
+use metrics_util::{layers::Layer, DebuggingRecorder};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
     id: u64,
     _padding: [u64; N],
@@ -36,16 +38,26 @@ impl<const N: usize> ByteSizeOf for Message<N> {
 }
 
 #[derive(Debug)]
-pub enum EncodeError {}
+pub struct EncodeError;
 
-#[derive(Debug)]
-pub enum DecodeError {}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!()
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
+
+impl error::Error for EncodeError {}
+
+#[derive(Debug)]
+pub struct DecodeError;
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for DecodeError {}
 
 impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
     type Error = EncodeError;
@@ -83,64 +95,31 @@ impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
 
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
-pub fn setup<const N: usize>(
-    max_events: usize,
-    variant: Variant,
+pub async fn setup<const N: usize>(
+    variant: BufferType,
+    total_events: usize,
+    data_dir: Option<PathBuf>,
+    id: String,
 ) -> (
-    Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
-    Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
+    BufferSender<Message<N>>,
+    BufferReceiver<Message<N>>,
     Vec<Message<N>>,
 ) {
-    let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
-    for i in 0..max_events {
+    let mut messages: Vec<Message<N>> = Vec::with_capacity(total_events);
+    for i in 0..total_events {
         messages.push(Message::new(i as u64));
     }
 
-    let (tx, rx, _) = buffers::build::<Message<N>>(variant, Span::none()).unwrap();
-    (Pin::new(tx.get()), Box::pin(rx), messages)
-}
+    let mut builder = TopologyBuilder::default();
+    variant
+        .add_to_builder(&mut builder, data_dir, id)
+        .expect("should not fail to add variant to builder");
+    let (tx, rx, _acker) = builder
+        .build(Span::none())
+        .await
+        .expect("should not fail to build topology");
 
-#[allow(dead_code)]
-#[allow(clippy::type_complexity)]
-pub fn setup_in_memory_v2<const N: usize>(
-    max_events: usize,
-    when_full: WhenFull,
-) -> (
-    Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
-    Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
-    Vec<Message<N>>,
-) {
-    let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
-    for i in 0..max_events {
-        messages.push(Message::new(i as u64));
-    }
-
-    let (tx, rx) = MemoryBuffer::new(max_events).into_buffer_parts();
-    let sender = BufferSender::new(tx, when_full).sink_map_err(|_| ());
-    let receiver = BufferReceiver::new(rx);
-    (Box::pin(sender), Box::pin(receiver), messages)
-}
-
-fn send_msg<const N: usize>(
-    msg: Message<N>,
-    mut sink: Pin<&mut (dyn Sink<Message<N>, Error = ()> + Unpin + Send)>,
-    context: &mut Context,
-) {
-    match sink.as_mut().poll_ready(context) {
-        Poll::Ready(Ok(())) => match sink.as_mut().start_send(msg) {
-            Ok(()) => match sink.as_mut().poll_flush(context) {
-                Poll::Ready(Ok(())) => {}
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        },
-        _ => unreachable!(),
-    }
-}
-
-#[inline]
-fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, context: &mut Context) {
-    while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
+    (tx, rx, messages)
 }
 
 pub fn init_instrumentation() {
@@ -163,51 +142,32 @@ pub fn init_instrumentation() {
 // reads it from the buffer.
 //
 
-#[allow(clippy::type_complexity)]
-pub fn wtr_measurement<const N: usize>(
-    input: (
-        Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
-        Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
-        Vec<Message<N>>,
-    ),
-) {
-    {
-        let waker = noop_waker();
-        let mut context = Context::from_waker(&waker);
-
-        let mut sink = input.0;
-        for msg in input.2.into_iter() {
-            send_msg(msg, sink.as_mut(), &mut context)
-        }
+pub async fn wtr_measurement<S1, S2, const N: usize>(
+    mut sink: S1,
+    mut stream: S2,
+    messages: Vec<Message<N>>,
+) where
+    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
+    S2: Stream<Item = Message<N>> + Send + Unpin,
+{
+    for msg in messages.into_iter() {
+        sink.send(msg).await.unwrap();
     }
+    drop(sink);
 
-    {
-        let waker = noop_waker();
-        let mut context = Context::from_waker(&waker);
-
-        let mut stream = input.1;
-        consume(stream.as_mut(), &mut context)
-    }
+    while stream.next().await.is_some() {}
 }
 
-#[allow(clippy::type_complexity)]
-pub fn war_measurement<const N: usize>(
-    input: (
-        Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
-        Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
-        Vec<Message<N>>,
-    ),
-) {
-    let snd_waker = noop_waker();
-    let mut snd_context = Context::from_waker(&snd_waker);
-
-    let rcv_waker = noop_waker();
-    let mut rcv_context = Context::from_waker(&rcv_waker);
-
-    let mut stream = input.1;
-    let mut sink = input.0;
-    for msg in input.2.into_iter() {
-        send_msg(msg, sink.as_mut(), &mut snd_context);
-        consume(stream.as_mut(), &mut rcv_context)
+pub async fn war_measurement<S1, S2, const N: usize>(
+    mut sink: S1,
+    mut stream: S2,
+    messages: Vec<Message<N>>,
+) where
+    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
+    S2: Stream<Item = Message<N>> + Send + Unpin,
+{
+    for msg in messages.into_iter() {
+        sink.send(msg).await.unwrap();
+        let _ = stream.next().await.unwrap();
     }
 }

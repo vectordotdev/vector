@@ -1,17 +1,19 @@
+use std::{fs::remove_file, path::PathBuf};
+
+use bytes::{Bytes, BytesMut};
+use futures::{SinkExt, StreamExt};
+use tokio::net::UnixDatagram;
+use tokio_util::codec::FramedRead;
+use tracing::field;
+
 use crate::{
     codecs,
     event::Event,
     internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
+    sources::{util::codecs::StreamDecodingError, Source},
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt};
-use std::{fs::remove_file, path::PathBuf};
-use tokio::net::UnixDatagram;
-use tokio_util::codec::FramedRead;
-use tracing::field;
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
@@ -58,7 +60,7 @@ async fn listen(
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::Error::FramingError(error.into());
+                    let error = codecs::decoding::Error::FramingError(error.into());
                     emit!(&SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error

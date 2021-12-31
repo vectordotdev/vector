@@ -1,8 +1,12 @@
-use super::Key;
-use crate::{
-    buffer_usage_data::BufferUsageData,
-    bytes::{DecodeBytes, EncodeBytes},
+use std::{
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
 };
+
 use bytes::BytesMut;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
@@ -10,20 +14,14 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::fmt::Debug;
-use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
-use std::task::{Context, Poll, Waker};
+
+use super::Key;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     /// Leveldb database.
     /// Shared with Reader.
@@ -42,31 +40,23 @@ where
     /// Events in batch.
     pub(crate) batch_size: usize,
     /// Max size of unread events in bytes.
-    pub(crate) max_size: usize,
+    pub(crate) max_size: u64,
     /// Size of unread events in bytes.
     /// Shared with Reader.
-    pub(crate) current_size: Arc<AtomicUsize>,
+    pub(crate) current_size: Arc<AtomicU64>,
     /// Buffer for internal use.
     pub(crate) slot: Option<T>,
-    /// Atomic structure for recording buffer metadata
-    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
+    /// Buffer usage data.
+    pub(crate) usage_handle: BufferUsageHandle,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
-unsafe impl<T> Send for Writer<T>
-where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
-{
-}
+unsafe impl<T> Send for Writer<T> where T: Bufferable {}
 
 impl<T> Clone for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn clone(&self) -> Self {
         Self {
@@ -79,16 +69,14 @@ where
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
             slot: None,
-            buffer_usage_data: self.buffer_usage_data.clone(),
+            usage_handle: self.usage_handle.clone(),
         }
     }
 }
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     type Error = ();
 
@@ -147,14 +135,12 @@ where
 
 impl<T> Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn try_send(&mut self, event: T) -> Option<T> {
         let mut buffer: BytesMut = BytesMut::with_capacity(64);
         T::encode(event, &mut buffer).unwrap();
-        let event_size = buffer.len();
+        let event_size = buffer.len() as u64;
 
         if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
             > self.max_size
@@ -174,7 +160,8 @@ where
         if self.batch_size >= 100 {
             self.flush();
         }
-        self.buffer_usage_data
+
+        self.usage_handle
             .increment_received_event_count_and_byte_size(1, event_size);
 
         None
@@ -197,15 +184,14 @@ where
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
+
         self.write_notifier.wake();
     }
 }
 
 impl<T> Drop for Writer<T>
 where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {
@@ -214,7 +200,7 @@ where
             //
             // We can't be picky at the moment so we will allow
             // for the buffer to exceed configured limit.
-            self.max_size = usize::MAX;
+            self.max_size = u64::MAX;
             assert!(self.try_send(event).is_none());
         }
 

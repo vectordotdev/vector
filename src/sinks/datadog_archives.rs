@@ -2,36 +2,51 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
-    sync::atomic::{AtomicU32, Ordering},
+    num::NonZeroU64,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
+use azure_storage::blob::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
+use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, Finalizable},
     ByteSizeOf,
 };
 
+use super::util::{
+    batch::BatchError,
+    encoding::{Encoder, StandardEncodings},
+    BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
+};
 use crate::{
-    config::GenerateConfig,
-    config::{DataType, SinkConfig, SinkContext},
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
     sinks::{
+        azure_common::{
+            self,
+            config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobRetryLogic},
+            service::AzureBlobService,
+            sink::AzureBlobSink,
+        },
         gcp::{GcpAuthConfig, GcpCredentials},
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::{GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -42,25 +57,27 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::partitioner::KeyPartitioner,
-        util::Concurrency,
-        util::{ServiceBuilderExt, TowerRequestConfig},
+        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 
-use goauth::scopes::Scope;
-
-use super::util::{
-    batch::BatchError,
-    encoding::{Encoder, StandardEncodings},
-    BatchSettings, Compression, RequestBuilder,
-};
-use crate::sinks::gcs_common::service::GcsMetadata;
-
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DatadogArchivesDefaultBatchSettings;
+
+/// We should avoid producing many small batches - this might slow down Log Rehydration,
+/// these values are similar with how DataDog's Log Archives work internally:
+/// batch size - 100mb
+/// batch timeout - 15min
+impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(900) };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -73,8 +90,12 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub aws_s3: Option<S3Config>,
     #[serde(default)]
+    pub azure_blob: Option<AzureBlobConfig>,
+    #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
     pub tls: Option<TlsOptions>,
+    #[serde(default, skip_serializing)]
+    batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -104,6 +125,12 @@ pub struct S3Options {
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
+pub struct AzureBlobConfig {
+    pub connection_string: String,
+}
+
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct GcsConfig {
     acl: Option<GcsPredefinedAcl>,
     storage_class: Option<GcsStorageClass>,
@@ -122,6 +149,8 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             aws_s3: None,
             gcp_cloud_storage: None,
             tls: None,
+            azure_blob: None,
+            batch: BatchConfig::default(),
         })
         .unwrap()
     }
@@ -138,16 +167,6 @@ enum ConfigError {
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
-
-/// We should avoid producing many small batches - this might slow down Log Rehydration,
-/// these values are similar with how DataDog's Log Archives work internally:
-/// batch size - 100mb
-/// batch timeout - 15min
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
-    BatchSettings::const_default()
-        .bytes(100_000_000)
-        .timeout(900)
-};
 
 impl DatadogArchivesSinkConfig {
     async fn build_sink(
@@ -166,6 +185,25 @@ impl DatadogArchivesSinkConfig {
                     svc,
                     s3_common::config::build_healthcheck(self.bucket.clone(), client)?,
                 ))
+            }
+            "azure_blob" => {
+                let azure_config = self
+                    .azure_blob
+                    .as_ref()
+                    .expect("azire blob config wasn't provided");
+                let client = azure_common::config::build_client(
+                    azure_config.connection_string.clone(),
+                    self.bucket.clone(),
+                )?;
+                let svc = self
+                    .build_azure_sink(
+                        Arc::<azure_storage::blob::prelude::ContainerClient>::clone(&client),
+                        cx,
+                    )
+                    .map_err(|error| format!("{}", error))?;
+                let healthcheck =
+                    azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
+                Ok((svc, healthcheck))
             }
             "gcp_cloud_storage" => {
                 let gcs_config = self
@@ -219,9 +257,8 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        // We use the default batch settings directly as we don't support allowing users to change
-        // the batching behavior, as it could negatively impact performance.
-        let batcher_settings = DEFAULT_BATCH_SETTINGS
+        let batcher_settings = self
+            .batch
             .into_batcher_settings()
             .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
@@ -247,13 +284,12 @@ impl DatadogArchivesSinkConfig {
         creds: Option<GcpCredentials>,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
-            rate_limit_num: Some(1000),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(&Default::default());
 
-        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
+        let batcher_settings = self
+            .batch
+            .into_batcher_settings()
+            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -293,6 +329,33 @@ impl DatadogArchivesSinkConfig {
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
         let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
+
+        Ok(VectorSink::Stream(Box::new(sink)))
+    }
+
+    fn build_azure_sink(
+        &self,
+        client: Arc<ContainerClient>,
+        cx: SinkContext,
+    ) -> crate::Result<VectorSink> {
+        let request_limits = self.request.unwrap_with(&Default::default());
+        let service = ServiceBuilder::new()
+            .settings(request_limits, AzureBlobRetryLogic)
+            .service(AzureBlobService::new(client));
+
+        let batcher_settings = self
+            .batch
+            .into_batcher_settings()
+            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let request_builder = DatadogAzureRequestBuilder {
+            container_name: self.bucket.clone(),
+            blob_prefix: self.key_prefix.clone(),
+            encoding: DatadogArchivesEncoding::default(),
+        };
+
+        let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
@@ -564,6 +627,63 @@ fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> Str
     key
 }
 
+#[derive(Debug)]
+struct DatadogAzureRequestBuilder {
+    container_name: String,
+    blob_prefix: Option<String>,
+    encoding: DatadogArchivesEncoding,
+}
+
+impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
+    type Metadata = AzureBlobMetadata;
+    type Events = Vec<Event>;
+    type Encoder = DatadogArchivesEncoding;
+    type Payload = Bytes;
+    type Request = AzureBlobRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        DEFAULT_COMPRESSION
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
+
+    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+        let (partition_key, mut events) = input;
+        let finalizers = events.take_finalizers();
+        let metadata = AzureBlobMetadata {
+            partition_key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
+
+        (metadata, events)
+    }
+
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        metadata.partition_key =
+            generate_object_key(self.blob_prefix.clone(), metadata.partition_key);
+
+        trace!(
+            message = "Sending events.",
+            bytes = ?payload.len(),
+            events_len = ?metadata.count,
+            container = ?self.container_name,
+            blob = ?metadata.partition_key
+        );
+
+        AzureBlobRequest {
+            blob_data: payload,
+            content_encoding: DEFAULT_COMPRESSION.content_encoding(),
+            content_type: "application/gzip",
+            metadata,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_archives")]
 impl SinkConfig for DatadogArchivesSinkConfig {
@@ -594,11 +714,15 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] // tests
+
+    use std::{collections::BTreeMap, io::Cursor};
+
+    use chrono::DateTime;
+    use vector_core::partition::Partitioner;
+
     use super::*;
     use crate::event::LogEvent;
-    use chrono::DateTime;
-    use std::{collections::BTreeMap, io::Cursor};
-    use vector_core::partition::Partitioner;
 
     #[test]
     fn generate_config() {
@@ -833,8 +957,10 @@ mod tests {
                     region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
                     auth: Default::default(),
                 }),
+                azure_blob: None,
                 gcp_cloud_storage: None,
                 tls: None,
+                batch: BatchConfig::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

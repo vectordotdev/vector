@@ -1,8 +1,32 @@
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use std::{error, fmt, mem};
+
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use quickcheck::{Arbitrary, Gen};
-use std::{fmt, mem};
+
+use crate::encoding::{DecodeBytes, EncodeBytes};
+
+#[derive(Debug)]
+pub struct EncodeError;
+
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for EncodeError {}
+
+#[derive(Debug)]
+pub struct DecodeError;
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for DecodeError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
@@ -21,10 +45,6 @@ impl ByteSizeOf for Message {
     }
 }
 
-//
-// QuickCheck support
-//
-
 impl Arbitrary for Message {
     fn arbitrary(g: &mut Gen) -> Self {
         Message {
@@ -34,22 +54,6 @@ impl Arbitrary for Message {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(self.id.shrink().map(|id| Message { id }))
-    }
-}
-
-//
-// Serialization and Deserialization
-//
-
-#[derive(Debug)]
-pub enum EncodeError {}
-
-#[derive(Debug)]
-pub enum DecodeError {}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!()
     }
 }
 

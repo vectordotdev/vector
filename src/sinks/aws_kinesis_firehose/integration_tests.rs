@@ -1,17 +1,6 @@
 #![cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::config::{SinkConfig, SinkContext};
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::test_util::components;
-use crate::test_util::components::AWS_SINK_TAGS;
-use crate::{
-    sinks::elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
-    test_util::{random_events_with_stream, random_string, wait_for_duration},
-};
 use futures::TryFutureExt;
 use rusoto_core::Region;
 use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
@@ -21,6 +10,24 @@ use rusoto_firehose::{
 };
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
+
+use super::*;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{SinkConfig, SinkContext},
+    sinks::{
+        elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, Compression, TowerRequestConfig,
+        },
+    },
+    test_util::{
+        components, components::AWS_SINK_TAGS, random_events_with_stream, random_string,
+        wait_for_duration,
+    },
+};
 
 #[tokio::test]
 async fn firehose_put_records() {
@@ -35,15 +42,15 @@ async fn firehose_put_records() {
 
     ensure_elasticesarch_delivery_stream(region, stream.clone(), elasticseacrh_arn.clone()).await;
 
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(2);
+
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(2),
-            ..Default::default()
-        },
+        batch,
         request: TowerRequestConfig {
             timeout_secs: Some(10),
             retry_attempts: Some(0),
@@ -68,7 +75,10 @@ async fn firehose_put_records() {
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: "http://localhost:4571".into(),
-        index: Some(stream.clone()),
+        bulk: Some(BulkConfig {
+            index: Some(stream.clone()),
+            action: None,
+        }),
         ..Default::default()
     };
     let common = ElasticSearchCommon::parse_config(&config).expect("Config error");

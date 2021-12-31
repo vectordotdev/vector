@@ -1,5 +1,15 @@
+use bytes::Bytes;
+use chrono::Utc;
+use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tokio_util::codec::FramedRead;
+
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{
         log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
     },
@@ -7,15 +17,9 @@ use crate::{
     internal_events::NatsEventsReceived,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -39,7 +43,7 @@ pub struct NatsSourceConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 inventory::submit! {
@@ -181,6 +185,8 @@ async fn create_subscription(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
 
     #[test]
@@ -192,6 +198,8 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::test_util::{collect_n, random_string};
 

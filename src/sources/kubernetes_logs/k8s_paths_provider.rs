@@ -2,12 +2,14 @@
 
 #![deny(missing_docs)]
 
-use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
+use std::path::PathBuf;
+
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
-use std::path::PathBuf;
+
+use super::path_helpers::build_pod_logs_directory;
+use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
@@ -85,7 +87,7 @@ impl PathsProvider for K8sPathsProvider {
 /// `Static Pod`s: they keep their logs at the path that consists of config
 /// hashsum instead of the `Pod` `uid`. The reason for this is `kubelet` is
 /// locally authoritative over those `Pod`s, and the API only has
-/// `Monitor Pod`s - the "dummy" entires useful for discovery and association.
+/// `Monitor Pod`s - the "dummy" entries useful for discovery and association.
 /// Their UIDs are generated at the Kubernetes API side, and do not represent
 /// the actual config hashsum as one would expect.
 ///
@@ -208,12 +210,14 @@ fn exclude_paths<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
     use super::{
         build_container_exclusion_patterns, exclude_paths, extract_excluded_containers_for_pod,
         extract_pod_logs_directory, list_pod_log_paths,
     };
-    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-    use std::path::PathBuf;
 
     #[test]
     fn test_extract_pod_logs_directory() {

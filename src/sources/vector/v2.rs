@@ -1,24 +1,27 @@
-use crate::{
-    config::SourceContext,
-    config::{DataType, GenerateConfig, Resource},
-    internal_events::{EventsReceived, TcpBytesReceived},
-    proto::vector as proto,
-    shutdown::ShutdownSignalToken,
-    sources::{util::AfterReadExt as _, Source},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
-    Pipeline,
-};
+use std::net::SocketAddr;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
+
+use crate::{
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceContext},
+    internal_events::{EventsReceived, TcpBytesReceived},
+    proto::vector as proto,
+    serde::bool_or_struct,
+    shutdown::ShutdownSignalToken,
+    sources::{util::AfterReadExt as _, Source},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
+    Pipeline,
+};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -77,7 +80,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 
     match status {
         BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
         BatchStatus::Delivered => Ok(()),
     }
 }
@@ -90,6 +93,8 @@ pub struct VectorConfig {
     pub shutdown_timeout_secs: u64,
     #[serde(default)]
     tls: Option<TlsConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -102,6 +107,7 @@ impl GenerateConfig for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -111,7 +117,7 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
 
-        let source = run(self.address, tls_settings, cx).map_err(|error| {
+        let source = run(self.address, tls_settings, cx, self.acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
@@ -135,12 +141,13 @@ async fn run(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     cx: SourceContext,
+    acknowledgements: AcknowledgementsConfig,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: cx.acknowledgements.enabled,
+        acknowledgements: acknowledgements.enabled,
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
@@ -195,12 +202,15 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::SinkContext;
-    use crate::sinks::vector::v2::VectorConfig as SinkConfig;
-    use crate::test_util::{self, components};
-    use crate::Pipeline;
     use shared::assert_event_data_eq;
+
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        sinks::vector::v2::VectorConfig as SinkConfig,
+        test_util::{self, components},
+        Pipeline,
+    };
 
     #[tokio::test]
     async fn receive_message() {

@@ -1,3 +1,14 @@
+use std::{num::NonZeroU64, task};
+
+use bytes::{Bytes, BytesMut};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use http::Uri;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
+
 use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
@@ -7,25 +18,25 @@ use crate::{
     sinks::{
         self,
         util::{
-            batch::{BatchConfig, BatchSettings},
+            batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::Uri;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::task;
-use tower::ServiceBuilder;
-use vector_core::ByteSizeOf;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PrometheusRemoteWriteDefaultBatchSettings;
+
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -46,7 +57,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -73,10 +84,7 @@ impl SinkConfig for RemoteWriteConfig {
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = BatchSettings::default()
-            .events(1_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
@@ -241,6 +249,11 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
+
     use super::*;
     use crate::{
         config::SinkContext,
@@ -248,10 +261,6 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util,
     };
-    use futures::StreamExt;
-    use http::HeaderMap;
-    use indoc::indoc;
-    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
@@ -441,18 +450,18 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::tests::*;
-    use super::*;
+    use std::{collections::HashMap, ops::Range};
+
+    use futures::stream;
+    use serde_json::Value;
+
+    use super::{tests::*, *};
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::MetricValue,
-        event::Event,
+        event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         tls::{self, TlsOptions},
     };
-    use futures::stream;
-    use serde_json::Value;
-    use std::{collections::HashMap, ops::Range};
 
     const HTTP_URL: &str = "http://localhost:8086";
     const HTTPS_URL: &str = "https://localhost:8087";

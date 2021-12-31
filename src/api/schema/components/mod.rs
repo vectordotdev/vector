@@ -3,23 +3,24 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+};
+
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
+use lazy_static::lazy_static;
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
         filter::{self, filter_items},
         relay, sort,
     },
-    config::ComponentKey,
-    config::Config,
+    config::{ComponentKey, Config},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use lazy_static::lazy_static;
-use std::{
-    cmp,
-    collections::{HashMap, HashSet},
-};
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -208,7 +209,7 @@ impl ComponentsQuery {
 
     /// Gets a configured component by component_key
     async fn component_by_component_key(&self, component_id: String) -> Option<Component> {
-        let key = ComponentKey::global(&component_id);
+        let key = ComponentKey::from(component_id);
         component_by_component_key(&key)
     }
 }
@@ -331,17 +332,17 @@ mod tests {
         vec![
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen1"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
@@ -490,22 +491,22 @@ mod tests {
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("e"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("d"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("g"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("f"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
             })),
         ];

@@ -1,14 +1,17 @@
-use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{BatchNotifier, Event, LogEvent, Value},
-    internal_events::{JournaldEventReceived, JournaldInvalidRecord},
-    shutdown::ShutdownSignal,
-    Pipeline,
+use std::{
+    collections::{HashMap, HashSet},
+    io::SeekFrom,
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    process::Stdio,
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
 };
+
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream::BoxStream, SinkExt, StreamExt};
+use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -17,23 +20,26 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::{
-    collections::{HashMap, HashSet},
-    io::SeekFrom,
-    iter::FromIterator,
-    process::Stdio,
-    str::FromStr,
-    time::Duration,
-};
-use tokio_util::codec::FramedRead;
-
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
     time::sleep,
+};
+use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, Event, LogEvent, Value},
+    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    Pipeline,
 };
 
 const DEFAULT_BATCH_SIZE: usize = 16;
@@ -84,6 +90,8 @@ pub struct JournaldConfig {
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
     pub journal_directory: Option<PathBuf>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
     /// Deprecated
     #[serde(default)]
     remap_priority: bool,
@@ -185,7 +193,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: cx.acknowledgements.enabled,
+                acknowledgements: self.acknowledgements.enabled,
             }
             .run_shutdown(cx.shutdown, start),
         ))
@@ -295,7 +303,10 @@ impl JournaldSource {
         cursor: &'a mut Option<String>,
     ) -> bool {
         loop {
-            let mut saw_record = false;
+            let mut record_size = 0;
+            let mut count = 0;
+            let mut byte_size = 0;
+            let mut events = Vec::new();
             let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
             let mut exiting = None;
 
@@ -319,7 +330,7 @@ impl JournaldSource {
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        emit!(&JournaldInvalidRecord {
+                        emit!(&JournaldInvalidRecordError {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
@@ -330,37 +341,45 @@ impl JournaldSource {
                     *cursor = Some(tmp);
                 }
 
-                saw_record = true;
-
-                if filter_matches(&record, &self.include_matches, &self.exclude_matches) {
-                    continue;
-                }
-
-                emit!(&JournaldEventReceived {
-                    byte_size: bytes.len()
-                });
-
-                match self.out.send(create_event(record, &batch)).await {
-                    Ok(_) => {}
-                    Err(error) => {
-                        error!(message = "Could not send journald log.", %error);
-                        // `out` channel is closed, don't restart journalctl.
-                        exiting = Some(false);
-                        break;
-                    }
+                if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
+                    record_size += bytes.len();
+                    let event = create_event(record, &batch);
+                    count += 1;
+                    byte_size += event.size_of();
+                    events.push(event);
                 }
             }
-
             drop(batch);
-            if saw_record {
-                if let Some(receiver) = receiver {
-                    // Ignore the received status, we can't do anything with failures here.
-                    receiver.await;
+
+            if record_size > 0 {
+                emit!(&BytesReceived {
+                    byte_size: record_size,
+                    protocol: "journald",
+                });
+            }
+
+            if count > 0 {
+                emit!(&JournaldEventsReceived { count, byte_size });
+                if !events.is_empty() {
+                    match self.out.send_all(&mut stream::iter(events).map(Ok)).await {
+                        Ok(_) => {
+                            if let Some(receiver) = receiver {
+                                // Ignore the received status, we can't do anything with failures here.
+                                receiver.await;
+                            }
+                        }
+                        Err(error) => {
+                            error!(message = "Could not send journald log.", %error);
+                            // `out` channel is closed, don't restart journalctl.
+                            exiting = Some(false);
+                        }
+                    }
                 }
                 if exiting != Some(false) {
                     Self::save_checkpoint(checkpointer, &*cursor).await;
                 }
             }
+
             if let Some(x) = exiting {
                 break x;
             }
@@ -381,7 +400,7 @@ impl JournaldSource {
 }
 
 /// A function that starts journalctl process.
-/// Return a stream of output splitted by '\n', and a `StopJournalctlFn`.
+/// Return a stream of output split by '\n', and a `StopJournalctlFn`.
 ///
 /// Code uses `start_journalctl` below,
 /// but we need this type to implement fake journald source in testing.
@@ -407,7 +426,7 @@ fn start_journalctl(
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        CharacterDelimitedCodec::new('\n'),
+        CharacterDelimitedDecoder::new(b'\n'),
     )
     .boxed();
 
@@ -451,10 +470,7 @@ fn create_command(
 }
 
 fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
-    let mut log = LogEvent::from_iter(record);
-    if let Some(batch) = batch {
-        log = log.with_batch_notifier(batch);
-    }
+    let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {
@@ -625,9 +641,10 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod checkpointer_tests {
-    use super::*;
     use tempfile::tempdir;
     use tokio::fs::read_to_string;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -669,16 +686,18 @@ mod checkpointer_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::EventStatus;
-    use futures::Stream;
-    use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
+        pin::Pin,
         task::{Context, Poll},
     };
+
+    use futures::Stream;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
+
+    use super::*;
+    use crate::{event::EventStatus, test_util::components};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -750,6 +769,7 @@ mod tests {
         exclude_matches: Matches,
         cursor: Option<&str>,
     ) -> Vec<Event> {
+        components::init_test();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -786,7 +806,9 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
         drop(trigger);
 
-        timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
+        let result = timeout(Duration::from_secs(1), rx.collect()).await.unwrap();
+        components::SOURCE_TESTS.assert(&["protocol"]);
+        result
     }
 
     fn create_unit_matches<S: Into<String>>(units: Vec<S>) -> Matches {

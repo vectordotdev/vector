@@ -1,6 +1,7 @@
-use crate::conversion::parse_bool;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+
+use crate::conversion::parse_bool;
 
 #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
 mod unix;

@@ -47,7 +47,7 @@ We can maintain backward compatibility for users referencing our raw or kustomiz
 
 The extraction is straightforward. Migrate the contents of `distribution/helm` into a new `timberio/helm-charts` git repository.
 
-Existing CI jobs for our charts can be transfered to the new repository with minor changes, or replaced with the tooling available
+Existing CI jobs for our charts can be transferred to the new repository with minor changes, or replaced with the tooling available
 with `ct`. Our existing lint job calls a make target that lints all charts in the `distribution/helm` directory and could be replaced
 with the `ct lint` command, which is essentially the same but contains additional helpers.
 

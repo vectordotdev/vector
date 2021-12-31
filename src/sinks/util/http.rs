@@ -1,15 +1,14 @@
-use super::{
-    retries::{RetryAction, RetryLogic},
-    sink::{self, ServiceLogic},
-    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
-    TowerRequestConfig, TowerRequestSettings,
+use std::{
+    fmt,
+    future::Future,
+    hash::Hash,
+    marker::PhantomData,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
 };
-use crate::{
-    buffers::Acker,
-    event::Event,
-    http::{HttpClient, HttpError},
-    internal_events::EndpointBytesSent,
-};
+
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
 use http::StatusCode;
@@ -17,18 +16,20 @@ use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
-use std::{
-    fmt,
-    future::Future,
-    hash::Hash,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tower::Service;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, ByteSizeOf};
+
+use super::{
+    retries::{RetryAction, RetryLogic},
+    sink::{self, ServiceLogic},
+    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
+};
+use crate::{
+    event::Event,
+    http::{HttpClient, HttpError},
+    internal_events::EndpointBytesSent,
+};
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -554,13 +555,16 @@ impl RequestConfig {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{config::ProxyConfig, test_util::next_addr};
+    #![allow(clippy::print_stderr)] //tests
+
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
         Response, Server, Uri,
     };
+
+    use super::*;
+    use crate::{config::ProxyConfig, test_util::next_addr};
 
     #[test]
     fn util_http_retry_logic() {

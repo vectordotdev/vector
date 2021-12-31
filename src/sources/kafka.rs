@@ -1,15 +1,9 @@
-use super::util::finalizer::OrderedFinalizer;
-use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{BatchNotifier, Event, Value},
-    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
-    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
-    serde::{default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    sources::util::TcpError,
-    Pipeline,
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Cursor,
+    sync::Arc,
 };
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
@@ -21,12 +15,26 @@ use rdkafka::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::sync::Arc;
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::Cursor,
-};
 use tokio_util::codec::FramedRead;
+
+use super::util::finalizer::OrderedFinalizer;
+use crate::{
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, Event, Value},
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
+    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    Pipeline,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -71,7 +79,9 @@ pub struct KafkaSourceConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -137,7 +147,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements.enabled,
+            self.acknowledgements.enabled,
         )))
     }
 
@@ -395,13 +405,8 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
-    use crate::{
-        shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
-        Pipeline,
-    };
+    use std::time::Duration;
+
     use chrono::{SubsecRound, Utc};
     use rdkafka::{
         config::{ClientConfig, FromClientConfig},
@@ -411,8 +416,14 @@ mod integration_test {
         util::Timeout,
         Offset, TopicPartitionList,
     };
-    use std::time::Duration;
     use vector_core::event::EventStatus;
+
+    use super::{test::*, *};
+    use crate::{
+        shutdown::ShutdownSignal,
+        test_util::{collect_n, random_string},
+        Pipeline,
+    };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();

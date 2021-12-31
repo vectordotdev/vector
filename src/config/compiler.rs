@@ -1,5 +1,8 @@
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
+use std::collections::HashSet;
+
 use indexmap::{IndexMap, IndexSet};
+
+use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -62,6 +65,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(e) = graph.check_for_cycles() {
+        errors.push(e);
+    }
+
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
     let sinks = sinks
@@ -112,9 +119,15 @@ pub(super) fn expand_macros(
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
+    let parent_types = HashSet::new();
 
     while let Some((key, transform)) = config.transforms.pop() {
-        if let Err(error) = transform.expand(key, &mut expanded_transforms, &mut expansions) {
+        if let Err(error) = transform.expand(
+            key,
+            &parent_types,
+            &mut expanded_transforms,
+            &mut expansions,
+        ) {
             errors.push(error);
         }
     }
@@ -196,6 +209,9 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 
 #[cfg(test)]
 mod test {
+    use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
+
     use super::*;
     use crate::{
         config::{
@@ -206,8 +222,6 @@ mod test {
         sources::Source,
         transforms::Transform,
     };
-    use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MockSourceConfig;

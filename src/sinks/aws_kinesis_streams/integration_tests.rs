@@ -1,20 +1,19 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::config::SinkConfig;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::{BatchConfig, Compression};
-use crate::test_util::components;
-use crate::{
-    config::SinkContext,
-    rusoto::RegionOrEndpoint,
-    test_util::{random_lines_with_stream, random_string},
-};
+use std::sync::Arc;
+
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
-use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+
+use super::*;
+use crate::{
+    aws::rusoto::RegionOrEndpoint,
+    config::{SinkConfig, SinkContext},
+    sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
+    test_util::{components, random_lines_with_stream, random_string},
+};
 
 #[tokio::test]
 async fn kinesis_put_records() {
@@ -27,16 +26,16 @@ async fn kinesis_put_records() {
 
     ensure_stream(region.clone(), stream.clone()).await;
 
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(2);
+
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(2),
-            ..Default::default()
-        },
+        batch,
         request: Default::default(),
         assume_role: None,
         auth: Default::default(),

@@ -1,21 +1,27 @@
-use crate::{
-    codecs::{self, Decoder, FramingConfig, ParserConfig},
-    config::log_schema,
-    event::Event,
-    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
-    serde::{default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    sources::{util::TcpError, Source},
-    udp, Pipeline,
-};
+use std::net::SocketAddr;
+
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::codec::FramedRead;
+
+use crate::{
+    codecs::{
+        self,
+        decoding::{DeserializerConfig, FramingConfig},
+        Decoder,
+    },
+    config::log_schema,
+    event::Event,
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
+    serde::{default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+    sources::{util::StreamDecodingError, Source},
+    udp, Pipeline,
+};
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]
@@ -35,7 +41,7 @@ pub struct UdpConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[get = "pub"]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 impl UdpConfig {
@@ -87,7 +93,7 @@ pub fn udp(
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
-                        let error = codecs::Error::FramingError(error.into());
+                        let error = codecs::decoding::Error::FramingError(error.into());
                         emit!(&SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error

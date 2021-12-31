@@ -74,22 +74,36 @@ components: transforms: pipelines: {
 			type: object: options: {
 				name: {
 					description: "Name of the pipeline"
-					warnings: []
-					required: false
-					common:   true
+					required:    false
+					common:      true
+					type: string: default: null
+				}
+
+				filter: {
+					description: """
+						A condition to filter the events that will be processed by the pipeline. If the condition is not satisfied,
+						the event will be forwarded to the next pipeline.
+
+						The filter uses the same format that conditions use for [unit testing](\(urls.vector_unit_tests)).
+						"""
+					required:    false
+					common:      true
 					type: string: {
-						default: null
-						syntax:  "literal"
+						default: "vrl"
+
+						enum: {
+							vrl: "[Vector Remap Language](\(urls.vrl_reference))."
+						}
 					}
 				}
+
 				transforms: {
 					description: """
 						Any list of valid transform configurations. See [transforms documentation](\(urls.vector_transforms))
 						for the list of available transforms and their configuration.
 						"""
 					required:    true
-					warnings: []
-					type: array: items: type: object: {}
+					type: array: items: type: object: options: {}
 				}
 			}
 		}
@@ -126,6 +140,10 @@ components: transforms: pipelines: {
 
 				[transforms.pipelines_processing.logs.pipelines.foo]
 				name = "foo"
+				filter.type = "vrl"
+				filter.source = '''
+					contains(.message, "hello") ?? false
+				'''
 
 				[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
 				type = "remap"
@@ -173,7 +191,6 @@ components: transforms: pipelines: {
 				{
 					log: {
 						message:          "[foo][bar] world"
-						went_through_foo: true
 						went_through_bar: true
 					}
 				},

@@ -1,8 +1,11 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    process::Command,
+};
+
 use serde::Deserialize;
 use serde_json::{Map, Value};
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::process::Command;
 
 use crate::Test;
 
@@ -15,6 +18,9 @@ const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "get_hostname",
     "now",
     "get_env_var",
+    "get_metadata_field",
+    "set_metadata_field",
+    "remove_metadata_field",
 ];
 
 #[derive(Debug, Deserialize)]

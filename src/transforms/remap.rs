@@ -1,19 +1,25 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, VrlTarget},
-    internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::{FunctionTransform, Transform},
-    Result,
+use std::{
+    fs::File,
+    io::{self, Read},
+    path::PathBuf,
 };
 
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::File;
-use std::io::{self, Read};
-use std::path::PathBuf;
-use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime, Terminate};
+use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+
+use crate::{
+    config::{
+        log_schema, ComponentKey, DataType, TransformConfig, TransformContext, TransformDescription,
+    },
+    event::{Event, VrlTarget},
+    internal_events::{RemapMappingAbort, RemapMappingError},
+    transforms::{SyncTransform, Transform, TransformOutputsBuf},
+    Result,
+};
+
+const DROPPED: &str = "dropped";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -26,6 +32,7 @@ pub struct RemapConfig {
     pub drop_on_error: bool,
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
+    pub reroute_dropped: bool,
 }
 
 inventory::submit! {
@@ -38,7 +45,16 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::function)
+        let remap = Remap::new(self.clone(), context)?;
+        Ok(Transform::synchronous(remap))
+    }
+
+    fn named_outputs(&self) -> Vec<String> {
+        if self.reroute_dropped {
+            vec![String::from(DROPPED)]
+        } else {
+            vec![]
+        }
     }
 
     fn input_type(&self) -> DataType {
@@ -52,22 +68,25 @@ impl TransformConfig for RemapConfig {
     fn transform_type(&self) -> &'static str {
         "remap"
     }
+
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug)]
 pub struct Remap {
+    component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
+    reroute_dropped: bool,
 }
 
 impl Remap {
-    pub fn new(
-        config: RemapConfig,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Self> {
+    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -85,20 +104,23 @@ impl Remap {
 
         let mut functions = vrl_stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let program = vrl::compile(
             &source,
             &functions,
-            Some(Box::new(enrichment_tables.clone())),
+            Some(Box::new(context.enrichment_tables.clone())),
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
+            component_key: context.key.clone(),
             program,
             runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
+            reroute_dropped: config.reroute_dropped,
         })
     }
 
@@ -106,34 +128,71 @@ impl Remap {
     const fn runtime(&self) -> &Runtime {
         &self.runtime
     }
+
+    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
+        match event {
+            Event::Log(ref mut log) => {
+                log.insert(
+                    log_schema().metadata_key(),
+                    serde_json::json!({
+                        "dropped": {
+                            "reason": reason,
+                            "message": error.to_string(),
+                            "component_id": self.component_key,
+                            "component_type": "remap",
+                            "component_kind": "transform",
+                        }
+                    }),
+                );
+            }
+            Event::Metric(ref mut metric) => {
+                let m = log_schema().metadata_key();
+                metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.insert_tag(
+                    format!("{}.dropped.component_id", m),
+                    self.component_key
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(String::new),
+                );
+                metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
+                metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+            }
+        }
+    }
 }
 
 impl Clone for Remap {
     fn clone(&self) -> Self {
         Self {
+            component_key: self.component_key.clone(),
             program: self.program.clone(),
             runtime: Runtime::default(),
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
+            reroute_dropped: self.reroute_dropped,
         }
     }
 }
 
-impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        // If a program can fail or abort at runtime, we need to clone the
-        // original event and keep it around, to allow us to discard any
-        // mutations made to the event while the VRL program runs, before it
-        // failed or aborted.
+impl SyncTransform for Remap {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        // If a program can fail or abort at runtime and we know that we will still need to forward
+        // the event in that case (either to the main output or `dropped`, depending on the
+        // config), we need to clone the original event and keep it around, to allow us to discard
+        // any mutations made to the event while the VRL program runs, before it failed or aborted.
         //
-        // The `drop_on_{error, abort}` transform config allows operators to
-        // ignore events if their failed/aborted, in which case we can skip the
-        // cloning, since any mutations made by VRL will be ignored regardless.
-        #[allow(clippy::if_same_then_else)]
-        let original_event = if !self.drop_on_error && self.program.can_fail() {
-            Some(event.clone())
-        } else if !self.drop_on_abort && self.program.can_abort() {
+        // The `drop_on_{error, abort}` transform config allows operators to remove events from the
+        // main output if they're failed or aborted, in which case we can skip the cloning, since
+        // any mutations made by VRL will be ignored regardless. If they hav configured
+        // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
+        // the event to the `dropped` output.
+        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
+        let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
+        let original_event = if (self.program.can_fail() && forward_on_error)
+            || (self.program.can_abort() && forward_on_abort)
+        {
             Some(event.clone())
         } else {
             None
@@ -152,13 +211,17 @@ impl FunctionTransform for Remap {
                     output.push(event)
                 }
             }
-            Err(Terminate::Abort(_)) => {
+            Err(Terminate::Abort(error)) => {
                 emit!(&RemapMappingAbort {
                     event_dropped: self.drop_on_abort,
                 });
 
                 if !self.drop_on_abort {
                     output.push(original_event.expect("event will be set"))
+                } else if self.reroute_dropped {
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "abort", error);
+                    output.push_named(DROPPED, event)
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -169,6 +232,10 @@ impl FunctionTransform for Remap {
 
                 if !self.drop_on_error {
                     output.push(original_event.expect("event will be set"))
+                } else if self.reroute_dropped {
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "error", error);
+                    output.push_named(DROPPED, event)
                 }
             }
         }
@@ -188,17 +255,16 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        event::{
-            metric::{MetricKind, MetricValue},
-            LogEvent, Metric, Value,
-        },
-        transforms::test::transform_one,
-    };
+    use std::collections::{BTreeMap, HashMap};
+
     use indoc::{formatdoc, indoc};
     use shared::btreemap;
-    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        LogEvent, Metric, Value,
+    };
 
     #[test]
     fn generate_config() {
@@ -251,6 +317,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
         assert!(tform.runtime().is_empty());
@@ -300,6 +367,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -335,11 +403,13 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
-        let mut result = vec![];
-        tform.transform(&mut result, event);
+        let out = collect_outputs(&mut tform, event);
+        assert_eq!(2, out.primary.len());
+        let result = out.primary;
 
         assert_eq!(get_field_string(&result[0], "message"), "foo");
         assert_eq!(get_field_string(&result[1], "message"), "bar");
@@ -365,6 +435,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -393,6 +464,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -416,6 +488,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -444,6 +517,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -472,6 +546,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -499,6 +574,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -520,5 +596,267 @@ mod tests {
                 }))
             )
         );
+    }
+
+    #[test]
+    fn check_remap_branching() {
+        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
+        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+
+        let happy_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("hello".into(), "world".into());
+            Event::Metric(metric)
+        };
+
+        let abort_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("hello".into(), "goodbye".into());
+            Event::Metric(metric)
+        };
+
+        let error_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("not_hello".into(), "oops".into());
+            Event::Metric(metric)
+        };
+
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                if exists(.tags) {{
+                    # metrics
+                    .tags.foo = "bar"
+                    if string!(.tags.hello) == "goodbye" {{
+                      abort
+                    }}
+                }} else {{
+                    # logs
+                    .foo = "bar"
+                    if string!(.hello) == "goodbye" {{
+                      abort
+                    }}
+                }}
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "world".into());
+        assert_eq!(log["foo"], "bar".into());
+        assert!(!log.contains("metadata"));
+
+        let output = transform_one_fallible(&mut tform, abort).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "goodbye".into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "aborted",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("hello".into(), "world".into());
+                    tags.insert("foo".into(), "bar".into());
+                    tags
+                }))
+            )
+        );
+
+        let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("hello".into(), "goodbye".into());
+                    tags.insert("metadata.dropped.reason".into(), "abort".into());
+                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
+                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
+                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
+                    tags
+                }))
+            )
+        );
+
+        let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("not_hello".into(), "oops".into());
+                    tags.insert("metadata.dropped.reason".into(), "error".into());
+                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
+                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
+                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
+                    tags
+                }))
+            )
+        );
+    }
+
+    #[test]
+    fn check_remap_branching_disabled() {
+        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
+        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                if exists(.tags) {{
+                    # metrics
+                    .tags.foo = "bar"
+                    if string!(.tags.hello) == "goodbye" {{
+                      abort
+                    }}
+                }} else {{
+                    # logs
+                    .foo = "bar"
+                    if string!(.hello) == "goodbye" {{
+                      abort
+                    }}
+                }}
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: false,
+            ..Default::default()
+        };
+
+        assert!(conf.named_outputs().is_empty());
+
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "world".into());
+        assert_eq!(log["foo"], "bar".into());
+        assert!(!log.contains("metadata"));
+
+        let out = collect_outputs(&mut tform, abort);
+        assert!(out.primary.is_empty());
+        assert!(out.named[DROPPED].is_empty());
+
+        let out = collect_outputs(&mut tform, error);
+        assert!(out.primary.is_empty());
+        assert!(out.named[DROPPED].is_empty());
+    }
+
+    struct CollectedOuput {
+        primary: Vec<Event>,
+        named: HashMap<String, Vec<Event>>,
+    }
+
+    fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+
+        ft.transform(event, &mut outputs);
+
+        CollectedOuput {
+            primary: outputs.take_primary(),
+            named: outputs.take_all_named(),
+        }
+    }
+
+    fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
+        let mut out = collect_outputs(ft, event);
+        assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
+        assert!(out.primary.len() <= 1);
+        out.primary.pop()
+    }
+
+    fn transform_one_fallible(
+        ft: &mut dyn SyncTransform,
+        event: Event,
+    ) -> std::result::Result<Event, Event> {
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+
+        ft.transform(event, &mut outputs);
+
+        let mut buf = outputs.drain().collect::<Vec<_>>();
+        let mut err_buf = outputs.drain_named(DROPPED).collect::<Vec<_>>();
+
+        assert!(buf.len() < 2);
+        assert!(err_buf.len() < 2);
+        match (buf.pop(), err_buf.pop()) {
+            (Some(good), None) => Ok(good),
+            (None, Some(bad)) => Err(bad),
+            (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
+        }
     }
 }

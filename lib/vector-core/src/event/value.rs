@@ -1,15 +1,21 @@
-use crate::ByteSizeOf;
-use crate::{event::error::EventError, event::timestamp_to_string, Result};
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    hash::{Hash, Hasher},
+    iter::FromIterator,
+};
+
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
+
+use crate::{
+    event::{error::EventError, timestamp_to_string},
+    ByteSizeOf, Result,
+};
 
 #[derive(PartialOrd, Debug, Clone, Deserialize)]
 pub enum Value {
@@ -1337,9 +1343,11 @@ impl Value {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use quickcheck::{QuickCheck, TestResult};
     use std::{fs, io::Read, path::Path};
+
+    use quickcheck::{QuickCheck, TestResult};
+
+    use super::*;
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {

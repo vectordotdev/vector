@@ -1,12 +1,13 @@
-use crate::{
-    http::HttpError,
-    sinks::util::retries::{RetryAction, RetryLogic},
-};
-
 use http::StatusCode;
 use serde::Deserialize;
 
-use crate::sinks::elasticsearch::service::ElasticSearchResponse;
+use crate::{
+    http::HttpError,
+    sinks::{
+        elasticsearch::service::ElasticSearchResponse,
+        util::retries::{RetryAction, RetryLogic},
+    },
+};
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -103,11 +104,12 @@ fn get_error_reason(body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::EventStatus;
     use bytes::Bytes;
     use http::Response;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::event::EventStatus;
 
     #[test]
     fn handles_error_response() {
@@ -120,7 +122,7 @@ mod tests {
         assert!(matches!(
             logic.should_retry_response(&ElasticSearchResponse {
                 http_response: response,
-                event_status: EventStatus::Failed,
+                event_status: EventStatus::Rejected,
                 batch_size: 1,
                 events_byte_size: 1,
             }),

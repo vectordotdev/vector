@@ -1,11 +1,5 @@
 #![cfg(feature = "shutdown-tests")]
 
-use assert_cmd::prelude::*;
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
-use serde_json::{json, Value};
 use std::{
     fs::read_dir,
     io::Write,
@@ -15,6 +9,13 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
+
+use assert_cmd::prelude::*;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use serde_json::{json, Value};
 use vector::test_util::{next_addr, temp_file};
 
 mod support;
@@ -211,7 +212,7 @@ fn configuration_path_recomputed() {
         dir.join("conf1.toml"),
         &source_config(
             r#"
-        type = "generator"
+        type = "demo_logs"
         format = "shuffle"
         interval = 1.0 # optional, no default
         lines = ["foo", "bar"]"#,
@@ -312,10 +313,10 @@ fn timely_shutdown_file() {
 }
 
 #[test]
-fn timely_shutdown_generator() {
+fn timely_shutdown_demo_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "generator"
+    type = "demo_logs"
     format = "shuffle"
     interval = 1.0 # optional, no default
     lines = ["foo", "bar"]"#,

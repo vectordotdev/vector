@@ -22,10 +22,11 @@ interpreted as described in [RFC 2119].
    1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
-      1. [EventsRecevied](#eventsrecevied)
+      1. [EventsReceived](#eventsrecevied)
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
+1. [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
@@ -42,7 +43,7 @@ outline these rules to guide new component development and ongoing maintenance.
 This specification addresses _direct_ component development and does not cover
 aspects that components inherit "for free". For example, this specification does
 not cover global context, such as `component_id`, that all components receive in
-their telemetry by nature of being a Vector compoent.
+their telemetry by nature of being a Vector component.
 
 ## How to read this document
 
@@ -114,8 +115,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -155,8 +157,12 @@ or receiving one or more Vector events.
 
 #### EventsSent
 
-*All components* MUST emit an `EventsSent` event immediately after
-sending the events down stream, if the transmission was successful.
+*All components* that send events down stream, and delete them in Vector, MUST
+emit an `EventsSent` event immediately after sending, if the transmission was
+successful.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 * Properties
   * `count` - The count of Vector events.
@@ -172,8 +178,12 @@ sending the events down stream, if the transmission was successful.
 
 #### BytesSent
 
-*Sinks* MUST emit a `BytesSent` event immediately after sending bytes to the
-downstream target, if the transmission was successful.
+*Sinks* that send events down stream, and delete them in Vector, MUST emit
+a `BytesSent` event immediately after sending bytes to the downstream target, if
+the transmission was successful.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 * Properties
   * `byte_size`
@@ -224,8 +234,23 @@ implement since errors are specific to the component.
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+## Health checks
+
+All sink components SHOULD define a health check. These checks are executed at
+boot and as part of `vector validate`. This health check SHOULD, as closely as
+possible, emulate the sink's normal operation to give the best possible signal
+that Vector is configured correctly.
+
+These checks SHOULD NOT query the health of external systems, but MAY fail due
+to external system being unhealthy. For example, a health check for the `aws_s3`
+sink might fail if AWS is unhealthy, but the check itself should not query for
+AWS's status.
+
+See the [development documentation][health checks] for more context guidance.
+
 [Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/

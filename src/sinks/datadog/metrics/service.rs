@@ -1,7 +1,5 @@
-use crate::{
-    http::{BuildRequest, CallRequest, HttpClient, HttpError},
-    sinks::util::retries::{RetryAction, RetryLogic},
-};
+use std::task::{Context, Poll};
+
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use http::{
@@ -10,13 +8,17 @@ use http::{
 };
 use hyper::Body;
 use snafu::ResultExt;
-use std::task::{Context, Poll};
 use tower::Service;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
+};
+
+use crate::{
+    http::{BuildRequest, CallRequest, HttpClient, HttpError},
+    sinks::util::retries::{RetryAction, RetryLogic},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -117,7 +119,7 @@ impl DriverResponse for DatadogMetricsResponse {
         if self.status_code.is_success() {
             EventStatus::Delivered
         } else if self.status_code.is_client_error() {
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             EventStatus::Errored
         }

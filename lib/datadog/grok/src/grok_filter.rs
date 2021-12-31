@@ -1,16 +1,20 @@
+use std::{convert::TryFrom, string::ToString};
+
+use ordered_float::NotNan;
+use strum_macros::Display;
+use vrl_compiler::Value;
+
 use crate::{
     ast::{Function, FunctionArgument},
+    filters::{array, keyvalue, keyvalue::KeyValueFilter},
+    matchers::date::{apply_date_filter, DateFilter},
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
 
-use ordered_float::NotNan;
-use std::{convert::TryFrom, string::ToString};
-use strum_macros::Display;
-use vrl_compiler::Value;
-
 #[derive(Debug, Display, Clone)]
 pub enum GrokFilter {
+    Date(DateFilter),
     Integer,
     IntegerExt,
     // with scientific notation support, e.g. 1e10
@@ -22,6 +26,12 @@ pub enum GrokFilter {
     Lowercase,
     Uppercase,
     Json,
+    Array(
+        Option<(char, char)>,
+        Option<String>,
+        Box<Option<GrokFilter>>,
+    ),
+    KeyValue(KeyValueFilter),
 }
 
 impl TryFrom<&Function> for GrokFilter {
@@ -53,13 +63,17 @@ impl TryFrom<&Function> for GrokFilter {
                 .args
                 .as_ref()
                 .and_then(|args| {
-                    if let FunctionArgument::Arg(ref null_value) = args[0] {
-                        Some(GrokFilter::NullIf(null_value.to_string()))
+                    if let FunctionArgument::Arg(Value::Bytes(null_value)) = &args[0] {
+                        Some(GrokFilter::NullIf(
+                            String::from_utf8_lossy(null_value).to_string(),
+                        ))
                     } else {
                         None
                     }
                 })
                 .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+            "array" => array::filter_from_function(f),
+            "keyvalue" => keyvalue::filter_from_function(f),
             _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
         }
     }
@@ -109,7 +123,15 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             Value::Integer(v) => Ok(Value::Float(
                 NotNan::new((*v as f64) * scale_factor).expect("NaN"),
             )),
-            Value::Float(v) => Ok(Value::Float(*v * scale_factor)),
+            Value::Float(v) => Ok(Value::Float(
+                NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
+            )),
+            Value::Bytes(v) => {
+                let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                })?;
+                Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
+            }
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
@@ -141,13 +163,40 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::NullIf(null_value) => match value {
-            Value::Bytes(_) => {
-                if value.to_string() == *null_value {
+            Value::Bytes(bytes) => {
+                if String::from_utf8_lossy(bytes) == *null_value {
                     Ok(Value::Null)
                 } else {
                     Ok(value.to_owned())
                 }
             }
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string(),
+            )),
+        },
+        GrokFilter::Date(date_filter) => apply_date_filter(value, date_filter),
+        GrokFilter::KeyValue(keyvalue_filter) => keyvalue::apply_filter(value, keyvalue_filter),
+        GrokFilter::Array(brackets, delimiter, value_filter) => match value {
+            Value::Bytes(bytes) => array::parse(
+                String::from_utf8_lossy(bytes).as_ref(),
+                brackets.to_owned(),
+                delimiter.as_ref().map(|s| s.as_str()),
+            )
+            .map_err(|_e| {
+                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+            })
+            .and_then(|values| {
+                if let Some(value_filter) = value_filter.as_ref() {
+                    let result = values
+                        .iter()
+                        .map(|v| apply_filter(v, value_filter))
+                        .collect::<Result<Vec<Value>, _>>()
+                        .map(Value::from);
+                    return result;
+                }
+                Ok(values.into())
+            }),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),

@@ -1,5 +1,14 @@
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    codecs::{Decoder, FramingConfig, ParserConfig},
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        Decoder,
+    },
     config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
@@ -11,10 +20,6 @@ use crate::{
     },
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -25,7 +30,7 @@ pub struct UnixConfig {
     #[serde(default)]
     pub framing: Option<Box<dyn FramingConfig>>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn ParserConfig>,
+    pub decoding: Box<dyn DeserializerConfig>,
 }
 
 impl UnixConfig {

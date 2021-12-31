@@ -1,3 +1,11 @@
+use std::num::NonZeroU64;
+
+use http::Uri;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+
+use super::util::SinkBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
@@ -9,10 +17,6 @@ use crate::{
         },
     },
 };
-use http::Uri;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 
 // New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
 const MAX_PAYLOAD_SIZE: usize = 1_000_000_usize;
@@ -23,11 +27,6 @@ enum BuildError {
         "Missing authentication key, must provide either 'license_key' or 'insert_key'"
     ))]
     MissingAuthParam,
-    #[snafu(display(
-        "Too high batch max size. The value must be {} bytes or less",
-        MAX_PAYLOAD_SIZE
-    ))]
-    BatchMaxSize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -37,6 +36,15 @@ pub enum NewRelicLogsRegion {
     #[derivative(Default)]
     Us,
     Eu,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NewRelicLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
@@ -53,7 +61,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -133,15 +141,7 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let max_payload_size = self.batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
-        if max_payload_size > MAX_PAYLOAD_SIZE {
-            return Err(Box::new(BuildError::BatchMaxSize));
-        }
-        let batch = BatchConfig {
-            max_bytes: Some(max_payload_size),
-            max_events: None,
-            ..self.batch
-        };
+        let batch_settings = self.batch.validate()?.limit_max_bytes(MAX_PAYLOAD_SIZE)?;
 
         let tower = TowerRequestConfig { ..self.request };
 
@@ -154,7 +154,7 @@ impl NewRelicLogsConfig {
             headers: None,
             compression: self.compression,
             encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
-            batch,
+            batch: batch_settings.into(),
             request,
             tls: None,
         })
@@ -163,6 +163,13 @@ impl NewRelicLogsConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufRead;
+
+    use bytes::Buf;
+    use futures::{stream, StreamExt};
+    use hyper::Method;
+    use serde_json::Value;
+
     use super::*;
     use crate::{
         config::SinkConfig,
@@ -173,11 +180,6 @@ mod tests {
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
-    use bytes::Buf;
-    use futures::{stream, StreamExt};
-    use hyper::Method;
-    use serde_json::Value;
-    use std::io::BufRead;
 
     #[test]
     fn generate_config() {

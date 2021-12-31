@@ -1,13 +1,18 @@
-use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    serde::{default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
-};
+use std::{fmt, net::SocketAddr};
+
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::{fmt, net::SocketAddr};
 use warp::Filter;
+
+use crate::{
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 pub mod errors;
 mod filters;
@@ -23,7 +28,9 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -56,7 +63,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            cx.acknowledgements.enabled,
+            self.acknowledgements.enabled,
             cx.out,
         );
 
@@ -102,6 +109,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -109,6 +117,21 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
+    use std::{
+        io::{Cursor, Read},
+        net::SocketAddr,
+    };
+
+    use bytes::Bytes;
+    use chrono::{DateTime, SubsecRound, Utc};
+    use flate2::read::GzEncoder;
+    use futures::Stream;
+    use pretty_assertions::assert_eq;
+    use shared::assert_event_data_eq;
+    use tokio::time::{sleep, Duration};
+
     use super::*;
     use crate::{
         event::{Event, EventStatus},
@@ -116,17 +139,6 @@ mod tests {
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Pipeline,
     };
-    use bytes::Bytes;
-    use chrono::{DateTime, SubsecRound, Utc};
-    use flate2::read::GzEncoder;
-    use futures::Stream;
-    use pretty_assertions::assert_eq;
-    use shared::assert_event_data_eq;
-    use std::{
-        io::{Cursor, Read},
-        net::SocketAddr,
-    };
-    use tokio::time::{sleep, Duration};
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
     const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";
@@ -164,11 +176,10 @@ mod tests {
         delivered: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         use EventStatus::*;
-        let status = if delivered { Delivered } else { Failed };
+        let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut cx = SourceContext::new_test(sender);
-        cx.acknowledgements.enabled = true;
+        let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -177,6 +188,7 @@ mod tests {
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: true.into(),
             }
             .build(cx)
             .await

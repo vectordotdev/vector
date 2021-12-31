@@ -509,6 +509,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_discarded_events_total: {
+			description:       "The number of events dropped by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
@@ -590,6 +596,18 @@ components: sources: internal_metrics: {
 		}
 		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		datadog_logs_received_in_total: {
+			description:       "Number of Datadog logs received."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		datadog_metrics_received_in_total: {
+			description:       "Number of Datadog metrics received."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -912,6 +930,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		splunk_pending_acks: {
+			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		streams_total: {
 			description:       "The total number of streams."
 			type:              "counter"
@@ -1135,6 +1159,7 @@ components: sources: internal_metrics: {
 			description: "The type of the error"
 			required:    true
 			enum: {
+				"acknowledgements_failed":     "The acknowledgement operation failed."
 				"delete_failed":               "The file deletion failed."
 				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."

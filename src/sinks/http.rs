@@ -1,15 +1,5 @@
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::io::Write;
+
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -20,7 +10,20 @@ use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::io::Write;
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -48,7 +51,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
@@ -138,10 +141,7 @@ impl SinkConfig for HttpSinkConfig {
         config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
-        let batch = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config
             .request
             .tower
@@ -301,6 +301,20 @@ fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crat
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        io::{BufRead, BufReader},
+        sync::{atomic, Arc},
+    };
+
+    use bytes::{Buf, Bytes};
+    use flate2::read::MultiGzDecoder;
+    use futures::{channel::mpsc, stream, StreamExt};
+    use headers::{Authorization, HeaderMapExt};
+    use http::request::Parts;
+    use hyper::{Method, Response, StatusCode};
+    use serde::Deserialize;
+    use vector_core::event::{BatchNotifier, BatchStatus};
+
     use super::*;
     use crate::{
         assert_downcast_matches,
@@ -314,16 +328,6 @@ mod tests {
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
-    use bytes::{Buf, Bytes};
-    use flate2::read::MultiGzDecoder;
-    use futures::{channel::mpsc, stream, StreamExt};
-    use headers::{Authorization, HeaderMapExt};
-    use http::request::Parts;
-    use hyper::{Method, Response, StatusCode};
-    use serde::Deserialize;
-    use std::io::{BufRead, BufReader};
-    use std::sync::{atomic, Arc};
-    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -353,6 +357,7 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
+        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,
@@ -579,14 +584,14 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
         let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();

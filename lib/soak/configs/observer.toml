@@ -1,4 +1,0 @@
-prometheus = "http://localhost:9090"
-query = "sum(rate((bytes_written[1m])))"
-experiment_name = "foobar"
-vector_id = "featuresha-commitsha"

@@ -10,7 +10,7 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes five **breaking changes**:
+Vector's 0.17.0 release includes several **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
 1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
@@ -62,7 +62,7 @@ fast as it can. In version 0.17.0, the default for `interval` is now `1.0`, whic
 outputs one batch per second. To specify no delay between batches you now need to explicit set
 `interval` to `0.0`.
 
-[generator]: /docs/reference/configuration/sources/generator
+[generator]: /docs/reference/configuration/sources/demo_logs
 
 ### The deprecated `wasm` transform was removed {#wasm}
 

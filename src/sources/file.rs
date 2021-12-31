@@ -1,17 +1,5 @@
-use super::util::finalizer::OrderedFinalizer;
-use super::util::{EncodingConfig, MultilineConfig};
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
-    internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
-    },
-    line_agg::{self, LineAgg},
-    shutdown::ShutdownSignal,
-    trace::{current_span, Instrument},
-    Pipeline,
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
@@ -26,10 +14,25 @@ use futures::{
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
-use std::path::PathBuf;
-use std::time::Duration;
 use tokio::task::spawn_blocking;
+
+use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    encoding_transcode::{Decoder, Encoder},
+    event::{BatchNotifier, Event, LogEvent},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
+    line_agg::{self, LineAgg},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    trace::{current_span, Instrument},
+    Pipeline,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -91,6 +94,8 @@ pub struct FileConfig {
     pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -192,6 +197,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -233,7 +239,7 @@ impl SourceConfig for FileConfig {
             data_dir,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements.enabled,
+            self.acknowledgements.enabled,
         ))
     }
 
@@ -326,7 +332,7 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
-        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+        let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -477,6 +483,18 @@ fn create_event(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        future::Future,
+        io::{Seek, Write},
+    };
+
+    use encoding_rs::UTF_16LE;
+    use pretty_assertions::assert_eq;
+    use tempfile::tempdir;
+    use tokio::time::{sleep, timeout, Duration};
+
     use super::*;
     use crate::{
         config::Config,
@@ -485,16 +503,6 @@ mod tests {
         sources::file,
         test_util::components::{self, SOURCE_TESTS},
     };
-    use encoding_rs::UTF_16LE;
-    use pretty_assertions::assert_eq;
-    use std::{
-        collections::HashSet,
-        fs::{self, File},
-        future::Future,
-        io::{Seek, Write},
-    };
-    use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -1141,8 +1149,10 @@ mod tests {
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
     async fn file_start_position_ignore_old_files() {
-        use std::os::unix::io::AsRawFd;
-        use std::time::{Duration, SystemTime};
+        use std::{
+            os::unix::io::AsRawFd,
+            time::{Duration, SystemTime},
+        };
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {

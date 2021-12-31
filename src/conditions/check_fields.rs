@@ -1,13 +1,14 @@
-use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::{Event, Value},
-};
+use std::{net::IpAddr, str::FromStr};
+
 use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
-use std::str::FromStr;
+
+use crate::{
+    conditions::{Condition, ConditionConfig, ConditionDescription},
+    event::{Event, Value},
+};
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]

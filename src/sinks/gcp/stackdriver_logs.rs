@@ -1,29 +1,31 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::config::healthcheck_response;
-use crate::template::TemplateRenderingError;
-use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
-    http::HttpClient,
-    internal_events::TemplateRenderingFailed,
-    sinks::{
-        util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        },
-        Healthcheck, VectorSink,
-    },
-    template::Template,
-    tls::{TlsOptions, TlsSettings},
-};
+use std::collections::HashMap;
+
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
-use std::collections::HashMap;
+
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::{
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
+    http::HttpClient,
+    internal_events::TemplateRenderingFailed,
+    sinks::{
+        gcs_common::config::healthcheck_response,
+        util::{
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::{Template, TemplateRenderingError},
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -50,7 +52,7 @@ pub struct StackdriverConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -64,6 +66,9 @@ struct StackdriverSink {
     severity_key: Option<String>,
     uri: Uri,
 }
+
+// 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
+const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -109,10 +114,11 @@ impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
-        let batch = BatchSettings::default()
-            .bytes(5_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
             rate_limit_num: Some(1000),
             rate_limit_duration_secs: Some(1),
@@ -299,11 +305,12 @@ impl StackdriverConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{LogEvent, Value};
     use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::value::RawValue;
+
+    use super::*;
+    use crate::event::{LogEvent, Value};
 
     #[test]
     fn generate_config() {

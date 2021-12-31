@@ -19,7 +19,7 @@ components: sinks: gcp_cloud_storage: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10485760
+				max_bytes:    10_000_000
 				timeout_secs: 300
 			}
 			compression: {

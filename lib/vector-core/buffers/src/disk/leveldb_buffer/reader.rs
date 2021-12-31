@@ -1,5 +1,16 @@
-use super::Key;
-use crate::{buffer_usage_data::BufferUsageData, bytes::DecodeBytes};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
+};
+
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -9,24 +20,16 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use std::collections::VecDeque;
-use std::fmt::Display;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
+
+use super::Key;
+use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 
 /// Minimal size of uncompacted for which a compaction can be triggered.
-const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
+const MIN_UNCOMPACTED_SIZE: u64 = 4 * 1024 * 1024;
 
 /// The reader side of N to 1 channel through leveldb.
 ///
@@ -40,10 +43,7 @@ const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
 ///  0   `compacted_offset`    |        |
 ///                     `delete_offset` |
 ///                                `read_offset`
-pub struct Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+pub struct Reader<T> {
     /// Leveldb database.
     /// Shared with Writers.
     pub(crate) db: Arc<Database<Key>>,
@@ -64,35 +64,34 @@ where
     pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     /// Size of unread events in bytes.
     /// Shared with Writers.
-    pub(crate) current_size: Arc<AtomicUsize>,
+    pub(crate) current_size: Arc<AtomicU64>,
     /// Number of oldest read, not deleted, events that have been acked by the consumer.
     /// Shared with consumer.
     pub(crate) ack_counter: Arc<AtomicUsize>,
     /// Size of deleted, not compacted, events in bytes.
-    pub(crate) uncompacted_size: usize,
+    pub(crate) uncompacted_size: u64,
     /// Sizes in bytes of read, not acked/deleted, events.
-    pub(crate) unacked_sizes: VecDeque<usize>,
+    pub(crate) unacked_sizes: VecDeque<u64>,
     /// Buffer for internal use.
     pub(crate) buffer: VecDeque<(Key, Vec<u8>)>,
     /// Limit on uncompacted_size after which we trigger compaction.
-    pub(crate) max_uncompacted_size: usize,
+    pub(crate) max_uncompacted_size: u64,
     /// Last time that compaction was triggered.
     pub(crate) last_compaction: Instant,
     // Pending read from the LevelDB datasbase
     pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
+    // Buffer usage data.
+    pub(crate) usage_handle: BufferUsageHandle,
     pub(crate) phantom: PhantomData<T>,
-    /// Atomic structure for recording buffer metadata
-    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
-unsafe impl<T> Send for Reader<T> where T: Send + Sync + Unpin {}
+unsafe impl<T> Send for Reader<T> where T: Bufferable {}
 
 impl<T> Stream for Reader<T>
 where
-    T: Send + Sync + Unpin + DecodeBytes<T>,
-    <T as DecodeBytes<T>>::Error: Display,
+    T: Bufferable,
 {
     type Item = T;
 
@@ -154,15 +153,15 @@ where
         }
 
         if let Some((key, value)) = this.buffer.pop_front() {
-            this.unacked_sizes.push_back(value.len());
+            let bytes_read = value.len() as u64;
+            this.unacked_sizes.push_back(bytes_read);
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
-            let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
-                    this.buffer_usage_data
-                        .increment_sent_event_count_and_byte_size(1, byte_size);
+                    this.usage_handle
+                        .increment_sent_event_count_and_byte_size(1, bytes_read);
                     Poll::Ready(Some(event))
                 }
                 Err(error) => {
@@ -180,22 +179,16 @@ where
     }
 }
 
-impl<T> Drop for Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+impl<T> Drop for Reader<T> {
     fn drop(&mut self) {
         let unread_size = self.delete_acked();
         self.flush(unread_size);
     }
 }
 
-impl<T> Reader<T>
-where
-    T: Send + Sync + Unpin,
-{
+impl<T> Reader<T> {
     /// Returns number of bytes to be read.
-    fn delete_acked(&mut self) -> usize {
+    fn delete_acked(&mut self) -> u64 {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
         let unread_size = if num_to_delete > 0 {
@@ -218,7 +211,7 @@ where
         unread_size
     }
 
-    fn flush(&mut self, unread_size: usize) {
+    fn flush(&mut self, unread_size: u64) {
         if self.acked > 0 {
             let new_offset = self.delete_offset + self.acked;
             assert!(

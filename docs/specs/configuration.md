@@ -37,7 +37,7 @@ make Vector's configuration as high quality as possible in order to achieve a
 This specification is focused on broad configuration guidelines and not specific
 options. It is intended to guide Vector's configuration without tedious
 management. When necessary, specific configuration will be covered in other
-relevant specifications, such as the [component specifiction].
+relevant specifications, such as the [component specification].
 
 ## Terminology
 

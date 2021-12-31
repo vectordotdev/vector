@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use indexmap::IndexMap;
+
 use super::{
     graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
     TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext,
@@ -7,10 +11,8 @@ use crate::{
     config,
     event::{Event, Value},
     topology::builder::load_enrichment_tables,
-    transforms::Transform,
+    transforms::{Transform, TransformOutputsBuf},
 };
-use indexmap::IndexMap;
-use std::collections::HashMap;
 
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
@@ -114,7 +116,7 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
             name,
             events
                 .iter()
-                .map(|e| event_to_string(e))
+                .map(event_to_string)
                 .collect::<Vec<_>>()
                 .join("\n    ")
         )
@@ -146,14 +148,15 @@ fn walk(
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
-            Transform::FallibleFunction(ref mut t) => {
-                let mut err_buf = Vec::new();
+            Transform::Synchronous(ref mut t) => {
+                let mut outputs = TransformOutputsBuf::new_with_capacity(
+                    target.config.named_outputs(),
+                    inputs.len(),
+                );
                 for input in inputs.clone() {
-                    t.transform(&mut results, &mut err_buf, input)
+                    t.transform(input, &mut outputs)
                 }
-                // unit tests don't currently support multiple outputs, so just throw these away
-                err_buf.clear();
-
+                results.extend(outputs.drain());
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
@@ -493,15 +496,16 @@ async fn build_unit_test(
 
     errors.extend(tables_errors);
 
-    let context = TransformContext {
-        globals: config.global.clone(),
-        enrichment_tables: enrichment_tables.clone(),
-    };
-
     // Build reduced transforms.
     let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
     for (id, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(id) {
+            let context = TransformContext {
+                key: Some(id.clone()),
+                globals: config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
+            };
+
             match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
@@ -594,9 +598,10 @@ async fn build_unit_test(
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::config::ConfigBuilder;
-    use indoc::indoc;
 
     #[tokio::test]
     async fn parse_no_input() {
@@ -1497,7 +1502,7 @@ mod tests {
     async fn type_inconsistency_while_expanding_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "generator"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5
@@ -1541,7 +1546,7 @@ mod tests {
     async fn invalid_name_in_expanded_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "generator"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5

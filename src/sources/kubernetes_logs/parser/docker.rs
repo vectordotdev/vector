@@ -1,13 +1,14 @@
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use serde_json::Value as JsonValue;
+use snafu::{OptionExt, ResultExt, Snafu};
+
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
     transforms::FunctionTransform,
 };
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
-use serde_json::Value as JsonValue;
-use snafu::{OptionExt, ResultExt, Snafu};
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";

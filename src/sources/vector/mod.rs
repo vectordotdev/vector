@@ -1,10 +1,11 @@
 pub mod v1;
 pub mod v2;
 
+use serde::{Deserialize, Serialize};
+
 use crate::config::{
     DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -15,7 +16,7 @@ enum V1 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV1 {
-    version: Option<V1>,
+    version: V1,
     #[serde(flatten)]
     config: v1::VectorConfig,
 }
@@ -47,7 +48,13 @@ inventory::submit! {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
-        v2::VectorConfig::generate_config()
+        let config =
+            toml::Value::try_into::<v2::VectorConfig>(v2::VectorConfig::generate_config()).unwrap();
+        toml::Value::try_from(VectorConfigV2 {
+            version: V2::V2,
+            config,
+        })
+        .unwrap()
     }
 }
 

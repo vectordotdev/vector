@@ -158,10 +158,12 @@ impl Expression for ToTimestampFn {
 #[cfg(test)]
 #[allow(overflowing_literals)]
 mod tests {
-    use super::*;
-    use shared::TimeZone;
     use std::collections::BTreeMap;
+
+    use shared::TimeZone;
     use vrl::prelude::expression::Literal;
+
+    use super::*;
 
     #[test]
     fn out_of_range_integer() {

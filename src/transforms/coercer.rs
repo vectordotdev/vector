@@ -1,3 +1,8 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
@@ -5,10 +10,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -30,10 +31,10 @@ impl TransformConfig for CoercerConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
-        Ok(Transform::function(Coercer {
+        Ok(Transform::function(Coercer::new(
             types,
-            drop_unspecified: self.drop_unspecified,
-        }))
+            self.drop_unspecified,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,6 +54,15 @@ impl TransformConfig for CoercerConfig {
 pub struct Coercer {
     types: HashMap<String, Conversion>,
     drop_unspecified: bool,
+}
+
+impl Coercer {
+    pub const fn new(types: HashMap<String, Conversion>, drop_unspecified: bool) -> Self {
+        Self {
+            types,
+            drop_unspecified,
+        }
+    }
 }
 
 impl FunctionTransform for Coercer {
@@ -95,12 +105,13 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::CoercerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {

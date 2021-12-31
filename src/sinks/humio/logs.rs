@@ -1,13 +1,21 @@
+use serde::{Deserialize, Serialize};
+
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::logs::config::HecSinkLogsConfig,
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
-    sinks::{Healthcheck, VectorSink},
+    sinks::{
+        splunk_hec::{
+            common::{
+                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+            },
+            logs::config::HecLogsSinkConfig,
+        },
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        Healthcheck, VectorSink,
+    },
     template::Template,
     tls::TlsOptions,
 };
-use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -31,12 +39,18 @@ pub struct HumioLogsConfig {
     #[serde(default)]
     pub(in crate::sinks::humio) request: TowerRequestConfig,
     #[serde(default)]
-    pub(in crate::sinks::humio) batch: BatchConfig,
+    pub(in crate::sinks::humio) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
+    #[serde(default = "timestamp_nanos_key")]
+    pub(in crate::sinks::humio) timestamp_nanos_key: Option<String>,
 }
 
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
+}
+
+pub fn timestamp_nanos_key() -> Option<String> {
+    Some("@timestamp.nanos".to_string())
 }
 
 impl GenerateConfig for HumioLogsConfig {
@@ -54,6 +68,7 @@ impl GenerateConfig for HumioLogsConfig {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }
@@ -76,22 +91,27 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
-    fn build_hec_config(&self) -> HecSinkLogsConfig {
+    fn build_hec_config(&self) -> HecLogsSinkConfig {
         let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
-        HecSinkLogsConfig {
-            token: self.token.clone(),
+        HecLogsSinkConfig {
+            default_token: self.token.clone(),
             endpoint,
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
+            timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             encoding: self.encoding.clone().into_encoding(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
             tls: self.tls.clone(),
+            acknowledgements: HecClientAcknowledgementsConfig {
+                indexer_acknowledgements_enabled: false,
+                ..Default::default()
+            },
         }
     }
 }
@@ -109,6 +129,12 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
+    use chrono::{TimeZone, Utc};
+    use indoc::indoc;
+    use serde_json::{json, Value as JsonValue};
+
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
@@ -116,10 +142,6 @@ mod integration_tests {
         sinks::util::Compression,
         test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
-    use chrono::Utc;
-    use indoc::indoc;
-    use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -139,6 +161,9 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         let log = event.as_mut_log();
         log.insert(log_schema().host_key(), host.clone());
+
+        let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
+        log.insert(log_schema().timestamp_key(), ts);
 
         components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
@@ -161,6 +186,7 @@ mod integration_tests {
                 .unwrap_or_else(|| "no error message".to_string())
         );
         assert_eq!(Some(host), entry.host);
+        assert_eq!("132456", entry.timestamp_nanos);
     }
 
     #[tokio::test]
@@ -242,6 +268,9 @@ mod integration_tests {
 
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         HumioLogsConfig {
             token: token.to_string(),
             endpoint: Some(HOST.to_string()),
@@ -253,11 +282,9 @@ mod integration_tests {
             index: None,
             compression: Compression::None,
             request: TowerRequestConfig::default(),
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             tls: None,
+            timestamp_nanos_key: timestamp_nanos_key(),
         }
     }
 
@@ -351,6 +378,7 @@ mod integration_tests {
     }
 
     #[derive(Clone, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct HumioLog {
         #[serde(rename = "#repo")]
         humio_repo: String,
@@ -372,6 +400,9 @@ mod integration_tests {
 
         #[serde(rename = "@timestamp")]
         timestamp_millis: u64,
+
+        #[serde(rename = "@timestamp.nanos")]
+        timestamp_nanos: String,
 
         #[serde(rename = "@timezone")]
         timezone: String,

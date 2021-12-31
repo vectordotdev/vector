@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
@@ -5,7 +7,6 @@ use crate::{
     internal_events::SampleEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -140,6 +141,8 @@ impl FunctionTransform for Sample {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
     use super::*;
     use crate::{
         conditions::{ConditionConfig, VrlConfig},
@@ -148,7 +151,6 @@ mod tests {
         test_util::random_lines,
         transforms::test::transform_one,
     };
-    use approx::assert_relative_eq;
 
     fn condition_contains(key: &str, needle: &str) -> Box<dyn Condition> {
         VrlConfig {

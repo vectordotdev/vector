@@ -1,7 +1,7 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use super::{Error, Value};
 use crate::ExpressionError;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
@@ -84,7 +84,7 @@ impl Value {
         self,
         mut rhs: impl FnMut() -> Result<Self, ExpressionError>,
     ) -> Result<Self, Error> {
-        let err = |err| Error::Or(err);
+        let err = Error::Or;
 
         match self {
             Value::Null => rhs().map_err(err),

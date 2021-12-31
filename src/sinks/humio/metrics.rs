@@ -1,21 +1,25 @@
-use super::{host_key, logs::HumioLogsConfig, Encoding};
-use crate::{
-    config::{
-        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
-        TransformContext,
-    },
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
-    sinks::{Healthcheck, VectorSink},
-    template::Template,
-    tls::TlsOptions,
-    transforms::metric_to_log::MetricToLogConfig,
-};
 use async_trait::async_trait;
 use futures::{stream, StreamExt};
 use futures_util::stream::BoxStream;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use vector_core::{event::Event, sink::StreamSink, transform::Transform};
+
+use super::{host_key, logs::HumioLogsConfig, Encoding};
+use crate::{
+    config::{
+        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
+        TransformContext,
+    },
+    sinks::{
+        splunk_hec::common::SplunkHecDefaultBatchSettings,
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        Healthcheck, VectorSink,
+    },
+    template::Template,
+    tls::TlsOptions,
+    transforms::metric_to_log::MetricToLogConfig,
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioMetricsConfig {
@@ -39,7 +43,7 @@ pub struct HumioMetricsConfig {
     #[serde(default)]
     request: TowerRequestConfig,
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     tls: Option<TlsOptions>,
     // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //
@@ -89,6 +93,7 @@ impl SinkConfig for HumioMetricsConfig {
             request: self.request,
             batch: self.batch,
             tls: self.tls.clone(),
+            timestamp_nanos_key: None,
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -131,6 +136,10 @@ impl StreamSink for HumioMetricsSink {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, Utc};
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::{
         event::{
@@ -140,9 +149,6 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{self, components, components::HTTP_SINK_TAGS},
     };
-    use chrono::{offset::TimeZone, Utc};
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {

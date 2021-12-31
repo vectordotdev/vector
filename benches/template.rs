@@ -1,8 +1,7 @@
-use criterion::{criterion_group, BatchSize, Criterion};
-
-use chrono::Utc;
 use std::convert::TryFrom;
 
+use chrono::Utc;
+use criterion::{criterion_group, BatchSize, Criterion};
 use vector::{config::log_schema, event::Event};
 
 fn bench_elasticsearch_index(c: &mut Criterion) {

@@ -1,8 +1,8 @@
-use super::batch::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
-use flate2::write::GzEncoder;
 use std::io::Write;
+
+use flate2::write::GzEncoder;
+
+use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub mod compression;
 pub mod json;
@@ -78,13 +78,6 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config.get_settings_or_default(defaults))
-    }
-
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
         // can't track compressed sizes. Keep a running count of the
@@ -128,23 +121,23 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use super::{Buffer, Compression};
-    use crate::{
-        buffers::Acker,
-        sinks::util::{BatchSettings, BatchSink, EncodedEvent},
-    };
-    use futures::{future, stream, SinkExt, StreamExt};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
     };
+
+    use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
+    use vector_core::buffers::Acker;
+
+    use super::{Buffer, Compression};
+    use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
 
     #[tokio::test]
     async fn gzip() {
         use flate2::read::MultiGzDecoder;
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -152,13 +145,16 @@ mod test {
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
-        let timeout = Duration::from_secs(0);
+
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 100_000;
+        batch_settings.size.events = 1_000;
+        batch_settings.timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::gzip_default()),
-            timeout,
+            Buffer::new(batch_settings.size, Compression::gzip_default()),
+            batch_settings.timeout,
             acker,
         );
 

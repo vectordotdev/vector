@@ -1,3 +1,9 @@
+use std::collections::BTreeMap;
+
+use async_stream::stream;
+use tokio::time::Duration;
+use tokio_stream::{Stream, StreamExt};
+
 use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
     SentEventsTotal,
@@ -7,10 +13,6 @@ use crate::{
     event::{Metric, MetricValue},
     metrics::Controller,
 };
-use async_stream::stream;
-use std::collections::BTreeMap;
-use tokio::time::Duration;
-use tokio_stream::{Stream, StreamExt};
 
 fn get_controller() -> &'static Controller {
     Controller::get().expect("Metrics system not initialized. Please report.")
@@ -230,7 +232,7 @@ pub fn component_counter_metrics(
     })
 }
 
-/// Returns the throughput of a 'counter' metric, sampled over `interval` millseconds
+/// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
 /// and filtered by the provided `filter_fn`.
 pub fn counter_throughput(
     interval: i32,

@@ -1,19 +1,20 @@
+use std::{
+    fs::{create_dir_all, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
+
+use colored::*;
+use indexmap::IndexMap;
+use serde::Serialize;
+use structopt::StructOpt;
+use toml::{map::Map, Value};
+use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
+
 use crate::config::{
     component::ExampleError, SinkDescription, SinkHealthcheckOptions, SourceDescription,
     TransformDescription,
 };
-use colored::*;
-use indexmap::IndexMap;
-use serde::Serialize;
-use std::path::{Path, PathBuf};
-use std::{
-    fs::{create_dir_all, File},
-    io::Write,
-};
-use structopt::StructOpt;
-use toml::{map::Map, Value};
-use vector_core::config::GlobalOptions;
-use vector_core::default_data_dir;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -64,7 +65,7 @@ pub struct SinkOuter {
     #[serde(flatten)]
     pub inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 }
 
 #[derive(Serialize)]
@@ -264,7 +265,7 @@ fn generate_example(
                             }
                         })
                         .unwrap_or_else(|| vec!["component-id".to_owned()]),
-                    buffer: crate::buffers::BufferConfig::default(),
+                    buffer: BufferConfig::default(),
                     healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
@@ -326,11 +327,14 @@ fn generate_example(
     }
 
     if file.is_some() {
+        #[allow(clippy::print_stdout)]
         match write_config(file.as_ref().unwrap(), &builder) {
-            Ok(_) => println!(
-                "Config file written to {:?}",
-                &file.as_ref().unwrap().join("\n")
-            ),
+            Ok(_) => {
+                println!(
+                    "Config file written to {:?}",
+                    &file.as_ref().unwrap().join("\n")
+                )
+            }
             Err(e) => errs.push(format!("failed to write to file: {}", e)),
         };
     };
@@ -345,11 +349,17 @@ fn generate_example(
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_example(!opts.fragment, &opts.expression, &opts.file) {
         Ok(s) => {
-            println!("{}", s);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{}", s);
+            }
             exitcode::OK
         }
         Err(errs) => {
-            errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            #[allow(clippy::print_stderr)]
+            {
+                errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            }
             exitcode::SOFTWARE
         }
     }
@@ -371,9 +381,10 @@ fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn generate_all() {
@@ -404,7 +415,10 @@ mod tests {
         }
 
         for (component, error) in &errors {
-            println!("{:?} : {}", component, error);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{:?} : {}", component, error);
+            }
         }
         assert!(errors.is_empty());
     }
@@ -417,6 +431,7 @@ mod tests {
     #[test]
     fn generate_configfile() {
         use std::fs;
+
         use tempfile::tempdir;
 
         let tempdir = tempdir().expect("Unable to create tempdir for config");

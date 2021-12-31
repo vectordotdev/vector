@@ -1,15 +1,21 @@
-use super::healthcheck::healthcheck;
-use super::sink::LokiSink;
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{BatchConfig, TowerRequestConfig, UriSerde};
-use crate::sinks::VectorSink;
-use crate::template::Template;
-use crate::tls::{TlsOptions, TlsSettings};
+use std::{collections::HashMap, num::NonZeroU64};
+
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    http::{Auth, HttpClient, MaybeAuth},
+    sinks::{
+        util::{
+            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
+        },
+        VectorSink,
+    },
+    template::Template,
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -33,9 +39,18 @@ pub struct LokiConfig {
     pub request: TowerRequestConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LokiDefaultBatchSettings;
+
+impl SinkBatchSettings for LokiDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(100_000);
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -134,8 +149,9 @@ pub fn valid_label_name(label: &Template) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::valid_label_name;
     use std::convert::TryInto;
+
+    use super::valid_label_name;
 
     #[test]
     fn valid_label_names() {

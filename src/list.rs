@@ -1,7 +1,9 @@
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
-use serde::Serialize;
 use std::collections::HashSet;
+
+use serde::Serialize;
 use structopt::StructOpt;
+
+use crate::config::{SinkDescription, SourceDescription, TransformDescription};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -52,6 +54,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     transforms.retain(|name| !deprecated.contains(name));
     sinks.retain(|name| !deprecated.contains(name));
 
+    #[allow(clippy::print_stdout)]
     match opts.format {
         Format::Text => {
             println!("Sources:");

@@ -1,8 +1,9 @@
-use crate::event::Event;
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{Sink, Stream, StreamExt};
 use std::fmt;
+
+use async_trait::async_trait;
+use futures::{stream::BoxStream, Sink, Stream, StreamExt};
+
+use crate::event::Event;
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),

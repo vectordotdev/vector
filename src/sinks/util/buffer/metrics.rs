@@ -1,10 +1,13 @@
-use crate::sinks::util::batch::{
-    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
 use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
+
 use vector_core::event::{
     metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue, Sample},
     Event, EventMetadata,
+};
+
+use crate::sinks::util::{
+    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
+    Merged, SinkBatchSettings,
 };
 
 /// The metrics buffer is a data structure for collecting a flow of data
@@ -40,13 +43,10 @@ impl Batch for MetricsBuffer {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .disallow_max_bytes()?
-            .get_settings_or_default(defaults))
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        config.disallow_max_bytes()
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
@@ -270,7 +270,7 @@ fn finish_metric(item: (MetricSeries, MetricEntry)) -> Metric {
     Metric::from_parts(series, data, metadata)
 }
 
-fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
     if samples.is_empty() {
         return Vec::new();
     }
@@ -298,10 +298,15 @@ fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
-    use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{
+        event::metric::{MetricKind::*, MetricValue, StatisticKind},
+        sinks::util::BatchSettings,
+    };
 
     type Buffer = Vec<Vec<Metric>>;
 
@@ -328,9 +333,12 @@ mod test {
     }
 
     fn rebuffer<State: MetricNormalize>(metrics: Vec<Metric>) -> Buffer {
-        let batch_size = BatchSettings::default().bytes(9999).events(6).size;
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 6;
+
         let mut normalizer = MetricNormalizer::<State>::default();
-        let mut buffer = MetricsBuffer::new(batch_size);
+        let mut buffer = MetricsBuffer::new(batch_settings.size);
         let mut result = vec![];
 
         for metric in metrics {
@@ -338,7 +346,8 @@ mod test {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
-                        let batch = std::mem::replace(&mut buffer, MetricsBuffer::new(batch_size));
+                        let batch =
+                            std::mem::replace(&mut buffer, MetricsBuffer::new(batch_settings.size));
                         result.push(batch.finish());
                     }
                     PushResult::Ok(false) => (),

@@ -1,19 +1,5 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::config::healthcheck_response;
-use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::HttpClient,
-    sinks::{
-        util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        },
-        Healthcheck, UriParseError, VectorSink,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::num::NonZeroU64;
+
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -21,10 +7,39 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::HttpClient,
+    sinks::{
+        gcs_common::config::healthcheck_response,
+        util::{
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, UriParseError, VectorSink,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
+
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("Configured topic not found"))]
     TopicNotFound,
+}
+
+// 10MB maximum message size: https://cloud.google.com/pubsub/quotas#resource_limits
+const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PubsubDefaultBatchSettings;
+
+impl SinkBatchSettings for PubsubDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(10_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -39,7 +54,7 @@ pub struct PubsubConfig {
     pub auth: GcpAuthConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
@@ -74,11 +89,11 @@ impl_generate_config_from_default!(PubsubConfig);
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
-        let batch_settings = BatchSettings::default()
-            .bytes(10_000_000)
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batch_settings()?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -197,8 +212,9 @@ async fn healthcheck(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -221,12 +237,15 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::components::{self, HTTP_SINK_TAGS};
-    use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
+
+    use super::*;
+    use crate::test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    };
 
     const EMULATOR_HOST: &str = "http://localhost:8681";
     const PROJECT: &str = "testproject";
@@ -285,7 +304,7 @@ mod integration_tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
         sink.run(events).await.expect("Sending events failed");
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[tokio::test]
@@ -351,6 +370,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessageOuter {
         ackId: String,
         message: PullMessage,
@@ -358,6 +378,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessage {
         data: String,
         messageId: String,

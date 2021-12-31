@@ -38,6 +38,7 @@ components: sources: aws_s3: components._aws & {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		strategy: {
 			common:      false
 			description: "The strategy to use to consume objects from AWS S3."

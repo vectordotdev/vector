@@ -4,16 +4,6 @@
 #![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
-use async_trait::async_trait;
-use futures::{
-    channel::mpsc,
-    future,
-    stream::{self, BoxStream},
-    task::Poll,
-    FutureExt, Sink, SinkExt, StreamExt,
-};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     collections::BTreeSet,
     fs::{create_dir, OpenOptions},
@@ -26,9 +16,19 @@ use std::{
     },
     task::Context,
 };
+
+use async_trait::async_trait;
+use futures::{
+    channel::mpsc,
+    future,
+    stream::{self, BoxStream},
+    task::Poll,
+    FutureExt, Sink, SinkExt, StreamExt,
+};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
-    buffers::Acker,
     config::{
         DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
         TransformContext,
@@ -43,6 +43,7 @@ use vector::{
     transforms::{FunctionTransform, Transform},
     Pipeline,
 };
+use vector_core::buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
     let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);

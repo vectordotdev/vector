@@ -229,6 +229,17 @@ components: sources: kubernetes_logs: {
 				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
 			}
 		}
+		max_read_bytes: {
+			category:    "Reading"
+			common:      false
+			description: "An approximate limit on the amount of data read from a single pod log file at a given time."
+			required:    false
+			type: uint: {
+				default: 2048
+				examples: [2048]
+				unit: "bytes"
+			}
+		}
 		max_line_bytes: {
 			common:      false
 			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
@@ -258,6 +269,19 @@ components: sources: kubernetes_logs: {
 			common:      false
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
 			required:    false
+			type: uint: {
+				default: 60_000
+				unit:    "milliseconds"
+			}
+		}
+		delay_deletion_ms: {
+			common: false
+			description: """
+				Delay between receiving a `DELETE` event and removing any related metadata Vector has stored. This controls how quickly Vector will remove
+				metadata for resources that have been removed from Kubernetes, a longer delay will allow Vector to continue processing and enriching logs after the source Pod has been deleted.
+				If Vector tries to process logs from a Pod which has already had its metadata removed from the local cache, it will fail to enrich the event with metadata and log a warning.
+				"""
+			required: false
 			type: uint: {
 				default: 60_000
 				unit:    "milliseconds"
@@ -390,7 +414,7 @@ components: sources: kubernetes_logs: {
 				}
 			}
 			stream: {
-				description: "The name of the stream the log line was sumbitted to."
+				description: "The name of the stream the log line was submitted to."
 				required:    true
 				type: string: {
 					examples: ["stdout", "stderr"]

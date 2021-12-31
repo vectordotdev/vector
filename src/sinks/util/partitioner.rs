@@ -1,5 +1,6 @@
-use crate::{internal_events::TemplateRenderingFailed, template::Template};
 use vector_core::{event::Event, partition::Partitioner};
+
+use crate::{internal_events::TemplateRenderingFailed, template::Template};
 
 /// Partitions items based on the generated key for the given event.
 pub struct KeyPartitioner(Template);

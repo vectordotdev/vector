@@ -1,25 +1,30 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+    path::PathBuf,
+};
+
+use async_trait::async_trait;
+use component::ComponentDescription;
+use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
+use serde::{Deserialize, Serialize};
+use vector_core::buffers::{Acker, BufferConfig, BufferType};
+pub use vector_core::{
+    config::GlobalOptions,
+    transform::{DataType, ExpandType, TransformConfig, TransformContext},
+};
+
 use crate::{
-    buffers::Acker,
     conditions,
     event::Metric,
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
     transforms::noop::Noop,
     Pipeline,
 };
-use async_trait::async_trait;
-use component::ComponentDescription;
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
-use std::hash::Hash;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
 mod builder;
@@ -33,6 +38,7 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
+mod recursive;
 mod unit_test;
 mod validation;
 mod vars;
@@ -41,15 +47,14 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, ComponentScope, OutputId};
+pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
-pub use vector_core::config::proxy::ProxyConfig;
-pub use vector_core::config::{log_schema, LogSchema};
+pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
@@ -163,8 +168,6 @@ impl From<bool> for AcknowledgementsConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
-    #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
@@ -177,7 +180,6 @@ pub struct SourceOuter {
 impl SourceOuter {
     pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
         Self {
-            acknowledgements: Default::default(),
             inner: Box::new(source),
             proxy: Default::default(),
         }
@@ -204,7 +206,6 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
-    pub acknowledgements: AcknowledgementsConfig,
     pub proxy: ProxyConfig,
 }
 
@@ -222,7 +223,6 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
-                acknowledgements: Default::default(),
                 proxy: Default::default(),
             },
             shutdown,
@@ -236,7 +236,6 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
-            acknowledgements: Default::default(),
             proxy: Default::default(),
         }
     }
@@ -259,7 +258,7 @@ pub struct SinkOuter<T> {
     healthcheck: SinkHealthcheckOptions,
 
     #[serde(default)]
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 
     #[serde(
         default,
@@ -285,7 +284,14 @@ impl<T> SinkOuter<T> {
 
     pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(&id.to_string()));
+        for stage in self.buffer.stages() {
+            match stage {
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
+                    resources.push(Resource::DiskBuffer(id.to_string()))
+                }
+            }
+        }
         resources
     }
 
@@ -379,17 +385,17 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub(super) acker: Acker,
-    pub(super) healthcheck: SinkHealthcheckOptions,
-    pub(super) globals: GlobalOptions,
-    pub(super) proxy: ProxyConfig,
+    pub acker: Acker,
+    pub healthcheck: SinkHealthcheckOptions,
+    pub globals: GlobalOptions,
+    pub proxy: ProxyConfig,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::Null,
+            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
@@ -439,26 +445,38 @@ impl TransformOuter<String> {
     pub(crate) fn expand(
         mut self,
         key: ComponentKey,
+        parent_types: &HashSet<&'static str>,
         transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
         expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
     ) -> Result<(), String> {
+        if !self.inner.nestable(parent_types) {
+            return Err(format!(
+                "the component {} cannot be nested in {:?}",
+                self.inner.transform_type(),
+                parent_types
+            ));
+        }
+
         let expansion = self
             .inner
             .expand()
             .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
+
+        let mut ptypes = parent_types.clone();
+        ptypes.insert(self.inner.transform_type());
 
         if let Some((expanded, expand_type)) = expansion {
             let mut children = Vec::new();
             let mut inputs = self.inputs.clone();
 
             for (name, content) in expanded {
-                let full_name = ComponentKey::global(format!("{}.{}", key, name));
+                let full_name = key.join(name);
 
                 let child = TransformOuter {
                     inputs,
                     inner: content,
                 };
-                child.expand(full_name.clone(), transforms, expansions)?;
+                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
                 children.push(full_name.clone());
 
                 inputs = match expand_type {
@@ -677,9 +695,11 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
-    use indoc::indoc;
     use std::path::PathBuf;
+
+    use indoc::indoc;
+
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
 
     #[test]
     fn default_data_dir() {
@@ -694,7 +714,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -717,7 +737,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -750,7 +770,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -772,7 +792,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -801,7 +821,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -830,7 +850,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -851,7 +871,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -883,7 +903,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -916,7 +936,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -960,7 +980,7 @@ mod test {
                     target = "stdout"
                     encoding.codec = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -994,7 +1014,7 @@ mod test {
                 [api]
                     enabled = true
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -1004,10 +1024,14 @@ mod test {
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::{load_from_str, Format, Resource};
+    use std::{
+        collections::{HashMap, HashSet},
+        net::{Ipv4Addr, SocketAddr},
+    };
+
     use indoc::indoc;
-    use std::collections::{HashMap, HashSet};
-    use std::net::{Ipv4Addr, SocketAddr};
+
+    use super::{load_from_str, Format, Resource};
 
     fn localhost(port: u16) -> Resource {
         Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
@@ -1134,8 +1158,55 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .is_err());
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-stdin",
+    feature = "sinks-console",
+    feature = "transforms-pipelines",
+    feature = "transforms-filter"
+))]
+mod pipelines_tests {
+    use indoc::indoc;
+
+    use super::{load_from_str, Format};
+
+    #[test]
+    fn forbid_pipeline_nesting() {
+        let res = load_from_str(
+            indoc! {r#"
+                [sources.in]
+                  type = "stdin"
+
+                [transforms.processing]
+                  inputs = ["in"]
+                  type = "pipelines"
+
+                  [transforms.processing.logs.pipelines.foo]
+                    name = "foo"
+
+                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                      type = "pipelines"
+
+                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                        name = "bar"
+
+                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                            type = "filter"
+                            condition = ""
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["processing"]
+                  encoding = "json"
+            "#},
+            Format::Toml,
+        );
+        assert!(res.is_err(), "should error");
     }
 }

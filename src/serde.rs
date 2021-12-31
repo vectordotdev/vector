@@ -1,13 +1,14 @@
-#[cfg(feature = "codecs")]
-use crate::codecs::{
-    BytesDecoderConfig, BytesParserConfig, FramingConfig, NewlineDelimitedDecoderConfig,
-    ParserConfig,
-};
+use std::{fmt, marker::PhantomData};
+
 use indexmap::map::IndexMap;
 use serde::{de, Deserialize, Serialize};
-use std::fmt;
-use std::marker::PhantomData;
 pub use vector_core::serde::skip_serializing_if_default;
+
+#[cfg(feature = "codecs")]
+use crate::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
+};
 
 pub const fn default_true() -> bool {
     true
@@ -35,8 +36,8 @@ pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_decoding() -> Box<dyn ParserConfig> {
-    Box::new(BytesParserConfig::new())
+pub fn default_decoding() -> Box<dyn DeserializerConfig> {
+    Box::new(BytesDeserializerConfig::new())
 }
 
 pub fn to_string(value: impl serde::Serialize) -> String {

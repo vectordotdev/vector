@@ -1,15 +1,16 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::http::HttpClient;
+use std::collections::{BTreeMap, HashMap};
+
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use snafu::Snafu;
-use std::collections::{BTreeMap, HashMap};
+use snafu::{ResultExt, Snafu};
 use tower::Service;
+
+use crate::http::HttpClient;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -170,8 +171,7 @@ fn healthcheck(
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
-    measurement: String,
-    metric_type: &str,
+    measurement: &str,
     tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
@@ -188,8 +188,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
-    unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
+    let unwrapped_tags = tags.unwrap_or_default();
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
 
@@ -209,9 +208,9 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
         if key.is_empty() || value.is_empty() {
             continue;
         }
-        encode_string(key.to_string(), output);
+        encode_string(&key, output);
         output.push('=');
-        encode_string(value.to_string(), output);
+        encode_string(&value, output);
         output.push(',');
     }
 
@@ -225,7 +224,7 @@ fn encode_fields(
     output: &mut String,
 ) {
     for (key, value) in fields.into_iter() {
-        encode_string(key.to_string(), output);
+        encode_string(&key, output);
         output.push('=');
         match value {
             Field::String(s) => {
@@ -262,7 +261,7 @@ fn encode_fields(
     output.pop();
 }
 
-fn encode_string(key: String, output: &mut String) {
+fn encode_string(key: &str, output: &mut String) {
     for c in key.chars() {
         if "\\, =".contains(c) {
             output.push('\\');
@@ -308,11 +307,12 @@ pub(in crate::sinks) fn encode_uri(
 #[cfg(test)]
 #[allow(dead_code)]
 pub mod test_util {
+    use std::{fs::File, io::Read};
+
+    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+
     use super::*;
     use crate::tls;
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
-    use std::fs::File;
-    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
@@ -726,19 +726,19 @@ mod tests {
     #[test]
     fn test_encode_string() {
         let mut value = String::new();
-        encode_string("measurement_name".to_string(), &mut value);
+        encode_string("measurement_name", &mut value);
         assert_eq!(value, "measurement_name");
 
         let mut value = String::new();
-        encode_string("measurement name".to_string(), &mut value);
+        encode_string("measurement name", &mut value);
         assert_eq!(value, "measurement\\ name");
 
         let mut value = String::new();
-        encode_string("measurement=name".to_string(), &mut value);
+        encode_string("measurement=name", &mut value);
         assert_eq!(value, "measurement\\=name");
 
         let mut value = String::new();
-        encode_string("measurement,name".to_string(), &mut value);
+        encode_string("measurement,name", &mut value);
         assert_eq!(value, "measurement\\,name");
     }
 

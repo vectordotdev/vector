@@ -1,3 +1,10 @@
+use std::time::SystemTime;
+
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -6,16 +13,11 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, UriSerde,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
+        RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateRenderingError},
 };
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::time::SystemTime;
 
 lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("https://logs.logdna.com");
@@ -45,7 +47,7 @@ pub struct LogdnaConfig {
     default_env: Option<String>,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -81,10 +83,7 @@ impl SinkConfig for LogdnaConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
         let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = PartitionHttpSink::new(
@@ -292,17 +291,20 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        config::SinkConfig,
-        sinks::util::test::{build_test_server_status, load_sink},
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{next_addr, random_lines},
-    };
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
+    use super::*;
+    use crate::{
+        config::SinkConfig,
+        sinks::util::test::{build_test_server_status, load_sink},
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            next_addr, random_lines,
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -415,7 +417,7 @@ mod tests {
     #[tokio::test]
     async fn smoke_fails() {
         let (_hosts, _partitions, mut rx) =
-            smoke_start(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+            smoke_start(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
         assert!(matches!(rx.try_next(), Err(mpsc::TryRecvError { .. })));
     }
 

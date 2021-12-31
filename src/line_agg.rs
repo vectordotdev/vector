@@ -2,18 +2,19 @@
 
 #![deny(missing_docs)]
 
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    hash::Hash,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::Entry, HashMap};
-use std::hash::Hash;
-use std::time::Duration;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
 
 /// The mode of operation of the line aggregator.
@@ -387,10 +388,11 @@ impl<C> Aggregate<C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
     use futures::SinkExt;
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[tokio::test]
     async fn mode_continue_through_1() {
@@ -673,7 +675,7 @@ mod tests {
     async fn timeout_resets_on_new_line() {
         // Tests if multiline aggregation updates
         // it's timeout every time it get's a new line.
-        // To test this we are emmiting a single large
+        // To test this we are emitting a single large
         // multiline but drip feeding it into the aggreagator
         // with 1ms delay.
 

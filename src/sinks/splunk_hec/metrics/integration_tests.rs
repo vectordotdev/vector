@@ -1,5 +1,11 @@
+use std::{convert::TryFrom, sync::Arc};
+
+use futures_util::stream;
+use serde_json::Value as JsonValue;
+use shared::btreemap;
+use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
+
 use super::config::HecMetricsSinkConfig;
-use crate::template::Template;
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{Metric, MetricKind},
@@ -7,34 +13,30 @@ use crate::{
         splunk_hec::common::integration_test_helpers::get_token,
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::Template,
     test_util::components::{self, HTTP_SINK_TAGS},
 };
-use futures_util::stream;
-use serde_json::Value as JsonValue;
-use shared::btreemap;
-use std::convert::TryFrom;
-use std::sync::Arc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
 
 async fn config() -> HecMetricsSinkConfig {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(10);
+
     HecMetricsSinkConfig {
         default_namespace: None,
-        token: get_token().await,
+        default_token: get_token().await,
         endpoint: "http://localhost:8088/".into(),
         host_key: "host".into(),
         index: None,
         sourcetype: None,
         source: None,
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(10),
-            ..Default::default()
-        },
+        batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
     }
 }
 

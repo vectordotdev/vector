@@ -1,14 +1,14 @@
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
+
 use structopt::{clap::AppSettings, StructOpt};
 
+#[cfg(windows)]
+use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-
-#[cfg(windows)]
-use crate::service;
+use crate::{config, generate, get_version, graph, list, unit_test, validate};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]

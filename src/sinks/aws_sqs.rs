@@ -1,18 +1,9 @@
-use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
-    event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        sink::{self, Response},
-        BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
-    },
-    template::{Template, TemplateParseError},
+use std::{
+    convert::{TryFrom, TryInto},
+    num::NonZeroU64,
+    task::{Context, Poll},
 };
+
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
@@ -21,13 +12,26 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    convert::{TryFrom, TryInto},
-    task::{Context, Poll},
-};
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
+use crate::{
+    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
+    event::Event,
+    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        retries::RetryLogic,
+        sink::{self, Response},
+        BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
+    },
+    template::{Template, TemplateParseError},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -53,6 +57,15 @@ enum HealthcheckError {
 pub struct SqsSink {
     client: SqsClient,
     queue_url: String,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SqsSinkDefaultBatchSettings;
+
+impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = Some(262_144);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -148,7 +161,8 @@ impl SqsSink {
         // Currently we do not use batching, so this mostly for future. Also implement `Service` is simpler than `Sink`.
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
-        let batch = BatchSettings::default().events(1).bytes(262_144);
+        let batch: BatchConfig<SqsSinkDefaultBatchSettings> = BatchConfig::default();
+        let batch_settings = batch.into_batch_settings()?;
 
         let request = config.request.unwrap_with(&TowerRequestConfig {
             timeout_secs: Some(30),
@@ -176,8 +190,8 @@ impl SqsSink {
             .batch_sink(
                 SqsRetryLogic,
                 sqs,
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )
@@ -321,9 +335,10 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::event::LogEvent;
-    use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
@@ -370,12 +385,16 @@ mod tests {
 #[cfg(feature = "aws-sqs-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    #![allow(clippy::print_stdout)] //tests
+
+    use std::collections::HashMap;
+
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
-    use std::collections::HashMap;
     use tokio::time::{sleep, Duration};
+
+    use super::*;
+    use crate::test_util::{random_lines_with_stream, random_string};
 
     #[tokio::test]
     async fn sqs_send_message_batch() {
@@ -394,7 +413,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             message_deduplication_id: None,

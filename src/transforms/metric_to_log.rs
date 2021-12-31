@@ -1,3 +1,8 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use shared::TimeZone;
+
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -8,10 +13,6 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::Conversion,
 };
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use shared::TimeZone;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -50,6 +51,10 @@ impl TransformConfig for MetricToLogConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -121,15 +126,19 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue, StatisticKind},
-        Metric, Value,
-    };
-    use crate::transforms::test::transform_one;
+    use std::collections::BTreeMap;
+
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{
+            metric::{MetricKind, MetricValue, StatisticKind},
+            Metric, Value,
+        },
+        transforms::test::transform_one,
+    };
 
     #[test]
     fn generate_config() {

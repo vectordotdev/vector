@@ -1,7 +1,10 @@
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
+
 use lazy_static::lazy_static;
-use std::borrow::Cow;
-use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -166,7 +169,7 @@ impl TryFrom<Value> for Filter {
             Value::Object(object) => {
                 let r#type = match object
                     .get("type")
-                    .ok_or("filters specified as objects must have type paramater")?
+                    .ok_or("filters specified as objects must have type parameter")?
                 {
                     Value::Bytes(bytes) => Ok(bytes.clone()),
                     _ => Err("type key in filters must be a string"),
@@ -267,8 +270,9 @@ impl FromStr for Redactor {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         redact => Redact;

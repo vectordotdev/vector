@@ -1,8 +1,11 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, TransformConfig, TransformContext},
+    event::Event,
+    transforms::{FunctionTransform, Transform},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EventType {
@@ -77,7 +80,7 @@ impl TransformConfig for EventRouterConfig {
                     inner: self.filter.clone(),
                 }),
             );
-            res.insert("transforms".to_string(), inner.clone());
+            res.insert("pipelines".to_string(), inner.clone());
             Ok(Some((res, ExpandType::Serial { alias: true })))
         } else {
             Err("must specify at least one pipeline".into())

@@ -1,16 +1,18 @@
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    pin::Pin,
+    time::Duration,
+};
+
+use async_stream::stream;
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{TaskTransform, Transform},
-};
-use async_stream::stream;
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    pin::Pin,
-    time::Duration,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -145,10 +147,12 @@ impl TaskTransform for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::metric, event::Event, event::Metric};
-    use futures::{stream, SinkExt};
     use std::{collections::BTreeSet, task::Poll};
+
+    use futures::{stream, SinkExt};
+
+    use super::*;
+    use crate::event::{metric, Event, Metric};
 
     #[test]
     fn generate_config() {
@@ -450,7 +454,7 @@ interval_ms = 999999
         );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
-        // Queue up some events to be consummed & recorded
+        // Queue up some events to be consumed & recorded
         let in_stream = Box::pin(stream::iter(inputs));
         // Kick off the transform process which should consume & record them
         let mut out_stream = agg.transform(in_stream);
@@ -526,7 +530,7 @@ interval_ms = 999999
         tx.send(gauge_a_2.clone()).await.unwrap();
         // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Now fast foward time enough that our flush should trigger.
+        // Now fast forward time enough that our flush should trigger.
         tokio::time::advance(Duration::from_secs(11)).await;
         // We should have had an interval fire now and our output aggregate events should be
         // available.
@@ -540,7 +544,7 @@ interval_ms = 999999
                 };
                 count += 1;
             } else {
-                panic!("Unexpectedly recieved None in output stream");
+                panic!("Unexpectedly received None in output stream");
             }
         }
         // We should be back to pending, having nothing waiting for us

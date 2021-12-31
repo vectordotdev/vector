@@ -1,23 +1,24 @@
-use crate::sources::statsd::parser::ParseError;
-use crate::udp;
-use crate::{
-    codecs::{self, NewlineDelimitedCodec, Parser},
-    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
-    shutdown::ShutdownSignal,
-    sources::util::{SocketListenAddr, TcpSource},
-    tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
-};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+
+use self::parser::ParseError;
+use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
+use crate::{
+    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
+    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
+    tls::{MaybeTlsSettings, TlsConfig},
+    udp, Pipeline,
+};
 
 pub mod parser;
 #[cfg(unix)]
@@ -60,6 +61,7 @@ struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
+    connection_limit: Option<u32>,
 }
 
 impl TcpConfig {
@@ -72,6 +74,7 @@ impl TcpConfig {
             tls: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
+            connection_limit: None,
         }
     }
 }
@@ -109,8 +112,9 @@ impl SourceConfig for StatsdConfig {
                     config.shutdown_timeout_secs,
                     tls,
                     config.receive_buffer_bytes,
-                    cx.shutdown,
-                    cx.out,
+                    cx,
+                    false.into(),
+                    config.connection_limit,
                 )
             }
             #[cfg(unix)]
@@ -137,9 +141,9 @@ impl SourceConfig for StatsdConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsdParser;
+pub struct StatsdDeserializer;
 
-impl Parser for StatsdParser {
+impl Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
@@ -184,8 +188,8 @@ async fn statsd_udp(
     );
 
     let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedCodec::new()),
-        Box::new(StatsdParser),
+        Box::new(NewlineDelimitedDecoder::new()),
+        Box::new(StatsdDeserializer),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -211,31 +215,39 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(NewlineDelimitedCodec::new()),
-            Box::new(StatsdParser),
+            Box::new(NewlineDelimitedDecoder::new()),
+            Box::new(StatsdDeserializer),
         )
+    }
+
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
+        TcpNullAcker
     }
 }
 
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
+    use futures::channel::mpsc;
+    use hyper::body::to_bytes as body_to_bytes;
+    use tokio::{
+        io::AsyncWriteExt,
+        time::{sleep, Duration},
+    };
+
     use super::*;
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::channel::mpsc;
-    use hyper::body::to_bytes as body_to_bytes;
-    use tokio::io::AsyncWriteExt;
-    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {

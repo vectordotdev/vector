@@ -46,12 +46,12 @@ impl Function for FormatInt {
                 result: Ok("\"42\""),
             },
             Example {
-                title: "format hexidecimal integer",
+                title: "format hexadecimal integer",
                 source: r#"format_int!(42, 16)"#,
                 result: Ok("2a"),
             },
             Example {
-                title: "format negative hexidecimal integer",
+                title: "format negative hexadecimal integer",
                 source: r#"format_int!(-42, 16)"#,
                 result: Ok("-2a"),
             },

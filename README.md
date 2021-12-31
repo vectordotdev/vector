@@ -143,7 +143,7 @@ Vector is an end-to-end, unified, open data platform.
 |     **Reliability** |   **✓**    |       |           |         |          |           |           |
 |         Memory-safe |   **✓**    |       |           |         |          |           |           |
 | Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |   ✓   |           |    ✓    |    ✓     |     ✓     |     ✓     |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs
@@ -178,7 +178,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.installation.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
 [docs.installation.platforms]: https://vector.dev/docs/setup/installation/platforms/
 [docs.installation]: https://vector.dev/docs/setup/installation/
-[docs.networking.adaptive-request-concurrency]: https://vector.dev/docs/about/under-the-hood/networking/adaptive-request-concurrency/
+[docs.networking.adaptive-request-concurrency]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 [docs.platforms.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
 [docs.quickstart]: https://vector.dev/docs/setup/quickstart/
 [docs.reference.api]: https://vector.dev/docs/reference/api/

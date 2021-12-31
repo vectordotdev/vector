@@ -1,10 +1,11 @@
+use tokio_stream::StreamExt;
+use url::Url;
+use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
+
 use crate::{
     config,
     signal::{SignalRx, SignalTo},
 };
-use tokio_stream::StreamExt;
-use url::Url;
-use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
@@ -34,7 +35,10 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     let subscription_client = match connect_subscription_client(url).await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
+            }
             return exitcode::UNAVAILABLE;
         }
     };
@@ -62,7 +66,10 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
                     for log_event in d.output_events_by_component_id_patterns.iter().filter_map(|ev| ev.as_log()) {
-                        println!("{}", log_event.string);
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("{}", log_event.string);
+                        }
                     }
                 }
             }

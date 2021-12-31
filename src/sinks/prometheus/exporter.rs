@@ -1,15 +1,13 @@
-use crate::{
-    buffers::Acker,
-    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricData, MetricKind, MetricValue},
-    event::Event,
-    internal_events::PrometheusServerRequestComplete,
-    sinks::{
-        util::{statistic::validate_quantiles, StreamSink},
-        Healthcheck, VectorSink,
-    },
-    tls::{MaybeTlsSettings, TlsConfig},
+use std::{
+    convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
+    net::SocketAddr,
+    ops::{Deref, DerefMut},
+    sync::{Arc, RwLock},
+    time::Instant,
 };
+
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
@@ -21,18 +19,23 @@ use hyper::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    convert::Infallible,
-    hash::{Hash, Hasher},
-    mem::discriminant,
-    net::SocketAddr,
-    ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
-    time::Instant,
-};
 use stream_cancel::{Trigger, Tripwire};
+use vector_core::buffers::Acker;
 
 use super::collector::{self, MetricCollector as _};
+use crate::{
+    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
+    event::{
+        metric::{Metric, MetricData, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::PrometheusServerRequestComplete,
+    sinks::{
+        util::{statistic::validate_quantiles, StreamSink},
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
@@ -272,13 +275,16 @@ impl PrometheusExporter {
         let address = self.config.address;
 
         tokio::spawn(async move {
+            #[allow(clippy::print_stderr)]
             let tls = MaybeTlsSettings::from_config(&tls, true)
                 .map_err(|error| eprintln!("Server TLS error: {}", error))?;
+            #[allow(clippy::print_stderr)]
             let listener = tls
                 .bind(&address)
                 .await
                 .map_err(|error| eprintln!("Server bind error: {}", error))?;
 
+            #[allow(clippy::print_stderr)]
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
@@ -301,7 +307,7 @@ impl StreamSink for PrometheusExporter {
             let mut metrics = self.metrics.write().unwrap();
 
             // sets need to be expired from time to time
-            // because otherwise they could grow infinitelly
+            // because otherwise they could grow infinitely
             let now = Utc::now().timestamp();
             let interval = now - metrics.last_flush_timestamp;
             if interval > self.config.flush_period_secs as i64 {
@@ -454,6 +460,12 @@ impl PartialEq for MetricEntry {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Duration;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+    use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+
     use super::*;
     use crate::{
         config::ProxyConfig,
@@ -462,11 +474,6 @@ mod tests {
         test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
-    use chrono::Duration;
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
-    use tokio::{sync::mpsc, time};
-    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -658,12 +665,17 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
+    #![allow(clippy::print_stdout)] // tests
+    #![allow(clippy::print_stderr)] // tests
+    #![allow(clippy::dbg_macro)] // tests
+
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
+
+    use super::*;
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
