@@ -6,6 +6,7 @@ Rewriting the `kubernetes_logs` source to leverage the "official" Rust client fo
 
 - [`kubernetes_logs` error handling RFC](https://github.com/vectordotdev/vector/issues/7527)
 - [`kubernetes_logs` source fixes](https://github.com/vectordotdev/vector/issues/10016)
+- [Extracting Kubernetes runtime out of Vector code base](https://github.com/vectordotdev/vector/issues/2963)
 
 ## Scope
 
