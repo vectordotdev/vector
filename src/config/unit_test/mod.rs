@@ -30,7 +30,7 @@ use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
 
-use super::graph::Graph;
+use super::{compiler::expand_globs, graph::Graph};
 
 pub struct UnitTest {
     pub name: String,
@@ -327,6 +327,7 @@ async fn build_unit_test(
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
+    expand_globs(&mut config_builder);
 
     // To properly identify all components relevant to the test, expand relevant
     // transforms

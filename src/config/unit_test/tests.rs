@@ -1187,3 +1187,43 @@ async fn test_task_transform() {
     assert!(tests.remove(0).run().await.errors.is_empty());
     assert!(!tests.remove(0).run().await.errors.is_empty());
 }
+
+#[tokio::test]
+async fn test_glob_input() {
+    let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.ingress1]
+          type = "remap"
+          inputs = [ "ignored" ]
+          source = '.new_field = "value1"'
+
+        [transforms.final]
+          type = "remap"
+          inputs = [ "ingress*" ]
+          source = '.another_new_field = "value2"'
+
+        [[tests]]
+          name = "glob input test"
+
+          [[tests.inputs]]
+            type = "log"
+            insert_at = "ingress1"
+
+            [tests.inputs.log_fields]
+              message = "test1"
+
+          [[tests.outputs]]
+            extract_from = "final"
+
+            [[tests.outputs.conditions]]
+              type = "vrl"
+              source = """
+                assert_eq!(.message, "test1", "incorrect message")
+                assert_eq!(.new_field, "value1", "incorrect value")
+                assert_eq!(.another_new_field, "value2", "incorrect value")
+              """
+    "#})
+    .unwrap();
+
+    let mut tests = build_unit_tests(config).await.unwrap();
+    assert!(tests.remove(0).run().await.errors.is_empty());
+}
