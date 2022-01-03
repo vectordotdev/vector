@@ -456,7 +456,7 @@ components: {
 	#Outputs: {
 		_default_output: #Output & {
 			name:        ""
-			description: "Use this component's ID as an input to downstream transforms and sinks."
+			description: "Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks."
 		}
 
 		default_output: *_default_output | #Output | null
