@@ -121,7 +121,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
-[output]: /docs/reference/configuration/sources/internal_metrics/#output
+[output]: /docs/reference/configuration/sources/internal_metrics/#output-data
 [remap]: /docs/reference/configuration/transforms/remap
 [rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
