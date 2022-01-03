@@ -59,7 +59,6 @@ jobs:
           - test: 'aws'
           - test: 'azure'
           - test: 'clickhouse'
-          - test: 'datadog-agent'
           - test: 'datadog-metrics'
           - test: 'docker-logs'
           - test: 'elasticsearch'
@@ -105,11 +104,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-       include:
-         - test: 'redis'
+        include:
+          - test: 'datadog-agent'
+          - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
+        env:
+          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 

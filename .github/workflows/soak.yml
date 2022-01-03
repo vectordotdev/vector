@@ -24,7 +24,9 @@ jobs:
   cancel-previous:
     runs-on: ubuntu-20.04
     timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
+    if: |
+      github.ref != 'refs/heads/master' &&
+      ${{ github.actor != 'dependabot[bot]' }}
     steps:
       - uses: styfle/cancel-workflow-action@0.9.1
         with:
@@ -33,6 +35,7 @@ jobs:
 
   compute-soak-meta:
     name: Compute metadata for soaks
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
@@ -99,6 +102,7 @@ jobs:
 
   compute-test-plan:
     name: Compute soak test plan
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs: [compute-soak-meta]
     outputs:
@@ -145,6 +149,7 @@ jobs:
 
   build-image:
     name: Build ${{ matrix.variant.name }} 'soak-vector' container
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, general]
     needs: [compute-soak-meta]
     strategy:
