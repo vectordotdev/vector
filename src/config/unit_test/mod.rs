@@ -5,8 +5,8 @@ mod unit_test_components;
 use crate::{
     conditions::Condition,
     config::{
-        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigDiff,
-        ConfigPath, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
+        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
+        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
     topology::{
@@ -35,7 +35,6 @@ use super::graph::Graph;
 pub struct UnitTest {
     pub name: String,
     config: Config,
-    diff: ConfigDiff,
     pieces: Pieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
@@ -46,7 +45,8 @@ pub struct UnitTestResult {
 
 impl UnitTest {
     pub async fn run(self) -> UnitTestResult {
-        let (topology, _) = topology::start_validated(self.config, self.diff, self.pieces)
+        let diff = config::ConfigDiff::initial(&self.config);
+        let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();
         let _ = topology.sources_finished().await;
@@ -381,7 +381,6 @@ async fn build_unit_test(
     Ok(UnitTest {
         name: test.name,
         config,
-        diff,
         pieces,
         test_result_rxs,
     })
