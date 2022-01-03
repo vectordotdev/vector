@@ -314,9 +314,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.18"
+version = "3.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2b041fbdb00d101ec64077da09f380d14234aac676f9eaa52d0858c55083da6"
+checksum = "348a1d939fb0f9bd0b9f1531c9834dc100cc2ccb279254fb4b784b1df32a63f6"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -445,9 +445,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bab175edd22a3f32cbdeb22ade3f0b2ad6831bf696992fbe7ae69b564849fdb"
+checksum = "0c0c5a1ac448dd37e43358dd06759578bd994dc0c3e7aeb003eddb374cc16e93"
 dependencies = [
  "atomig-macro",
  "serde",
@@ -3069,13 +3069,13 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1323096b05d41827dadeaee54c9981958c0f94e670bc94ed80037d1a7b8b186b"
+checksum = "31f4c6746584866f0feabcc69893c5b51beef3831656a968ed7ae254cdc4fd03"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
- "itoa 0.4.8",
+ "itoa 1.0.1",
 ]
 
 [[package]]
