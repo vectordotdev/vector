@@ -373,14 +373,7 @@ endif
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh datadog-agent stop
-	@scripts/setup_integration_env.sh datadog-agent start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib sources::datadog::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh datadog-agent stop
-endif
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-datadog-logs
 test-integration-datadog-logs: ## Runs Docker Logs integration tests
@@ -564,14 +557,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
-.PHONY: test-integration-redis
-test-integration-redis: ## Runs Redis integration tests
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml run --rm runner
-
-.PHONY: test-integration-redis-cleanup
-test-integration-redis-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml rm -fsv
-
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -593,6 +578,15 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh dnstap stop
 endif
+
+test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+ifeq ($(AUTODESPAWN), true)
+	make test-integration-$*-cleanup
+endif
+
+test-integration-%-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm -fsv
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)

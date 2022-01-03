@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "3.0.18", default-features = false, optional = true }
+async-graphql = { version = "3.0.19", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
@@ -51,7 +51,7 @@ tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.3.4", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.5", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
@@ -72,7 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.2"
-tracing-subscriber = { version = "0.3.4", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 
 [features]
 api = ["async-graphql"]
