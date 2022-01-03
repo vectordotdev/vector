@@ -1,6 +1,8 @@
 use super::{state::VmState, Variable, VmArgumentList};
-use crate::{expression::Literal, vm::argument_list::VmArgument, Context, Function, Value};
-use std::collections::{BTreeMap, HashMap};
+use crate::{
+    expression::Literal, vm::argument_list::VmArgument, Context, ExpressionError, Function, Value,
+};
+use std::collections::BTreeMap;
 
 macro_rules! binary_op {
     ($self: ident, $($pat: pat => $expr: expr,)*) => {{
@@ -155,6 +157,7 @@ impl Vm {
 
         loop {
             let next = state.next();
+
             match next {
                 OpCode::Return => {
                     return Ok(state.stack.pop().unwrap_or(Value::Null));
@@ -238,7 +241,24 @@ impl Vm {
                     let value = state.stack.pop().unwrap();
 
                     match variable {
-                        Variable::Internal => unimplemented!("variables are rubbish"),
+                        Variable::Internal(ident, path) => {
+                            let path = match path {
+                                Some(path) => path,
+                                None => {
+                                    ctx.state_mut().insert_variable(ident.clone(), value);
+                                    continue;
+                                }
+                            };
+
+                            // Update existing variable using the provided path, or create a
+                            // new value in the store.
+                            match ctx.state_mut().variable_mut(ident) {
+                                Some(stored) => stored.insert_by_path(path, value),
+                                None => ctx
+                                    .state_mut()
+                                    .insert_variable(ident.clone(), value.at_path(path)),
+                            }
+                        }
                         Variable::External(path) => ctx.target_mut().insert(path, value)?,
                     }
                 }
@@ -251,7 +271,19 @@ impl Vm {
                             let value = ctx.target().get(path)?.unwrap_or(Value::Null);
                             state.stack.push(value);
                         }
-                        Variable::Internal => unimplemented!("variables are junk"),
+                        Variable::Internal(ident, path) => {
+                            let value = match ctx.state().variable(ident) {
+                                Some(value) => match path {
+                                    Some(path) => {
+                                        value.get_by_path(path).cloned().unwrap_or(Value::Null)
+                                    }
+                                    None => value.clone(),
+                                },
+                                None => Value::Null,
+                            };
+
+                            state.stack.push(value);
+                        }
                     }
                 }
                 OpCode::Call => {
@@ -265,13 +297,35 @@ impl Vm {
                         .collect();
 
                     let mut argumentlist = VmArgumentList::new(parameters, args);
+                    let function = &self.fns[function_id];
 
-                    match self.fns[function_id].call(ctx, &mut argumentlist) {
+                    match function.call(ctx, &mut argumentlist) {
                         Ok(result) => state.stack.push(result),
-                        Err(err) => {
-                            println!("{:?}", err);
-                            todo!()
-                        }
+                        Err(err) => match err {
+                            ExpressionError::Abort { .. } => {
+                                panic!("abort errors must only be defined by `abort` statement")
+                            }
+                            ExpressionError::Error {
+                                message,
+                                labels,
+                                notes,
+                            } => {
+                                // labels.push(Label::primary(message.clone(), self.span));
+                                return Err(ExpressionError::Error {
+                                    message: format!(
+                                        //r#"function call error for "{}" at ({}:{}): {}"#,
+                                        r#"function call error for "{}": {}"#,
+                                        function.identifier(),
+                                        //self.span.start(),
+                                        //self.span.end(),
+                                        message
+                                    ),
+                                    labels,
+                                    notes,
+                                }
+                                .to_string());
+                            }
+                        },
                     }
                 }
                 OpCode::CreateObject => {

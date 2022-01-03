@@ -409,7 +409,11 @@ where
 
                 let variable = match target {
                     Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
-                    _ => unimplemented!("nothing else supported"),
+                    Target::External(None) => crate::vm::Variable::External(LookupBuf::root()),
+                    Target::Internal(ident, path) => {
+                        crate::vm::Variable::Internal(ident.clone(), path.clone())
+                    }
+                    Target::Noop => return Ok(()),
                 };
 
                 let target = vm.get_target(&variable);
@@ -427,7 +431,9 @@ where
 
                 let variable = match ok {
                     Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
-                    _ => unimplemented!("nothing else supported"),
+                    Target::External(None) => crate::vm::Variable::External(LookupBuf::root()),
+                    Target::Noop => todo!(),
+                    Target::Internal(ident, path) => todo!(),
                 };
 
                 let target = vm.get_target(&variable);
