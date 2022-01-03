@@ -1,17 +1,36 @@
 //! `observer` is a program that inspects a prometheus with a configured query,
-//! writes the result out to disk. It replaces curl-in-a-loop in our soak infra.
-use std::{borrow::Cow, fs, io::Read, time::Duration};
-
+//! writes the result out to disk.
 use argh::FromArgs;
+use prometheus_parser::GroupKind;
 use reqwest::Url;
 use serde::Deserialize;
 use snafu::Snafu;
-use tokio::{runtime::Builder, time::sleep};
-use tracing::{debug, error, info};
+use std::{
+    borrow::Cow,
+    fmt,
+    fmt::Debug,
+    io::Read,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH},
+};
+use tokio::{
+    fs,
+    io::{AsyncWriteExt, BufWriter},
+    runtime::Builder,
+    sync::mpsc::{channel, Receiver, Sender},
+    time::sleep,
+};
+use tracing::{debug, info, instrument};
+use uuid::Uuid;
 
 fn default_config_path() -> String {
     "/etc/vector/soak/observer.yaml".to_string()
 }
+
+static TERMINATE: AtomicBool = AtomicBool::new(false);
 
 #[derive(FromArgs)]
 /// vector soak `observer` options
@@ -21,27 +40,22 @@ struct Opts {
     config_path: String,
 }
 
-/// Query configuration
+/// Target configuration
 #[derive(Debug, Deserialize)]
-pub struct Query {
+pub struct Target {
     id: String,
-    query: String,
-    unit: soak::Unit,
+    url: String,
 }
 
 /// Main configuration struct for this program
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// Location to scrape prometheus
-    pub prometheus: String,
     /// The name of the experiment being observed
     pub experiment_name: String,
     /// The variant of the experiment, generally 'baseline' or 'comparison'
     pub variant: soak::Variant,
-    /// The vector ID associated with the experiment
-    pub vector_id: String,
-    /// The queries to make of the experiment
-    pub queries: Vec<Query>,
+    /// The targets for this experiment.
+    pub targets: Vec<Target>,
     /// The file to record captures into
     pub capture_path: String,
 }
@@ -58,6 +72,32 @@ enum Error {
     ParseFloat { error: std::num::ParseFloatError },
     #[snafu(display("Could not serialize output: {}", error))]
     Json { error: serde_json::Error },
+    #[snafu(display("Could not deserialize config: {}", error))]
+    Yaml { error: serde_yaml::Error },
+    #[snafu(display("Could not deserialize prometheus response: {}", error))]
+    Prometheus {
+        error: prometheus_parser::ParserError,
+    },
+    #[snafu(display("Could not query time: {}", error))]
+    Time { error: SystemTimeError },
+}
+
+impl From<SystemTimeError> for Error {
+    fn from(error: SystemTimeError) -> Self {
+        Self::Time { error }
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(error: serde_yaml::Error) -> Self {
+        Self::Yaml { error }
+    }
+}
+
+impl From<prometheus_parser::ParserError> for Error {
+    fn from(error: prometheus_parser::ParserError) -> Self {
+        Self::Prometheus { error }
+    }
 }
 
 impl From<reqwest::Error> for Error {
@@ -78,12 +118,6 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<std::num::ParseFloatError> for Error {
-    fn from(error: std::num::ParseFloatError) -> Self {
-        Self::ParseFloat { error }
-    }
-}
-
 impl From<serde_json::Error> for Error {
     fn from(error: serde_json::Error) -> Self {
         Self::Json { error }
@@ -97,123 +131,233 @@ enum Status {
     Error,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryResultValue {
-    time: f64,
-    value: String,
+struct CaptureManager {
+    capture_path: String,
+    rcv: Receiver<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryResult {
-    value: QueryResultValue,
+impl fmt::Debug for CaptureManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CaptureManager")
+            .field("capture_path", &self.capture_path)
+            .finish()
+    }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryData {
-    result: Vec<QueryResult>,
+impl CaptureManager {
+    fn new(capture_path: String, rcv: Receiver<String>) -> Self {
+        Self { capture_path, rcv }
+    }
+
+    #[instrument]
+    async fn run(mut self) -> Result<(), Error> {
+        let mut wtr = BufWriter::new(fs::File::create(self.capture_path).await?);
+        while let Some(msg) = self.rcv.recv().await {
+            wtr.write_all(msg.as_bytes()).await?;
+            wtr.write_all(b"\n").await?;
+        }
+        info!("All sender channels closed, flushing writer and exiting.");
+        wtr.flush().await?;
+        Ok(())
+    }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryResponse {
-    data: QueryData,
+struct TargetWorker {
+    snd: Sender<String>,
+    experiment_name: String,
+    target_id: String,
+    url: Url,
+    run_id: Arc<Uuid>,
+    variant: soak::Variant,
+}
+
+impl fmt::Debug for TargetWorker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TargetWorker")
+            .field("run_id", &self.run_id)
+            .field("target_id", &self.target_id)
+            .field("url", &self.url.as_str())
+            .finish()
+    }
+}
+
+impl TargetWorker {
+    fn new(
+        snd: Sender<String>,
+        experiment_name: String,
+        target_id: String,
+        url: Url,
+        run_id: Arc<Uuid>,
+        variant: soak::Variant,
+    ) -> Self {
+        Self {
+            snd,
+            experiment_name,
+            target_id,
+            url,
+            run_id,
+            variant,
+        }
+    }
+
+    #[instrument]
+    async fn run(self) -> Result<(), Error> {
+        let client: reqwest::Client = reqwest::Client::new();
+
+        for fetch_index in 0..u64::max_value() {
+            if TERMINATE.load(Ordering::Relaxed) {
+                info!("Received terminate signal");
+                break;
+            }
+            sleep(Duration::from_millis(307)).await;
+
+            let now_ms: u128 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+            let request = client.get(self.url.clone()).build()?;
+            let response = match client.execute(request).await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    debug!(
+                        "Did not receive a response from {} with error: {}",
+                        self.target_id, e
+                    );
+                    continue;
+                }
+            };
+            let body = response.text().await?;
+            let metric_groups = prometheus_parser::parse_text(&body)?;
+            if metric_groups.is_empty() {
+                debug!("failed to request body: {:?}", body);
+            }
+            for metric in metric_groups {
+                let metric_name = metric.name;
+                let (kind, mm) = match metric.metrics {
+                    GroupKind::Summary(..) | GroupKind::Histogram(..) | GroupKind::Untyped(..) => {
+                        continue
+                    }
+                    GroupKind::Counter(mm) => (soak::MetricKind::Counter, mm),
+                    GroupKind::Gauge(mm) => (soak::MetricKind::Gauge, mm),
+                };
+                for (k, v) in mm.iter() {
+                    let timestamp = k.timestamp.map(|x| x as u128).unwrap_or(now_ms);
+                    let value = v.value;
+                    let output = soak::Output {
+                        run_id: Cow::Borrowed(&self.run_id),
+                        experiment: Cow::Borrowed(&self.experiment_name),
+                        variant: self.variant,
+                        target: Cow::Borrowed(&self.target_id),
+                        time: timestamp,
+                        fetch_index,
+                        metric_name: Cow::Borrowed(&metric_name),
+                        metric_kind: kind,
+                        metric_labels: k.labels.clone(),
+                        value,
+                    };
+                    let buf = serde_json::to_string(&output)?;
+                    self.snd
+                        .send(buf)
+                        .await
+                        .expect("could not send over channel");
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 struct Worker {
-    vector_id: String,
     experiment_name: String,
     variant: soak::Variant,
-    queries: Vec<(Query, Url)>,
+    targets: Vec<(Target, Url)>,
     capture_path: String,
 }
 
 impl Worker {
     fn new(config: Config) -> Self {
-        let mut queries = Vec::with_capacity(config.queries.len());
-        for query in config.queries {
-            let url = format!("{}/api/v1/query?query={}", config.prometheus, query.query);
-            let url = url.parse::<Url>().unwrap();
-            queries.push((query, url));
+        let mut targets = Vec::with_capacity(config.targets.len());
+        for target in config.targets {
+            let url = target.url.parse::<Url>().expect("failed to parse URL");
+            targets.push((target, url));
         }
 
         Self {
-            vector_id: config.vector_id,
             experiment_name: config.experiment_name,
             variant: config.variant,
-            queries,
+            targets,
             capture_path: config.capture_path,
         }
     }
 
     async fn run(self) -> Result<(), Error> {
-        let client: reqwest::Client = reqwest::Client::new();
+        let (snd, rcv) = channel(1024);
 
-        let file = fs::File::create(self.capture_path)?;
-        let mut wtr = csv::Writer::from_writer(file);
-        for fetch_index in 0..u64::max_value() {
-            for (query, url) in &self.queries {
-                let request = client.get(url.clone()).build()?;
-                let body = client
-                    .execute(request)
-                    .await?
-                    .json::<QueryResponse>()
-                    .await?;
-                debug!("body: {:?}", body.data);
+        let run_id: Arc<Uuid> = Arc::new(Uuid::new_v4());
 
-                if !body.data.result.is_empty() {
-                    let time = body.data.result[0].value.time;
-                    let value = body.data.result[0].value.value.parse::<f64>()?;
-                    let output = soak::Output {
-                        experiment: Cow::Borrowed(&self.experiment_name),
-                        variant: self.variant,
-                        vector_id: Cow::Borrowed(&self.vector_id),
-                        time,
-                        query_id: Cow::Borrowed(&query.id),
-                        query: Cow::Borrowed(&query.query),
-                        value,
-                        unit: query.unit,
-                        fetch_index,
-                    };
-                    info!("{}", serde_json::to_string(&output)?);
-                    wtr.serialize(&output).expect("could not serialize");
-                    wtr.flush()?;
-                } else {
-                    error!("failed to request body: {:?}", body.data);
-                }
-            }
-            sleep(Duration::from_secs(1)).await;
+        let jh = tokio::spawn({
+            let capture_manager = CaptureManager::new(self.capture_path, rcv);
+            capture_manager.run()
+        });
+        for (target, url) in self.targets.into_iter() {
+            let tp = TargetWorker::new(
+                snd.clone(),
+                self.experiment_name.clone(),
+                target.id,
+                url,
+                Arc::clone(&run_id),
+                self.variant,
+            );
+            tokio::spawn(tp.run());
         }
-        // SAFETY: The only way to reach this point is to break the above loop
-        // -- which we do not -- or to traverse u64::MAX seconds, implying that
-        // the computer running this program has been migrated away from the
-        // Earth meanwhile as our dear craddle is now well encompassed by the
-        // sun. Unless we moved the Earth.
-        unreachable!()
+        drop(snd);
+
+        // Wait for a terminate signal to come in, flip TERMINATE to true and
+        // then wait for spawned tasks to complete.
+        #[cfg(target_family = "unix")]
+        {
+            use tokio::signal::unix::{signal, SignalKind};
+            let mut signals = signal(SignalKind::terminate())?;
+            signals.recv().await;
+            info!("Received SIGTERM, beginning shut down.");
+        }
+        #[cfg(target_family = "windows")]
+        {
+            use tokio::signal;
+            signal::ctrl_c().await?;
+            info!("Received ctrl-c, beginning shut down.");
+        }
+        TERMINATE.store(true, Ordering::Relaxed);
+
+        // The file manager is the last component of this program that properly
+        // shuts down, doing so when all of its sender channels are gone.
+        jh.await
+            .expect("could not join capture file writer")
+            .expect("capture file writer did not shut down properly");
+
+        info!("Final component safely shut down. Bye. :)");
+
+        Ok(())
     }
 }
 
-fn get_config() -> Config {
+fn get_config() -> Result<Config, Error> {
     let ops: Opts = argh::from_env();
     let mut file: std::fs::File = std::fs::OpenOptions::new()
         .read(true)
-        .open(ops.config_path)
-        .unwrap();
+        .open(ops.config_path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
-    serde_yaml::from_str(&contents).unwrap()
+    file.read_to_string(&mut contents)?;
+    serde_yaml::from_str(&contents).map_err(|e| e.into())
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     tracing_subscriber::fmt().init();
-    let config: Config = get_config();
+    let config: Config = get_config()?;
+    debug!("CONFIG: {:?}", config);
     let runtime = Builder::new_current_thread()
         .enable_time()
         .enable_io()
         .build()
         .unwrap();
     let worker = Worker::new(config);
-    runtime.block_on(worker.run()).unwrap();
+    runtime.block_on(worker.run())?;
+    Ok(())
 }
