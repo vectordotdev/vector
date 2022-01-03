@@ -20,7 +20,7 @@ exposed for both operators and load balancers/service discovery.
 
 ### Out of scope
 
-- ...
+- Immediate integrations to expose component level healh
 
 ## Pain
 
