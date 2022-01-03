@@ -38,7 +38,7 @@ pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.132", default-features = false, features = ["derive"] }
+serde = { version = "1.0.133", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.73", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
