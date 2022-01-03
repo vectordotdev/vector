@@ -257,7 +257,7 @@ mod tests {
                 "facility" => "local0",
                 "hostname" => "master",
                 "severity" => "err",
-                "timestamp" => chrono::Utc.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0),
+                "timestamp" => chrono::Utc.ymd(chrono::Utc::now().year(), 6, 8).and_hms_milli(11, 54, 8, 0),
                 "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
