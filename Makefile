@@ -308,7 +308,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -374,14 +374,6 @@ endif
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
-
-.PHONY: test-integration-datadog-logs
-test-integration-datadog-logs: ## Runs Docker Logs integration tests
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-logs.yml run --rm runner
-
-.PHONY: test-integration-datadog-logs-cleanup
-test-integration-datadog-logs-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-logs.yml rm -fsv
 
 .PHONY: test-integration-datadog-metrics
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
