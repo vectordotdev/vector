@@ -295,7 +295,7 @@ impl Graph {
 
         traversal.push_back((root.to_owned(), Vec::new()));
         while !traversal.is_empty() {
-            let (n, mut path) = traversal.pop_back().expect("can't be empty").clone();
+            let (n, mut path) = traversal.pop_back().expect("can't be empty");
             path.push(n.clone());
             let neighbors = self
                 .edges
