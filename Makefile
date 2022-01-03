@@ -383,14 +383,6 @@ test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
 test-integration-docker-logs: ## Runs Docker Logs integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
 
-.PHONY: test-integration-elasticsearch
-test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.elasticsearch.yml run --rm runner
-
-.PHONY: test-integration-elasticsearch-cleanup
-test-integration-elasticsearch-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.elasticsearch.yml rm -fsv
-
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
 ifeq ($(AUTOSPAWN), true)
