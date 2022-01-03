@@ -34,7 +34,7 @@ once_cell = { version = "1.9", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.9", default-features = false }
+pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
