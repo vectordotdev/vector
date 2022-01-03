@@ -499,14 +499,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
 
-.PHONY: test-integration-nginx
-test-integration-nginx: ## Runs nginx integration tests
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.nginx.yml run --rm runner
-
-.PHONY: test-integration-nginx
-test-integration-nginx-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.nginx.yml rm -fsv
-
 .PHONY: test-integration-postgresql_metrics
 test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
 ifeq ($(AUTOSPAWN), true)
