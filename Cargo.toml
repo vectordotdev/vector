@@ -128,7 +128,7 @@ tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
-tracing-subscriber = { version = "0.3.4", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
+tracing-subscriber = { version = "0.3.5", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -185,7 +185,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.18", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.19", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.18", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -232,7 +232,7 @@ flate2 = { version = "1.0.21", default-features = false }
 futures-util = { version = "0.3.19", default-features = false }
 getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
-governor = { version = "0.3.2", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
+governor = { version = "0.4.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.5", default-features = false }
@@ -250,7 +250,7 @@ k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", 
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.7.1", default-features = false, optional = true }
+lru = { version = "0.7.2", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
 memchr = { version = "2.4", default-features = false, optional = true }
