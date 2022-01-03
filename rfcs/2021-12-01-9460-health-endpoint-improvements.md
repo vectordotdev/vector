@@ -1,6 +1,6 @@
 # RFC 9460 - 2021-12-01 - Health endpoint improvements
 
-Our existing `/health' endpoint is limited and additional information should be
+Our existing `/health` endpoint is limited and additional information should be
 exposed for both operators and load balancers/service discovery.
 
 ## Context
