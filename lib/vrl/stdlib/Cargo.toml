@@ -42,6 +42,7 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.4.0", optional = true }
+utf8-width = { version = "0.1.5", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -270,7 +271,7 @@ sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
 slice = []
 split = []
-starts_with = []
+starts_with = ["utf8-width"]
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
