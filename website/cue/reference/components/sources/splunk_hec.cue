@@ -7,7 +7,7 @@ components: sources: splunk_hec: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"

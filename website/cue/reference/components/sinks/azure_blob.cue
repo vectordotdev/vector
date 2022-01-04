@@ -5,7 +5,7 @@ components: sinks: azure_blob: {
 
 	classes: {
 		commonly_used: true
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Azure"]

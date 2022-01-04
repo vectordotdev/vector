@@ -7,7 +7,7 @@ components: sources: fluent: {
 
 	classes: {
 		commonly_used: true
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		deployment_roles: ["sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "stream"
