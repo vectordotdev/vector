@@ -164,7 +164,7 @@ tower = { version = "0.4.10", default-features = false, features = ["buffer", "l
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.132", default-features = false, features = ["derive"] }
+serde = { version = "1.0.133", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.73", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.23", default-features = false }
@@ -186,7 +186,7 @@ smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.19", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.18", default-features = false, optional = true }
+async-graphql-warp = { version = "3.0.19", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -238,7 +238,7 @@ hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.5", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2.5", default-features = false }
+http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.16", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
@@ -266,7 +266,7 @@ openssl = { version = "0.10.38", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.9", default-features = false }
+pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
@@ -705,6 +705,7 @@ all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
   "datadog-agent-integration-tests",
+  "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
@@ -755,6 +756,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
+datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
