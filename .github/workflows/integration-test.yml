@@ -68,7 +68,6 @@ jobs:
           - test: 'humio'
           - test: 'influxdb'
           - test: 'kafka'
-          - test: 'logstash'
           - test: 'loki'
           - test: 'mongodb_metrics'
           - test: 'nginx'
@@ -107,6 +106,7 @@ jobs:
         include:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
+          - test: 'logstash'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
