@@ -24,6 +24,7 @@ pub struct Builder {
 }
 
 impl Builder {
+    // https://github.com/rust-lang/rust/issues/73255
     #[allow(clippy::missing_const_for_fn)]
     pub fn with_buffer(self, n: usize) -> Self {
         Self {
@@ -46,6 +47,7 @@ impl Builder {
         rx
     }
 
+    // https://github.com/rust-lang/rust/issues/73255
     #[allow(clippy::missing_const_for_fn)]
     pub fn build(self) -> SourceSender {
         SourceSender {
