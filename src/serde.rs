@@ -1,7 +1,5 @@
-use std::{fmt, marker::PhantomData};
-
 use indexmap::map::IndexMap;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 #[cfg(feature = "codecs")]

@@ -5,7 +5,7 @@ use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
-use crate::config::{proxy::ProxyConfig, serde::bool_or_struct, LogSchema};
+use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
 pub enum DataDirError {
