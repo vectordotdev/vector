@@ -105,6 +105,7 @@ jobs:
       matrix:
         include:
           - test: 'datadog-agent'
+          - test: 'datadog-logs'
           - test: 'nginx'
           - test: 'redis'
     steps:

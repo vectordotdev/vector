@@ -1,0 +1,23 @@
+services:
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "datadog-logs-integration-tests"
+      - "--lib"
+      - "::datadog::logs::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - CI_TEST_DATADOG_API_KEY
+    volumes:
+      - ${PWD}:/code
