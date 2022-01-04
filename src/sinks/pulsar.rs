@@ -18,6 +18,7 @@ use std::{
 };
 use vector_core::buffers::Acker;
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::error::AuthenticationError;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -143,6 +144,8 @@ impl PulsarSinkConfig {
                     audience: oauth2.audience.clone(),
                     scope: oauth2.scope.clone(),
                 }));
+            } else {
+                return Err(PulsarError::Authentication(AuthenticationError::Custom("Invalid auth config".to_string())));
             }
         }
 
