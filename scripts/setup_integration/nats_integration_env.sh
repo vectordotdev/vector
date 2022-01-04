@@ -24,26 +24,26 @@ start_podman () {
   podman pod create --replace --name vector_nats_tls_client_cert -p 4228:4222
   podman pod create --replace --name vector_nats_jwt -p 4229:4222
 
-  podman run -d --pod=vector_nats --name vector_nats_test nats
-  podman run -d --pod=vector_nats_userpass --name vector_nats_userpass_test nats \
+  podman run -d --pod=vector_nats --name vector_nats_test docker.io/library/nats:latest
+  podman run -d --pod=vector_nats_userpass --name vector_nats_userpass_test docker.io/library/nats:latest \
       --user natsuser --pass natspass
-  podman run -d --pod=vector_nats_token --name vector_nats_token_test nats \
+  podman run -d --pod=vector_nats_token --name vector_nats_token_test docker.io/library/nats:latest \
       --auth secret
   podman run -d --pod=vector_nats_nkey --name vector_nats_nkey_test \
     -v "$(pwd)"/tests/data:/usr/share/nats/config:ro \
-    nats -c /usr/share/nats/config/nats-nkey.conf
+    docker.io/library/nats:latest -c /usr/share/nats/config/nats-nkey.conf
 
   podman run -d --pod=vector_nats_tls --name vector_nats_tls_test \
     -v "$(pwd)"/tests/data:/usr/share/nats/config:ro \
-    nats -c /usr/share/nats/config/nats-tls.conf
+    docker.io/library/nats:latest -c /usr/share/nats/config/nats-tls.conf
 
   podman run -d --pod=vector_nats_tls_client_cert --name vector_nats_tls_client_cert_test \
     -v "$(pwd)"/tests/data:/usr/share/nats/config:ro \
-    nats -c /usr/share/nats/config/nats-tls-client-cert.conf
+    docker.io/library/nats:latest -c /usr/share/nats/config/nats-tls-client-cert.conf
 
   podman run -d --pod=vector_nats_jwt --name vector_nats_jwt_test \
     -v "$(pwd)"/tests/data:/usr/share/nats/config:ro \
-    nats -c /usr/share/nats/config/nats-jwt.conf
+    docker.io/library/nats:latest -c /usr/share/nats/config/nats-jwt.conf
 }
 
 start_docker () {
