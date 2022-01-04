@@ -264,7 +264,7 @@ num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.9", default-features = false }
 openssl = { version = "0.10.38", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
-ordered-float = { version = "2.8.0", default-features = false }
+ordered-float = { version = "2.9.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
