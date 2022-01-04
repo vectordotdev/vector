@@ -106,6 +106,7 @@ jobs:
       matrix:
         include:
           - test: 'datadog-agent'
+          - test: 'datadog-logs'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0

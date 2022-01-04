@@ -705,6 +705,7 @@ all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
   "datadog-agent-integration-tests",
+  "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
@@ -755,6 +756,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
+datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
