@@ -1,2 +1,0 @@
-type = "pipelines"
-inputs = ["generator"]

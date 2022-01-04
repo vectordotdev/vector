@@ -1,7 +1,0 @@
-{
-  "type": "demo_logs",
-  "format": "json",
-  "decoding": {
-    "codec": "json"
-  }
-}
