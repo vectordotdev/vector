@@ -111,6 +111,13 @@ impl NewlineDelimitedEncoderConfig {
     }
 }
 
+#[typetag::serde(name = "newline_delimited")]
+impl encoding::FramingConfig for NewlineDelimitedEncoderConfig {
+    fn build(&self) -> crate::Result<encoding::BoxedFramer> {
+        Ok(Box::new(NewlineDelimitedEncoder::new()))
+    }
+}
+
 /// A codec for handling bytes that are delimited by (a) newline(s).
 #[derive(Debug, Clone)]
 pub struct NewlineDelimitedEncoder(CharacterDelimitedEncoder);
