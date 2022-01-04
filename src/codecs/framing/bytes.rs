@@ -1,7 +1,8 @@
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
+
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 
 /// Config used to build a `BytesDecoderConfig`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -66,9 +67,10 @@ impl Decoder for BytesDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::StreamExt;
     use tokio_util::codec::FramedRead;
+
+    use super::*;
 
     #[test]
     fn decode_frame() {

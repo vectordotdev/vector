@@ -1,14 +1,13 @@
-use crate::{
-    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricData, MetricKind, MetricValue},
-    event::Event,
-    internal_events::PrometheusServerRequestComplete,
-    sinks::{
-        util::{statistic::validate_quantiles, StreamSink},
-        Healthcheck, VectorSink,
-    },
-    tls::{MaybeTlsSettings, TlsConfig},
+use std::{
+    convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
+    net::SocketAddr,
+    ops::{Deref, DerefMut},
+    sync::{Arc, RwLock},
+    time::Instant,
 };
+
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
@@ -20,19 +19,23 @@ use hyper::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    convert::Infallible,
-    hash::{Hash, Hasher},
-    mem::discriminant,
-    net::SocketAddr,
-    ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
-    time::Instant,
-};
 use stream_cancel::{Trigger, Tripwire};
 use vector_core::buffers::Acker;
 
 use super::collector::{self, MetricCollector as _};
+use crate::{
+    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
+    event::{
+        metric::{Metric, MetricData, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::PrometheusServerRequestComplete,
+    sinks::{
+        util::{statistic::validate_quantiles, StreamSink},
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
@@ -457,6 +460,12 @@ impl PartialEq for MetricEntry {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Duration;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+    use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+
     use super::*;
     use crate::{
         config::ProxyConfig,
@@ -465,11 +474,6 @@ mod tests {
         test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
-    use chrono::Duration;
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
-    use tokio::{sync::mpsc, time};
-    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -665,12 +669,13 @@ mod integration_tests {
     #![allow(clippy::print_stderr)] // tests
     #![allow(clippy::dbg_macro)] // tests
 
-    use super::*;
-    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
+
+    use super::*;
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 

@@ -1,3 +1,28 @@
+use std::{
+    collections::HashMap,
+    io::Read,
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
+
+use bytes::{Buf, Bytes};
+use chrono::{DateTime, TimeZone, Utc};
+use flate2::read::MultiGzDecoder;
+use futures::{stream, FutureExt, SinkExt};
+use http::StatusCode;
+use serde::{Deserialize, Serialize};
+use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
+use snafu::Snafu;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
+use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+
+use self::{
+    acknowledgements::{
+        HecAckStatusRequest, HecAckStatusResponse, HecAcknowledgementsConfig,
+        IndexerAcknowledgement,
+    },
+    splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
+};
 use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
@@ -8,31 +33,6 @@ use crate::{
     serde::bool_or_struct,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
-};
-use bytes::{Buf, Bytes};
-use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt};
-use http::StatusCode;
-use serde::{Deserialize, Serialize};
-use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
-use snafu::Snafu;
-use std::{
-    collections::HashMap,
-    io::Read,
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
-use vector_core::{event::BatchNotifier, ByteSizeOf};
-
-use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
-
-use self::{
-    acknowledgements::{
-        HecAckStatusRequest, HecAckStatusResponse, HecAcknowledgementsConfig,
-        IndexerAcknowledgement,
-    },
-    splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 
 mod acknowledgements;
@@ -960,6 +960,15 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
+    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
+
+    use chrono::{TimeZone, Utc};
+    use futures::{stream, StreamExt};
+    use futures_util::Stream;
+    use reqwest::{RequestBuilder, Response};
+    use serde::Deserialize;
+    use vector_core::event::EventStatus;
+
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
@@ -977,13 +986,6 @@ mod tests {
         },
         Pipeline,
     };
-    use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
-    use futures_util::Stream;
-    use reqwest::{RequestBuilder, Response};
-    use serde::Deserialize;
-    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
-    use vector_core::event::EventStatus;
 
     #[test]
     fn generate_config() {

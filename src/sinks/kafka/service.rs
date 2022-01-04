@@ -1,16 +1,24 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::kafka::KafkaStatisticsContext;
+use std::task::{Context, Poll};
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rdkafka::error::KafkaError;
-use rdkafka::message::OwnedHeaders;
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::util::Timeout;
-use std::task::{Context, Poll};
+use rdkafka::{
+    error::KafkaError,
+    message::OwnedHeaders,
+    producer::{FutureProducer, FutureRecord},
+    util::Timeout,
+};
 use tower::Service;
-use vector_core::buffers::Ackable;
-use vector_core::internal_event::{BytesSent, EventsSent};
-use vector_core::stream::DriverResponse;
+use vector_core::{
+    buffers::Ackable,
+    internal_event::{BytesSent, EventsSent},
+    stream::DriverResponse,
+};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    kafka::KafkaStatisticsContext,
+};
 
 pub struct KafkaRequest {
     pub body: Vec<u8>,

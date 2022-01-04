@@ -26,6 +26,7 @@ interpreted as described in [RFC 2119].
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
+1. [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
@@ -233,8 +234,23 @@ implement since errors are specific to the component.
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+## Health checks
+
+All sink components SHOULD define a health check. These checks are executed at
+boot and as part of `vector validate`. This health check SHOULD, as closely as
+possible, emulate the sink's normal operation to give the best possible signal
+that Vector is configured correctly.
+
+These checks SHOULD NOT query the health of external systems, but MAY fail due
+to external system being unhealthy. For example, a health check for the `aws_s3`
+sink might fail if AWS is unhealthy, but the check itself should not query for
+AWS's status.
+
+See the [development documentation][health checks] for more context guidance.
+
 [Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/

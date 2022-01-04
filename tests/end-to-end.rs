@@ -1,10 +1,14 @@
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode};
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::task::JoinHandle;
-use vector::test_util;
-use vector::Error;
+
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Request, Response, Server, StatusCode,
+};
+use tokio::{
+    sync::{mpsc, oneshot, Mutex},
+    task::JoinHandle,
+};
+use vector::{test_util, Error};
 
 type Lock = Arc<Mutex<()>>;
 
@@ -70,8 +74,10 @@ pub fn http_client(
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 async fn http_to_http(status: StatusCode, response: StatusCode) {
     use tokio::time::{timeout, Duration};
-    use vector::config::{self, ConfigDiff, Format};
-    use vector::topology;
+    use vector::{
+        config::{self, ConfigDiff, Format},
+        topology,
+    };
 
     let address1 = test_util::next_addr();
     let address2 = test_util::next_addr();
@@ -92,7 +98,7 @@ uri = "http://{address2}/"
             address1 = address1,
             address2 = address2,
         ),
-        Some(Format::Toml),
+        Format::Toml,
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);

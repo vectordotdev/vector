@@ -1,5 +1,6 @@
-use metrics::counter;
 use std::error::Error;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

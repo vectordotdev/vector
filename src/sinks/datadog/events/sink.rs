@@ -1,17 +1,22 @@
-use crate::config::log_schema;
-use crate::event::{Event, LogEvent};
-use crate::internal_events::DatadogEventsFieldInvalid;
-use crate::sinks::datadog::events::request_builder::{
-    DatadogEventsRequest, DatadogEventsRequestBuilder,
-};
-use crate::sinks::datadog::events::service::DatadogEventsResponse;
-use crate::sinks::util::{SinkBuilderExt, StreamSink};
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
 use std::num::NonZeroUsize;
+
+use async_trait::async_trait;
+use futures::{stream::BoxStream, StreamExt};
 use tower::util::BoxService;
 use vector_core::buffers::Acker;
+
+use crate::{
+    config::log_schema,
+    event::{Event, LogEvent},
+    internal_events::DatadogEventsFieldInvalid,
+    sinks::{
+        datadog::events::{
+            request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
+            service::DatadogEventsResponse,
+        },
+        util::{SinkBuilderExt, StreamSink},
+    },
+};
 
 pub struct DatadogEventsSink {
     pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,

@@ -1,5 +1,6 @@
-use crate::encode_key_value::EncodeKeyValueFn;
 use vrl::prelude::*;
+
+use crate::encode_key_value::EncodeKeyValueFn;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;

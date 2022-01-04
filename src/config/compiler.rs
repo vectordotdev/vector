@@ -1,6 +1,8 @@
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
-use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
+
+use indexmap::{IndexMap, IndexSet};
+
+use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -207,6 +209,9 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 
 #[cfg(test)]
 mod test {
+    use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
+
     use super::*;
     use crate::{
         config::{
@@ -217,8 +222,6 @@ mod test {
         sources::Source,
         transforms::Transform,
     };
-    use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MockSourceConfig;

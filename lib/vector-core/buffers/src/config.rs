@@ -1,20 +1,39 @@
-use crate::{build, Acker, BufferInputCloner, BufferStream, Bufferable, Variant, WhenFull};
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, path::PathBuf};
+
+use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use snafu::{ResultExt, Snafu};
 use tracing::Span;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum BufferTypeKind {
-    Memory,
-    #[cfg(feature = "disk-buffer")]
-    Disk,
+use crate::{
+    topology::{
+        builder::{TopologyBuilder, TopologyError},
+        channel::{BufferReceiver, BufferSender},
+    },
+    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
+    Acker, Bufferable, WhenFull,
+};
+
+#[derive(Debug, Snafu)]
+pub enum BufferBuildError {
+    #[snafu(display("the configured buffer type requires `data_dir` be specified"))]
+    RequiresDataDir,
+    #[snafu(display("error occurred when building buffer: {}", source))]
+    FailedToBuildTopology { source: TopologyError },
 }
 
-#[cfg(feature = "disk-buffer")]
+#[derive(Deserialize, Serialize)]
+enum BufferTypeKind {
+    #[serde(rename = "memory")]
+    MemoryV1,
+    #[serde(rename = "memory_v2")]
+    MemoryV2,
+    #[serde(rename = "disk")]
+    DiskV1,
+    #[serde(rename = "disk_v2")]
+    DiskV2,
+}
+
 const ALL_FIELDS: [&str; 4] = ["type", "max_events", "max_size", "when_full"];
-#[cfg(not(feature = "disk-buffer"))]
-const ALL_FIELDS: [&str; 3] = ["type", "max_events", "when_full"];
 
 struct BufferTypeVisitor;
 
@@ -25,8 +44,7 @@ impl BufferTypeVisitor {
     {
         let mut kind: Option<BufferTypeKind> = None;
         let mut max_events: Option<usize> = None;
-        #[cfg(feature = "disk-buffer")]
-        let mut max_size: Option<usize> = None;
+        let mut max_size: Option<u64> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
@@ -42,7 +60,6 @@ impl BufferTypeVisitor {
                     }
                     max_events = Some(map.next_value()?);
                 }
-                #[cfg(feature = "disk-buffer")]
                 "max_size" => {
                     if max_size.is_some() {
                         return Err(de::Error::duplicate_field("max_size"));
@@ -60,31 +77,53 @@ impl BufferTypeVisitor {
                 }
             }
         }
-        let kind = kind.unwrap_or(BufferTypeKind::Memory);
+        let kind = kind.unwrap_or(BufferTypeKind::MemoryV1);
         let when_full = when_full.unwrap_or_default();
         match kind {
-            BufferTypeKind::Memory => {
-                #[cfg(feature = "disk-buffer")]
+            BufferTypeKind::MemoryV1 => {
                 if max_size.is_some() {
                     return Err(de::Error::unknown_field(
                         "max_size",
                         &["type", "max_events", "when_full"],
                     ));
                 }
-                Ok(BufferType::Memory {
+                Ok(BufferType::MemoryV1 {
                     max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
                     when_full,
                 })
             }
-            #[cfg(feature = "disk-buffer")]
-            BufferTypeKind::Disk => {
+            BufferTypeKind::MemoryV2 => {
+                if max_size.is_some() {
+                    return Err(de::Error::unknown_field(
+                        "max_size",
+                        &["type", "max_events", "when_full"],
+                    ));
+                }
+                Ok(BufferType::MemoryV2 {
+                    max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
+                    when_full,
+                })
+            }
+            BufferTypeKind::DiskV1 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
                         "max_events",
                         &["type", "max_size", "when_full"],
                     ));
                 }
-                Ok(BufferType::Disk {
+                Ok(BufferType::DiskV1 {
+                    max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
+                    when_full,
+                })
+            }
+            BufferTypeKind::DiskV2 => {
+                if max_events.is_some() {
+                    return Err(de::Error::unknown_field(
+                        "max_events",
+                        &["type", "max_size", "when_full"],
+                    ));
+                }
+                Ok(BufferType::DiskV2 {
                     max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
                     when_full,
                 })
@@ -172,7 +211,7 @@ impl Serialize for BufferConfig {
     }
 }
 
-const fn memory_buffer_default_max_events() -> usize {
+pub const fn memory_buffer_default_max_events() -> usize {
     500
 }
 
@@ -181,30 +220,85 @@ const fn memory_buffer_default_max_events() -> usize {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BufferType {
-    /// A buffer stage backed by an in-memory channel.
-    Memory {
+    /// A buffer stage backed by an in-memory channel provided by `futures`.
+    #[serde(rename = "memory")]
+    MemoryV1 {
+        #[serde(default = "memory_buffer_default_max_events")]
+        max_events: usize,
+        #[serde(default)]
+        when_full: WhenFull,
+    },
+    /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    #[serde(rename = "memory_v2")]
+    MemoryV2 {
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: usize,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[cfg(feature = "disk-buffer")]
-    Disk {
-        max_size: usize,
+    #[serde(rename = "disk")]
+    DiskV1 {
+        max_size: u64,
+        #[serde(default)]
+        when_full: WhenFull,
+    },
+    /// A buffer stage backed by disk.
+    #[serde(rename = "disk_v2")]
+    DiskV2 {
+        max_size: u64,
         #[serde(default)]
         when_full: WhenFull,
     },
 }
 
 impl BufferType {
-    fn when_full(&self) -> WhenFull {
+    /// Adds this buffer type as a stage to an existing [`TopologyBuilder`].
+    ///
+    /// # Errors
+    ///
+    /// If a required parameter is missing, or if there is an error building the topology itself, an
+    /// error variant will be returned desribing the error
+    pub fn add_to_builder<T>(
+        &self,
+        builder: &mut TopologyBuilder<T>,
+        data_dir: Option<PathBuf>,
+        id: String,
+    ) -> Result<(), BufferBuildError>
+    where
+        T: Bufferable + Clone,
+    {
         match *self {
-            #[cfg(not(feature = "disk-buffer"))]
-            BufferType::Memory { when_full, .. } => when_full,
-            #[cfg(feature = "disk-buffer")]
-            BufferType::Memory { when_full, .. } | BufferType::Disk { when_full, .. } => when_full,
-        }
+            BufferType::MemoryV1 {
+                when_full,
+                max_events,
+            } => {
+                builder.stage(MemoryV1Buffer::new(max_events), when_full);
+            }
+            BufferType::MemoryV2 {
+                when_full,
+                max_events,
+            } => {
+                builder.stage(MemoryV2Buffer::new(max_events), when_full);
+            }
+            BufferType::DiskV1 {
+                when_full,
+                max_size,
+            } => {
+                let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
+                builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
+            }
+            BufferType::DiskV2 {
+                when_full,
+                max_size,
+            } => {
+                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
+                let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
+                builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -221,19 +315,15 @@ impl BufferType {
 /// component, where you could only choose which buffer type to use.  As we expand buffer
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
-///
-/// * - buffers are currently only single stage as we work on improvements to the buffers system;
-///     this will eventually be changed to allow chained buffer topologies to be constructed by
-///     users depending on their buffer config for sinks
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
-    stages: Vec<BufferType>,
+    pub stages: Vec<BufferType>,
 }
 
 impl Default for BufferConfig {
     fn default() -> Self {
         Self {
-            stages: vec![BufferType::Memory {
+            stages: vec![BufferType::MemoryV1 {
                 max_events: memory_buffer_default_max_events(),
                 when_full: WhenFull::default(),
             }],
@@ -261,57 +351,23 @@ impl BufferConfig {
     ///
     /// If a disk buffer stage is configured and the data directory provided is `None`, an error
     /// variant will be thrown.
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn build<T>(
+    pub async fn build<T>(
         &self,
-        data_dir: &Option<PathBuf>,
+        data_dir: Option<PathBuf>,
         buffer_id: String,
         span: Span,
-    ) -> Result<(BufferInputCloner<T>, BufferStream<T>, Acker), String>
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), BufferBuildError>
     where
         T: Bufferable + Clone,
     {
-        // For now, we only support a single buffer stage, so make sure we only have one.
-        let stage = match self.stages.len() {
-            0 => Err("buffer must be configured".to_string()),
-            1 => self
-                .stages
-                .first()
-                .copied()
-                .ok_or_else(|| "stage cannot possibly be empty".to_string()),
-            _ => Err("chained buffers are not yet supported".to_string()),
-        }?;
+        let mut builder = TopologyBuilder::default();
 
-        // Overflow mode is also not supported yet.
-        if let WhenFull::Overflow = stage.when_full() {
-            return Err("overflow mode is not yet supported".to_string());
+        for stage in self.stages.iter().copied() {
+            stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 
-        let variant = match stage {
-            BufferType::Memory {
-                max_events,
-                when_full,
-            } => Variant::Memory {
-                max_events,
-                when_full,
-                instrument: true,
-            },
-            #[cfg(feature = "disk-buffer")]
-            BufferType::Disk {
-                max_size,
-                when_full,
-            } => Variant::Disk {
-                max_size,
-                when_full,
-                data_dir: data_dir
-                    .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
-                    .clone(),
-                id: buffer_id,
-            },
-        };
-        build(variant, span)
+        builder.build(span).await.context(FailedToBuildTopology)
     }
 }
 
@@ -369,7 +425,7 @@ max_events: 42
             r#"
           max_events: 100
           "#,
-            BufferType::Memory {
+            BufferType::MemoryV1 {
                 max_events: 100,
                 when_full: WhenFull::Block,
             },
@@ -385,11 +441,11 @@ max_events: 42
             when_full: drop_newest
           "#,
             &[
-                BufferType::Memory {
+                BufferType::MemoryV1 {
                     max_events: 42,
                     when_full: WhenFull::Block,
                 },
-                BufferType::Memory {
+                BufferType::MemoryV1 {
                     max_events: 100,
                     when_full: WhenFull::DropNewest,
                 },
@@ -403,7 +459,7 @@ max_events: 42
             r#"
           type: memory
           "#,
-            BufferType::Memory {
+            BufferType::MemoryV1 {
                 max_events: 500,
                 when_full: WhenFull::Block,
             },
@@ -414,7 +470,7 @@ max_events: 42
           type: memory
           max_events: 100
           "#,
-            BufferType::Memory {
+            BufferType::MemoryV1 {
                 max_events: 100,
                 when_full: WhenFull::Block,
             },
@@ -425,19 +481,83 @@ max_events: 42
           type: memory
           when_full: drop_newest
           "#,
-            BufferType::Memory {
+            BufferType::MemoryV1 {
                 max_events: 500,
                 when_full: WhenFull::DropNewest,
             },
         );
 
-        #[cfg(feature = "disk-buffer")]
+        check_single_stage(
+            r#"
+          type: memory
+          when_full: overflow
+          "#,
+            BufferType::MemoryV1 {
+                max_events: 500,
+                when_full: WhenFull::Overflow,
+            },
+        );
+
         check_single_stage(
             r#"
           type: disk
           max_size: 1024
           "#,
-            BufferType::Disk {
+            BufferType::DiskV1 {
+                max_size: 1024,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check_single_stage(
+            r#"
+          type: memory_v2
+          "#,
+            BufferType::MemoryV2 {
+                max_events: 500,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check_single_stage(
+            r#"
+          type: memory_v2
+          max_events: 100
+          "#,
+            BufferType::MemoryV2 {
+                max_events: 100,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check_single_stage(
+            r#"
+          type: memory_v2
+          when_full: drop_newest
+          "#,
+            BufferType::MemoryV2 {
+                max_events: 500,
+                when_full: WhenFull::DropNewest,
+            },
+        );
+
+        check_single_stage(
+            r#"
+          type: memory_v2
+          when_full: overflow
+          "#,
+            BufferType::MemoryV2 {
+                max_events: 500,
+                when_full: WhenFull::Overflow,
+            },
+        );
+
+        check_single_stage(
+            r#"
+          type: disk_v2
+          max_size: 1024
+          "#,
+            BufferType::DiskV2 {
                 max_size: 1024,
                 when_full: WhenFull::Block,
             },

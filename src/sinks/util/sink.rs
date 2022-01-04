@@ -31,17 +31,6 @@
 //! from the sink. A oneshot channel is used to tie them back into the sink to allow
 //! it to notify the consumer that the request has succeeded.
 
-use super::{
-    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
-    buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
-    service::{Map, ServiceBuilderExt},
-    EncodedEvent,
-};
-use crate::event::EventStatus;
-use futures::{
-    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
-};
-use pin_project::pin_project;
 use std::{
     collections::HashMap,
     fmt,
@@ -50,17 +39,28 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{
+    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
+};
+use pin_project::pin_project;
 use tokio::{
     sync::oneshot,
     time::{sleep, Duration, Sleep},
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
+// === StreamSink ===
+pub use vector_core::sink::StreamSink;
 use vector_core::{buffers::Acker, internal_event::EventsSent};
 
-// === StreamSink ===
-
-pub use vector_core::sink::StreamSink;
+use super::{
+    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
+    buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
+    service::{Map, ServiceBuilderExt},
+    EncodedEvent,
+};
+use crate::event::EventStatus;
 
 // === BatchSink ===
 
@@ -634,19 +634,21 @@ impl<'a> Response for &'a str {}
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        convert::Infallible,
+        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
+    };
+
+    use bytes::Bytes;
+    use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
+    use tokio::{task::yield_now, time::Instant};
+    use vector_core::buffers::Acker;
+
     use super::*;
     use crate::{
         sinks::util::{BatchSettings, EncodedLength, VecBuffer},
         test_util::trace_init,
     };
-    use bytes::Bytes;
-    use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
-    use std::{
-        convert::Infallible,
-        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
-    };
-    use tokio::{task::yield_now, time::Instant};
-    use vector_core::buffers::Acker;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -664,7 +666,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_acking_sequential() {
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let mut batch_settings = BatchSettings::default();
@@ -687,7 +689,7 @@ mod tests {
         trace_init();
 
         // Services future will be spawned and work between `yield_now` calls.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|req: Vec<usize>| async move {
             let duration = match req[0] {
@@ -824,7 +826,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -859,7 +861,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_flushes_below_min_on_close() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -899,7 +901,7 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_expired_linger() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -946,7 +948,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -980,7 +982,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1009,7 +1011,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1044,7 +1046,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_submits_after_linger() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1088,7 +1090,7 @@ mod tests {
         // that we poll the service futures within the mock clock
         // context. This allows us to manually advance the time on the
         // "spawned" futures.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
 
         let svc = tower::service_fn(|req: u8| {
             if req == 3 {
@@ -1132,7 +1134,7 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_ordering_per_partition() {
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let mut delay = true;

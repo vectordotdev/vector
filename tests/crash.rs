@@ -1,13 +1,14 @@
 #![allow(clippy::type_complexity)]
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use async_trait::async_trait;
-use futures::{future, FutureExt, Sink, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use async_trait::async_trait;
+use futures::{future, FutureExt, Sink, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{

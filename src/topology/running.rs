@@ -1,31 +1,34 @@
-use crate::topology::builder;
-use crate::topology::fanout::{ControlChannel, ControlMessage};
-use crate::topology::{
-    build_or_log_errors, handle_errors, retain, take_healthchecks, BuiltBuffer, Outputs,
-    TaskHandle, WatchRx, WatchTx,
-};
-use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
-    event::Event,
-    shutdown::SourceShutdownCoordinator,
-    topology::{builder::Pieces, task::TaskOutput},
-    trigger::DisabledTrigger,
-};
-use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
+
+use futures::{future, Future, FutureExt, SinkExt};
 use tokio::{
     sync::{mpsc, watch},
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_core::buffers::BufferInputCloner;
+use vector_core::buffers::topology::channel::BufferSender;
+
+use crate::{
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
+    event::Event,
+    shutdown::SourceShutdownCoordinator,
+    topology::{
+        build_or_log_errors, builder,
+        builder::Pieces,
+        fanout::{ControlChannel, ControlMessage},
+        handle_errors, retain, take_healthchecks,
+        task::TaskOutput,
+        BuiltBuffer, Outputs, TaskHandle, WatchRx, WatchTx,
+    },
+    trigger::DisabledTrigger,
+};
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<ComponentKey, BufferInputCloner<Event>>,
+    inputs: HashMap<ComponentKey, BufferSender<Event>>,
     outputs: HashMap<OutputId, ControlChannel>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
@@ -416,7 +419,7 @@ impl RunningTopology {
                 if reuse_buffers.contains(key) {
                     let tx = self.inputs.remove(key).unwrap();
                     let (rx, acker) = match buffer {
-                        TaskOutput::Sink(rx, acker) => (rx, acker),
+                        TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
                         _ => unreachable!(),
                     };
 
@@ -604,7 +607,10 @@ impl RunningTopology {
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
                         let _ = output
-                            .send(ControlMessage::Add(sink_key.clone(), input.get()))
+                            .send(ControlMessage::Add(
+                                sink_key.clone(),
+                                Box::pin(input.clone()),
+                            ))
                             .await;
                     }
                 }
@@ -615,7 +621,10 @@ impl RunningTopology {
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
                         let _ = output
-                            .send(ControlMessage::Add(transform_key.clone(), input.get()))
+                            .send(ControlMessage::Add(
+                                transform_key.clone(),
+                                Box::pin(input.clone()),
+                            ))
                             .await;
                     }
                 }
@@ -634,7 +643,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), tx.get()))
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())))
                 .await;
         }
 
@@ -696,7 +705,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), tx.get()))
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())))
                 .await;
         }
 
@@ -706,7 +715,10 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(key.clone(), Some(tx.get())))
+                .send(ControlMessage::Replace(
+                    key.clone(),
+                    Some(Box::pin(tx.clone())),
+                ))
                 .await;
         }
 

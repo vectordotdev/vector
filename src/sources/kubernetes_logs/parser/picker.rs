@@ -1,10 +1,11 @@
+use shared::TimeZone;
+
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
     transforms::FunctionTransform,
 };
-use shared::TimeZone;
 
 #[derive(Clone, Debug)]
 enum PickerState {
@@ -68,8 +69,10 @@ impl FunctionTransform for Picker {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{cri, docker, test_util};
-    use super::*;
+    use super::{
+        super::{cri, docker, test_util},
+        *,
+    };
     use crate::{
         event::{Event, LogEvent},
         test_util::trace_init,

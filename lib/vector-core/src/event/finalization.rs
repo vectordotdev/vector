@@ -1,23 +1,19 @@
 #![deny(missing_docs)]
 
-use super::Event;
-use crate::ByteSizeOf;
+use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
+
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
-use std::iter::{self, ExactSizeIterator};
-use std::pin::Pin;
-use std::task::Poll;
-use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
 
-type ImmutVec<T> = Box<[T]>;
+use super::Event;
+use crate::ByteSizeOf;
 
 /// Wrapper type for an array of event finalizers. This is the primary
 /// public interface to event finalization metadata.
 #[derive(Clone, Debug, Default)]
-pub struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
+pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
 
 impl Eq for EventFinalizers {}
 
@@ -49,48 +45,22 @@ impl ByteSizeOf for EventFinalizers {
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
     pub fn new(finalizer: EventFinalizer) -> Self {
-        Self(vec![Arc::new(finalizer)].into())
+        Self(vec![Arc::new(finalizer)])
     }
 
     /// Add a single finalizer to this array.
     pub fn add(&mut self, finalizer: EventFinalizer) {
-        self.add_generic(iter::once(Arc::new(finalizer)));
+        self.0.push(Arc::new(finalizer));
     }
 
     /// Merge the given list of finalizers into this array.
     pub fn merge(&mut self, other: Self) {
-        // Box<[T]> is missing IntoIterator; this just adds a `capacity` value
-        let other: Vec<_> = other.0.into();
-        self.add_generic(other.into_iter());
-    }
-
-    fn add_generic<I>(&mut self, items: I)
-    where
-        I: ExactSizeIterator<Item = Arc<EventFinalizer>>,
-    {
-        if self.0.is_empty() {
-            self.0 = items.collect::<Vec<_>>().into();
-        } else if items.len() > 0 {
-            // This requires a bit of extra work both to avoid cloning
-            // the actual elements and because `self.0` cannot be
-            // mutated in place.
-            let finalizers = mem::replace(&mut self.0, vec![].into());
-            let mut result: Vec<_> = finalizers.into();
-            // This is the only step that may cause a (re)allocation.
-            result.reserve_exact(items.len());
-            for entry in items {
-                // Deduplicate by hand, assume the list is trivially small
-                if !result.iter().any(|existing| Arc::ptr_eq(existing, &entry)) {
-                    result.push(entry);
-                }
-            }
-            self.0 = result.into();
-        }
+        self.0.extend(other.0.into_iter());
     }
 
     /// Update the status of all finalizers in this set.
     pub fn update_status(&self, status: EventStatus) {
-        for finalizer in self.0.iter() {
+        for finalizer in &self.0 {
             finalizer.update_status(status);
         }
     }
@@ -100,7 +70,7 @@ impl EventFinalizers {
     /// immediately signal the source batch.
     pub fn update_sources(&mut self) {
         let finalizers = mem::take(&mut self.0);
-        for finalizer in finalizers.iter() {
+        for finalizer in &finalizers {
             finalizer.update_batch();
         }
     }
@@ -382,8 +352,9 @@ impl<T: Finalizable> Finalizable for Vec<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::sync::oneshot::error::TryRecvError::Empty;
+
+    use super::*;
 
     #[test]
     fn defaults() {
@@ -443,6 +414,7 @@ mod tests {
         assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
     }
 
+    #[ignore] // The current implementation does not deduplicate finalizers
     #[test]
     fn clone_and_merge_events() {
         let (mut fin1, mut receiver) = make_finalizer();

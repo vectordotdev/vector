@@ -1,7 +1,8 @@
-use super::{component::ExampleError, GenerateConfig};
-use crate::{providers, signal};
 use async_trait::async_trait;
 use toml::Value;
+
+use super::{component::ExampleError, GenerateConfig};
+use crate::{providers, signal};
 
 #[async_trait]
 #[typetag::serde(tag = "type")]

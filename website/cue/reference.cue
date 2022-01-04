@@ -444,6 +444,7 @@ _values: {
 	{"float": #TypeFloat & {_args: required: Args.required}} |
 	{"object": #TypeObject & {_args: required: Args.required}} |
 	{"string": #TypeString & {_args: required: Args.required}} |
+	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
 	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
 	{"uint": #TypeUint & {_args: required: Args.required}}
 }
@@ -531,6 +532,18 @@ _values: {
 	}
 
 	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+}
+
+#TypeAsciiChar: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: string | null
+	}
+
+	examples?: [string, ...string]
 }
 
 #TypeTimestamp: {

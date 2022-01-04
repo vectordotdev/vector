@@ -2,17 +2,18 @@
 
 #![deny(missing_docs)]
 
-use super::path_helpers::{parse_log_file_path, LogFileInfo};
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
 use evmap::ReadHandle;
 use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use serde::{Deserialize, Serialize};
+
+use super::path_helpers::{parse_log_file_path, LogFileInfo};
+use crate::{
+    event::{Event, LogEvent, PathComponent, PathIter},
+    kubernetes as k8s,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -210,9 +211,10 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use k8s_openapi::api::core::v1::PodIP;
     use shared::assert_event_data_eq;
+
+    use super::*;
 
     #[test]
     fn test_annotate_from_metadata() {

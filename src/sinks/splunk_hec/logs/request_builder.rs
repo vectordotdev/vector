@@ -2,12 +2,11 @@ use std::sync::Arc;
 
 use vector_core::event::{EventFinalizers, Finalizable};
 
+use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
     util::{encoding::EncodingConfig, Compression, RequestBuilder},
 };
-
-use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 
 pub struct HecLogsRequestBuilder {
     pub compression: Compression,

@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
+
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -147,9 +148,10 @@ fn type_def() -> BTreeMap<&'static str, Kind> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::DateTime;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_glog => ParseGlog;

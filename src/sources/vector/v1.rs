@@ -1,3 +1,9 @@
+use bytes::Bytes;
+use getset::Setters;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
     codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
     config::{DataType, GenerateConfig, Resource, SourceContext},
@@ -10,11 +16,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::Bytes;
-use getset::Setters;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -65,6 +66,7 @@ impl VectorConfig {
             self.receive_buffer_bytes,
             cx,
             false.into(),
+            None,
         )
     }
 
@@ -116,7 +118,7 @@ impl TcpSource for VectorSource {
         )
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }
@@ -124,29 +126,15 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use super::VectorConfig;
-    use crate::shutdown::ShutdownSignal;
-    use crate::{
-        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
-        event::Event,
-        event::{
-            metric::{MetricKind, MetricValue},
-            Metric,
-        },
-        sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
-        Pipeline,
-    };
+    use std::net::SocketAddr;
+
     use futures::stream;
     use shared::assert_event_data_eq;
-    use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
-
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -154,6 +142,20 @@ mod test {
         futures::SinkExt,
         prost::Message,
         tokio_util::codec::{FramedWrite, LengthDelimitedCodec},
+    };
+
+    use super::VectorConfig;
+    use crate::{
+        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
+        event::{
+            metric::{MetricKind, MetricValue},
+            Event, Metric,
+        },
+        shutdown::ShutdownSignal,
+        sinks::vector::v1::VectorConfig as SinkConfig,
+        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        tls::{TlsConfig, TlsOptions},
+        Pipeline,
     };
 
     #[test]

@@ -1,14 +1,5 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    http::{Auth, HttpClient},
-    internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
-        NginxMetricsStubStatusParseError,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
+
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
@@ -16,9 +7,22 @@ use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    http::{Auth, HttpClient},
+    internal_events::{
+        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
+        NginxMetricsStubStatusParseError,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 pub mod parser;
 use parser::NginxStubStatus;
@@ -249,7 +253,19 @@ mod integration_tests {
     use super::*;
     use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
 
-    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
+    fn nginx_proxy_address() -> String {
+        std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())
+    }
+
+    fn nginx_address() -> String {
+        std::env::var("NGINX_ADDRESS").unwrap_or_else(|_| "http://localhost:8000".into())
+    }
+
+    fn squid_address() -> String {
+        std::env::var("SQUID_ADDRESS").unwrap_or_else(|_| "http://localhost:3128".into())
+    }
+
+    async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
@@ -259,7 +275,7 @@ mod integration_tests {
 
         tokio::spawn(async move {
             NginxMetricsConfig {
-                endpoints: vec![endpoint.to_owned()],
+                endpoints: vec![endpoint],
                 scrape_interval_secs: 15,
                 namespace: "vector_nginx".to_owned(),
                 tls: None,
@@ -290,18 +306,15 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_stub_status() {
-        test_nginx(
-            "http://localhost:8010/basic_status",
-            None,
-            ProxyConfig::default(),
-        )
-        .await
+        let url = format!("{}/basic_status", nginx_address());
+        test_nginx(url, None, ProxyConfig::default()).await
     }
 
     #[tokio::test]
     async fn test_stub_status_auth() {
+        let url = format!("{}/basic_status_auth", nginx_address());
         test_nginx(
-            "http://localhost:8010/basic_status_auth",
+            url,
             Some(Auth::Basic {
                 user: "vector".to_owned(),
                 password: "vector".to_owned(),
@@ -315,11 +328,12 @@ mod integration_tests {
     // It is the only test of its kind
     #[tokio::test]
     async fn test_stub_status_with_proxy() {
+        let url = format!("{}/basic_status", nginx_proxy_address());
         test_nginx(
-            "http://vector_nginx:8000/basic_status",
+            url,
             None,
             ProxyConfig {
-                http: Some("http://localhost:3128".into()),
+                http: Some(squid_address()),
                 ..Default::default()
             },
         )

@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
+
 use chrono::{offset::TimeZone, Datelike, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -39,7 +40,7 @@ impl Function for ParseKlog {
                     "level": "info",
                     "line": 70,
                     "message": "hello from klog",
-                    "timestamp": "2021-05-05T17:59:40.692994Z"
+                    "timestamp": "2022-05-05T17:59:40.692994Z"
                 }"#}),
         }]
     }
@@ -159,9 +160,10 @@ fn type_def() -> BTreeMap<&'static str, Kind> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::DateTime;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_klog => ParseKlog;

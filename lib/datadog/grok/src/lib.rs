@@ -1,4 +1,5 @@
 mod ast;
+mod filters;
 mod grok_filter;
 mod lexer;
 mod matchers;

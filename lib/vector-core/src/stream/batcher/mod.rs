@@ -2,18 +2,19 @@ pub mod config;
 pub mod data;
 pub mod limiter;
 
-use futures::stream::{Fuse, Stream};
-use futures::{Future, StreamExt};
-use pin_project::pin_project;
-
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-use tokio::time::Sleep;
-
-use futures::ready;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 pub use config::BatchConfig;
+use futures::{
+    ready,
+    stream::{Fuse, Stream},
+    Future, StreamExt,
+};
+use pin_project::pin_project;
+use tokio::time::Sleep;
 
 #[pin_project]
 pub struct Batcher<S, C> {
@@ -114,11 +115,12 @@ where
 #[cfg(test)]
 #[allow(clippy::similar_names)]
 mod test {
+    use std::{num::NonZeroUsize, time::Duration};
+
+    use futures::stream;
+
     use super::*;
     use crate::stream::BatcherSettings;
-    use futures::stream;
-    use std::num::NonZeroUsize;
-    use std::time::Duration;
 
     #[tokio::test]
     async fn item_limit() {

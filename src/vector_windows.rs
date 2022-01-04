@@ -1,13 +1,16 @@
-use crate::app::Application;
-use crate::signal::SignalTo;
 use std::{ffi::OsString, time::Duration};
-use windows_service::service::{
-    ServiceControl, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
-};
+
 use windows_service::{
-    define_windows_service, service::ServiceControlAccept,
-    service_control_handler::ServiceControlHandlerResult, service_dispatcher, Result,
+    define_windows_service,
+    service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+        ServiceType,
+    },
+    service_control_handler::ServiceControlHandlerResult,
+    service_dispatcher, Result,
 };
+
+use crate::{app::Application, signal::SignalTo};
 
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -15,26 +18,25 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const NO_ERROR: u32 = 0;
 
 pub mod service_control {
-    use windows_service::service::{
-        ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType, ServiceStatus,
-    };
+    use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
+
+    use snafu::ResultExt;
     use windows_service::{
-        service::{ServiceAccess, ServiceState},
+        service::{
+            ServiceAccess, ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType,
+            ServiceState, ServiceStatus,
+        },
         service_manager::{ServiceManager, ServiceManagerAccess},
         Result,
     };
 
-    use crate::internal_events::{
-        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
-        WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
+    use crate::{
+        internal_events::{
+            WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
+            WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
+        },
+        vector_windows::{NO_ERROR, SERVICE_TYPE},
     };
-    use crate::vector_windows::{NO_ERROR, SERVICE_TYPE};
-    use std::ffi::OsString;
-    use std::fmt;
-    use std::time::Duration;
-
-    use snafu::ResultExt;
-    use std::fmt::Formatter;
 
     struct ErrorDisplay<'a> {
         error: &'a windows_service::Error,

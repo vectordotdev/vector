@@ -1,12 +1,14 @@
-use crate::aws::auth::AwsAuthentication;
-use crate::codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig};
-use crate::config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext};
-use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
-use crate::sources::aws_sqs::source::SqsSource;
-
-use crate::aws::region::RegionOrEndpoint;
-use serde::{Deserialize, Serialize};
 use std::cmp;
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::aws_sqs::source::SqsSource,
+};
 
 #[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
 #[derivative(Default)]

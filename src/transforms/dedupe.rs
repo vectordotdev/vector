@@ -1,3 +1,10 @@
+use std::{future::ready, pin::Pin};
+
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -7,11 +14,6 @@ use crate::{
     internal_events::DedupeEventDiscarded,
     transforms::{TaskTransform, Transform},
 };
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
-use std::{future::ready, pin::Pin};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -208,10 +210,13 @@ impl TaskTransform for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::{event::Event, event::Value};
     use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{Event, Value},
+        transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+    };
 
     #[test]
     fn generate_config() {

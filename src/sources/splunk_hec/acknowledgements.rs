@@ -1,6 +1,3 @@
-use futures_util::future::Shared;
-use roaring::RoaringTreemap;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     num::NonZeroU64,
@@ -10,14 +7,19 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
+use futures_util::future::Shared;
+use roaring::RoaringTreemap;
+use serde::{Deserialize, Serialize};
 use tokio::time::interval;
 use vector_core::event::BatchStatusReceiver;
 use warp::Rejection;
 
-use crate::sources::util::finalizer::OrderedFinalizer;
-use crate::{config::AcknowledgementsConfig, shutdown::ShutdownSignal};
-
 use super::ApiError;
+use crate::{
+    config::AcknowledgementsConfig, shutdown::ShutdownSignal,
+    sources::util::finalizer::OrderedFinalizer,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
@@ -242,18 +244,16 @@ pub struct HecAckStatusResponse {
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU64;
-    use tokio::time::sleep;
 
     use futures_util::FutureExt;
-    use tokio::time;
+    use tokio::{time, time::sleep};
     use vector_core::event::BatchNotifier;
 
+    use super::IndexerAcknowledgement;
     use crate::{
         shutdown::ShutdownSignal,
         sources::splunk_hec::acknowledgements::{Channel, HecAcknowledgementsConfig},
     };
-
-    use super::IndexerAcknowledgement;
 
     #[tokio::test]
     async fn test_channel_get_ack_id_and_acks_status() {

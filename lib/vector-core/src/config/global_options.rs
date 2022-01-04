@@ -1,10 +1,11 @@
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
-use crate::serde::bool_or_struct;
+use std::{fs::DirBuilder, path::PathBuf};
+
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::DirBuilder;
-use std::path::PathBuf;
+
+use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use crate::config::{proxy::ProxyConfig, serde::bool_or_struct, LogSchema};
 
 #[derive(Debug, Snafu)]
 pub enum DataDirError {

@@ -3,19 +3,13 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use crate::event::Value;
-    use crate::kafka::KafkaCompression;
-    use crate::sinks::kafka::config::{KafkaRole, KafkaSinkConfig};
-    use crate::sinks::kafka::sink::KafkaSink;
-    use crate::sinks::kafka::*;
-    use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-    use crate::sinks::util::{BatchConfig, NoDefaultsBatchSettings, StreamSink};
-    use crate::test_util::components;
-    use crate::{
-        kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{random_lines_with_stream, random_string, wait_for},
-        tls::TlsOptions,
+    use std::{
+        collections::{BTreeMap, HashMap},
+        future::ready,
+        thread,
+        time::Duration,
     };
+
     use bytes::Bytes;
     use futures::StreamExt;
     use rdkafka::{
@@ -23,10 +17,28 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use std::collections::HashMap;
-    use std::{collections::BTreeMap, future::ready, thread, time::Duration};
-    use vector_core::buffers::Acker;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::{
+        buffers::Acker,
+        event::{BatchNotifier, BatchStatus},
+    };
+
+    use crate::{
+        event::Value,
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        sinks::{
+            kafka::{
+                config::{KafkaRole, KafkaSinkConfig},
+                sink::KafkaSink,
+                *,
+            },
+            util::{
+                encoding::{EncodingConfig, StandardEncodings},
+                BatchConfig, NoDefaultsBatchSettings, StreamSink,
+            },
+        },
+        test_util::{components, random_lines_with_stream, random_string, wait_for},
+        tls::TlsOptions,
+    };
 
     #[tokio::test]
     async fn healthcheck() {
@@ -101,7 +113,7 @@ mod integration_test {
             librdkafka_options,
             headers_key: None,
         };
-        let (acker, _ack_counter) = Acker::new_for_testing();
+        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
@@ -245,7 +257,7 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let sink = Box::new(KafkaSink::new(config, acker).unwrap());
 
         let num_events = 1000;

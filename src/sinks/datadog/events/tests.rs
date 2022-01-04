@@ -1,11 +1,5 @@
-use super::*;
-use crate::event::Event;
-use crate::{
-    config::SinkConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
-    test_util::components::{self, HTTP_SINK_TAGS},
-    test_util::{next_addr, random_lines_with_stream},
-};
+use std::sync::Arc;
+
 use bytes::Bytes;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
@@ -15,8 +9,18 @@ use futures::{
 use hyper::StatusCode;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use std::sync::Arc;
 use vector_core::event::{BatchNotifier, BatchStatus};
+
+use super::*;
+use crate::{
+    config::SinkConfig,
+    event::Event,
+    sinks::util::test::{build_test_server_status, load_sink},
+    test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        next_addr, random_lines_with_stream,
+    },
+};
 
 fn random_events_with_stream(
     len: usize,
