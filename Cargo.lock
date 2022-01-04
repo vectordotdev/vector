@@ -879,6 +879,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64ct"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6b4d9b1225d28d360ec6a231d65af1fd99a2a095154c8040689617290569c5c"
+
+[[package]]
 name = "bindgen"
 version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1464,6 +1470,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-oid"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d6f2aa4d0537bcc1c74df8755072bd31c1ef1a3a1b85a68e8404a8c353b7b8b"
+
+[[package]]
 name = "const_fn"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1901,6 +1913,15 @@ name = "debug-helper"
 version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76fbd10dce159c002b9c688ae8ab7cd531151e185e0ad360f4bfea3b0eede3a8"
+
+[[package]]
+name = "der"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79b71cca7d95d7681a4b3b9cdf63c8dbc3730d0584c2c74e31416d64a90493f4"
+dependencies = [
+ "const-oid",
+]
 
 [[package]]
 name = "derivative"
@@ -4234,7 +4255,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nkeys",
+ "nkeys 0.1.0",
  "nuid",
  "once_cell",
  "parking_lot",
@@ -4349,7 +4370,22 @@ dependencies = [
  "ed25519-dalek",
  "log",
  "rand 0.7.3",
- "signatory",
+ "signatory 0.21.0",
+]
+
+[[package]]
+name = "nkeys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e66a7cd1358277b2a6f77078e70aea7315ff2f20db969cc61153103ec162594"
+dependencies = [
+ "byteorder",
+ "data-encoding",
+ "ed25519-dalek",
+ "getrandom 0.2.3",
+ "log",
+ "rand 0.8.4",
+ "signatory 0.23.2",
 ]
 
 [[package]]
@@ -4808,6 +4844,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem-rfc7468"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84e93a3b1cc0510b03020f33f21e62acdde3dcaef432edc95bea377fbd4c2cd4"
+dependencies = [
+ "base64ct",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4981,6 +5026,18 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pkcs8"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee3ef9b64d26bad0536099c816c6734379e45bbd5f14798def6809e5cc350447"
+dependencies = [
+ "der",
+ "pem-rfc7468",
+ "spki",
+ "zeroize",
+]
 
 [[package]]
 name = "pkg-config"
@@ -6797,6 +6854,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "signatory"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfecc059e81632eef1dd9b79e22fc28b8fe69b30d3357512a77a0ad8ee3c782"
+dependencies = [
+ "pkcs8",
+ "rand_core 0.6.3",
+ "signature",
+ "zeroize",
+]
+
+[[package]]
 name = "signature"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6956,6 +7025,15 @@ name = "spin"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "511254be0c5bcf062b019a6c89c01a664aa359ded62f78aa72c6fc137c0590e5"
+
+[[package]]
+name = "spki"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c01a0c15da1b0b0e1494112e7af814a678fec9bd157881b49beac661e9b6f32"
+dependencies = [
+ "der",
+]
 
 [[package]]
 name = "standback"
@@ -8319,6 +8397,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.23.1",
+ "nkeys 0.2.0",
  "nom 7.1.0",
  "notify",
  "num-format",

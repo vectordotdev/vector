@@ -258,6 +258,7 @@ memchr = { version = "2.4", default-features = false, optional = true }
 mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
+nkeys = { version = "0.2.0", optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
@@ -490,7 +491,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
-sources-nats = ["async-nats", "codecs"]
+sources-nats = ["async-nats", "nkeys", "codecs"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
@@ -675,7 +676,7 @@ sinks-influxdb = []
 sinks-kafka = ["rdkafka", "zstd"]
 sinks-logdna = []
 sinks-loki = ["uuid"]
-sinks-nats = ["async-nats"]
+sinks-nats = ["async-nats", "nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
