@@ -76,72 +76,72 @@ components: _nats: {
 					required:    false
 					type: string: {
 						default: ""
-                        enum: {
-                            user_password: "Username and password auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password"
-                            token: "Token auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens"
-                            credentials_file: "Credentials file auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt"
-                            nkey: "Nkey auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth"
-                        }
-                    }
-                }
+						enum: {
+							user_password:    "Username and password auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password"
+							token:            "Token auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens"
+							credentials_file: "Credentials file auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt"
+							nkey:             "Nkey auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth"
+						}
+					}
+				}
 				username: {
-					common: false
-					description: "username"
+					common:        false
+					description:   "username"
 					relevant_when: "strategy = \"user_password\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["nats-user"]
+						examples: ["nats-user"]
 					}
 				}
 				password: {
-					common: false
-					description: "password"
+					common:        false
+					description:   "password"
 					relevant_when: "strategy = \"user_password\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["nats-password"]
+						examples: ["nats-password"]
 					}
 				}
 				token: {
-					common: false
-					description: "token"
+					common:        false
+					description:   "token"
 					relevant_when: "strategy = \"token\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["secret-token"]
+						examples: ["secret-token"]
 					}
 				}
 				credentials_file: {
-					common: false
-					description: "Path to credentials file"
+					common:        false
+					description:   "Path to credentials file"
 					relevant_when: "strategy = \"credentials_file\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["/etc/nats/nats.creds"]
+						examples: ["/etc/nats/nats.creds"]
 					}
 				}
 				nkey: {
-					common: false
-					description: "User string representing nkey public key"
+					common:        false
+					description:   "User string representing nkey public key"
 					relevant_when: "strategy = \"nkey\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4"]
+						examples: ["UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4"]
 					}
 				}
 				seed: {
-					common: false
-					description: "Seed string representing nkey private key"
+					common:        false
+					description:   "Seed string representing nkey private key"
 					relevant_when: "strategy = \"nkey\""
 					required:      false
 					type: string: {
 						default: ""
-						examples:    ["SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY"]
+						examples: ["SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY"]
 					}
 				}
 			}
