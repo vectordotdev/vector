@@ -1,8 +1,0 @@
-{
-  "inputs": [
-    "apache_sample"
-  ],
-  "type": "elasticsearch",
-  "endpoint": "http://79.12.221.222:9200",
-  "bulk": {"index": "vector-%Y-%m-%d"}
-}

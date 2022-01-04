@@ -1,9 +1,0 @@
-name = "first pipeline"
-
-[[transforms]]
-type = "remap"
-source = ".though_first = true"
-
-[[transforms]]
-type = "remap"
-source = '.hello = "world"'
