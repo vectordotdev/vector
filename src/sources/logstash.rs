@@ -659,7 +659,7 @@ mod test {
 
 #[cfg(all(test, feature = "logstash-integration-tests"))]
 mod integration_tests {
-    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
+    use std::time::Duration;
 
     use futures::Stream;
     use tokio::time::timeout;
@@ -667,54 +667,23 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SourceContext,
-        docker::Container,
         event::EventStatus,
-        test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
+        test_util::{collect_n, trace_init, wait_for_tcp},
         tls::TlsOptions,
         Pipeline,
     };
 
-    const BEATS_IMAGE: &str = "docker.elastic.co/beats/heartbeat";
-    const BEATS_TAG: &str = "7.12.1";
-
-    const LOGSTASH_IMAGE: &str = "docker.elastic.co/logstash/logstash";
-    const LOGSTASH_TAG: &str = "7.13.1";
+    fn heartbeat_address() -> String {
+        std::env::var("HEARTBEAT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into())
+    }
 
     #[tokio::test]
     async fn beats_heartbeat() {
         trace_init();
 
-        let (out, address) = source(None).await;
+        let out = source(heartbeat_address(), None).await;
 
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("heartbeat.yml")).unwrap();
-        write!(
-            &mut file,
-            r#"
-heartbeat.monitors:
-- type: http
-  schedule: '@every 1s'
-  urls:
-    - https://google.com
-
-output.logstash:
-  hosts: ['host.docker.internal:{}']
-"#,
-            address.port()
-        )
-        .unwrap();
-
-        let events = Container::new(BEATS_IMAGE, BEATS_TAG)
-            .bind(
-                dir.path().join("heartbeat.yml").display(),
-                "/usr/share/heartbeat/heartbeat.yml",
-            )
-            // adding `-strict.perms=false to the default cmd as otherwise heartbeat was
-            // complaining about the file permissions when running in CI
-            // https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
-            .cmd("-environment=container")
-            .cmd("-strict.perms=false")
-            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
             .await
             .unwrap();
 
@@ -730,56 +699,28 @@ output.logstash:
         assert!(log.get("host").is_some());
     }
 
+    fn logstash_address() -> String {
+        std::env::var("LOGSTASH_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".into())
+    }
+
     #[tokio::test]
     async fn logstash() {
         trace_init();
 
-        let (out, address) = source(Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                key_file: Some("tests/data/host.docker.internal.key".into()),
-                ..Default::default()
-            },
-        }))
+        let out = source(
+            logstash_address(),
+            Some(TlsConfig {
+                enabled: Some(true),
+                options: TlsOptions {
+                    crt_file: Some("tests/data/host.docker.internal.crt".into()),
+                    key_file: Some("tests/data/host.docker.internal.key".into()),
+                    ..Default::default()
+                },
+            }),
+        )
         .await;
 
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("logstash.conf")).unwrap();
-        write!(
-            &mut file,
-            "{}",
-            r#"
-input {
-  generator {
-    count => 5
-    message => "Hello World"
-  }
-}
-output {
-  lumberjack {
-    hosts => "host.docker.internal"
-    ssl_certificate => "/tmp/logstash.crt"
-    port => PORT
-  }
-}
-"#
-            .replace("PORT", &address.port().to_string())
-        )
-        .unwrap();
-
-        let pwd = std::env::current_dir().unwrap();
-        let events = Container::new(LOGSTASH_IMAGE, LOGSTASH_TAG)
-            .bind("/dev/null", "/usr/share/logstash/config/logstash.yml") // tries to contact elasticsearch by default
-            .bind(
-                dir.path().join("logstash.conf").display(),
-                "/usr/share/logstash/pipeline/logstash.conf",
-            )
-            .bind(
-                pwd.join("tests/data/host.docker.internal.crt").display(),
-                "/tmp/logstash.crt",
-            )
-            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
             .await
             .unwrap();
 
@@ -794,9 +735,9 @@ output {
         assert!(log.get("host").is_some());
     }
 
-    async fn source(tls: Option<TlsConfig>) -> (impl Stream<Item = Event>, SocketAddr) {
+    async fn source(address: String, tls: Option<TlsConfig>) -> impl Stream<Item = Event> {
         let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let address: std::net::SocketAddr = address.parse().unwrap();
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
@@ -813,6 +754,6 @@ output {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        recv
     }
 }

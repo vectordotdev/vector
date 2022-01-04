@@ -471,10 +471,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh loki stop
 endif
 
-.PHONY: test-integration-logstash
-test-integration-logstash: ## Runs Logstash integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features logstash-integration-tests --lib ::logstash:: -- --nocapture
-
 .PHONY: test-integration-mongodb_metrics
 test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
 ifeq ($(AUTOSPAWN), true)
