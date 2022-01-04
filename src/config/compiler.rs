@@ -144,18 +144,20 @@ pub(super) fn expand_macros(
 pub fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
-        .keys()
-        .chain(config.transforms.keys())
-        .map(ToString::to_string)
+        .iter()
+        .flat_map(|(key, s)| {
+            s.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
+            })
+        })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.named_outputs().into_iter().map(move |port| {
-                OutputId {
-                    component: key.clone(),
-                    port: Some(port),
-                }
-                .to_string()
+            t.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
             })
         }))
+        .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
 
     for (id, transform) in config.transforms.iter_mut() {

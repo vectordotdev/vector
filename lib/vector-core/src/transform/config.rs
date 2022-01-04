@@ -52,10 +52,6 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn outputs(&self) -> Vec<Output>;
 
-    fn named_outputs(&self) -> Vec<String> {
-        Vec::new()
-    }
-
     fn transform_type(&self) -> &'static str;
 
     /// Return true if the transform is able to be run across multiple tasks simultaneously with no

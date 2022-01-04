@@ -50,20 +50,19 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn named_outputs(&self) -> Vec<String> {
-        if self.reroute_dropped {
-            vec![String::from(DROPPED)]
-        } else {
-            vec![]
-        }
-    }
-
     fn input_type(&self) -> DataType {
         DataType::Any
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        if self.reroute_dropped {
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ]
+        } else {
+            vec![Output::default(DataType::Any)]
+        }
     }
 
     fn transform_type(&self) -> &'static str {
@@ -795,7 +794,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(conf.named_outputs().is_empty());
+        assert_eq!(vec![Output::default(DataType::Any)], conf.outputs());
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -824,7 +823,13 @@ mod tests {
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 
@@ -845,7 +850,13 @@ mod tests {
         ft: &mut dyn SyncTransform,
         event: Event,
     ) -> std::result::Result<Event, Event> {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 

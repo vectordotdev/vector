@@ -32,7 +32,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
+        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        TransformContext,
     },
     event::Event,
     internal_events::EventsReceived,
@@ -252,7 +253,7 @@ pub async fn build_pieces(
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
             input_type: transform.inner.input_type(),
-            named_outputs: transform.inner.named_outputs(),
+            outputs: transform.inner.outputs(),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
 
@@ -460,7 +461,7 @@ struct TransformNode {
     typetag: &'static str,
     inputs: Vec<OutputId>,
     input_type: DataType,
-    named_outputs: Vec<String>,
+    outputs: Vec<Output>,
     enable_concurrency: bool,
 }
 
@@ -484,7 +485,7 @@ fn build_sync_transform(
     node: TransformNode,
     input_rx: BufferReceiver<Event>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.named_outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs);
 
     let runner = Runner::new(t, input_rx, node.input_type, outputs);
     let transform = if node.enable_concurrency {
