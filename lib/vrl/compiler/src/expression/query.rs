@@ -123,7 +123,7 @@ impl Expression for Query {
         let variable = match &self.target {
             Target::External => crate::vm::Variable::External(self.path.clone()),
             Target::Internal(variable) => {
-                crate::vm::Variable::Internal(variable.ident().clone(), None)
+                crate::vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
             }
             _ => unimplemented!("Only external vars for now"),
         };

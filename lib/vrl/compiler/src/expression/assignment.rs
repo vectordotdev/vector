@@ -433,7 +433,9 @@ where
                     Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
                     Target::External(None) => crate::vm::Variable::External(LookupBuf::root()),
                     Target::Noop => todo!(),
-                    Target::Internal(ident, path) => todo!(),
+                    Target::Internal(ident, path) => {
+                        crate::vm::Variable::Internal(ident.clone(), path.clone())
+                    }
                 };
 
                 let target = vm.get_target(&variable);
