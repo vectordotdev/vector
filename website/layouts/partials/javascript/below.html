@@ -1,4 +1,0 @@
-{{ $js      := "js/below.js"}}
-{{ $jsOpts  := dict "targetPath" $js "minify" true "sourceMap" "inline" }}
-{{ $builtJs := resources.Get $js | resources.ExecuteAsTemplate $js . | js.Build $jsOpts | fingerprint "sha256" }}
-<script type="text/javascript" src="{{ $builtJs.RelPermalink }}" integrity="{{ $builtJs.Data.Integrity }}"></script>

@@ -1,5 +1,0 @@
-{{ $homeJs := "js/home.tsx" }}
-{{ $jsOpts := dict "defines" (dict "process.env.NODE_ENV" "\"development\"") "sourceMap" "inline" }}
-{{ $babelOpts := dict "noComments" true }}
-{{ $compiled := resources.Get $homeJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
-<script src="{{ $compiled.RelPermalink }}"></script>
