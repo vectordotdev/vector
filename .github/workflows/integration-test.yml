@@ -67,7 +67,6 @@ jobs:
           - test: 'humio'
           - test: 'influxdb'
           - test: 'kafka'
-          - test: 'logstash'
           - test: 'loki'
           - test: 'mongodb_metrics'
           - test: 'postgresql_metrics'
@@ -106,6 +105,7 @@ jobs:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'elasticsearch'
+          - test: 'logstash'
           - test: 'nginx'
           - test: 'redis'
     steps:
