@@ -30,6 +30,32 @@ pub enum EncodingConfigAdapter<
 }
 
 impl<
+        LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+        Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
+            + Debug
+            + Clone,
+    > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+{
+    pub fn new(
+        framing: Option<Box<dyn FramingConfig>>,
+        encoding: Option<Box<dyn SerializerConfig>>,
+    ) -> Self {
+        Self::Encoding(EncodingConfig {
+            framing,
+            encoding: encoding.map(|encoding| EncodingWithTransformationConfig {
+                encoding,
+                filter: None,
+                timestamp_format: None,
+            }),
+        })
+    }
+
+    pub fn legacy(encoding: LegacyEncodingConfig, migrator: Migrator) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper { encoding }, migrator)
+    }
+}
+
+impl<
         LegacyEncodingConfig: EncodingConfiguration + Debug + Clone,
         Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
             + Debug
