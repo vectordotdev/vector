@@ -149,7 +149,7 @@ pub async fn build_pieces(
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
 
-        let mut builder = SourceSender::builder();
+        let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         for output in source_outputs {

@@ -16,15 +16,25 @@ pub use errors::{ClosedError, StreamSendError};
 
 const CHUNK_SIZE: usize = 1000;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Builder {
+    buf_size: usize,
     inner: Option<Inner>,
     named_inners: HashMap<String, Inner>,
 }
 
 impl Builder {
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn with_buffer(self, n: usize) -> Self {
+        Self {
+            buf_size: n,
+            inner: self.inner,
+            named_inners: self.named_inners,
+        }
+    }
+
     pub fn add_output(&mut self, output: Output) -> ReceiverStream<Event> {
-        let (inner, rx) = Inner::new_with_buffer(1000); // TODO: pass buffer size
+        let (inner, rx) = Inner::new_with_buffer(self.buf_size);
         match output.port {
             None => {
                 self.inner = Some(inner);
@@ -53,7 +63,11 @@ pub struct SourceSender {
 
 impl SourceSender {
     pub fn builder() -> Builder {
-        Builder::default()
+        Builder {
+            buf_size: CHUNK_SIZE,
+            inner: None,
+            named_inners: Default::default(),
+        }
     }
 
     pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
