@@ -71,7 +71,6 @@ jobs:
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongodb_metrics'
-          - test: 'nginx'
           - test: 'postgresql_metrics'
           - test: 'prometheus'
           - test: 'pulsar'
@@ -107,6 +106,7 @@ jobs:
         include:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
+          - test: 'nginx'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0

@@ -499,17 +499,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
 
-.PHONY: test-integration-nginx
-test-integration-nginx: ## Runs nginx integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
-	@scripts/setup_integration_env.sh nginx start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
-endif
-
 .PHONY: test-integration-postgresql_metrics
 test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
 ifeq ($(AUTOSPAWN), true)
