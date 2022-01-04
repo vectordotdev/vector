@@ -20,7 +20,7 @@ start_podman () {
   podman pod create --replace --name vector_nats_userpass -p 4223:4222
   podman pod create --replace --name vector_nats_token -p 4224:4222
   podman pod create --replace --name vector_nats_nkey -p 4225:4222
-  podman pod create --replace --name vector_nats_tls -p 4226:4222
+  podman pod create --replace --name vector_nats_tls -p 4227:4222
   podman pod create --replace --name vector_nats_tls_client_cert -p 4228:4222
   podman pod create --replace --name vector_nats_jwt -p 4229:4222
 
@@ -119,6 +119,9 @@ stop_podman () {
 
   podman pod stop vector_nats_token_test 2>/dev/null; true
   podman pod rm --force vector_nats_token 2>/dev/null; true
+
+  podman pod stop vector_nats_nkey_test 2>/dev/null; true
+  podman pod rm --force vector_nats_nkey 2>/dev/null; true
 
   podman pod stop vector_nats_tls_test 2>/dev/null; true
   podman pod rm --force vector_nats_tls 2>/dev/null; true

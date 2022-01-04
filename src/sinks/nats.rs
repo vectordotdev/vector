@@ -294,7 +294,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -317,7 +316,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -340,7 +338,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConnectError { .. })));
     }
 
@@ -362,7 +359,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -384,7 +380,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConnectError { .. })));
     }
 
@@ -407,7 +402,7 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
+        assert!(r.is_ok());
     }
 
     #[tokio::test]
@@ -429,7 +424,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConfigError { .. })));
     }
 
@@ -455,7 +449,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -475,7 +468,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConnectError { .. })));
     }
 
@@ -503,7 +495,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -529,7 +520,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConnectError { .. })));
     }
 
@@ -557,7 +547,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(r.is_ok());
     }
 
@@ -585,7 +574,6 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        eprintln!("{:?}", r);
         assert!(matches!(r, Err(BuildError::ConnectError { .. })));
     }
 }
