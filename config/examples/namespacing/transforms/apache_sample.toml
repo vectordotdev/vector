@@ -1,6 +1,0 @@
-# Sample the data to save on cost
-inputs       = ["apache_parser"]
-type         = "sample"
-rate         = 50                            # only keep 50%
-
-
