@@ -312,6 +312,17 @@ components: sinks: elasticsearch: {
 				options: {}
 			}
 		}
+		suppress_type_name: {
+			common: false
+			description: """
+				Stop Vector from sending the `type` to Elasticsearch, which was deprecated in Elasticsearch 7.x
+				and removed in Elasticsearch 8.x
+
+				If enabled the `doc_type` option will be ignored.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 
 	input: {

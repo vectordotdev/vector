@@ -1,6 +1,10 @@
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use pin_project::pin_project;
-use std::task::{Context, Poll};
-use std::{io, pin::Pin};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait AfterReadExt {

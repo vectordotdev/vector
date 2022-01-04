@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use std::borrow::Cow;
 
 use datadog_filter::{
     build_matcher,
@@ -6,9 +6,8 @@ use datadog_filter::{
     Filter, Matcher, Resolver, Run,
 };
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
-
 use lookup_lib::{parser::parse_lookup, LookupBuf};
-use std::borrow::Cow;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;

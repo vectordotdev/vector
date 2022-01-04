@@ -1,17 +1,19 @@
-use crate::internal_events::azure_blob::{
-    AzureBlobErrorResponse, AzureBlobEventSent, AzureBlobHttpError,
-};
-use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
-use azure_core::HttpError;
-use azure_storage::blob::prelude::*;
-use futures::{future::BoxFuture, TryFutureExt};
 use std::{
     result::Result as StdResult,
     sync::Arc,
     task::{Context, Poll},
 };
+
+use azure_core::HttpError;
+use azure_storage::blob::prelude::*;
+use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing_futures::Instrument;
+
+use crate::{
+    internal_events::azure_blob::{AzureBlobErrorResponse, AzureBlobEventSent, AzureBlobHttpError},
+    sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
+};
 
 #[derive(Clone)]
 pub struct AzureBlobService {

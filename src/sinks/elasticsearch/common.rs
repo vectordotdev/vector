@@ -1,27 +1,29 @@
-use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::elasticsearch::{
-    finish_signer, ElasticSearchAuth, ElasticSearchCommonMode, ElasticSearchConfig, ParseError,
-};
-use crate::transforms::metric_to_log::MetricToLog;
+use std::{collections::HashMap, convert::TryFrom};
 
-use crate::sinks::util::http::RequestConfig;
-
-use crate::aws::rusoto::region_from_endpoint;
-use crate::sinks::util::{Compression, TowerRequestConfig, UriSerde};
-use crate::tls::TlsSettings;
 use http::{StatusCode, Uri};
 use hyper::Body;
+use rusoto_core::Region;
 use rusoto_signature::SignedRequest;
 use snafu::ResultExt;
-use std::convert::TryFrom;
 
 use super::{InvalidHost, Request};
-use crate::aws::rusoto;
-use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::HealthcheckError;
-use rusoto_core::Region;
-use std::collections::HashMap;
+use crate::{
+    aws::{rusoto, rusoto::region_from_endpoint},
+    http::{Auth, HttpClient, MaybeAuth},
+    sinks::{
+        elasticsearch::{
+            encoder::ElasticSearchEncoder, finish_signer, ElasticSearchAuth,
+            ElasticSearchCommonMode, ElasticSearchConfig, ParseError,
+        },
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
+            UriSerde,
+        },
+        HealthcheckError,
+    },
+    tls::TlsSettings,
+    transforms::metric_to_log::MetricToLog,
+};
 
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
@@ -33,6 +35,7 @@ pub struct ElasticSearchCommon {
     pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
     pub mode: ElasticSearchCommonMode,
     pub doc_type: String,
+    pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
     pub compression: Compression,
     pub region: Region,
@@ -104,9 +107,8 @@ impl ElasticSearchCommon {
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
-        let mut config = config.clone();
-        let mut request = config.request;
-        request.add_old_option(config.headers.take());
+        let config = config.clone();
+        let request = config.request;
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
@@ -121,6 +123,7 @@ impl ElasticSearchCommon {
             compression,
             credentials,
             doc_type,
+            suppress_type_name: config.suppress_type_name,
             encoding: config.encoding,
             id_key: config.id_key,
             mode,

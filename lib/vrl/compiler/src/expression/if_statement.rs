@@ -1,6 +1,9 @@
-use crate::expression::{Block, Expr, Literal, Predicate, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
+
+use crate::{
+    expression::{Block, Expr, Literal, Predicate, Resolved},
+    Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {

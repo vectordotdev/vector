@@ -1,14 +1,13 @@
 use std::io;
 
+use serde::{Deserialize, Serialize};
 use vector_core::{config::log_schema, event::LogEvent};
 
+use super::sink::HecProcessedEvent;
 use crate::{
-    internal_events::{SplunkEventEncodeError, SplunkEventSent},
+    internal_events::SplunkEventEncodeError,
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
-use serde::{Deserialize, Serialize};
-
-use super::sink::HecProcessedEvent;
 
 #[derive(Serialize, Debug)]
 pub enum HecEvent {
@@ -81,12 +80,7 @@ impl HecLogsEncoder {
         hec_data.sourcetype = metadata.sourcetype;
 
         match serde_json::to_vec(&hec_data) {
-            Ok(value) => {
-                emit!(&SplunkEventSent {
-                    byte_size: value.len()
-                });
-                Some(value)
-            }
+            Ok(value) => Some(value),
             Err(error) => {
                 emit!(&SplunkEventEncodeError { error });
                 None

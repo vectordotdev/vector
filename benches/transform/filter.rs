@@ -1,14 +1,16 @@
-use crate::common::AlwaysFail;
-use crate::common::AlwaysPass;
+use std::time::Duration;
+
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
     Throughput,
 };
-use std::time::Duration;
-use vector::conditions::Condition;
-use vector::transforms::filter::Filter;
-use vector::transforms::FunctionTransform;
+use vector::{
+    conditions::Condition,
+    transforms::{filter::Filter, FunctionTransform},
+};
 use vector_core::event::{Event, LogEvent};
+
+use crate::common::{AlwaysFail, AlwaysPass};
 
 #[derive(Debug)]
 struct Payload {

@@ -1,11 +1,16 @@
-use bollard::container::{Config, CreateContainerOptions};
-use bollard::image::{CreateImageOptions, ListImagesOptions};
-use bollard::{errors::Error as DockerError, models::HostConfig, Docker, API_DEFAULT_VERSION};
+use std::{collections::HashMap, env, path::PathBuf};
+
+use bollard::{
+    container::{Config, CreateContainerOptions},
+    errors::Error as DockerError,
+    image::{CreateImageOptions, ListImagesOptions},
+    models::HostConfig,
+    Docker, API_DEFAULT_VERSION,
+};
 use futures::StreamExt;
 use http::uri::Uri;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{collections::HashMap, env, path::PathBuf};
 
 // From bollard source.
 const DEFAULT_TIMEOUT: u64 = 120;

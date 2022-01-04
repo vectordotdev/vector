@@ -1,7 +1,10 @@
-use crate::config::{DataType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, TransformConfig, TransformContext},
+    event::Event,
+    transforms::{FunctionTransform, Transform},
+};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Noop;

@@ -1,8 +1,13 @@
-use crate::expression::{Expr, Noop, Resolved};
-use crate::parser::Node;
-use crate::{value::Kind, Context, Expression, Span, State, TypeDef};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+
+use crate::{
+    expression::{Expr, Noop, Resolved},
+    parser::Node,
+    value::Kind,
+    Context, Expression, Span, State, TypeDef,
+};
 
 pub type Result = std::result::Result<Not, Error>;
 

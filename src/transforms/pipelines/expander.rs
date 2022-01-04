@@ -1,7 +1,10 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, TransformConfig, TransformContext},
+    transforms::Transform,
+};
 
 /// This transform is a simple helper to chain expansions.
 /// You can put a list of transforms that expands in parallel inside a transform that

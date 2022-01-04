@@ -3,6 +3,10 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
+use std::net::SocketAddr;
+
+use serde::{Deserialize, Serialize};
+
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
@@ -14,8 +18,6 @@ use crate::{
     sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
@@ -110,6 +112,7 @@ impl SourceConfig for SocketConfig {
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
+                    config.connection_limit,
                 )
             }
             Mode::Udp(config) => {
@@ -206,27 +209,6 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
-    use crate::{
-        codecs::NewlineDelimitedDecoderConfig,
-        config::{
-            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
-        },
-        event::Event,
-        shutdown::{ShutdownSignal, SourceShutdownCoordinator},
-        sinks::util::tcp::TcpSinkConfig,
-        test_util::{
-            collect_n,
-            components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
-            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
-        },
-        tls::{self, TlsConfig, TlsOptions},
-        Pipeline,
-    };
-    use bytes::Bytes;
-    #[cfg(unix)]
-    use futures::channel::mpsc::Receiver;
-    use futures::{stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -235,6 +217,11 @@ mod test {
         },
         thread,
     };
+
+    use bytes::Bytes;
+    #[cfg(unix)]
+    use futures::channel::mpsc::Receiver;
+    use futures::{stream, StreamExt};
     #[cfg(unix)]
     use tokio::io::AsyncWriteExt;
     use tokio::{
@@ -251,6 +238,24 @@ mod test {
             task::yield_now,
         },
         tokio_util::codec::{FramedWrite, LinesCodec},
+    };
+
+    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    use crate::{
+        codecs::NewlineDelimitedDecoderConfig,
+        config::{
+            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+        },
+        event::Event,
+        shutdown::{ShutdownSignal, SourceShutdownCoordinator},
+        sinks::util::tcp::TcpSinkConfig,
+        test_util::{
+            collect_n,
+            components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
+            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
+        },
+        tls::{self, TlsConfig, TlsOptions},
+        Pipeline,
     };
 
     #[test]

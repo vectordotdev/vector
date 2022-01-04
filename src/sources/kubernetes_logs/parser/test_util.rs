@@ -1,11 +1,12 @@
 #![cfg(test)]
 
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+
 use crate::{
     event::{Event, LogEvent},
     transforms::Transform,
 };
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
 
 /// Build a log event for test purposes.
 ///

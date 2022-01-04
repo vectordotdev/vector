@@ -1,11 +1,13 @@
+use std::{collections::BTreeMap, fmt};
+
 use datadog_grok::{
     parse_grok,
     parse_grok_rules::{self, GrokRule},
 };
-use std::collections::BTreeMap;
-use std::fmt;
-use vrl::diagnostic::{Label, Span};
-use vrl::prelude::*;
+use vrl::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -273,8 +275,9 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use shared::btreemap;
+
+    use super::*;
 
     test_function![
         parse_grok => ParseGroks;

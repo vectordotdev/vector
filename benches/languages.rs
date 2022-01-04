@@ -140,6 +140,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   types.level = "string"
                   types.message = "string"
                   types.msgid = "string"
+                  types.version = "int"
                   types.procid = "int"
                   types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
             "#},
@@ -156,7 +157,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
                     local priority, version, timestamp, hostname, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-                    return {priority = priority, version = version, timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
+                    return {priority = priority, version = tonumber(version), timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
                   end
 
                   function process(event, emit)
@@ -331,7 +332,7 @@ fn benchmark_configs(
                     config.push_str(&transform_config);
                     config.push_str(&sink_config);
 
-                    let config = config::load_from_str(&config, Some(config::Format::Toml))
+                    let config = config::load_from_str(&config, config::Format::Toml)
                         .expect(&format!("invalid TOML configuration: {}", &config));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {

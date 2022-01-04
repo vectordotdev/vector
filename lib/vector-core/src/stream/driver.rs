@@ -1,19 +1,22 @@
-use super::FuturesUnorderedChunked;
-use crate::event::{EventStatus, Finalizable};
-use crate::internal_event::emit;
-use crate::internal_event::EventsSent;
-use buffers::{Ackable, Acker};
-use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use std::{
     collections::{BinaryHeap, VecDeque},
     fmt,
     num::NonZeroUsize,
     task::Poll,
 };
+
+use buffers::{Ackable, Acker};
+use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+
+use super::FuturesUnorderedChunked;
+use crate::{
+    event::{EventStatus, Finalizable},
+    internal_event::{emit, EventsSent},
+};
 
 /// Newtype wrapper around sequence numbers to enforce misuse resistance.
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -284,7 +287,9 @@ where
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
-                                        emit(&response.events_sent());
+                                        if response.event_status() == EventStatus::Delivered {
+                                            emit(&response.events_sent());
+                                        }
                                     }
                                 };
                                 (seq_num, ack_size)
@@ -317,8 +322,7 @@ mod tests {
         iter::repeat_with,
         num::NonZeroUsize,
         pin::Pin,
-        sync::atomic::Ordering,
-        sync::Arc,
+        sync::{atomic::Ordering, Arc},
         task::{Context, Poll},
         time::Duration,
     };
@@ -336,12 +340,11 @@ mod tests {
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
 
+    use super::{Driver, DriverResponse};
     use crate::{
         event::{EventFinalizers, EventStatus, Finalizable},
         stream::driver::AcknowledgementTracker,
     };
-
-    use super::{Driver, DriverResponse};
 
     struct DelayRequest(usize);
 
@@ -603,7 +606,7 @@ mod tests {
         let input_total: usize = input_requests.iter().sum();
         let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
         let service = DelayService::new(10, Duration::from_millis(5), Duration::from_millis(150));
-        let (acker, counter) = Acker::new_for_testing();
+        let (acker, counter) = Acker::basic();
         let driver = Driver::new(input_stream, service, acker);
 
         // Now actually run the driver, consuming all of the input.

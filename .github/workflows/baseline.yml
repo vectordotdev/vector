@@ -13,6 +13,7 @@ jobs:
     name: "Release Build (optimized)"
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -28,6 +29,7 @@ jobs:
       # with full LTO / single codegen unit.
       PROFILE: debug
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -38,6 +40,7 @@ jobs:
     name: "Debug Build"
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -48,6 +51,7 @@ jobs:
     name: "Debug Rebuild"
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -60,6 +64,7 @@ jobs:
     name: "Cargo Check"
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh

@@ -1,9 +1,12 @@
-use crate::expression::{levenstein, Resolved};
-use crate::parser::ast::Ident;
-use crate::{Context, Expression, Span, State, TypeDef, Value};
+use std::fmt;
 
 use diagnostic::{DiagnosticError, Label};
-use std::fmt;
+
+use crate::{
+    expression::{levenstein, Resolved},
+    parser::ast::Ident,
+    Context, Expression, Span, State, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {

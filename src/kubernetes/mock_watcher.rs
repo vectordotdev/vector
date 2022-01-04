@@ -2,13 +2,19 @@
 
 #![cfg(test)]
 
-use super::watcher::{self, Watcher};
+use std::fmt;
+
 use async_stream::try_stream;
-use futures::channel::mpsc::{Receiver, Sender};
-use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
+use futures::{
+    channel::mpsc::{Receiver, Sender},
+    future::BoxFuture,
+    stream::BoxStream,
+    SinkExt, StreamExt,
+};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, WatchOptional};
 use serde::de::DeserializeOwned;
-use std::fmt;
+
+use super::watcher::{self, Watcher};
 
 /// An event that's send to the test scenario driver.
 #[derive(Debug, PartialEq)]

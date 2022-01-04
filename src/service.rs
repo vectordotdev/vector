@@ -1,11 +1,8 @@
-use std::ffi::OsString;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{ffi::OsString, path::PathBuf, time::Duration};
 
 use structopt::StructOpt;
 
-use crate::cli::handle_config_errors;
-use crate::config;
+use crate::{cli::handle_config_errors, config};
 
 const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 

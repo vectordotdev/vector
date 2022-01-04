@@ -1,13 +1,15 @@
-use super::{handler, schema, ShutdownTx};
-use crate::{config, topology};
+use std::{convert::Infallible, net::SocketAddr};
+
 use async_graphql::{
-    http::{playground_source, GraphQLPlaygroundConfig},
+    http::{playground_source, GraphQLPlaygroundConfig, WebSocketProtocols},
     Data, Request, Schema,
 };
-use async_graphql_warp::{graphql_subscription_with_data, Response as GQLResponse};
-use std::{convert::Infallible, net::SocketAddr};
+use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
 use tokio::sync::oneshot;
-use warp::{filters::BoxedFilter, http::Response, Filter, Reply};
+use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
+
+use super::{handler, schema, ShutdownTx};
+use crate::{config, topology};
 
 pub struct Server {
     _shutdown: ShutdownTx,
@@ -51,9 +53,6 @@ impl Server {
 }
 
 fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(impl Reply,)> {
-    // Build the GraphQL schema.
-    let schema = schema::build_schema().finish();
-
     // Routes...
 
     // Health.
@@ -62,21 +61,48 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
     // 404.
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
-    // GraphQL query and subscription handler.
-    let graphql_handler = warp::path("graphql").and(
-        graphql_subscription_with_data(schema.clone(), move |_| async {
-            let mut data = Data::default();
-            data.insert(watch_tx);
-            Ok(data)
-        })
-        .or(async_graphql_warp::graphql(schema).and_then(
-            |(schema, request): (Schema<_, _, _>, Request)| async move {
-                Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
-            },
-        )),
-    );
+    // GraphQL subscription handler. Creates a Warp WebSocket handler and for each connection,
+    // parses the required headers for GraphQL and builds per-connection context based on the
+    // provided `WatchTx` channel sender. This allows GraphQL resolvers to subscribe to
+    // topology changes.
+    let graphql_subscription_handler =
+        warp::ws()
+            .and(graphql_protocol())
+            .map(move |ws: Ws, protocol: WebSocketProtocols| {
+                let schema = schema::build_schema().finish();
+                let watch_tx = watch_tx.clone();
 
-    // GraphQL playground
+                let reply = ws.on_upgrade(move |socket| {
+                    let mut data = Data::default();
+                    data.insert(watch_tx);
+
+                    GraphQLWebSocket::new(socket, schema, protocol)
+                        .with_data(data)
+                        .serve()
+                });
+
+                warp::reply::with_header(
+                    reply,
+                    "Sec-WebSocket-Protocol",
+                    protocol.sec_websocket_protocol(),
+                )
+            });
+
+    // Handle GraphQL queries. Headers will first be parsed to determine whether the query is
+    // a subscription and if so, an attempt will be made to upgrade the connection to WebSockets.
+    // All other queries will fall back to the default HTTP handler.
+    let graphql_handler =
+        warp::path("graphql")
+            .and(graphql_subscription_handler)
+            .or(
+                async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
+                    |(schema, request): (Schema<_, _, _>, Request)| async move {
+                        Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
+                    },
+                ),
+            );
+
+    // Provide a playground for executing GraphQL queries/mutations/subscriptions.
     let graphql_playground = if playground {
         warp::path("playground")
             .map(move || {
@@ -91,6 +117,8 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
         not_found.boxed()
     };
 
+    // Wire up the health + GraphQL endpoints. Provides a permissive CORS policy to allow for
+    // cross-origin interaction with the Vector API.
     health
         .or(graphql_handler)
         .or(graphql_playground)

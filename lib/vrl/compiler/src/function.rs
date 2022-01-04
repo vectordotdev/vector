@@ -1,13 +1,18 @@
-use crate::expression::{
-    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
-};
-use crate::parser::Node;
-use crate::value::Kind;
-use crate::vm::VmArgumentList;
-use crate::{Context, ExpressionError, Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
+
+use crate::{
+    expression::{
+        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+    },
+    parser::Node,
+    value::Kind,
+    vm::VmArgumentList,
+    Context, ExpressionError, Span, Value,
+};
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 

@@ -1,7 +1,8 @@
 //! Metrics queries/subscriptions.
 
-use crate::BoxedSubscription;
 use graphql_client::GraphQLQuery;
+
+use crate::BoxedSubscription;
 
 /// UptimeSubscription returns uptime metrics to determine how long the Vector
 /// instance has been running.

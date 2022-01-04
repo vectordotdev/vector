@@ -1,3 +1,10 @@
+#[cfg(feature = "datadog-pipelines")]
+use std::collections::BTreeMap;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
+
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "datadog-pipelines")]
@@ -7,11 +14,6 @@ use super::{
     HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
     TransformOuter,
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "datadog-pipelines")]
-use std::collections::BTreeMap;
-use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -152,7 +154,10 @@ impl ConfigBuilder {
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
+        self.add_sink_outer(id, sink);
+    }
 
+    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
@@ -293,14 +298,12 @@ impl ConfigBuilder {
 
     #[cfg(test)]
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
     #[cfg(test)]
     pub fn from_json(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }
 }
 
@@ -313,8 +316,9 @@ mod tests {
     /// fails, it likely means an implementation detail of serialization has changed, which is
     /// likely to impact the final hash.
     fn version_json_order() {
-        use super::{ConfigBuilder, ConfigBuilderHash};
         use serde_json::{json, Value};
+
+        use super::{ConfigBuilder, ConfigBuilderHash};
 
         // Expected key order of serialization. This is important for guaranteeing that a
         // hash is reproducible across versions.

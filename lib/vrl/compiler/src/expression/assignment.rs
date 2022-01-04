@@ -1,14 +1,15 @@
-use crate::expression::{Expr, Literal, Resolved};
-use crate::parser::{
-    ast::{self, Ident},
-    Node,
+use crate::{
+    expression::{Expr, Literal, Resolved},
+    parser::{
+        ast::{self, Ident},
+        Node,
+    },
+    vm::OpCode,
+    Context, Expression, Span, State, TypeDef, Value,
 };
-use crate::vm::OpCode;
-use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
-use std::convert::TryFrom;
-use std::fmt;
+use std::{convert::TryFrom, fmt};
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {

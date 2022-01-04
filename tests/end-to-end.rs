@@ -1,14 +1,14 @@
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode};
-use std::collections::HashMap;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::task::JoinHandle;
-use tokio::time::{timeout, Duration};
-use vector::config::{self, ConfigDiff, Format};
-use vector::test_util::{next_addr, wait_for_tcp};
-use vector::topology;
-use vector::Error;
+
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Request, Response, Server, StatusCode,
+};
+use tokio::{
+    sync::{mpsc, oneshot, Mutex},
+    task::JoinHandle,
+};
+use vector::{test_util, Error};
 
 type Lock = Arc<Mutex<()>>;
 
@@ -46,7 +46,7 @@ pub async fn http_server(
     let server = Server::bind(&address).serve(service);
     tokio::spawn(server);
 
-    wait_for_tcp(address).await;
+    test_util::wait_for_tcp(address).await;
 
     rx
 }
@@ -73,8 +73,14 @@ pub fn http_client(
 
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 async fn http_to_http(status: StatusCode, response: StatusCode) {
-    let address1 = next_addr();
-    let address2 = next_addr();
+    use tokio::time::{timeout, Duration};
+    use vector::{
+        config::{self, ConfigDiff, Format},
+        topology,
+    };
+
+    let address1 = test_util::next_addr();
+    let address2 = test_util::next_addr();
     let config = config::load_from_str(
         &format!(
             r#"
@@ -92,18 +98,18 @@ uri = "http://{address2}/"
             address1 = address1,
             address2 = address2,
         ),
-        Some(Format::Toml),
+        Format::Toml,
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = topology::build_or_log_errors(&config, &diff, std::collections::HashMap::new())
         .await
         .unwrap();
     let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)
         .await
         .unwrap();
 
-    wait_for_tcp(address1).await;
+    test_util::wait_for_tcp(address1).await;
 
     let mutex = Arc::new(Mutex::new(()));
     let pause = mutex.lock().await;

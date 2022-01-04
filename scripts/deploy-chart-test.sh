@@ -15,7 +15,7 @@ set -euo pipefail
 #
 #   Deploy:
 #
-#   $ CHART_REPO=https://helm.testmaterial.tld scripts/deploy-public-chart-test.sh up test-namespace-qwerty chart
+#   $ CHART_REPO=https://helm.testmaterial.tld scripts/deploy-public-chart-test.sh up test-namespace-qwerty chart release
 #
 #   Teardown:
 #
@@ -32,6 +32,9 @@ NAMESPACE="${2:?"Specify the namespace as the second argument"}"
 
 # The helm chart to manage
 HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
+
+# Release name for chart install
+RELEASE_NAME="${4:?"Specify the release name as the fourth argument"}"
 
 # Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
@@ -61,7 +64,7 @@ up() {
   $VECTOR_TEST_HELM repo add "$CUSTOM_HELM_REPO_LOCAL_NAME" "$CHART_REPO" --force-update || true
   $VECTOR_TEST_HELM repo update
 
-  $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE"
+  $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE" --dry-run -o yaml | $VECTOR_TEST_KUBECTL apply -f -
 
   if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
     $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
@@ -80,9 +83,10 @@ up() {
   # overwriting console output.
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
-    --set "global.vector.commonEnvKV.LOG=info"
-    --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
-    --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
+    --set "env[0].name=VECTOR_LOG"
+    --set "env[0].value=info"
+    --set "image.repository=$CONTAINER_IMAGE_REPOSITORY"
+    --set "image.tag=$CONTAINER_IMAGE_TAG"
   )
 
   set -x
@@ -90,9 +94,8 @@ up() {
     --atomic \
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
-    "$HELM_CHART" \
-    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART" \
-    --devel
+    "$RELEASE_NAME" \
+    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART"
   { set +x; } &>/dev/null
 }
 
@@ -105,7 +108,9 @@ down() {
     $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "$HELM_CHART"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
+  if $VECTOR_TEST_KUBECTL get namespace "$NAMESPACE" &>/dev/null; then
+    $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
+  fi
 }
 
 case "$COMMAND" in

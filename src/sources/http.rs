@@ -1,3 +1,12 @@
+use std::{collections::HashMap, net::SocketAddr};
+
+use bytes::{Bytes, BytesMut};
+use chrono::Utc;
+use http::StatusCode;
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Decoder;
+use warp::http::{HeaderMap, HeaderValue};
+
 use crate::{
     codecs::{
         self,
@@ -16,14 +25,6 @@ use crate::{
     },
     tls::TlsConfig,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use http::StatusCode;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
-use tokio_util::codec::Decoder;
-
-use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -226,6 +227,16 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+
+    use flate2::{
+        write::{GzEncoder, ZlibEncoder},
+        Compression,
+    };
+    use futures::Stream;
+    use http::HeaderMap;
+    use pretty_assertions::assert_eq;
+
     use super::SimpleHttpConfig;
     use crate::{
         codecs::{
@@ -237,16 +248,6 @@ mod tests {
         test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use flate2::{
-        write::{GzEncoder, ZlibEncoder},
-        Compression,
-    };
-    use futures::Stream;
-    use http::HeaderMap;
-    use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-    use std::io::Write;
-    use std::net::SocketAddr;
 
     #[test]
     fn generate_config() {

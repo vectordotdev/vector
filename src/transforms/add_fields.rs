@@ -1,17 +1,19 @@
-use crate::serde::Fields;
+use std::convert::TryFrom;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use toml::value::Value as TomlValue;
+
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
     },
+    serde::Fields,
     template::Template,
     transforms::{FunctionTransform, Transform},
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -137,10 +139,10 @@ impl FunctionTransform for AddFields {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::LogEvent;
-    use crate::transforms::test::transform_one;
     use std::iter::FromIterator;
+
+    use super::*;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

@@ -1,4 +1,3 @@
-use crate::{state, Context, Program, Target, Value};
 use compiler::{
     vm::{OpCode, Vm},
     ExpressionError, Function,
@@ -6,6 +5,8 @@ use compiler::{
 use lookup::LookupBuf;
 use shared::TimeZone;
 use std::{error::Error, fmt};
+
+use crate::{state, Context, Program, Target, Value};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 

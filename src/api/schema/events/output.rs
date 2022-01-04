@@ -1,10 +1,10 @@
+use async_graphql::Union;
+
 use super::{
     log::Log,
     notification::{EventNotification, EventNotificationType},
 };
 use crate::api::tap::{TapNotification, TapPayload};
-
-use async_graphql::Union;
 
 #[derive(Union, Debug)]
 /// An event or a notification

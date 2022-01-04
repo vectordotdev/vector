@@ -1,7 +1,9 @@
-use crate::*;
-use quickcheck::{QuickCheck, TestResult};
 use std::{fs, io::Read, path::Path, str::FromStr};
+
+use quickcheck::{QuickCheck, TestResult};
 use tracing::trace;
+
+use crate::*;
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;

@@ -1,10 +1,10 @@
+use std::{convert::TryFrom, str::FromStr};
+
 use http::{uri::InvalidUri, Uri};
 use rusoto_core::{region::ParseRegionError, Region};
+use snafu::{ResultExt, Snafu};
 
 pub use crate::aws::region::RegionOrEndpoint;
-use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
-use std::str::FromStr;
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {
@@ -70,11 +70,13 @@ fn region_name_from_host(host: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::convert::TryInto;
+
     use indoc::indoc;
     use rusoto_core::Region;
     use serde::Deserialize;
-    use std::convert::TryInto;
+
+    use super::*;
 
     #[derive(Deserialize)]
     struct Config {

@@ -1,6 +1,5 @@
-use vrl::prelude::*;
-
 use percent_encoding::{utf8_percent_encode, AsciiSet};
+use vrl::prelude::*;
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &percent_encoding::CONTROLS

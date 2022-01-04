@@ -1,18 +1,21 @@
+use serde::{Deserialize, Serialize};
+
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::logs::config::HecLogsSinkConfig,
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{
-        splunk_hec::common::{
-            acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+        splunk_hec::{
+            common::{
+                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+            },
+            logs::config::HecLogsSinkConfig,
         },
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsOptions,
 };
-use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -126,6 +129,12 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
+    use chrono::{TimeZone, Utc};
+    use indoc::indoc;
+    use serde_json::{json, Value as JsonValue};
+
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
@@ -133,10 +142,6 @@ mod integration_tests {
         sinks::util::Compression,
         test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
-    use chrono::{TimeZone, Utc};
-    use indoc::indoc;
-    use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";

@@ -1,3 +1,21 @@
+use std::{cmp, future::ready, panic, sync::Arc};
+
+use bytes::Bytes;
+use chrono::{DateTime, TimeZone, Utc};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use lazy_static::lazy_static;
+use rusoto_core::{Region, RusotoError};
+use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
+use rusoto_sqs::{
+    DeleteMessageBatchError, DeleteMessageBatchRequest, DeleteMessageBatchRequestEntry,
+    DeleteMessageBatchResult, Message, ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
+};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use snafu::{ResultExt, Snafu};
+use tokio::{pin, select};
+use tokio_util::codec::FramedRead;
+use tracing::Instrument;
+
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
@@ -11,22 +29,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
-use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError};
-use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
-use rusoto_sqs::{
-    DeleteMessageBatchError, DeleteMessageBatchRequest, DeleteMessageBatchRequestEntry,
-    DeleteMessageBatchResult, Message, ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
-};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use snafu::{ResultExt, Snafu};
-use std::{cmp, future::ready, panic, sync::Arc};
-use tokio::{pin, select};
-use tokio_util::codec::FramedRead;
-use tracing::Instrument;
 
 lazy_static! {
     static ref SUPPORTED_S3S_EVENT_VERSION: semver::VersionReq =
@@ -427,7 +429,7 @@ impl IngestorProcess {
                 // the case that the same vector instance processes the same message.
                 let mut read_error = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, CharacterDelimitedDecoder::new('\n'))
+                    FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);

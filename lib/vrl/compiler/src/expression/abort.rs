@@ -1,6 +1,9 @@
-use crate::expression::{ExpressionError, Resolved};
-use crate::{Context, Expression, Span, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{ExpressionError, Resolved},
+    Context, Expression, Span, State, TypeDef,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Abort {

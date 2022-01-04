@@ -1,25 +1,29 @@
-use super::errors::{ParseRecords, RequestError};
-use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use super::Compression;
-use crate::codecs;
-use crate::sources::util::StreamDecodingError;
-use crate::{
-    config::log_schema,
-    event::{BatchStatus, Event},
-    internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
-    },
-    Pipeline,
-};
+use std::{io::Read, sync::Arc};
+
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
-use std::{io::Read, sync::Arc};
 use tokio_util::codec::FramedRead;
 use vector_core::event::BatchNotifier;
 use warp::reject;
+
+use super::{
+    errors::{ParseRecords, RequestError},
+    models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
+    Compression,
+};
+use crate::{
+    codecs,
+    config::log_schema,
+    event::{BatchStatus, Event},
+    internal_events::{
+        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
+    },
+    sources::util::StreamDecodingError,
+    Pipeline,
+};
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
 pub async fn firehose(

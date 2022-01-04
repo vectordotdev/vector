@@ -1,8 +1,11 @@
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
+use std::{io, usize};
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use memchr::memchr;
 use serde::{Deserialize, Serialize};
-use std::{cmp, io, usize};
 use tokio_util::codec::{Decoder, Encoder};
+
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -14,7 +17,7 @@ pub struct CharacterDelimitedDecoderConfig {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
-    delimiter: char,
+    delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
@@ -42,31 +45,24 @@ impl FramingConfig for CharacterDelimitedDecoderConfig {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: char,
+    delimiter: u8,
     /// The maximum length of the byte buffer.
     max_length: usize,
-    /// Whether the `max_length` has been exceeded, resulting in discarding all
-    /// subsequent bytes.
-    is_discarding: bool,
-    /// The index from where to continue reading the buffer.
-    next_index: usize,
 }
 
 impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
-    pub const fn new(delimiter: char) -> Self {
+    pub const fn new(delimiter: u8) -> Self {
         CharacterDelimitedDecoder {
             delimiter,
             max_length: usize::MAX,
-            is_discarding: false,
-            next_index: 0,
         }
     }
 
     /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
+    pub const fn new_with_max_length(delimiter: u8, max_length: usize) -> Self {
         CharacterDelimitedDecoder {
             max_length,
             ..CharacterDelimitedDecoder::new(delimiter)
@@ -85,81 +81,59 @@ impl Decoder for CharacterDelimitedDecoder {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         loop {
-            // Determine how far into the buffer we'll search for a newline. If
-            // there's no max_length set, we'll read to the end of the buffer.
-            let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
-
-            let newline_pos = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| *b as char == self.delimiter);
-
-            match (self.is_discarding, newline_pos) {
-                (true, Some(offset)) => {
-                    // If we found a newline, discard up to that offset and
-                    // then stop discarding. On the next iteration, we'll try
-                    // to read a line normally.
-                    buf.advance(offset + self.next_index + 1);
-                    self.is_discarding = false;
-                    self.next_index = 0;
-                }
-                (true, None) => {
-                    // Otherwise, we didn't find a newline, so we'll discard
-                    // everything we read. On the next iteration, we'll continue
-                    // discarding up to max_len bytes unless we find a newline.
-                    buf.advance(read_to);
-                    self.next_index = 0;
-                    if buf.is_empty() {
-                        return Ok(None);
+            // This function has the following goal: we are searching for
+            // sub-buffers delimited by `self.delimiter` with size no more than
+            // `self.max_length`. If a sub-buffer is found that exceeds
+            // `self.max_length` we discard it, else we return it. At the end of
+            // the buffer if the delimiter is not present the remainder of the
+            // buffer is discarded.
+            match memchr(self.delimiter, buf) {
+                None => return Ok(None),
+                Some(next_delimiter_idx) => {
+                    if next_delimiter_idx > self.max_length {
+                        // The discovered sub-buffer is too big, so we discard
+                        // it, taking care to also discard the delimiter.
+                        warn!(
+                            message = "Discarding frame larger than max_length.",
+                            buf_len = buf.len(),
+                            max_length = self.max_length,
+                            internal_log_rate_secs = 30
+                        );
+                        buf.advance(next_delimiter_idx + 1);
+                    } else {
+                        let frame = buf.split_to(next_delimiter_idx).freeze();
+                        trace!(
+                            message = "Decoding the frame.",
+                            bytes_proccesed = frame.len()
+                        );
+                        buf.advance(1); // scoot past the delimiter
+                        return Ok(Some(frame));
                     }
-                }
-                (false, Some(pos)) => {
-                    // We found a correct frame
-
-                    let newpos_index = pos + self.next_index;
-                    self.next_index = 0;
-                    let mut frame = buf.split_to(newpos_index + 1);
-
-                    trace!(
-                        message = "Decoding the frame.",
-                        bytes_proccesed = frame.len()
-                    );
-
-                    let frame = frame.split_to(frame.len() - 1);
-
-                    return Ok(Some(frame.freeze()));
-                }
-                (false, None) if buf.len() > self.max_length => {
-                    // We reached the max length without finding the
-                    // delimiter so must discard the rest until we
-                    // reach the next delimiter
-                    self.is_discarding = true;
-                    warn!(
-                        message = "Discarding frame larger than max_length.",
-                        buf_len = buf.len(),
-                        max_length = self.max_length,
-                        internal_log_rate_secs = 30
-                    );
-                    return Ok(None);
-                }
-                (false, None) => {
-                    // We didn't find the delimiter and didn't
-                    // reach the max frame length.
-                    self.next_index = read_to;
-                    return Ok(None);
                 }
             }
         }
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
-        let frame = self.decode(buf)?.or_else(|| {
-            (!buf.is_empty() && !self.is_discarding).then(|| {
-                self.next_index = 0;
-                buf.split_to(buf.len()).into()
-            })
-        });
-
-        Ok(frame)
+        match self.decode(buf)? {
+            Some(frame) => Ok(Some(frame)),
+            None => {
+                if buf.is_empty() {
+                    Ok(None)
+                } else if buf.len() > self.max_length {
+                    warn!(
+                        message = "Discarding frame larger than max_length.",
+                        buf_len = buf.len(),
+                        max_length = self.max_length,
+                        internal_log_rate_secs = 30
+                    );
+                    Ok(None)
+                } else {
+                    let bytes: Bytes = buf.split_to(buf.len()).freeze();
+                    Ok(Some(bytes))
+                }
+            }
+        }
     }
 }
 
@@ -180,13 +154,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use indoc::indoc;
     use std::collections::HashMap;
+
+    use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn character_delimited_decode() {
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
         buf.put_slice(b"abc\n");
         assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
@@ -194,7 +170,7 @@ mod tests {
 
     #[test]
     fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
 
         let mut buf = BytesMut::new();
         codec.encode(b"abc", &mut buf).unwrap();
@@ -206,17 +182,23 @@ mod tests {
     fn decode_max_length() {
         const MAX_LENGTH: usize = 6;
 
-        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
-        buf.reserve(200);
-        // limit is 6 so this should fail
+        // limit is 6 so it will skip longer lines
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
-        assert!(codec.decode(buf).unwrap().is_none());
-        assert!(codec.decode(buf).unwrap().is_some());
-        assert!(codec.decode_eof(buf).unwrap().is_none());
-        assert!(codec.decode_eof(buf).unwrap().is_some());
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode(buf).unwrap(), None);
+
+        let buf = &mut BytesMut::new();
+
+        // limit is 6 so it will skip longer lines
+        buf.put_slice(b"1234567\n123456\n123412314\n123");
+
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
     }
 
     // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
@@ -225,7 +207,7 @@ mod tests {
     fn decoder_discard_repeat() {
         const MAX_LENGTH: usize = 1;
 
-        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
         buf.reserve(200);
@@ -244,7 +226,7 @@ mod tests {
         let mut bytes = serde_json::to_vec(&input).unwrap();
         bytes.push(b'\n');
 
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
 
         buf.reserve(bytes.len());
@@ -312,7 +294,7 @@ mod tests {
             {"log":"2019-01-18 07:53:06.419 [               ]  INFO 1 --- [vent-bus.prod-1] c.t.listener.CommonListener              : warehousing Dailywarehousing.daily\n","stream":"stdout","time":"2019-01-18T07:53:06.420527437Z"}
         "#};
 
-        let mut codec = CharacterDelimitedDecoder::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
 
         buf.extend(events.to_string().as_bytes());

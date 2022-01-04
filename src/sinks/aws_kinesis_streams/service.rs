@@ -1,18 +1,17 @@
-use crate::internal_events::AwsBytesSent;
-use futures::future::BoxFuture;
-use futures::TryFutureExt;
+use std::task::{Context, Poll};
+
+use futures::{future::BoxFuture, TryFutureExt};
 use rusoto_core::{Region, RusotoError};
 use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput};
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
-use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
-
-use crate::event::EventStatus;
-use crate::internal_events::AwsKinesisStreamsEventSent;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use crate::{
+    event::EventStatus,
+    internal_events::{AwsBytesSent, AwsKinesisStreamsEventSent},
+    sinks::aws_kinesis_streams::request_builder::KinesisRequest,
+};
 
 #[derive(Clone)]
 pub struct KinesisService {

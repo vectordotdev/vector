@@ -1,6 +1,9 @@
-use crate::expression::{Array, Block, Group, Object, Resolved, Value};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{Array, Block, Group, Object, Resolved, Value},
+    Context, Expression, State, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Container {

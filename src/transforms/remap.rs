@@ -7,17 +7,16 @@ use crate::{
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
     Result,
 };
-
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::File;
-use std::io::{self, Read};
-use std::path::PathBuf;
-use std::sync::Arc;
-use vrl::diagnostic::Formatter;
-use vrl::prelude::ExpressionError;
-use vrl::{Program, Runtime, Terminate, Vm};
+use std::{
+    fs::File,
+    io::{self, Read},
+    path::PathBuf,
+    sync::Arc,
+};
+use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate, Vm};
 
 const DROPPED: &str = "dropped";
 
@@ -255,14 +254,16 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use indoc::{formatdoc, indoc};
+    use shared::btreemap;
+
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue},
         LogEvent, Metric, Value,
     };
-    use indoc::{formatdoc, indoc};
-    use shared::btreemap;
-    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn generate_config() {

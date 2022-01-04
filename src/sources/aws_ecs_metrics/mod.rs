@@ -1,3 +1,11 @@
+use std::{env, time::Instant};
+
+use futures::{stream, SinkExt, StreamExt};
+use hyper::{Body, Client, Request};
+use serde::{Deserialize, Serialize};
+use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
+
 use crate::{
     config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     event::Event,
@@ -8,12 +16,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{stream, SinkExt, StreamExt};
-use hyper::{Body, Client, Request};
-use serde::{Deserialize, Serialize};
-use std::{env, time::Instant};
-use tokio::time;
-use tokio_stream::wrappers::IntervalStream;
 
 mod parser;
 
@@ -185,17 +187,18 @@ async fn aws_ecs_metrics(
 
 #[cfg(test)]
 mod test {
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        Body, Response, Server,
+    };
+    use tokio::time::{sleep, Duration};
+
     use super::*;
     use crate::{
         event::MetricValue,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
-    use hyper::{
-        service::{make_service_fn, service_fn},
-        {Body, Response, Server},
-    };
-    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
@@ -554,9 +557,10 @@ mod test {
 #[cfg(feature = "aws-ecs-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use tokio::time::{sleep, Duration};
+
     use super::*;
     use crate::test_util::collect_ready;
-    use tokio::time::{sleep, Duration};
 
     async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();

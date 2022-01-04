@@ -1,27 +1,32 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::http::{Auth, HttpClient};
-use crate::sinks::util::http::{HttpBatchService, RequestConfig};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    task::{Context, Poll},
+};
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Response, Uri};
-use hyper::service::Service;
-use hyper::{Body, Request};
-use std::task::{Context, Poll};
+use http::{header::HeaderName, Response, Uri};
+use hyper::{header::HeaderValue, service::Service, Body, Request};
+use rusoto_core::{
+    credential::{AwsCredentials, ProvideAwsCredentials},
+    signature::{SignedRequest, SignedRequestPayload},
+    Region,
+};
 use tower::ServiceExt;
-use vector_core::buffers::Ackable;
+use vector_core::{
+    buffers::Ackable, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+};
 
-use crate::aws::rusoto::AwsCredentialsProvider;
-use crate::sinks::util::{Compression, ElementCount};
-use http::header::HeaderName;
-use hyper::header::HeaderValue;
-use rusoto_core::credential::{AwsCredentials, ProvideAwsCredentials};
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::Region;
-use std::collections::HashMap;
-use std::sync::Arc;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
-use vector_core::ByteSizeOf;
+use crate::{
+    aws::rusoto::AwsCredentialsProvider,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    http::{Auth, HttpClient},
+    sinks::util::{
+        http::{HttpBatchService, RequestConfig},
+        Compression, ElementCount,
+    },
+};
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
