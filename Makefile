@@ -308,7 +308,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -373,14 +373,7 @@ endif
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh datadog-agent stop
-	@scripts/setup_integration_env.sh datadog-agent start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-agent-integration-tests --lib sources::datadog::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh datadog-agent stop
-endif
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-datadog-metrics
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
@@ -478,10 +471,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh loki stop
 endif
 
-.PHONY: test-integration-logstash
-test-integration-logstash: ## Runs Logstash integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features logstash-integration-tests --lib ::logstash:: -- --nocapture
-
 .PHONY: test-integration-mongodb_metrics
 test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -504,17 +493,6 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
-endif
-
-.PHONY: test-integration-nginx
-test-integration-nginx: ## Runs nginx integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
-	@scripts/setup_integration_env.sh nginx start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
 endif
 
 .PHONY: test-integration-postgresql_metrics
@@ -556,14 +534,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
-.PHONY: test-integration-redis
-test-integration-redis: ## Runs Redis integration tests
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml run --rm runner
-
-.PHONY: test-integration-redis-cleanup
-test-integration-redis-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.redis.yml rm -fsv
-
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -585,6 +555,15 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh dnstap stop
 endif
+
+test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+ifeq ($(AUTODESPAWN), true)
+	make test-integration-$*-cleanup
+endif
+
+test-integration-%-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm -fsv
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
@@ -665,8 +644,6 @@ check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
-check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
-check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -703,22 +680,6 @@ check-examples: ## Check that the config/examples files are valid
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
-
-.PHONY: check-helm-lint
-check-helm-lint: ## Check that Helm charts pass helm lint
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
-
-.PHONY: check-helm-dependencies
-check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
-
-.PHONY: check-helm-snapshots
-check-helm-snapshots: ## Check that the Helm template snapshots do not diverge from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh check
-
-.PHONY: check-kubernetes-yaml
-check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
@@ -856,10 +817,6 @@ release-rollback: ## Rollback pending release changes
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
-.PHONY: release-helm
-release-helm: ## Package and release Helm Chart
-	@scripts/release-helm.sh
-
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
@@ -917,18 +874,6 @@ version: ## Get the current Vector version
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
-
-.PHONY: update-helm-dependencies
-update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
-
-.PHONY: update-helm-snapshots
-update-helm-snapshots: ## Update the Helm template snapshots from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh update
-
-.PHONY: update-kubernetes-yaml
-update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)

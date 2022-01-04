@@ -141,7 +141,7 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-fn expand_globs(config: &mut ConfigBuilder) {
+pub fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .keys()

@@ -608,22 +608,6 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
-  release-helm:
-    runs-on: ubuntu-18.04
-    needs:
-      # This is not strictly required, but ensures that Helm Chart doesn't
-      # appear before the image it refers to.
-      - release-docker
-    steps:
-      - uses: actions/checkout@v2.4.0
-      - name: Install Helm
-        run: scripts/environment/setup-helm.sh
-      - name: Release Helm Chart
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-        run: make release-helm
-
   nightly-failure:
     name: nightly-failure
     if: failure() && github.ref == 'refs/heads/master'
@@ -640,7 +624,6 @@ jobs:
       - release-docker
       - release-s3
       - release-cloudsmith
-      - release-helm
       - deb-verify
       - rpm-verify
       - osx-verify

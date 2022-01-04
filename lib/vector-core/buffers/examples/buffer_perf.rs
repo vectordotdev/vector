@@ -122,40 +122,40 @@ impl Configuration {
         let matches = App::new("buffer-perf")
             .about("Runner for performance testing of buffers")
             .arg(
-                Arg::with_name("buffer_type")
+                Arg::new("buffer_type")
                     .help("Sets the buffer type to use")
-                    .short("t")
+                    .short('t')
                     .long("buffer-type")
                     .possible_values(&["disk-v1", "disk-v2", "in-memory-v1", "in-memory-v2"])
                     .default_value("disk-v2"),
             )
             .arg(
-                Arg::with_name("read_total_records")
+                Arg::new("read_total_records")
                     .help("Sets the total number of records that should be read")
                     .long("read-total-records")
                     .default_value("10000000"),
             )
             .arg(
-                Arg::with_name("write_total_records")
+                Arg::new("write_total_records")
                     .help("Sets the total number of records that should be write")
                     .long("write-total-records")
                     .default_value("10000000"),
             )
             .arg(
-                Arg::with_name("write_batch_size")
+                Arg::new("write_batch_size")
                     .help("Sets the batch size for writing")
-                    .short("b")
+                    .short('b')
                     .long("write-batch-size")
                     .default_value("100"),
             )
             .arg(
-                Arg::with_name("min_record_size")
+                Arg::new("min_record_size")
                     .help("Sets the lower bound of the size of the pre-generated records")
                     .long("min-record-size")
                     .default_value("512"),
             )
             .arg(
-                Arg::with_name("max_record_size")
+                Arg::new("max_record_size")
                     .help("Sets the upper bound of the size of the pre-generated records")
                     .long("max-record-size")
                     .default_value("4096"),
