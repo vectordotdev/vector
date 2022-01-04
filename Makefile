@@ -659,8 +659,6 @@ check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
-check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
-check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -697,22 +695,6 @@ check-examples: ## Check that the config/examples files are valid
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
-
-.PHONY: check-helm-lint
-check-helm-lint: ## Check that Helm charts pass helm lint
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
-
-.PHONY: check-helm-dependencies
-check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
-
-.PHONY: check-helm-snapshots
-check-helm-snapshots: ## Check that the Helm template snapshots do not diverge from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh check
-
-.PHONY: check-kubernetes-yaml
-check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
@@ -850,10 +832,6 @@ release-rollback: ## Rollback pending release changes
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
-.PHONY: release-helm
-release-helm: ## Package and release Helm Chart
-	@scripts/release-helm.sh
-
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
@@ -911,18 +889,6 @@ version: ## Get the current Vector version
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
-
-.PHONY: update-helm-dependencies
-update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
-
-.PHONY: update-helm-snapshots
-update-helm-snapshots: ## Update the Helm template snapshots from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh update
-
-.PHONY: update-kubernetes-yaml
-update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
