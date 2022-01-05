@@ -62,6 +62,23 @@ Relying on an external library will reduce the amount of code and complexity tha
 currently exists within Vector and allow us to focus less on making to tools correct
 and more on ensuring we're using them properly.
 
+### Existing crate vs our implementation
+
+Leveraging `kube` was considered at the start of the Kubernetes integration project,
+but eventually we wrote our own implementation on top of the `k8s-openapi` crate.
+
+Over the past year and a half, `kube` has matured greatly and today it is being
+[donated](https://github.com/kube-rs/kube-rs/issues/584) to the [CNCF](https://www.cncf.io/).
+This appears to be the [state of `kube` roughly at the time](https://github.com/kube-rs/kube-rs/tree/c38d82162d2626bcfcf2ef8cf0c9d93e0734af49)
+of writing our own implementation. While our existing implementation is quite
+generic and modular, the needs of the component today are quite limited.
+Realistically we just need the following:
+
+- Client: authentication and configuration to call the Kubernetes API
+  - `kube-client`
+- Reflector: error handling and a persistent cache for an event stream
+  - `kube-runtime::reflector`
+
 ## Drawbacks
 
 Converting the underlying libraries to `kube` (where possible) doesn't guarantee
@@ -99,6 +116,7 @@ term the source can be decoupled and introduced as a standalone enrichment compo
 
 ## Outstanding Questions
 
+- Do we want to re-evaluate the usage of `evmap` in this component?
 - ~~Do we want to make this change with a version change of the source, opting in
 to the change with a `version` option in the configuration?~~ No, the risk seems low
 enough to not warrant a version split between the old and new code.
@@ -106,6 +124,9 @@ enough to not warrant a version split between the old and new code.
 ## Plan Of Attack
 
 - Replace contents of `src/kubernetes` with equivalents from `kube`
+  1. `src/kubernetes/client` replaced with `kube-client`
+  1. `src/kubernetes/reflector` and dependencies replaced with `kube-runtime::reflector`
+  1. `src/kubernetes/state` updates to minimize in-house code
 - Ensure unit tests and integration tests show matching behavior before and after rewrite
 
 ## Future Improvements
