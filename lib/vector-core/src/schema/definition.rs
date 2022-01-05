@@ -2,15 +2,29 @@ use std::collections::{HashMap, HashSet};
 
 use super::field;
 use lookup::LookupBuf;
-use value::{kind, Kind};
+use value::{
+    kind::{self, Collection},
+    Kind,
+};
 
 /// The schema representation of the "output" produced by a component.
 #[derive(Clone, Debug)]
 pub struct Definition {
-    kind: value::Kind,
+    /// The structure of the event.
+    ///
+    /// An event is _always_ a collection with fields (e.g. an "object" or "map").
+    structure: kind::Collection<kind::Field>,
+
+    /// Special purposes assigned to field within the structure.
+    ///
+    /// The value within this map points to a path inside the `structure`. It is an invalid state
+    /// for there to be a purpose pointing to a non-existing path in the structure.
     purpose: HashMap<field::Purpose, LookupBuf>,
 
     /// A list of paths that are allowed to be missing.
+    ///
+    /// The key in this set points to a path inside the `structure`. It is an invalid state for
+    /// there to be a key pointing to a non-existing path in the structure.
     optional: HashSet<LookupBuf>,
 }
 
@@ -20,29 +34,44 @@ impl Definition {
     /// This means no type information is known about the event.
     pub fn empty() -> Self {
         Self {
-            kind: Kind::object(kind::Collection::any()),
+            structure: kind::Collection::any(),
             purpose: HashMap::default(),
             optional: HashSet::default(),
         }
     }
 
-    /// Given kinds and purposes, create a new output schema.
+    /// Given structure, purposes, and optionals, create a new schema definition.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// This function panics if the provided `kind` is not of an `object` type.
+    /// Returns an error if any of the paths in `purpose` point to a non-existing path in
+    /// `structure`.
+    ///
+    // TODO(Jean): Return proper error.
     pub fn from_parts(
-        kind: value::Kind,
+        structure: kind::Collection<kind::Field>,
         purpose: HashMap<field::Purpose, LookupBuf>,
         optional: HashSet<LookupBuf>,
-    ) -> Self {
-        assert!(kind.is_object());
+    ) -> Result<Self, ()> {
+        let kind: Kind = structure.clone().into();
 
-        Self {
-            kind,
+        for (_, path) in &purpose {
+            if !kind.has_path(path.clone()) {
+                return Err(());
+            }
+        }
+
+        for path in &optional {
+            if !kind.has_path(path.clone()) {
+                return Err(());
+            }
+        }
+
+        Ok(Self {
+            structure,
             purpose,
             optional,
-        }
+        })
     }
 
     /// Add type information for an event field.
@@ -50,6 +79,8 @@ impl Definition {
     /// # Panics
     ///
     /// This function panics if the provided path is a root path (e.g. `.`).
+    ///
+    /// It also panics if the path points to a root-level array (e.g. `.[0]`).
     pub fn define_field(
         &mut self,
         path: impl Into<LookupBuf>,
@@ -57,10 +88,19 @@ impl Definition {
         purpose: Option<field::Purpose>,
     ) {
         let path = path.into();
-        assert!(!path.is_root());
 
-        let kind = kind.nest_at_path(&path.to_lookup());
-        self.kind.merge(kind);
+        match path.get(0) {
+            None => panic!("must not be a root path"),
+            Some(segment) if segment.is_index() => panic!("must not start with an index"),
+            _ => {}
+        };
+
+        let collection = kind
+            .nest_at_path(&path.to_lookup())
+            .into_object()
+            .expect("always object");
+
+        self.structure.merge(collection, true);
 
         if let Some(purpose) = purpose {
             self.purpose.insert(purpose, path);
@@ -85,19 +125,29 @@ impl Definition {
 
     /// Set the kind for all undefined fields.
     pub fn define_other_fields(&mut self, kind: Kind) {
-        self.kind
-            .as_object_mut()
-            .expect("must always be an object")
-            .set_other(kind);
+        self.structure.set_other(kind);
     }
 
     /// Get the type definition of the schema.
-    pub fn kind(&self) -> &value::Kind {
-        &self.kind
+    pub fn to_kind(&self) -> value::Kind {
+        self.structure.clone().into()
+    }
+
+    /// Get the collection .... TODO
+    pub fn collection(&self) -> &Collection<kind::Field> {
+        &self.structure
+    }
+
+    /// Get the [`Kind`] linked to a given purpose.
+    pub fn kind_by_purpose(&self, purpose: &field::Purpose) -> Option<Kind> {
+        self.purpose.get(purpose).cloned().and_then(|path| {
+            let kind = Kind::object(self.structure.known().clone());
+            kind.find_at_path(path)
+        })
     }
 
     /// Get a list of field purposes and their path.
-    pub fn purpose(&self) -> &HashMap<field::Purpose, LookupBuf> {
+    pub fn purposes(&self) -> &HashMap<field::Purpose, LookupBuf> {
         &self.purpose
     }
 
@@ -111,17 +161,17 @@ impl Definition {
 
     /// Merge `other` schema into `self`.
     ///
-    /// If both schemas contain the same purpose key, then `other` key is used. In the future, we
-    /// might update this to return an error, and prevent Vector from booting.
+    /// If both schemas contain the same purpose key, then `other` key is used.
     pub fn merge(&mut self, other: Self) {
         // Optional Fields
         //
         // The merge strategy for optional fields is as follows:
         //
-        // 1. For any optional field in `Self`, keep it only if the field is also optional in
-        //    `other` _or_ if the field is unspecified in `other`.
-        // 2. Do the same, but the inverse for `other`, comparing against `self.
-        // 3. Add the resulting fields from the above two steps as the new optional fields.
+        // If the field is marked as optional in both definitions, _or_ if it's optional in one,
+        // and unspecified in the other, then the field remains optional.
+        //
+        // If it's marked as "required" in either of the two definitions, then it becomes
+        // a required field in the merged definition.
         //
         // Note that it is allowed to have required field nested under optional paths. For example,
         // `.foo` might be set as optional, but `.foo.bar` as required. In this case, it means that
@@ -129,19 +179,21 @@ impl Definition {
         // to have a `bar` field.
         let mut optional = HashSet::default();
         for path in &self.optional {
-            if other.is_optional_field(path) || !other.kind.has_path(path.clone()) {
+            if other.is_optional_field(path) || !other.to_kind().has_path(path.clone()) {
                 optional.insert(path.clone());
             }
         }
         for path in other.optional {
-            if self.is_optional_field(&path) || !self.kind.has_path(path.clone()) {
+            if self.is_optional_field(&path) || !self.to_kind().has_path(path.clone()) {
                 optional.insert(path);
             }
         }
         self.optional = optional;
 
-        // Kind
-        self.kind.merge(other.kind);
+        // Known fields
+        //
+        //
+        self.structure.merge(other.structure, false);
 
         // Purpose
         self.purpose.extend(other.purpose);
