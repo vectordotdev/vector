@@ -43,6 +43,14 @@ impl<'a> VmState<'a> {
         self.stack.pop().ok_or_else(|| "stack underflow".into())
     }
 
+    pub fn peek_stack(&self) -> Result<&Value, ExpressionError> {
+        if self.stack.is_empty() {
+            return Err("peeking empty stack".into());
+        }
+
+        Ok(&self.stack[self.stack.len() - 1])
+    }
+
     pub fn parameter_stack(&self) -> &Vec<Option<VmArgument<'a>>> {
         &self.parameter_stack
     }

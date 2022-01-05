@@ -2,6 +2,7 @@ use std::{fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
+    vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -53,6 +54,17 @@ impl Expression for Array {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         TypeDef::new().array(type_defs).with_fallibility(fallible)
+    }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        for value in &self.inner {
+            value.dump(vm)?;
+        }
+
+        vm.write_chunk(OpCode::CreateArray);
+        vm.write_primitive(self.inner.len());
+
+        Ok(())
     }
 }
 

@@ -35,6 +35,7 @@ pub enum OpCode {
     SetPath,
     GetPath,
     Call,
+    CreateArray,
     CreateObject,
     EmptyParameter,
     MoveParameter,
@@ -198,17 +199,17 @@ impl Vm {
                 }
                 OpCode::SetLocal => {
                     let slot = state.next_primitive();
-                    state.stack[slot] = state.stack[state.stack.len() - 1].clone();
+                    state.stack[slot] = state.peek_stack()?.clone();
                 }
                 OpCode::JumpIfFalse => {
                     let jump = state.next_primitive();
-                    if !is_truthy(&state.stack[state.stack.len() - 1]) {
+                    if !is_truthy(state.peek_stack()?) {
                         state.ip += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
                     let jump = state.next_primitive();
-                    if is_truthy(&state.stack[state.stack.len() - 1]) {
+                    if is_truthy(state.peek_stack()?) {
                         state.ip += jump;
                     }
                 }
@@ -377,6 +378,16 @@ impl Vm {
                         },
                     }
                 }
+                OpCode::CreateArray => {
+                    let count = state.next_primitive();
+                    let mut arr = Vec::new();
+
+                    for _ in 0..count {
+                        arr.push(state.pop_stack()?);
+                    }
+
+                    state.stack.push(Value::Array(arr));
+                }
                 OpCode::CreateObject => {
                     let count = state.next_primitive();
                     let mut object = BTreeMap::new();
@@ -389,7 +400,7 @@ impl Vm {
                         object.insert(key, value);
                     }
 
-                    state.stack.push(Value::Object(object))
+                    state.stack.push(Value::Object(object));
                 }
                 OpCode::EmptyParameter => state.parameter_stack.push(None),
                 OpCode::MoveParameter => state
