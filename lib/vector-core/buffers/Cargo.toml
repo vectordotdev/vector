@@ -30,7 +30,7 @@ tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
-clap = "3.0.1"
+clap = "3.0.4"
 criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
