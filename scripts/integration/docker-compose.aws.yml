@@ -58,7 +58,6 @@ services:
       - S3_ADDRESS=http://mock-localstack:4566
       - SQS_ADDRESS=http://mock-localstack:4566
       - WATCHLOGS_ADDRESS=http://mock-watchlogs:6000
-      - REDIS_URL=redis://redis:6379/0
     networks:
       - backend
     volumes:
