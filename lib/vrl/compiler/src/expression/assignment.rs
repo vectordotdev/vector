@@ -422,24 +422,18 @@ where
             }
             Variant::Infallible {
                 ok,
-                err: _,
+                err,
                 expr,
                 default: _,
             } => {
                 // This isn't handling the error case yet.
                 expr.dump(vm)?;
-                vm.write_chunk(OpCode::SetPath);
+                vm.write_chunk(OpCode::SetPathInfallible);
 
-                let variable = match ok {
-                    Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
-                    Target::External(None) => crate::vm::Variable::External(LookupBuf::root()),
-                    Target::Noop => todo!(),
-                    Target::Internal(ident, path) => {
-                        crate::vm::Variable::Internal(ident.clone(), path.clone())
-                    }
-                };
+                let target = vm.get_target(&ok.into());
+                vm.write_primitive(target);
 
-                let target = vm.get_target(&variable);
+                let target = vm.get_target(&err.into());
                 vm.write_primitive(target);
             }
         }

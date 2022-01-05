@@ -31,6 +31,7 @@ pub enum OpCode {
     JumpIfNotErr,
     Jump,
     Loop,
+    SetPathInfallible,
     SetPath,
     GetPath,
     Call,
@@ -250,6 +251,65 @@ impl Vm {
                             }
                         }
                         Variable::External(path) => ctx.target_mut().insert(path, value)?,
+                    }
+                }
+                OpCode::SetPathInfallible => {
+                    let variable = state.next_primitive();
+                    let variable = &self.targets[variable];
+
+                    let error = state.next_primitive();
+                    let error = &self.targets[error];
+
+                    match state.error.take() {
+                        Some(err) => {
+                            let err = Value::from(err.to_string());
+                            match error {
+                                Variable::Internal(ident, path) => {
+                                    let path = match path {
+                                        Some(path) => path,
+                                        None => {
+                                            ctx.state_mut().insert_variable(ident.clone(), err);
+                                            continue;
+                                        }
+                                    };
+
+                                    // Update existing variable using the provided path, or create a
+                                    // new value in the store.
+                                    match ctx.state_mut().variable_mut(ident) {
+                                        Some(stored) => stored.insert_by_path(path, err),
+                                        None => ctx
+                                            .state_mut()
+                                            .insert_variable(ident.clone(), err.at_path(path)),
+                                    }
+                                }
+                                Variable::External(path) => ctx.target_mut().insert(path, err)?,
+                            }
+                        }
+                        None => {
+                            let value = state.pop_stack()?;
+
+                            match variable {
+                                Variable::Internal(ident, path) => {
+                                    let path = match path {
+                                        Some(path) => path,
+                                        None => {
+                                            ctx.state_mut().insert_variable(ident.clone(), value);
+                                            continue;
+                                        }
+                                    };
+
+                                    // Update existing variable using the provided path, or create a
+                                    // new value in the store.
+                                    match ctx.state_mut().variable_mut(ident) {
+                                        Some(stored) => stored.insert_by_path(path, value),
+                                        None => ctx
+                                            .state_mut()
+                                            .insert_variable(ident.clone(), value.at_path(path)),
+                                    }
+                                }
+                                Variable::External(path) => ctx.target_mut().insert(path, value)?,
+                            }
+                        }
                     }
                 }
                 OpCode::GetPath => {
