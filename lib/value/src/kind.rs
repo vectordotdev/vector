@@ -45,6 +45,14 @@ impl Kind {
         self.object.as_mut()
     }
 
+    /// Take an object `Collection` type out of the `Kind`.
+    ///
+    /// This returns `None` if the type is not known to be an object.
+    #[must_use]
+    pub fn into_object(self) -> Option<Collection<collection::Field>> {
+        self.object
+    }
+
     /// Get the inner array collection.
     ///
     /// This returns `None` if the type is not known to be an array.
@@ -61,26 +69,97 @@ impl Kind {
         self.array.as_mut()
     }
 
+    /// Take an array `Collection` type out of the `Kind`.
+    ///
+    /// This returns `None` if the type is not known to be an array.
+    #[must_use]
+    pub fn into_array(self) -> Option<Collection<collection::Index>> {
+        self.array
+    }
+
+    /// Returns `Kind`, with non-primitive states removed.
+    ///
+    /// That is, it returns `self,` but removes the `object` and `array` states.
+    ///
+    /// Returns `None` if no primitive states are set.
+    #[must_use]
+    pub fn to_primitive(mut self) -> Option<Self> {
+        self.remove_array().ok()?;
+        self.remove_object().ok()?;
+
+        Some(self)
+    }
+
     /// Check if other is contained within self.
     ///
-    /// FIXME(Jean): doesn't yet work for nested collection kinds.
+    /// If `Kind` is a non-collection type, it needs to match exactly, but if it has a collection
+    /// type, then the known fields in `self` need to be present in `other`, but not the other way
+    /// around.
     #[must_use]
     pub fn contains(&self, other: &Self) -> bool {
-        (self.is_bytes() && other.is_bytes())
-            || (self.is_integer() && other.is_integer())
-            || (self.is_float() && other.is_float())
-            || (self.is_boolean() && other.is_boolean())
-            || (self.is_timestamp() && other.is_timestamp())
-            || (self.is_regex() && other.is_regex())
-            || (self.is_null() && other.is_null())
-            || (self.is_array() && other.is_array())
-            || (self.is_object() && other.is_object())
+        let mut matched = false;
+
+        match (self.bytes, other.bytes) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.integer, other.integer) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.float, other.float) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.boolean, other.boolean) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.timestamp, other.timestamp) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.regex, other.regex) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.null, other.null) {
+            (None, Some(_)) => return false,
+            (Some(_), Some(_)) => matched = true,
+            _ => {}
+        };
+
+        match (self.array.as_ref(), other.array.as_ref()) {
+            (None, Some(_)) => return false,
+            (Some(this), Some(other)) if this.contains(other) => matched = true,
+            _ => {}
+        };
+
+        match (self.object.as_ref(), other.object.as_ref()) {
+            (None, Some(_)) => return false,
+            (Some(this), Some(other)) if this.contains(other) => matched = true,
+            _ => {}
+        };
+
+        matched
     }
 
     /// Merge `other` type into `self`.
     ///
-    /// Collection types are recursively merged.
-    pub fn merge(&mut self, other: Self) {
+    /// The provided [`MergeStrategy`] determines how the merge happens.
+    pub fn merge(&mut self, other: Self, strategy: MergeStrategy) {
         // Merge primitive types by setting their state to "present" if needed.
         self.bytes = self.bytes.or(other.bytes);
         self.integer = self.integer.or(other.integer);
@@ -95,8 +174,9 @@ impl Kind {
             (None, None) => None,
             (this @ Some(..), None) => this,
             (None, other @ Some(..)) => other,
+            (Some(..), other @ Some(..)) if strategy.collections.is_shallow() => other,
             (Some(mut this), Some(other)) => {
-                this.merge(other);
+                this.merge(other, false);
                 Some(this)
             }
         };
@@ -104,8 +184,37 @@ impl Kind {
             (None, None) => None,
             (this @ Some(..), None) => this,
             (None, other @ Some(..)) => other,
+            (Some(..), other @ Some(..)) if strategy.collections.is_shallow() => other,
             (Some(mut this), Some(other)) => {
-                this.merge(other);
+                this.merge(other, false);
+                Some(this)
+            }
+        };
+    }
+
+    /// Similar to `merge`, except that non-collection types are overwritten instead of merged.
+    pub fn merge_collections(&mut self, other: Self) {
+        self.bytes = other.bytes;
+        self.integer = other.integer;
+        self.float = other.float;
+        self.boolean = other.boolean;
+        self.timestamp = other.timestamp;
+        self.regex = other.regex;
+        self.null = other.null;
+
+        self.array = match (self.array.take(), other.array) {
+            (None | Some(..), None) => None,
+            (None, other @ Some(..)) => other,
+            (Some(mut this), Some(other)) => {
+                this.merge(other, true);
+                Some(this)
+            }
+        };
+        self.object = match (self.object.take(), other.object) {
+            (None | Some(..), None) => None,
+            (None, other @ Some(..)) => other,
+            (Some(mut this), Some(other)) => {
+                this.merge(other, true);
                 Some(this)
             }
         };
@@ -184,7 +293,7 @@ impl Kind {
                     Some(collection) => fields
                         .into_iter()
                         .find_map(|field| collection.known().get(&field.into()).cloned())
-                        .unwrap_or_else(|| collection.other().into_owned()),
+                        .unwrap_or_else(|| collection.other()),
                 },
 
                 SegmentBuf::Field(FieldBuf { name: field, .. }) => match self.as_object() {
@@ -202,7 +311,7 @@ impl Kind {
                         .known()
                         .get(&field.into())
                         .cloned()
-                        .unwrap_or_else(|| collection.other().into_owned()),
+                        .unwrap_or_else(|| collection.other()),
                 },
 
                 SegmentBuf::Index(index) => match self.as_array() {
@@ -220,7 +329,7 @@ impl Kind {
                         .known()
                         .get(&(index as usize).into())
                         .cloned()
-                        .unwrap_or_else(|| collection.other().into_owned()),
+                        .unwrap_or_else(|| collection.other()),
                 },
             },
         };
@@ -272,6 +381,25 @@ impl Kind {
             null: Some(()),
             array: Some(Collection::json()),
             object: Some(Collection::json()),
+        }
+    }
+
+    /// The "primitive" type state.
+    ///
+    /// This state represents all types, _except_ ones that contain collection of types (e.g.
+    /// objects and arrays).
+    #[must_use]
+    pub fn primitive() -> Self {
+        Self {
+            bytes: Some(()),
+            integer: Some(()),
+            float: Some(()),
+            boolean: Some(()),
+            timestamp: Some(()),
+            regex: Some(()),
+            null: Some(()),
+            array: None,
+            object: None,
         }
     }
 
@@ -437,6 +565,23 @@ impl Kind {
             object: None,
         }
     }
+
+    /// Check for the "empty" state of a type.
+    ///
+    /// NOTE: We do NOT want to expose this method publicly, as its an invalid invariant to have
+    ///       a type state with all variants set to "none".
+    #[allow(unused)]
+    fn is_empty(&self) -> bool {
+        !self.is_bytes()
+            && !self.is_integer()
+            && !self.is_float()
+            && !self.is_boolean()
+            && !self.is_timestamp()
+            && !self.is_regex()
+            && !self.is_null()
+            && !self.is_array()
+            && !self.is_object()
+    }
 }
 
 // `or_*` methods to extend the state of a type using a builder-like API.
@@ -521,6 +666,12 @@ impl Kind {
             && self.is_null()
             && self.is_array()
             && self.is_object()
+    }
+
+    /// Returns `true` if only primitive type states are valid.
+    #[must_use]
+    pub fn is_primitive(&self) -> bool {
+        !self.is_empty() && !self.is_object() && !self.is_array()
     }
 
     /// Returns `true` if the type is _at least_ `bytes`.
@@ -614,19 +765,50 @@ impl Kind {
     ///
     /// Returns `true` only if the type is exactly a float.
     #[must_use]
+    #[allow(clippy::many_single_char_names)]
     pub fn is_exact(&self) -> bool {
-        let mut exact = None;
+        let a = self.is_bytes();
+        let b = self.is_integer();
+        if a && b {
+            return false;
+        }
 
-        exact = exact.xor(self.bytes);
-        exact = exact.xor(self.integer);
-        exact = exact.xor(self.float);
-        exact = exact.xor(self.boolean);
-        exact = exact.xor(self.timestamp);
-        exact = exact.xor(self.regex);
-        exact = exact.xor(self.null);
-        exact = exact.xor(self.array.as_ref().map(|_| ()));
-        exact = exact.xor(self.object.as_ref().map(|_| ()));
-        exact.is_some()
+        let c = self.is_float();
+        if !(!c || !a && !b) {
+            return false;
+        }
+
+        let d = self.is_boolean();
+        if !(!d || !a && !b && !c) {
+            return false;
+        }
+
+        let e = self.is_timestamp();
+        if !(!e || !a && !b && !c && !d) {
+            return false;
+        }
+
+        let f = self.is_regex();
+        if !(!f || !a && !b && !c && !d && !e) {
+            return false;
+        }
+
+        let g = self.is_null();
+        if !(!g || !a && !b && !c && !d && !e && !f) {
+            return false;
+        }
+
+        let h = self.is_array();
+        if !(!h || !a && !b && !c && !d && !e && !f && !g) {
+            return false;
+        }
+
+        let i = self.is_object();
+        if !(!i || !a && !b && !c && !d && !e && !f && !g) {
+            return false;
+        }
+
+        true
     }
 }
 
@@ -852,6 +1034,18 @@ impl Kind {
     }
 }
 
+impl From<Collection<Field>> for Kind {
+    fn from(collection: Collection<Field>) -> Self {
+        Kind::object(collection)
+    }
+}
+
+impl From<Collection<Index>> for Kind {
+    fn from(collection: Collection<Index>) -> Self {
+        Kind::array(collection)
+    }
+}
+
 impl std::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_any() {
@@ -911,6 +1105,60 @@ impl std::fmt::Display for Kind {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum KnownFieldMergeStrategy {
+    /// Merge the type of known fields.
+    ///
+    /// That is, given:
+    ///
+    /// ```json,ignore
+    /// { "foo": true }
+    /// ```
+    ///
+    /// merging with:
+    ///
+    /// ```json,ignore
+    /// { "foo": 12 }
+    /// ```
+    ///
+    /// The type for known field `foo` becomes [boolean, integer]. Meaning the field will either be
+    /// a boolean or an integer at runtime.
+    Merge,
+
+    /// Overwrite the type of a known field.
+    /// That is, given:
+    ///
+    /// ```json,ignore
+    /// { "foo": true }
+    /// ```
+    ///
+    /// merging with:
+    ///
+    /// ```json,ignore
+    /// { "foo": 12 }
+    /// ```
+    ///
+    /// The type for known field `foo` becomes [integer]. Meaning the field will be an integer, and
+    /// can no longer be a boolean.
+    Overwrite,
+}
+
+impl Default for KnownFieldMergeStrategy {
+    fn default() -> Self {
+        Self::Merge
+    }
+}
+
+/// The strategy used to merge two [`Kind`]s
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct MergeStrategy {
+    /// The merge strategy for known fields.
+    pub known_fields: KnownFieldMergeStrategy,
+
+    /// The merge strategy for collections.
+    pub collections: collection::MergeStrategy,
+}
+
 #[derive(Debug)]
 pub struct EmptyKindError;
 
@@ -955,19 +1203,19 @@ mod tests {
         let mut left = Kind::any();
         let right = Kind::any();
         let want = Kind::any();
-        left.merge(right);
+        left.merge(right, MergeStrategy::default());
         assert_eq!(left, want);
 
         // (any) & (null) = (any)
         let mut left = Kind::any();
         let right = Kind::null();
-        left.merge(right);
+        left.merge(right, MergeStrategy::default());
         assert_eq!(left, want);
 
         // (null) & (null) = (null)
         let mut left = Kind::null();
         let right = Kind::null();
-        left.merge(right);
+        left.merge(right, MergeStrategy::default());
         assert_eq!(left, Kind::null());
 
         // (null, timestamp) & (bytes, boolean) = (null, timestamp, bytes, boolean)
@@ -975,7 +1223,7 @@ mod tests {
         left.add_timestamp();
         let mut right = Kind::bytes();
         right.add_boolean();
-        left.merge(right);
+        left.merge(right, MergeStrategy::default());
         assert_eq!(left, {
             let mut want = Kind::null();
             want.add_timestamp();
@@ -983,5 +1231,28 @@ mod tests {
             want.add_bytes();
             want
         });
+    }
+
+    #[test]
+    fn kind_is_exact() {
+        let kind = Kind::any();
+        assert!(!kind.is_exact());
+
+        let kind = Kind::json();
+        assert!(!kind.is_exact());
+
+        let kind = Kind::boolean().or_float();
+        assert!(!kind.is_exact());
+
+        let kind = Kind::timestamp();
+        assert!(kind.is_exact());
+
+        let kind = Kind::array(BTreeMap::default());
+        assert!(kind.is_exact());
+    }
+
+    #[test]
+    fn test_contains() {
+        // TODO
     }
 }
