@@ -1,5 +1,26 @@
 use vrl::prelude::*;
 
+fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+    let substring = {
+        let bytes = substring.try_bytes()?;
+        let string = String::from_utf8_lossy(&bytes);
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    let value = {
+        let string = value.try_bytes_utf8_lossy()?;
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    Ok(value.contains(&substring).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Contains;
 
@@ -59,6 +80,17 @@ impl Function for Contains {
             },
         ]
     }
+
+    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let substring = args.required("substring");
+        let case_sensitive = args
+            .optional("case_sensitive")
+            .map(|value| value.try_boolean().unwrap_or(true))
+            .unwrap_or(true);
+
+        contains(value, substring, case_sensitive)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -70,29 +102,11 @@ struct ContainsFn {
 
 impl Expression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let substring = self.substring.resolve(ctx)?;
         let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
-        let substring = {
-            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
-            let string = String::from_utf8_lossy(&bytes);
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        let value = {
-            let value = self.value.resolve(ctx)?;
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        Ok(value.contains(&substring).into())
+        contains(value, substring, case_sensitive)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
