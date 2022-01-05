@@ -241,25 +241,80 @@ impl Expression for Op {
     }
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        use crate::vm::OpCode;
+
         self.lhs.dump(vm)?;
-        self.rhs.dump(vm)?;
-        vm.write_chunk(match self.opcode {
-            ast::Opcode::Mul => crate::vm::OpCode::Multiply,
-            ast::Opcode::Div => crate::vm::OpCode::Divide,
-            ast::Opcode::Add => crate::vm::OpCode::Add,
-            ast::Opcode::Sub => crate::vm::OpCode::Subtract,
-            ast::Opcode::Rem => todo!(),
-            ast::Opcode::Or => todo!(),
-            ast::Opcode::And => todo!(),
-            ast::Opcode::Err => todo!(),
-            ast::Opcode::Ne => crate::vm::OpCode::NotEqual,
-            ast::Opcode::Eq => crate::vm::OpCode::Equal,
-            ast::Opcode::Ge => crate::vm::OpCode::GreaterEqual,
-            ast::Opcode::Gt => crate::vm::OpCode::Greater,
-            ast::Opcode::Le => crate::vm::OpCode::LessEqual,
-            ast::Opcode::Lt => crate::vm::OpCode::Less,
-            ast::Opcode::Merge => todo!(),
-        });
+        match self.opcode {
+            ast::Opcode::Mul => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Multiply);
+            }
+            ast::Opcode::Div => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Divide);
+            }
+            ast::Opcode::Add => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Add);
+            }
+            ast::Opcode::Sub => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Subtract);
+            }
+            ast::Opcode::Rem => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Rem);
+            }
+            ast::Opcode::Or => {
+                // Or is rewritten as an if statement to allow short circuiting.
+                let if_jump = vm.emit_jump(OpCode::JumpIfTrue);
+                vm.write_chunk(OpCode::Pop);
+                self.rhs.dump(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::And => {
+                // And is rewritten as an if statement to allow short circuiting
+                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
+                vm.write_chunk(OpCode::Pop);
+                self.rhs.dump(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::Err => {
+                // Err is rewritten as an if statement to allow short circuiting
+                let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
+                vm.write_chunk(OpCode::ClearError);
+                self.rhs.dump(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::Ne => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::NotEqual);
+            }
+            ast::Opcode::Eq => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Equal);
+            }
+            ast::Opcode::Ge => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::GreaterEqual);
+            }
+            ast::Opcode::Gt => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Greater);
+            }
+            ast::Opcode::Le => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::LessEqual);
+            }
+            ast::Opcode::Lt => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Less);
+            }
+            ast::Opcode::Merge => {
+                self.rhs.dump(vm)?;
+                vm.write_chunk(OpCode::Merge);
+            }
+        };
         Ok(())
     }
 }

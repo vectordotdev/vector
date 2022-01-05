@@ -30,6 +30,8 @@ pub enum OpCode {
     Subtract,
     Multiply,
     Divide,
+    Rem,
+    Merge,
     Print,
     Not,
     Greater,
@@ -39,7 +41,10 @@ pub enum OpCode {
     NotEqual,
     Equal,
     Pop,
+    ClearError,
     JumpIfFalse,
+    JumpIfTrue,
+    JumpIfNotErr,
     Jump,
     Loop,
     SetPath,
@@ -213,6 +218,9 @@ impl Vm {
                 OpCode::Pop => {
                     let _ = state.stack.pop();
                 }
+                OpCode::ClearError => {
+                    state.error = None;
+                }
                 OpCode::GetLocal => {
                     let slot = state.next_primitive();
                     state.stack.push(state.stack[slot].clone());
@@ -224,6 +232,18 @@ impl Vm {
                 OpCode::JumpIfFalse => {
                     let jump = state.next_primitive();
                     if !is_truthy(&state.stack[state.stack.len() - 1]) {
+                        state.ip += jump;
+                    }
+                }
+                OpCode::JumpIfTrue => {
+                    let jump = state.next_primitive();
+                    if is_truthy(&state.stack[state.stack.len() - 1]) {
+                        state.ip += jump;
+                    }
+                }
+                OpCode::JumpIfNotErr => {
+                    let jump = state.next_primitive();
+                    if state.error.is_none() {
                         state.ip += jump;
                     }
                 }
@@ -311,7 +331,7 @@ impl Vm {
                                 notes,
                             } => {
                                 // labels.push(Label::primary(message.clone(), self.span));
-                                return Err(ExpressionError::Error {
+                                state.error = Some(ExpressionError::Error {
                                     message: format!(
                                         //r#"function call error for "{}" at ({}:{}): {}"#,
                                         r#"function call error for "{}": {}"#,
@@ -322,8 +342,7 @@ impl Vm {
                                     ),
                                     labels,
                                     notes,
-                                }
-                                .to_string());
+                                });
                             }
                         },
                     }
@@ -351,6 +370,18 @@ impl Vm {
                     state
                         .parameter_stack
                         .push(Some(VmArgument::Any(&self.static_params[idx])));
+                }
+                OpCode::Rem => {
+                    let lhs = state.stack.pop().unwrap();
+                    let rhs = state.stack.pop().unwrap();
+
+                    state.stack.push(lhs.try_rem(rhs).unwrap());
+                }
+                OpCode::Merge => {
+                    let lhs = state.stack.pop().unwrap();
+                    let rhs = state.stack.pop().unwrap();
+
+                    state.stack.push(lhs.try_merge(rhs).unwrap());
                 }
             }
         }

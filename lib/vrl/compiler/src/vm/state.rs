@@ -1,5 +1,5 @@
 use super::{argument_list::VmArgument, OpCode, Vm};
-use crate::{expression::Literal, vm::vm::Instruction, Value};
+use crate::{expression::Literal, vm::vm::Instruction, ExpressionError, Value};
 
 /// `VmState` contains the mutable state used to run the Vm.
 pub struct VmState<'a> {
@@ -7,6 +7,7 @@ pub struct VmState<'a> {
     pub(super) ip: usize,
     pub(super) stack: Vec<Value>,
     pub(super) parameter_stack: Vec<Option<VmArgument<'a>>>,
+    pub(super) error: Option<ExpressionError>,
 }
 
 impl<'a> VmState<'a> {
@@ -16,6 +17,7 @@ impl<'a> VmState<'a> {
             ip: 0,
             stack: Vec::new(),
             parameter_stack: Vec::new(),
+            error: None,
         }
     }
 
