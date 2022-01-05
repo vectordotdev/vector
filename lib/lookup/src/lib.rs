@@ -18,7 +18,7 @@ pub trait Look<'a>:
 {
     type Segment: LookSegment<'a>;
 
-    fn get(&mut self, index: usize) -> Option<&Self::Segment>;
+    fn get(&self, index: usize) -> Option<&Self::Segment>;
 
     fn push_back(&mut self, segment: impl Into<Self::Segment>);
 

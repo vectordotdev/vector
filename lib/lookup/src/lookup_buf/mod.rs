@@ -207,7 +207,7 @@ impl Look<'static> for LookupBuf {
     type Segment = SegmentBuf;
 
     /// Get from the internal list of segments.
-    pub fn get(&mut self, index: usize) -> Option<&SegmentBuf> {
+    pub fn get(&self, index: usize) -> Option<&SegmentBuf> {
         self.segments.get(index)
     }
 

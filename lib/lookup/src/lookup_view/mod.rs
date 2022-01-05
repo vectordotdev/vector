@@ -130,7 +130,7 @@ impl<'a> Look<'a> for Lookup<'a> {
         self.segments.is_empty()
     }
 
-    pub fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
+    pub fn get(&self, index: usize) -> Option<&Segment<'a>> {
         self.segments.get(index)
     }
 
