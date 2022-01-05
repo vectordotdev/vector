@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::ByteSizeOf;
+use crate::{schema, ByteSizeOf};
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -9,9 +9,7 @@ use std::sync::Arc;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(
-    Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters,
-)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters)]
 pub struct EventMetadata {
     /// Used to store the datadog API from sources to sinks
     #[getset(get = "pub", set = "pub")]
@@ -19,6 +17,21 @@ pub struct EventMetadata {
     datadog_api_key: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+
+    /// An identifier into a schema definition that provides more detailed information about the
+    /// event (type information, and semantic meaning of fields).
+    #[serde(default = "schema::Id::empty", skip)]
+    schema_identifier: schema::Id,
+}
+
+impl Default for EventMetadata {
+    fn default() -> Self {
+        Self {
+            datadog_api_key: Default::default(),
+            finalizers: Default::default(),
+            schema_identifier: schema::Id::empty(),
+        }
+    }
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -57,6 +70,7 @@ impl EventMetadata {
         if self.datadog_api_key.is_none() {
             self.datadog_api_key = other.datadog_api_key;
         }
+        self.schema_identifier = other.schema_identifier;
     }
 
     /// Update the finalizer(s) status.
@@ -82,6 +96,16 @@ impl EventMetadata {
     /// Merges the given finalizers into the existing set of finalizers.
     pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
         self.finalizers.merge(finalizers);
+    }
+
+    /// Get the schema ID.
+    pub fn schema_id(&self) -> schema::Id {
+        self.schema_identifier
+    }
+
+    /// Set the schema ID.
+    pub fn set_schema_id(&mut self, id: schema::Id) {
+        self.schema_identifier = id;
     }
 }
 
