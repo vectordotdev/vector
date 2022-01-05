@@ -66,18 +66,20 @@ impl Function for SetFieldPurpose {
             Some(registry) if !registry.is_loading() && !registry.is_valid_purpose(&purpose) => {
                 let message = "invalid purpose provided";
                 let primary = format!(r#"the purpose "{}" is unused in this pipeline"#, purpose);
-                let context = format!(
-                    r#"must be one of: {}"#,
-                    registry
-                        .required_purposes()
-                        .into_iter()
-                        .map(|v| v.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
 
-                let error =
-                    CompilationError::new(message, vec![(primary, None)], vec![(context, None)]);
+                let purposes = registry
+                    .required_purposes()
+                    .into_iter()
+                    .map(|v| v.as_str())
+                    .collect::<Vec<_>>();
+
+                let contexts = if purposes.is_empty() {
+                    vec![]
+                } else {
+                    vec![(format!(r#"must be one of: {}"#, purposes.join(", ")), None)]
+                };
+
+                let error = CompilationError::new(message, vec![(primary, None)], contexts);
 
                 return Err(Box::new(error));
             }

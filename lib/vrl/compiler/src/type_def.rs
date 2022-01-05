@@ -102,7 +102,7 @@ impl From<value::Kind> for KindInfo {
                 map.insert(index.into(), kind.into());
             }
 
-            let other = array.other().into_owned().into();
+            let other = array.other().into();
             map.insert(Index::Any, other);
 
             set.insert(TypeKind::Array(map));
@@ -114,7 +114,7 @@ impl From<value::Kind> for KindInfo {
                 map.insert(key.into(), kind.into());
             }
 
-            let other = object.other().into_owned().into();
+            let other = object.other().into();
             map.insert(Field::Any, other);
 
             set.insert(TypeKind::Object(map));
@@ -143,7 +143,7 @@ impl From<KindInfo> for value::Kind {
         };
 
         for info in kinds {
-            kind.merge(info.into());
+            kind.merge(info.into(), value::kind::MergeStrategy::default());
         }
 
         kind
