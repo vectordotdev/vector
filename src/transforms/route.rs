@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -67,6 +68,23 @@ impl FunctionTransform for Lane {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
+pub struct Route;
+
+impl Route {
+    pub fn new(config: &RouteConfig, context: &TransformContext) -> Self {
+        Self
+    }
+}
+
+impl SyncTransform for Route {
+    fn transform(&mut self, event: Event, output: &mut vector_core::transform::TransformOutputsBuf) {
+        todo!()
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
@@ -95,8 +113,9 @@ impl GenerateConfig for RouteConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Err("this transform must be expanded".into())
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let route = Route::new(self, context);
+        Ok(Transform::synchronous(route))
     }
 
     fn input_type(&self) -> DataType {
