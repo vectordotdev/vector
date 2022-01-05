@@ -2,6 +2,24 @@ use std::collections::btree_map;
 
 use vrl::prelude::*;
 
+fn flatten(value: Value) -> Resolved {
+    match value {
+        Value::Array(arr) => Ok(Value::Array(
+            ArrayFlatten::new(arr.iter()).cloned().collect(),
+        )),
+        Value::Object(map) => Ok(Value::Object(
+            MapFlatten::new(map.iter())
+                .map(|(k, v)| (k, v.clone()))
+                .collect(),
+        )),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::Array | Kind::Object,
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Flatten;
 
@@ -42,6 +60,11 @@ impl Function for Flatten {
         let value = arguments.required("value");
         Ok(Box::new(FlattenFn { value }))
     }
+
+    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        flatten(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,21 +74,7 @@ struct FlattenFn {
 
 impl Expression for FlattenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            Value::Array(arr) => Ok(Value::Array(
-                ArrayFlatten::new(arr.iter()).cloned().collect(),
-            )),
-            Value::Object(map) => Ok(Value::Object(
-                MapFlatten::new(map.iter())
-                    .map(|(k, v)| (k, v.clone()))
-                    .collect(),
-            )),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Array | Kind::Object,
-            }
-            .into()),
-        }
+        flatten(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

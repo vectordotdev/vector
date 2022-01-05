@@ -25,6 +25,10 @@ impl Function for Now {
     ) -> Compiled {
         Ok(Box::new(NowFn))
     }
+
+    fn call(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+        Ok(Utc::now().into())
+    }
 }
 
 #[derive(Debug, Clone)]

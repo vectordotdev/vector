@@ -2,6 +2,38 @@ use chrono::{TimeZone as _, Utc};
 use shared::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
+fn to_timestamp(value: Value) -> Resolved {
+    use Value::*;
+
+    let value = match value {
+        v @ Timestamp(_) => v,
+        Integer(v) => {
+            let t = Utc.timestamp_opt(v, 0).single();
+            match t {
+                Some(time) => time.into(),
+                None => return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into()),
+            }
+        }
+        Float(v) => {
+            let t = Utc
+                .timestamp_opt(
+                    v.trunc() as i64,
+                    (v.fract() * 1_000_000_000.0).round() as u32,
+                )
+                .single();
+            match t {
+                Some(time) => time.into(),
+                None => return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into()),
+            }
+        }
+        Bytes(v) => Conversion::Timestamp(TimeZone::Local)
+            .convert::<Value>(v)
+            .map_err(|err| err.to_string())?,
+        v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
+    };
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
 
@@ -102,6 +134,11 @@ impl Function for ToTimestamp {
 
         Ok(Box::new(ToTimestampFn { value }))
     }
+
+    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        to_timestamp(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -111,40 +148,7 @@ struct ToTimestampFn {
 
 impl Expression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
-        let value = match self.value.resolve(ctx)? {
-            v @ Timestamp(_) => v,
-            Integer(v) => {
-                let t = Utc.timestamp_opt(v, 0).single();
-                match t {
-                    Some(time) => time.into(),
-                    None => {
-                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
-                    }
-                }
-            }
-            Float(v) => {
-                let t = Utc
-                    .timestamp_opt(
-                        v.trunc() as i64,
-                        (v.fract() * 1_000_000_000.0).round() as u32,
-                    )
-                    .single();
-                match t {
-                    Some(time) => time.into(),
-                    None => {
-                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
-                    }
-                }
-            }
-            Bytes(v) => Conversion::Timestamp(TimeZone::Local)
-                .convert::<Value>(v)
-                .map_err(|err| err.to_string())?,
-            v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
-        };
-
-        Ok(value)
+        to_timestamp(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
