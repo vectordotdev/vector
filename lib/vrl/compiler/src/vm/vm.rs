@@ -385,6 +385,7 @@ impl Vm {
                     for _ in 0..count {
                         arr.push(state.pop_stack()?);
                     }
+                    arr.reverse();
 
                     state.stack.push(Value::Array(arr));
                 }
