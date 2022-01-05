@@ -99,33 +99,15 @@ impl TransformConfig for RouteConfig {
         Err("this transform must be expanded".into())
     }
 
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-
-        while let Some((k, v)) = self.route.pop() {
-            if map
-                .insert(k.clone(), Box::new(LaneConfig { condition: v }))
-                .is_some()
-            {
-                return Err("duplicate route id".into());
-            }
-        }
-
-        if !map.is_empty() {
-            Ok(Some((map, ExpandType::Parallel { aggregates: false })))
-        } else {
-            Err("must specify at least one lane".into())
-        }
-    }
-
     fn input_type(&self) -> DataType {
         DataType::Any
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        self.route
+            .keys()
+            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .collect()
     }
 
     fn transform_type(&self) -> &'static str {
