@@ -211,6 +211,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
     pub proxy: ProxyConfig,
+    pub schema_id: schema::Id,
 }
 
 impl SourceContext {
@@ -228,6 +229,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
+                schema_id: schema::Id::empty(),
             },
             shutdown,
         )
@@ -241,6 +243,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
+            schema_id: schema::Id::empty(),
         }
     }
 }
@@ -400,6 +403,7 @@ pub struct SinkContext {
     pub(super) healthcheck: SinkHealthcheckOptions,
     pub(super) globals: GlobalOptions,
     pub(super) proxy: ProxyConfig,
+    pub(super) schema_id: schema::Id,
 }
 
 impl SinkContext {
@@ -410,6 +414,7 @@ impl SinkContext {
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
+            schema_id: schema::Id::empty(),
         }
     }
 
@@ -423,6 +428,10 @@ impl SinkContext {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    pub const fn schema_id(&self) -> schema::Id {
+        self.schema_id
     }
 }
 
