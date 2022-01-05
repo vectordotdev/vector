@@ -69,17 +69,34 @@ impl FunctionTransform for Lane {
 //------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct Route;
+pub struct Route {
+    conditions: IndexMap<String, Box<dyn Condition>>,
+}
 
 impl Route {
-    pub fn new(config: &RouteConfig, context: &TransformContext) -> Self {
-        Self
+    pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
+        let mut conditions = IndexMap::new();
+        for (output_name, condition) in config.route.iter() {
+            let condition = condition.build(&context.enrichment_tables)?;
+            conditions.insert(output_name.clone(), condition);
+        }
+        Ok(Self { conditions })
     }
 }
 
 impl SyncTransform for Route {
-    fn transform(&mut self, event: Event, output: &mut vector_core::transform::TransformOutputsBuf) {
-        todo!()
+    fn transform(
+        &mut self,
+        event: Event,
+        output: &mut vector_core::transform::TransformOutputsBuf,
+    ) {
+        for (output_name, condition) in self.conditions.iter() {
+            if condition.check(&event) {
+                output.push_named(output_name, event.clone());
+            } else {
+                emit!(&RouteEventDiscarded);
+            }
+        }
     }
 }
 
@@ -114,7 +131,7 @@ impl GenerateConfig for RouteConfig {
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let route = Route::new(self, context);
+        let route = Route::new(self, context)?;
         Ok(Transform::synchronous(route))
     }
 
