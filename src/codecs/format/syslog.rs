@@ -40,7 +40,7 @@ impl DeserializerConfig for SyslogDeserializerConfig {
             Kind::timestamp(),
             Some(Purpose::Timestamp),
         );
-        schema.define_optional_field("hostname", Kind::bytes(), Some(Purpose::Host));
+        schema.define_optional_field(log_schema().host_key(), Kind::bytes(), Some(Purpose::Host));
         schema.define_optional_field("severity", Kind::bytes(), Some(Purpose::Severity));
         schema.define_optional_field("facility", Kind::bytes(), None);
         schema.define_optional_field("version", Kind::integer(), None);
@@ -103,8 +103,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         );
     }
     if let Some(host) = parsed.hostname {
-        // FIXME: should this be `log_schema().host_key()`?
-        log.insert("hostname", host.to_string());
+        log.insert(log_schema().host_key(), host.to_string());
     }
     if let Some(severity) = parsed.severity {
         log.insert("severity", severity.as_str().to_owned());

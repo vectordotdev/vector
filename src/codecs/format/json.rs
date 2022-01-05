@@ -79,9 +79,7 @@ impl Deserializer for JsonDeserializer {
             let log = event.as_mut_log();
             let timestamp_key = log_schema().timestamp_key();
 
-            if !log.contains(timestamp_key) {
-                log.insert(timestamp_key, timestamp);
-            }
+            log.insert(timestamp_key, timestamp);
         }
 
         Ok(events)
