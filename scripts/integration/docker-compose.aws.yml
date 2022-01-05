@@ -50,6 +50,7 @@ services:
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
       - SQS_ADDRESS=http://mock-localstack:4566
+      - WATCHLOGS_ADDRESS=http://mock-watchlogs:6000
       - REDIS_URL=redis://redis:6379/0
     networks:
       - backend

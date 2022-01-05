@@ -23,6 +23,10 @@ use crate::{
 
 const GROUP_NAME: &str = "vector-cw";
 
+fn watchlogs_address() -> String {
+    std::env::var("WATCHLOGS_ADDRESS").unwrap_or_else(|_| "http://localhost:6000".into())
+}
+
 #[tokio::test]
 async fn cloudwatch_insert_log_event() {
     trace_init();
@@ -33,7 +37,7 @@ async fn cloudwatch_insert_log_event() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -80,7 +84,7 @@ async fn cloudwatch_insert_log_events_sorted() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -146,7 +150,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -218,7 +222,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -270,7 +274,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -318,7 +322,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -405,7 +409,7 @@ async fn cloudwatch_healthcheck() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
+        region: RegionOrEndpoint::with_endpoint(watchlogs_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         create_missing_group: None,
         create_missing_stream: None,
@@ -423,7 +427,7 @@ async fn cloudwatch_healthcheck() {
 fn create_client_test() -> CloudWatchLogsClient {
     let region = Region::Custom {
         name: "localstack".into(),
-        endpoint: "http://localhost:6000".into(),
+        endpoint: watchlogs_address(),
     };
 
     let proxy = ProxyConfig::default();
