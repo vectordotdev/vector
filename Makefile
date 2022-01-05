@@ -383,18 +383,6 @@ test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
 test-integration-docker-logs: ## Runs Docker Logs integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
 
-.PHONY: test-integration-elasticsearch
-test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-	@scripts/setup_integration_env.sh elasticsearch start
-	sleep 60 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-endif
-
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -563,7 +551,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm -fsv
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop --volumes
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
