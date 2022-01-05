@@ -133,8 +133,11 @@ impl Runtime {
         vm: &Vm,
         target: &mut dyn Target,
         timezone: &TimeZone,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, Terminate> {
         let mut context = Context::new(target, &mut self.state, timezone);
-        vm.interpret(&mut context)
+        vm.interpret(&mut context).map_err(|err| match err {
+            ExpressionError::Abort { .. } => Terminate::Abort(err),
+            err @ ExpressionError::Error { .. } => Terminate::Error(err),
+        })
     }
 }

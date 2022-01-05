@@ -149,7 +149,9 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program, &timezone);
+                let vm = runtime.compile(functions, &program).unwrap();
+                // let result = runtime.resolve(&mut test.object, &program, &timezone);
+                let result = runtime.run_vm(&vm, &mut test.object, &timezone);
 
                 match result {
                     Ok(got) => {

@@ -12,7 +12,7 @@ macro_rules! binary_op {
             $($pat => $self.stack.push($expr),)*
             _ => {
                 return Err(
-                    "binary op invalid type".to_string()
+                    "binary op invalid type".into()
                 )
             }
         }
@@ -157,7 +157,7 @@ impl Vm {
         self.write_primitive_at(offset, jump);
     }
 
-    pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, String> {
+    pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, ExpressionError> {
         let mut state: VmState = VmState::new(self);
 
         loop {
@@ -172,14 +172,14 @@ impl Vm {
                     state.stack.push(value.to_value());
                 }
                 OpCode::Negate => match state.stack.pop() {
-                    None => return Err("Negating nothing".to_string()),
+                    None => return Err("Negating nothing".into()),
                     Some(Value::Float(value)) => state.stack.push(Value::Float(value * -1.0)),
-                    _ => return Err("Negating non number".to_string()),
+                    _ => return Err("Negating non number".into()),
                 },
                 OpCode::Not => match state.stack.pop() {
-                    None => return Err("Notting nothing".to_string()),
+                    None => return Err("Notting nothing".into()),
                     Some(Value::Boolean(value)) => state.stack.push(Value::Boolean(!value)),
-                    _ => return Err("Notting non boolean".to_string()),
+                    _ => return Err("Notting non boolean".into()),
                 },
                 OpCode::Add => {
                     binary_op!(state,
@@ -200,7 +200,7 @@ impl Vm {
                 OpCode::Divide => binary_op!(state,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 / value2),),
                 OpCode::Print => match state.stack.pop() {
-                    None => return Err("Negating nothing".to_string()),
+                    None => return Err("Printing nothing".into()),
                     Some(value) => println!("{}", value),
                 },
                 OpCode::Greater => binary_op!(state,
