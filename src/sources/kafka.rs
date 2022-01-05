@@ -136,6 +136,7 @@ impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -147,7 +148,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled(),
         )))
     }
 

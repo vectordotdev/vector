@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 mod global_options;
 mod id;
 mod log_schema;
@@ -35,5 +37,34 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
             port: Some(name.into()),
             ty,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AcknowledgementsConfig {
+    enabled: Option<bool>,
+}
+
+impl AcknowledgementsConfig {
+    pub fn merge(&self, other: &Self) -> Self {
+        Self {
+            enabled: other.enabled.or(self.enabled),
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(false)
+    }
+}
+
+impl From<Option<bool>> for AcknowledgementsConfig {
+    fn from(enabled: Option<bool>) -> Self {
+        Self { enabled }
+    }
+}
+
+impl From<bool> for AcknowledgementsConfig {
+    fn from(enabled: bool) -> Self {
+        Some(enabled).into()
     }
 }

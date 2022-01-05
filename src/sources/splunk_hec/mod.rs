@@ -86,7 +86,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: HecAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             store_hec_token: false,
         }
     }
@@ -172,6 +172,10 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+        let acknowledgements = cx
+            .globals
+            .acknowledgements
+            .merge(&config.acknowledgements.inner);
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
@@ -179,7 +183,7 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = config.acknowledgements.inner.enabled.then(|| {
+        let idx_ack = acknowledgements.enabled().then(|| {
             Arc::new(IndexerAcknowledgement::new(
                 config.acknowledgements.clone(),
                 shutdown,

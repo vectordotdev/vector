@@ -1,9 +1,12 @@
-prometheus: "http://localhost:9090"
 experiment_name: "foobar"
 variant: "baseline"
-vector_id: "featuresha-commitsha"
-queries:
-  - query: sum(rate((bytes_written[2s])))
-    id: throughput
-    unit: bytes
 capture_path: "/tmp/captures-baseline.txt"
+targets:
+  - id: vector
+    url: "http://localhost:9598/metrics"
+  - id: lading_http_gen
+    url: "http://localhost:9001"
+  - id: lading_http_blackhole
+    url: "http://localhost:9002"
+  - id: lading_tcp_gen
+    url: "http://localhost:9003"

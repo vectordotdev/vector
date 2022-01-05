@@ -174,6 +174,7 @@ impl SourceConfig for JournaldConfig {
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
         let journal_dir = self.journal_directory.clone();
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let start: StartJournalctlFn = Box::new(move |cursor| {
             let mut command = create_command(
@@ -193,7 +194,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: self.acknowledgements.enabled,
+                acknowledgements: acknowledgements.enabled(),
             }
             .run_shutdown(cx.shutdown, start),
         ))

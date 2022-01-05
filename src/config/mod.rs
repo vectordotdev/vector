@@ -12,7 +12,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::{DataType, GlobalOptions, Output},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
 };
 
@@ -153,17 +153,6 @@ macro_rules! impl_generate_config_from_default {
             }
         }
     };
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

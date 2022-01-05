@@ -115,6 +115,8 @@ where
         acknowledgements: AcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+
         let listenfd = ListenFd::from_env();
 
         Ok(Box::pin(async move {
@@ -190,7 +192,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled,
+                                acknowledgements.enabled(),
                             );
 
                             tokio::spawn(
