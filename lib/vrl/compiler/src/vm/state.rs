@@ -39,8 +39,8 @@ impl<'a> VmState<'a> {
         }
     }
 
-    pub fn stack_mut(&mut self) -> &mut Vec<Value> {
-        &mut self.stack
+    pub fn pop_stack(&mut self) -> Result<Value, ExpressionError> {
+        self.stack.pop().ok_or_else(|| "stack underflow".into())
     }
 
     pub fn parameter_stack(&self) -> &Vec<Option<VmArgument<'a>>> {

@@ -4,21 +4,6 @@ use crate::{
 };
 use std::collections::BTreeMap;
 
-macro_rules! binary_op {
-    ($self: ident, $($pat: pat => $expr: expr,)*) => {{
-        let a = $self.stack.pop();
-        let b = $self.stack.pop();
-        match (b, a) {
-            $($pat => $self.stack.push($expr),)*
-            _ => {
-                return Err(
-                    "binary op invalid type".into()
-                )
-            }
-        }
-    }};
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
     Return,
@@ -32,7 +17,6 @@ pub enum OpCode {
     Divide,
     Rem,
     Merge,
-    Print,
     Not,
     Greater,
     GreaterEqual,
@@ -181,40 +165,26 @@ impl Vm {
                     Some(Value::Boolean(value)) => state.stack.push(Value::Boolean(!value)),
                     _ => return Err("Notting non boolean".into()),
                 },
-                OpCode::Add => {
-                    binary_op!(state,
-                                (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Float(value1 + value2),
-                                (Some(Value::Bytes(value1)), Some(Value::Bytes(value2))) => Value::Bytes({
-                                    use bytes::{BytesMut, BufMut};
-                                    let mut value = BytesMut::with_capacity(value1.len() + value2.len());
-                                    value.put(value1);
-                                    value.put(value2);
-                                    value.into()
-                                }),
-                    )
+                OpCode::Add => binary_op(&mut state, Value::try_add)?,
+                OpCode::Subtract => binary_op(&mut state, Value::try_sub)?,
+                OpCode::Multiply => binary_op(&mut state, Value::try_mul)?,
+                OpCode::Divide => binary_op(&mut state, Value::try_div)?,
+                OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
+                OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
+                OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
+                OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
+                OpCode::Less => binary_op(&mut state, Value::try_lt)?,
+                OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
+                OpCode::NotEqual => {
+                    let rhs = state.pop_stack()?;
+                    let lhs = state.pop_stack()?;
+                    state.stack.push((!lhs.eq_lossy(&rhs)).into());
                 }
-                OpCode::Subtract => binary_op!(state,
-                    (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 - value2),),
-                OpCode::Multiply => binary_op!(state,
-                    (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 * value2),),
-                OpCode::Divide => binary_op!(state,
-                    (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 / value2),),
-                OpCode::Print => match state.stack.pop() {
-                    None => return Err("Printing nothing".into()),
-                    Some(value) => println!("{}", value),
-                },
-                OpCode::Greater => binary_op!(state,
-                    (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 > value2),),
-                OpCode::GreaterEqual => binary_op!(state,
-                    (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 >= value2),),
-                OpCode::Less => binary_op!(state,
-                    (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 < value2),),
-                OpCode::LessEqual => binary_op!(state,
-                    (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 <= value2),),
-                OpCode::NotEqual => binary_op!(state,
-                    (Some(value1), Some(value2)) => Value::Boolean(value1 != value2),),
-                OpCode::Equal => binary_op!(state,
-                    (Some(value1), Some(value2)) => Value::Boolean(value1 == value2),),
+                OpCode::Equal => {
+                    let rhs = state.pop_stack()?;
+                    let lhs = state.pop_stack()?;
+                    state.stack.push(lhs.eq_lossy(&rhs).into());
+                }
                 OpCode::Pop => {
                     let _ = state.stack.pop();
                 }
@@ -258,7 +228,7 @@ impl Vm {
                 OpCode::SetPath => {
                     let variable = state.next_primitive();
                     let variable = &self.targets[variable];
-                    let value = state.stack.pop().unwrap();
+                    let value = state.pop_stack()?;
 
                     match variable {
                         Variable::Internal(ident, path) => {
@@ -352,8 +322,8 @@ impl Vm {
                     let mut object = BTreeMap::new();
 
                     for _ in 0..count {
-                        let value = state.stack.pop().unwrap();
-                        let key = state.stack.pop().unwrap();
+                        let value = state.pop_stack()?;
+                        let key = state.pop_stack()?;
                         let key = String::from_utf8_lossy(&key.try_bytes().unwrap()).to_string();
 
                         object.insert(key, value);
@@ -371,27 +341,26 @@ impl Vm {
                         .parameter_stack
                         .push(Some(VmArgument::Any(&self.static_params[idx])));
                 }
-                OpCode::Rem => {
-                    let lhs = state.stack.pop().unwrap();
-                    let rhs = state.stack.pop().unwrap();
-
-                    state.stack.push(lhs.try_rem(rhs).unwrap());
-                }
-                OpCode::Merge => {
-                    let lhs = state.stack.pop().unwrap();
-                    let rhs = state.stack.pop().unwrap();
-
-                    state.stack.push(lhs.try_merge(rhs).unwrap());
-                }
             }
         }
     }
 }
 
-fn is_truthy(object: &Value) -> bool {
-    match object {
-        Value::Null => false,
-        Value::Boolean(false) => false,
-        _ => true,
+fn binary_op<F, E>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
+where
+    E: Into<ExpressionError>,
+    F: Fn(Value, Value) -> Result<Value, E>,
+{
+    let rhs = state.pop_stack()?;
+    let lhs = state.pop_stack()?;
+    match fun(lhs, rhs) {
+        Ok(value) => state.stack.push(value),
+        Err(err) => state.error = Some(err.into()),
     }
+
+    Ok(())
+}
+
+fn is_truthy(object: &Value) -> bool {
+    !matches!(object, Value::Null | Value::Boolean(false))
 }

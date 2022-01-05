@@ -223,21 +223,7 @@ impl Expression for Op {
             Mul if lhs_kind.is_integer() && rhs_kind.is_bytes() => {
                 lhs_def.merge(rhs_def).scalar(K::Bytes)
             }
-
-            // ... + ...
-            // ... * ...
-            Add | Mul => lhs_def
-                .merge(rhs_def)
-                .fallible()
-                .scalar(K::Bytes | K::Integer | K::Float),
-
-            // ... - ...
-            // ... % ...
-            Sub | Rem => lhs_def
-                .merge(rhs_def)
-                .fallible()
-                .scalar(K::Integer | K::Float),
-        }
+ }
     }
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
