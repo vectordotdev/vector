@@ -562,6 +562,14 @@ mod integration_tests {
     use super::*;
     use crate::test_util::collect_ready;
 
+    fn ecs_address() -> String {
+        std::env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
+    }
+
+    fn ecs_url(version: &str) -> String {
+        format!("{}/{}", ecs_address(), version)
+    }
+
     async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();
 
@@ -585,18 +593,18 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scrapes_metrics_v2() {
-        scrape_metrics("http://localhost:9088/v2".into(), Version::V2).await;
+        scrape_metrics(ecs_url("v2"), Version::V2).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v3() {
-        scrape_metrics("http://localhost:9088/v3".into(), Version::V3).await;
+        scrape_metrics(ecs_url("v3"), Version::V3).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v4() {
         // mock uses same endpoint for v4 as v3
         // https://github.com/awslabs/amazon-ecs-local-container-endpoints/blob/mainline/docs/features.md#task-metadata-v4
-        scrape_metrics("http://localhost:9088/v3".into(), Version::V4).await;
+        scrape_metrics(ecs_url("v3"), Version::V4).await;
     }
 }
