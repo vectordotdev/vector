@@ -529,7 +529,7 @@ impl Value {
     fn insert_map(
         name: &str,
         requires_quoting: bool,
-        mut working_lookup: LookupBuf,
+        working_lookup: LookupBuf,
         map: &mut BTreeMap<String, Value>,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
@@ -576,7 +576,7 @@ impl Value {
     #[allow(clippy::too_many_lines)]
     fn insert_array(
         i: isize,
-        mut working_lookup: LookupBuf,
+        working_lookup: LookupBuf,
         array: &mut Vec<Value>,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
