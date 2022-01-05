@@ -310,29 +310,9 @@ test-integration: test-integration-kafka test-integration-logstash test-integrat
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 
-.PHONY: test-integration-aws
-test-integration-aws: ## Runs AWS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-	@scripts/setup_integration_env.sh aws start
-	sleep 10 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-endif
-
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-	@scripts/setup_integration_env.sh aws start
-	sleep 10 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-sqs-integration-tests --lib ::aws_sqs
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-endif
+	FILTER=::aws_sqs make test-integration-aws
 
 .PHONY: test-integration-aws-cloudwatch-logs
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
