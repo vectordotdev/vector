@@ -445,7 +445,13 @@ mod tests {
         assert_eq!(cfg.unwrap(), filecontents)
     }
 
-    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-add_fields",
+        feature = "transforms-json_parser",
+        feature = "transforms-remove_fields",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_basic() {
         assert_eq!(

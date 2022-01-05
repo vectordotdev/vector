@@ -81,12 +81,13 @@ impl SourceConfig for AwsS3Config {
             .as_ref()
             .map(|config| config.try_into())
             .transpose()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, self.acknowledgements),
+                    .run(cx, acknowledgements),
             )),
         }
     }

@@ -88,7 +88,7 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -102,15 +102,16 @@ impl SourceConfig for DatadogAgentConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
         let log_service = source
             .clone()
-            .event_service(self.acknowledgements.enabled, cx.out.clone());
+            .event_service(acknowledgements.enabled(), cx.out.clone());
         let series_v1_service = source
             .clone()
-            .series_v1_service(self.acknowledgements.enabled, cx.out.clone());
+            .series_v1_service(acknowledgements.enabled(), cx.out.clone());
         let sketches_service = source
             .clone()
-            .sketches_service(self.acknowledgements.enabled, cx.out.clone());
+            .sketches_service(acknowledgements.enabled(), cx.out.clone());
         let series_v2_service = source.series_v2_service();
 
         let shutdown = cx.shutdown;

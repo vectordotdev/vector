@@ -197,7 +197,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -234,12 +234,14 @@ impl SourceConfig for FileConfig {
             }
         }
 
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled(),
         ))
     }
 

@@ -187,13 +187,14 @@ impl Ingestor {
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
     ) -> Result<(), ()> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
-                acknowledgements.enabled,
+                acknowledgements.enabled(),
             );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());
