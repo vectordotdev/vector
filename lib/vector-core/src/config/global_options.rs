@@ -41,7 +41,11 @@ pub struct GlobalOptions {
     pub proxy: ProxyConfig,
     #[serde(skip)]
     pub enterprise: bool,
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(
+        default,
+        deserialize_with = "bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 
