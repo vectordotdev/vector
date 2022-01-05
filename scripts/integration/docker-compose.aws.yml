@@ -49,6 +49,7 @@ services:
     environment:
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
+      - EC2_METADATA_ADDRESS=http://mock-ec2-metadata:8111
       - SQS_ADDRESS=http://mock-localstack:4566
       - WATCHLOGS_ADDRESS=http://mock-watchlogs:6000
       - REDIS_URL=redis://redis:6379/0
