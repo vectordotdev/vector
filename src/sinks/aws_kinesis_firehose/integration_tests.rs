@@ -29,13 +29,21 @@ use crate::{
     },
 };
 
+fn kinesis_address() -> String {
+    std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
+
+fn elasticsearch_address() -> String {
+    std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+}
+
 #[tokio::test]
 async fn firehose_put_records() {
     let stream = gen_stream();
 
     let region = Region::Custom {
         name: "localstack".into(),
-        endpoint: "http://localhost:4566".into(),
+        endpoint: kinesis_address(),
     };
 
     let elasticseacrh_arn = ensure_elasticsearch_domain(region.clone(), stream.clone()).await;
@@ -47,7 +55,7 @@ async fn firehose_put_records() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+        region: RegionOrEndpoint::with_endpoint(kinesis_address().as_str()),
         encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
@@ -69,12 +77,12 @@ async fn firehose_put_records() {
     components::init_test();
     sink.0.run(events).await.unwrap();
 
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(5)).await;
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-        endpoint: "http://localhost:4571".into(),
+        endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
             action: None,
@@ -138,7 +146,7 @@ async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> Str
     // This takes a long time
     wait_for_duration(
         || async {
-            reqwest::get("http://localhost:4571/_cluster/health")
+            reqwest::get(format!("{}/_cluster/health", elasticsearch_address()))
                 .and_then(reqwest::Response::json::<Value>)
                 .await
                 .map(|v| {
@@ -149,7 +157,7 @@ async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> Str
                 })
                 .unwrap_or(false)
         },
-        Duration::from_secs(30),
+        Duration::from_secs(60),
     )
     .await;
 

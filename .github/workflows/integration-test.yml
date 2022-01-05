@@ -56,7 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'aws'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-metrics'
@@ -102,6 +101,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - test: 'aws'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'elasticsearch'
