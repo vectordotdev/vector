@@ -19,7 +19,7 @@ PRECOMPILED_TARGET_DIR="$PRECOMPILED_DIR/target/$TARGET/$PROFILE"
 STD_DIR="$PRECOMPILED_DIR/std"
 STD_TARGET_DIR="$STD_DIR/target/$TARGET/$PROFILE"
 
-RUSTFLAGS="--emit=llvm-bc" cargo +nightly build --manifest-path="$STD_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET -Z build-std=std
+RUSTFLAGS="--emit=llvm-bc" RUSTC_BOOTSTRAP=1 cargo build --manifest-path="$STD_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET -Z build-std=std
 RUSTFLAGS="--emit=llvm-bc" cargo build --manifest-path="$PRECOMPILED_DIR/Cargo.toml" $PROFILE_ARG --lib --target $TARGET
 
 BC_FILES=$(ls "$STD_TARGET_DIR"/deps/*.bc "$PRECOMPILED_TARGET_DIR"/deps/*.bc | egrep -v -i "(panic_abort|proc_macro).*\.bc")
