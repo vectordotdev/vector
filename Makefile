@@ -806,6 +806,10 @@ fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
 
+.PHONY: generate-kubernetes-manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
+	scripts/generate-manifests.sh
+
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
