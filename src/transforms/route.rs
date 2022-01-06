@@ -5,8 +5,7 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
-        TransformDescription,
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
