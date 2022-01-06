@@ -431,18 +431,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh loki stop
 endif
 
-.PHONY: test-integration-mongodb_metrics
-test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh mongodb_metrics stop
-	@scripts/setup_integration_env.sh mongodb_metrics start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh mongodb_metrics stop
-endif
-
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
 ifeq ($(AUTOSPAWN), true)
