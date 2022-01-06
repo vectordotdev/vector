@@ -52,6 +52,20 @@ impl Function for ParseSyslog {
 
         Ok(Box::new(ParseSyslogFn { value }))
     }
+
+    fn call(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let message = value.try_bytes_utf8_lossy()?;
+
+        let timezone = match ctx.timezone() {
+            TimeZone::Local => None,
+            TimeZone::Named(tz) => Some(*tz),
+        };
+        let parsed =
+            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
+
+        Ok(message_to_value(parsed))
+    }
 }
 
 #[derive(Debug, Clone)]
