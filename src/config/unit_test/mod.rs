@@ -374,11 +374,17 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
+    let graph = Graph::new_unchecked(
+        &config_builder.sources,
+        &config_builder.transforms,
+        &config_builder.sinks,
+    );
+    let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
-            .filter(|input| valid_components.contains(input))
+            .filter(|input| valid_inputs.contains_key(input))
             .collect::<Vec<_>>();
     }
 
