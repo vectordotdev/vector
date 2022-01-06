@@ -13,7 +13,7 @@ chrono-tz = "0.6.1"
 derivative = "2.1.3"
 nom = { version = "7", optional = true }
 serde = { version = "1.0.133", optional = true, features = ["derive"] }
-snafu = { version = "0.6", optional = true }
+snafu = { version = "0.7", optional = true }
 tracing = { version = "0.1", optional = true }
 serde_json = { version = "1.0.74", optional = true }
 
