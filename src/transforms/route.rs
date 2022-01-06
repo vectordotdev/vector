@@ -132,6 +132,8 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
+    use vector_core::transform::TransformOutputsBuf;
+
     use super::*;
 
     #[test]
@@ -184,5 +186,81 @@ mod test {
             serde_json::to_string(&config).unwrap(),
             r#"{"route":{"first":{"type":"check_fields","message.eq":"foo"}}}"#
         );
+    }
+
+    #[test]
+    fn route_pass_all_route_conditions() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(
+            serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
+        )
+        .unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            assert_eq!(events.len(), 1);
+            assert_eq!(events.pop().unwrap(), event);
+        }
+    }
+
+    #[test]
+    fn route_pass_one_route_condition() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(serde_json::json!({"message": "hello world"})).unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            if output_name == "first" {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            }
+            assert_eq!(events.len(), 0);
+        }
     }
 }
