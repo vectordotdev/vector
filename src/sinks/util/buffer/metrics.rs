@@ -1,8 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
+use std::{cmp::Ordering, collections::HashMap};
 
 use vector_core::event::{
     metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue, Sample},
-    Event, EventMetadata,
+    EventMetadata,
 };
 
 use crate::sinks::util::{
@@ -91,21 +91,36 @@ impl Batch for MetricsBuffer {
 /// before sending the events to the `MetricsBuffer`
 pub struct MetricNormalizer<N> {
     state: MetricSet,
-    _norm: PhantomData<N>,
+    inner: N,
 }
 
-impl<N: MetricNormalize> MetricNormalizer<N> {
+impl<N: Default> MetricNormalizer<N> {
     pub fn default() -> Self {
         Self {
             state: MetricSet::default(),
-            _norm: PhantomData::default(),
+            inner: N::default(),
+        }
+    }
+}
+
+impl<N> MetricNormalizer<N> {
+    pub fn from_inner(inner: N) -> Self {
+        Self {
+            state: MetricSet::default(),
+            inner,
         }
     }
 
+    pub fn get_state_mut(&mut self) -> &mut MetricSet {
+        &mut self.state
+    }
+}
+
+impl<N: MetricNormalize> MetricNormalizer<N> {
     /// This wraps `MetricNormalize::apply_state`, converting to/from
     /// the `Metric` type wrapper. See that function for return values.
-    pub fn apply(&mut self, event: Event) -> Option<Metric> {
-        N::apply_state(&mut self.state, event.into_metric())
+    pub fn apply(&mut self, metric: Metric) -> Option<Metric> {
+        self.inner.apply_state(&mut self.state, metric)
     }
 }
 
@@ -128,7 +143,7 @@ pub trait MetricNormalize {
     /// persistent data between calls. The return value is `None` if the
     /// incoming metric is only used to set a reference state, and
     /// `Some(metric)` otherwise.
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric>;
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric>;
 }
 
 type MetricEntry = (MetricData, EventMetadata);
@@ -259,6 +274,13 @@ impl MetricSet {
             self.insert(metric);
         }
     }
+
+    /// Removes a series from the set.
+    ///
+    /// If the series existed and was removed, returns `true`.  Otherwise, `false`.
+    pub fn remove(&mut self, series: &MetricSeries) -> bool {
+        self.0.remove(series).is_some()
+    }
 }
 
 fn finish_metric(item: (MetricSeries, MetricEntry)) -> Metric {
@@ -310,18 +332,20 @@ mod test {
 
     type Buffer = Vec<Vec<Metric>>;
 
+    #[derive(Default)]
     struct AbsoluteMetricNormalize;
 
     impl MetricNormalize for AbsoluteMetricNormalize {
-        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
             state.make_absolute(metric)
         }
     }
 
+    #[derive(Default)]
     struct IncrementalMetricNormalize;
 
     impl MetricNormalize for IncrementalMetricNormalize {
-        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
             state.make_incremental(metric)
         }
     }
@@ -332,7 +356,7 @@ mod test {
             .collect()
     }
 
-    fn rebuffer<State: MetricNormalize>(metrics: Vec<Metric>) -> Buffer {
+    fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 6;
@@ -342,7 +366,7 @@ mod test {
         let mut result = vec![];
 
         for metric in metrics {
-            if let Some(event) = normalizer.apply(Event::Metric(metric)) {
+            if let Some(event) = normalizer.apply(metric) {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
@@ -369,7 +393,7 @@ mod test {
             .collect()
     }
 
-    fn rebuffer_incremental_counters<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_incremental_counters<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for i in 0..4 {
             // counter-0 is repeated 5 times
@@ -443,7 +467,7 @@ mod test {
         assert_eq!(buffer.len(), 2);
     }
 
-    fn rebuffer_absolute_counters<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_absolute_counters<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // counter-0 and -1 only emitted once
         // counter-2 and -3 emitted twice
@@ -493,7 +517,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_gauges<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_incremental_gauges<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // gauge-1 emitted once
         // gauge-2 through -4 are emitted twice
@@ -545,7 +569,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_absolute_gauges<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_absolute_gauges<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // gauge-2 emitted once
         // gauge-3 and -4 emitted twice
@@ -593,7 +617,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_sets<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_incremental_sets<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // set-0 emitted 8 times with 4 different values
         // set-1 emitted once with 4 values
@@ -640,7 +664,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_distributions<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_incremental_distributions<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for _ in 2..6 {
             events.push(sample_distribution_histogram(2, Incremental, 10));
@@ -705,7 +729,7 @@ mod test {
         );
     }
 
-    fn rebuffer_absolute_aggregated_histograms<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_absolute_aggregated_histograms<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for _ in 2..5 {
             events.push(sample_aggregated_histogram(2, Absolute, 1.0, 1, 10.0));
@@ -752,7 +776,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_aggregated_histograms<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_incremental_aggregated_histograms<State: MetricNormalize + Default>() -> Buffer {
         let mut events = vec![sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0)];
 
         for i in 1..4 {
@@ -786,7 +810,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_aggregated_summaries<State: MetricNormalize>() -> Buffer {
+    fn rebuffer_aggregated_summaries<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for factor in 0..2 {
             for num in 2..4 {

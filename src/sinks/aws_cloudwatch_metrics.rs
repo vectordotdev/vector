@@ -160,7 +160,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event).map(|mut metric| {
+                    normalizer.apply(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -224,10 +224,11 @@ impl CloudWatchMetricsSvc {
     }
 }
 
+#[derive(Default)]
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),

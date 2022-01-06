@@ -167,7 +167,7 @@ impl SematextMetricsService {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event)
+                        .apply(event.into_metric())
                         .map(|item| Ok(EncodedEvent::new(item, byte_size)))
                 })
             })
@@ -197,10 +197,11 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 }
 
+#[derive(Default)]
 struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),

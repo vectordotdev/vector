@@ -2417,6 +2417,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "float_eq"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1d53499e94f9a7828e63c574adf62bcade7f358c3738f9ea70d7c2edb61023d"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8497,6 +8503,7 @@ dependencies = [
  "dyn-clone",
  "enrichment",
  "env-test-util",
+ "float_eq",
  "futures 0.3.19",
  "futures-util",
  "getset",

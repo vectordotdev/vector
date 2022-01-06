@@ -8,6 +8,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use float_eq::FloatEq;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -151,7 +152,7 @@ impl From<MetricKind> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
@@ -234,6 +235,58 @@ impl ByteSizeOf for MetricValue {
             Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
             Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
             Self::Sketch { sketch } => sketch.allocated_bytes(),
+        }
+    }
+}
+
+impl PartialEq for MetricValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Counter { value: l_value }, Self::Counter { value: r_value })
+            | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
+                l_value.eq_ulps(r_value, &1)
+            }
+            (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
+                l_values == r_values
+            }
+            (
+                Self::Distribution {
+                    samples: l_samples,
+                    statistic: l_statistic,
+                },
+                Self::Distribution {
+                    samples: r_samples,
+                    statistic: r_statistic,
+                },
+            ) => l_samples == r_samples && l_statistic == r_statistic,
+            (
+                Self::AggregatedHistogram {
+                    buckets: l_buckets,
+                    count: l_count,
+                    sum: l_sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: r_buckets,
+                    count: r_count,
+                    sum: r_sum,
+                },
+            ) => l_buckets == r_buckets && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            (
+                Self::AggregatedSummary {
+                    quantiles: l_quantiles,
+                    count: l_count,
+                    sum: l_sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: r_quantiles,
+                    count: r_count,
+                    sum: r_sum,
+                },
+            ) => l_quantiles == r_quantiles && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
+                l_sketch == r_sketch
+            }
+            _ => false,
         }
     }
 }
@@ -726,6 +779,24 @@ impl MetricData {
         }
     }
 
+    /// Creates a new `MetricData` from individual parts.
+    pub fn from_parts(
+        timestamp: Option<DateTime<Utc>>,
+        kind: MetricKind,
+        value: MetricValue,
+    ) -> Self {
+        Self {
+            timestamp,
+            kind,
+            value,
+        }
+    }
+
+    /// Consumes this `MetricData` and returns its individual parts.
+    pub fn into_parts(self) -> (Option<DateTime<Utc>>, MetricKind, MetricValue) {
+        (self.timestamp, self.kind, self.value)
+    }
+
     /// Update this `MetricData` by adding the value from another.
     #[must_use]
     pub fn update(&mut self, other: &Self) -> bool {
@@ -856,7 +927,14 @@ impl MetricValue {
                 *sum += sum2;
                 true
             }
-
+            (Self::Sketch { sketch }, Self::Sketch { sketch: sketch2 }) => {
+                match (sketch, sketch2) {
+                    (
+                        MetricSketch::AgentDDSketch(ddsketch),
+                        MetricSketch::AgentDDSketch(ddsketch2),
+                    ) => ddsketch.merge(ddsketch2),
+                }
+            }
             _ => false,
         }
     }

@@ -163,12 +163,26 @@ pub trait SinkBuilderExt: Stream {
     /// supported by the sink, or to modify them.  Such modifications typically include converting
     /// absolute metrics to incremental metrics by tracking the change over time for a particular
     /// series, or emitting absolute metrics based on incremental updates.
-    fn normalized<N>(self) -> Normalizer<Self, N>
+    fn normalized<N>(self, normalizer: N) -> Normalizer<Self, N>
     where
         Self: Stream<Item = Metric> + Unpin + Sized,
         N: MetricNormalize,
     {
-        Normalizer::new(self)
+        Normalizer::new(self, normalizer)
+    }
+
+    /// Normalizes a stream of [`Metric`] events with a default normalizer.
+    ///
+    /// An implementation of [`MetricNormalize`] is used to either drop metrics which cannot be
+    /// supported by the sink, or to modify them.  Such modifications typically include converting
+    /// absolute metrics to incremental metrics by tracking the change over time for a particular
+    /// series, or emitting absolute metrics based on incremental updates.
+    fn normalized_with_default<N>(self) -> Normalizer<Self, N>
+    where
+        Self: Stream<Item = Metric> + Unpin + Sized,
+        N: MetricNormalize + Default,
+    {
+        Normalizer::new(self, N::default())
     }
 
     /// Creates a [`Driver`] that uses the configured event stream as the input to the given

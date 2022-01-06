@@ -162,7 +162,7 @@ impl InfluxDbSvc {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event)
+                        .apply(event.into_metric())
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
@@ -232,10 +232,11 @@ fn merge_tags(
     }
 }
 
+#[derive(Default)]
 pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter

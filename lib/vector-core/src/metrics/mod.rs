@@ -12,7 +12,7 @@ use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
 pub use crate::metrics::{
-    ddsketch::{AgentDDSketch, BinMap},
+    ddsketch::{AgentDDSketch, BinMap, Config},
     handle::{Counter, Handle},
 };
 use crate::{

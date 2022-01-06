@@ -1,5 +1,4 @@
 use std::{
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -8,7 +7,7 @@ use futures_util::{ready, stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use vector_core::event::Metric;
 
-use super::buffer::metrics::{MetricNormalize, MetricSet};
+use super::buffer::metrics::{MetricNormalize, MetricNormalizer};
 
 #[pin_project]
 pub struct Normalizer<St, N>
@@ -17,19 +16,17 @@ where
 {
     #[pin]
     stream: Fuse<St>,
-    metric_set: MetricSet,
-    _normalizer: PhantomData<N>,
+    normalizer: MetricNormalizer<N>,
 }
 
 impl<St, N> Normalizer<St, N>
 where
     St: Stream,
 {
-    pub fn new(stream: St) -> Self {
+    pub fn new(stream: St, normalizer: N) -> Self {
         Self {
             stream: stream.fuse(),
-            metric_set: MetricSet::default(),
-            _normalizer: PhantomData,
+            normalizer: MetricNormalizer::from_inner(normalizer),
         }
     }
 }
@@ -46,7 +43,7 @@ where
         loop {
             match ready!(this.stream.as_mut().poll_next(cx)) {
                 Some(metric) => {
-                    if let Some(normalized) = N::apply_state(this.metric_set, metric) {
+                    if let Some(normalized) = this.normalizer.apply(metric) {
                         return Poll::Ready(Some(normalized));
                     }
                 }

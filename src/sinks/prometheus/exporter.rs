@@ -1,15 +1,13 @@
 use std::{
     convert::Infallible,
-    hash::{Hash, Hasher},
-    mem::discriminant,
+    hash::Hash,
+    mem::{discriminant, Discriminant},
     net::SocketAddr,
-    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
-use chrono::Utc;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -18,11 +16,19 @@ use hyper::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use vector_core::buffers::Acker;
+use vector_core::{
+    buffers::Acker,
+    event::metric::{MetricSeries, MetricSketch},
+    metrics::AgentDDSketch,
+};
 
-use super::collector::{self, MetricCollector as _};
+use super::{
+    collector::{MetricCollector, StringCollector},
+    samples_to_buckets,
+};
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::{
@@ -31,7 +37,11 @@ use crate::{
     },
     internal_events::PrometheusServerRequestComplete,
     sinks::{
-        util::{statistic::validate_quantiles, StreamSink},
+        util::{
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
+            statistic::validate_quantiles,
+            StreamSink,
+        },
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -45,6 +55,7 @@ enum BuildError {
     FlushPeriodTooShort { min: u64 },
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -57,11 +68,14 @@ pub struct PrometheusExporterConfig {
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+    #[serde(default = "default_distributions_as_summaries")]
+    pub distributions_as_summaries: bool,
     #[serde(default = "default_flush_period_secs")]
-    pub flush_period_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub flush_period_secs: Duration,
 }
 
-impl std::default::Default for PrometheusExporterConfig {
+impl Default for PrometheusExporterConfig {
     fn default() -> Self {
         Self {
             default_namespace: None,
@@ -69,6 +83,7 @@ impl std::default::Default for PrometheusExporterConfig {
             tls: None,
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
+            distributions_as_summaries: default_distributions_as_summaries(),
             flush_period_secs: default_flush_period_secs(),
         }
     }
@@ -80,8 +95,12 @@ fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-const fn default_flush_period_secs() -> u64 {
-    60
+const fn default_distributions_as_summaries() -> bool {
+    false
+}
+
+const fn default_flush_period_secs() -> Duration {
+    Duration::from_secs(60)
 }
 
 inventory::submit! {
@@ -102,7 +121,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
+        if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
             }));
@@ -160,18 +179,140 @@ impl SinkConfig for PrometheusCompatConfig {
 struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
-    metrics: Arc<RwLock<ExpiringMetrics>>,
+    metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
     acker: Acker,
 }
 
-struct ExpiringMetrics {
-    map: IndexMap<MetricEntry, MetricMetadata>,
-    last_flush_timestamp: i64,
+/// Expiration metadata for a metric.
+#[derive(Clone, Copy, Debug)]
+struct MetricMetadata {
+    should_clear: bool,
+    last_updated: Instant,
 }
 
-struct MetricMetadata {
-    is_incremental_set: bool,
-    updated_at: Instant,
+impl MetricMetadata {
+    pub fn new(should_clear: bool) -> Self {
+        Self {
+            should_clear,
+            last_updated: Instant::now(),
+        }
+    }
+
+    pub fn has_expired(&self, timeout: Duration) -> bool {
+        self.last_updated.elapsed() > timeout
+    }
+}
+
+// Composite identifier that uniquely represents a metric.
+//
+// Instead of simply working off of the name (series) alone, we include the metric kind as well as
+// the type (counter, gauge, etc) and any subtype information like histogram buckets.
+//
+// Specifically, though, we do _not_ include the actual metric value.  This type is used
+// specifically to look up the entry in a map for a metric in the sense of "get the metric whose
+// name is X and type is Y and has these tags".
+#[derive(Clone, Debug)]
+struct MetricRef(
+    MetricSeries,
+    MetricKind,
+    Discriminant<MetricValue>,
+    Option<Vec<f64>>,
+);
+
+impl MetricRef {
+    /// Creates a `MetricRef` based on the given `Metric`.
+    pub fn from_metric(metric: &Metric) -> Self {
+        // Either the buckets for an aggregated histogram, or the quantiles for an aggregated summary.
+        let bounds = match metric.value() {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                Some(buckets.iter().map(|b| b.upper_limit).collect())
+            }
+            MetricValue::AggregatedSummary { quantiles, .. } => {
+                Some(quantiles.iter().map(|q| q.quantile).collect())
+            }
+            _ => None,
+        };
+
+        Self(
+            metric.series().clone(),
+            metric.kind(),
+            discriminant(metric.value()),
+            bounds,
+        )
+    }
+}
+
+impl PartialEq for MetricRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1 && self.2 == other.2 && self.3 == other.3
+    }
+}
+
+impl Eq for MetricRef {}
+
+impl Hash for MetricRef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+        self.1.hash(state);
+        self.2.hash(state);
+        if let Some(bounds) = &self.3 {
+            for bound in bounds {
+                bound.to_bits().hash(state);
+            }
+        }
+    }
+}
+
+struct PrometheusExporterMetricNormalizer {
+    distributions_as_summaries: bool,
+    buckets: Vec<f64>,
+}
+
+impl MetricNormalize for PrometheusExporterMetricNormalizer {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        let new_metric = match metric.value() {
+            MetricValue::Distribution { .. } => {
+                // Convert the distribution as-is, and then let the normalizer absolute-ify it.
+                let (series, data, metadata) = metric.into_parts();
+                let (ts, kind, value) = data.into_parts();
+
+                let new_value = match value {
+                    MetricValue::Distribution { samples, .. } => {
+                        if self.distributions_as_summaries {
+                            // We use a sketch when in summary mode because they're actually able to be
+                            // merged and provide correct output, unlike the aggregated summaries that
+                            // we handle from _sources_ like Prometheus.  The collector code already
+                            // renders sketches as an aggregated summary to begin with, so we're gucci.
+                            let mut sketch = AgentDDSketch::with_agent_defaults();
+                            for sample in samples {
+                                sketch.insert_n(sample.value, sample.rate);
+                            }
+
+                            MetricValue::Sketch {
+                                sketch: MetricSketch::AgentDDSketch(sketch),
+                            }
+                        } else {
+                            let (buckets, count, sum) =
+                                samples_to_buckets(samples.iter(), &self.buckets);
+
+                            MetricValue::AggregatedHistogram {
+                                buckets,
+                                count,
+                                sum,
+                            }
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+
+                let data = MetricData::from_parts(ts, kind, new_value);
+                Metric::from_parts(series, data, metadata)
+            }
+            _ => metric,
+        };
+
+        state.make_absolute(new_metric)
+    }
 }
 
 fn handle(
@@ -179,20 +320,19 @@ fn handle(
     default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
-    expired: bool,
-    metrics: &IndexMap<MetricEntry, MetricMetadata>,
+    metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/metrics") => {
-            let mut s = collector::StringCollector::new();
+            let mut collector = StringCollector::new();
 
-            for (MetricEntry(metric), _) in metrics {
-                s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
+            for (_, (metric, _)) in metrics {
+                collector.encode_metric(default_namespace, buckets, quantiles, metric);
             }
 
-            *response.body_mut() = s.finish().into();
+            *response.body_mut() = collector.finish().into();
 
             response.headers_mut().insert(
                 "Content-Type",
@@ -212,10 +352,7 @@ impl PrometheusExporter {
         Self {
             server_shutdown_trigger: None,
             config,
-            metrics: Arc::new(RwLock::new(ExpiringMetrics {
-                map: IndexMap::new(),
-                last_flush_timestamp: Utc::now().timestamp(),
-            })),
+            metrics: Arc::new(RwLock::new(IndexMap::new())),
             acker,
         }
     }
@@ -229,20 +366,16 @@ impl PrometheusExporter {
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
-        let flush_period_secs = self.config.flush_period_secs;
 
         let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
-            let flush_period_secs = flush_period_secs;
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     let metrics = metrics.read().unwrap();
-                    let interval = (Utc::now().timestamp() - metrics.last_flush_timestamp) as u64;
-                    let expired = interval > flush_period_secs;
 
                     let response = info_span!(
                         "prometheus_server",
@@ -255,8 +388,7 @@ impl PrometheusExporter {
                             default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
-                            expired,
-                            &metrics.map,
+                            &metrics,
                         )
                     });
 
@@ -302,175 +434,93 @@ impl PrometheusExporter {
 impl StreamSink for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed().await;
+
+        let mut last_flush = Instant::now();
+        let mut normalizer = MetricNormalizer::from_inner(PrometheusExporterMetricNormalizer {
+            distributions_as_summaries: self.config.distributions_as_summaries,
+            buckets: self.config.buckets.clone(),
+        });
+
         while let Some(event) = input.next().await {
-            let item = event.into_metric();
-            let mut metrics = self.metrics.write().unwrap();
+            let metric = event.into_metric();
 
-            // sets need to be expired from time to time
-            // because otherwise they could grow infinitely
-            let now = Utc::now().timestamp();
-            let interval = now - metrics.last_flush_timestamp;
-            if interval > self.config.flush_period_secs as i64 {
-                metrics.last_flush_timestamp = now;
+            if let Some(normalized) = normalizer.apply(metric) {
+                // Push this metric into the expiration tracker.  All metrics that we handle here
+                // have already been normalized into absolute metrics, so we're really just updating
+                // the "last updated" field for existing/tracked metrics, and add it in for
+                // not-yet-seen ones.
+                let mut metrics = self.metrics.write().unwrap();
 
-                let now = Instant::now();
-                metrics.map = metrics
-                    .map
-                    .drain(..)
-                    .map(|(mut entry, metadata)| {
-                        if metadata.is_incremental_set {
-                            entry.0.zero();
-                        }
-                        (entry, metadata)
-                    })
-                    .filter(|(_metric, metadata)| {
-                        now.duration_since(metadata.updated_at).as_secs()
-                            < self.config.flush_period_secs
-                    })
-                    .collect();
+                let metric_ref = MetricRef::from_metric(&normalized);
+                match metrics.get_mut(&metric_ref) {
+                    Some((data, metadata)) => {
+                        *data = normalized;
+                        metadata.last_updated = Instant::now();
+                    }
+                    None => {
+                        // We specifically clear sets when they expire rather than totally delete
+                        // them, and this flag is how we know to do that.
+                        let should_clear = matches!(normalized.value(), MetricValue::Set { .. });
+                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(should_clear)));
+                    }
+                }
             }
 
-            match item.kind() {
-                MetricKind::Incremental => {
-                    let mut entry = MetricEntry(item.into_absolute());
-                    if let Some((MetricEntry(mut metric), _)) = metrics.map.remove_entry(&entry) {
-                        if metric.update(&entry) {
-                            entry = MetricEntry(metric);
-                        } else {
-                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
+            // If we've exceed our flush interval, go through all of the metrics we're currently
+            // tracking and remove any which have exceeded the the flush interval in terms of not
+            // having been updated within that long of a time.
+            //
+            // TODO: Can we be smarter about this? As is, we might wait up to 2x the flush period to
+            // remove an expired metric depending on how things line up.  It'd be cool to _check_
+            // for expired metrics more often, but we also don't want to check _way_ too often, like
+            // every second, since then we're constantly iterating through every metric, etc etc.
+            if last_flush.elapsed() > self.config.flush_period_secs {
+                last_flush = Instant::now();
+
+                let mut metrics = self.metrics.write().unwrap();
+
+                let metrics_to_expire = metrics
+                    .iter()
+                    .filter(|(_, (_, metadata))| {
+                        !metadata.has_expired(self.config.flush_period_secs)
+                    })
+                    .map(|(metric_ref, (_, metadata))| (metric_ref.clone(), *metadata))
+                    .collect::<Vec<_>>();
+
+                for (metric_ref, metadata) in metrics_to_expire {
+                    if metadata.should_clear {
+                        if let Some((metric, _)) = metrics.get_mut(&metric_ref) {
+                            metric.data_mut().value_mut().zero();
                         }
+                    } else {
+                        metrics.remove(&metric_ref);
                     }
-                    let is_set = matches!(entry.value(), MetricValue::Set { .. });
-                    metrics.map.insert(
-                        entry,
-                        MetricMetadata {
-                            is_incremental_set: is_set,
-                            updated_at: Instant::now(),
-                        },
-                    );
+                    normalizer.get_state_mut().remove(&metric_ref.0);
                 }
-                MetricKind::Absolute => {
-                    let new = MetricEntry(item);
-                    metrics.map.remove(&new);
-                    metrics.map.insert(
-                        new,
-                        MetricMetadata {
-                            is_incremental_set: false,
-                            updated_at: Instant::now(),
-                        },
-                    );
-                }
-            };
+            }
 
             self.acker.ack(1);
         }
+
         Ok(())
-    }
-}
-
-struct MetricEntry(Metric);
-
-impl Deref for MetricEntry {
-    type Target = Metric;
-    fn deref(&self) -> &Metric {
-        &self.0
-    }
-}
-
-impl DerefMut for MetricEntry {
-    fn deref_mut(&mut self) -> &mut Metric {
-        &mut self.0
-    }
-}
-
-impl AsRef<MetricData> for MetricEntry {
-    fn as_ref(&self) -> &MetricData {
-        self.0.as_ref()
-    }
-}
-
-impl Eq for MetricEntry {}
-
-impl Hash for MetricEntry {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let metric = &self.0;
-        metric.series().hash(state);
-        metric.kind().hash(state);
-        discriminant(metric.value()).hash(state);
-
-        match metric.value() {
-            MetricValue::AggregatedHistogram { buckets, .. } => {
-                for bucket in buckets {
-                    bucket.upper_limit.to_bits().hash(state);
-                }
-            }
-            MetricValue::AggregatedSummary { quantiles, .. } => {
-                for quantile in quantiles {
-                    quantile.quantile.to_bits().hash(state);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-impl PartialEq for MetricEntry {
-    fn eq(&self, other: &Self) -> bool {
-        // This differs from a straightforward implementation of `eq` by
-        // comparing only the "shape" bits (name, tags, and type) while
-        // allowing the contained values to be different.
-        self.series() == other.series()
-            && self.kind() == other.kind()
-            && discriminant(self.value()) == discriminant(other.value())
-            && match (self.value(), other.value()) {
-                (
-                    MetricValue::AggregatedHistogram {
-                        buckets: buckets1, ..
-                    },
-                    MetricValue::AggregatedHistogram {
-                        buckets: buckets2, ..
-                    },
-                ) => {
-                    buckets1.len() == buckets2.len()
-                        && buckets1
-                            .iter()
-                            .zip(buckets2.iter())
-                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                }
-                (
-                    MetricValue::AggregatedSummary {
-                        quantiles: quantiles1,
-                        ..
-                    },
-                    MetricValue::AggregatedSummary {
-                        quantiles: quantiles2,
-                        ..
-                    },
-                ) => {
-                    quantiles1.len() == quantiles2.len()
-                        && quantiles1
-                            .iter()
-                            .zip(quantiles2.iter())
-                            .all(|(q1, q2)| q1.quantile == q2.quantile)
-                }
-                _ => true,
-            }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::Duration;
+    use chrono::{Duration, Utc};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
+    use vector_core::{event::StatisticKind, samples};
 
     use super::*;
     use crate::{
         config::ProxyConfig,
         event::metric::{Metric, MetricValue},
         http::HttpClient,
+        sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
@@ -643,23 +693,254 @@ mod tests {
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
-        let internal_metrics = Arc::clone(&sink.metrics);
+        let metrics_handle = Arc::clone(&sink.metrics);
 
         sink.run(Box::pin(futures::stream::iter(metrics)))
             .await
             .unwrap();
 
-        let map = &internal_metrics.read().unwrap().map;
+        let metrics_after = metrics_handle.read().unwrap();
 
-        assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
-            &MetricValue::Counter { value: 40. }
+        let expected_m1 = metrics_after
+            .get(&MetricRef::from_metric(&m1))
+            .expect("m1 should exist");
+        let expected_m1_value = MetricValue::Counter { value: 40. };
+        assert_eq!(expected_m1.0.value(), &expected_m1_value);
+
+        let expected_m2 = metrics_after
+            .get(&MetricRef::from_metric(&m2))
+            .expect("m2 should exist");
+        let expected_m2_value = MetricValue::Counter { value: 33. };
+        assert_eq!(expected_m2.0.value(), &expected_m2_value);
+    }
+
+    #[tokio::test]
+    async fn sink_distributions_as_histograms() {
+        // When we get summary distributions, unless we've been configured to actually emit
+        // summaries for distributions, we just forcefully turn them into histograms.  This is
+        // simpler and uses less memory, as aggregated histograms are better supported by Prometheus
+        // since they can actually be aggregated anywhere in the pipeline -- so long as the buckets
+        // are the same -- without loss of accuracy.
+
+        // This expects that the default for the sink is to render distributions as aggregated histograms.
+        let config = PrometheusExporterConfig {
+            address: next_addr(), // Not actually bound, just needed to fill config
+            tls: None,
+            ..Default::default()
+        };
+        let buckets = config.buckets.clone();
+        let cx = SinkContext::new_test();
+
+        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+
+        // Define a series of incremental distribution updates.
+        let base_summary_metric = Metric::new(
+            "distrib_summary",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Summary,
+                samples: samples!(1.0 => 1, 3.0 => 2),
+            },
         );
 
-        assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
-            &MetricValue::Counter { value: 33. }
+        let base_histogram_metric = Metric::new(
+            "distrib_histo",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Histogram,
+                samples: samples!(7.0 => 1, 9.0 => 2),
+            },
         );
+
+        let metrics = vec![
+            base_summary_metric.clone(),
+            base_summary_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Summary,
+                    samples: samples!(1.0 => 2, 2.9 => 1),
+                }),
+            base_summary_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Summary,
+                    samples: samples!(1.0 => 4, 3.2 => 1),
+                }),
+            base_histogram_metric.clone(),
+            base_histogram_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Histogram,
+                    samples: samples!(7.0 => 2, 9.9 => 1),
+                }),
+            base_histogram_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Histogram,
+                    samples: samples!(7.0 => 4, 10.2 => 1),
+                }),
+        ];
+
+        // Figure out what the merged distributions should add up to.
+        let mut merged_summary = base_summary_metric.clone();
+        assert!(merged_summary.update(&metrics[1]));
+        assert!(merged_summary.update(&metrics[2]));
+        let expected_summary = distribution_to_agg_histogram(merged_summary, &buckets)
+            .expect("input summary metric should have been distribution")
+            .into_absolute();
+
+        let mut merged_histogram = base_histogram_metric.clone();
+        assert!(merged_histogram.update(&metrics[4]));
+        assert!(merged_histogram.update(&metrics[5]));
+        let expected_histogram = distribution_to_agg_histogram(merged_histogram, &buckets)
+            .expect("input histogram metric should have been distribution")
+            .into_absolute();
+
+        // TODO: make a new metric based on merged_distrib_histogram, with expected_histogram_value,
+        // so that the discriminant matches and our lookup in the indexmap can actually find it
+
+        // Now run the events through the sink and see what ends up in the internal metric map.
+        let metrics_handle = Arc::clone(&sink.metrics);
+
+        let events = metrics
+            .iter()
+            .cloned()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+        sink.run(Box::pin(futures::stream::iter(events)))
+            .await
+            .unwrap();
+
+        let metrics_after = metrics_handle.read().unwrap();
+
+        // Both metrics should be present, and both should be aggregated histograms.
+        assert_eq!(metrics_after.len(), 2);
+
+        let actual_summary = metrics_after
+            .get(&MetricRef::from_metric(&expected_summary))
+            .expect("summary metric should exist");
+        assert_eq!(actual_summary.0.value(), expected_summary.value());
+
+        let actual_histogram = metrics_after
+            .get(&MetricRef::from_metric(&expected_histogram))
+            .expect("histogram metric should exist");
+        assert_eq!(actual_histogram.0.value(), expected_histogram.value());
+    }
+
+    #[tokio::test]
+    async fn sink_distributions_as_summaries() {
+        // When we get summary distributions, unless we've been configured to actually emit
+        // summaries for distributions, we just forcefully turn them into histograms.  This is
+        // simpler and uses less memory, as aggregated histograms are better supported by Prometheus
+        // since they can actually be aggregated anywhere in the pipeline -- so long as the buckets
+        // are the same -- without loss of accuracy.
+
+        // This assumes that when we turn on `distributions_as_summaries`, we'll get aggregated
+        // summaries from distributions.  This is technically true, but the way this test works is
+        // that we check the internal metric data, which, when in this mode, will actually be a
+        // sketch (so that we can merge without loss of accuracy).
+        //
+        // The render code is actually what will end up rrendering those sketches as aggregated
+        // summaries in the scrape output.
+        let config = PrometheusExporterConfig {
+            address: next_addr(), // Not actually bound, just needed to fill config
+            tls: None,
+            distributions_as_summaries: true,
+            ..Default::default()
+        };
+        let cx = SinkContext::new_test();
+
+        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+
+        // Define a series of incremental distribution updates.
+        let base_summary_metric = Metric::new(
+            "distrib_summary",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Summary,
+                samples: samples!(1.0 => 1, 3.0 => 2),
+            },
+        );
+
+        let base_histogram_metric = Metric::new(
+            "distrib_histo",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Histogram,
+                samples: samples!(7.0 => 1, 9.0 => 2),
+            },
+        );
+
+        let metrics = vec![
+            base_summary_metric.clone(),
+            base_summary_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Summary,
+                    samples: samples!(1.0 => 2, 2.9 => 1),
+                }),
+            base_summary_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Summary,
+                    samples: samples!(1.0 => 4, 3.2 => 1),
+                }),
+            base_histogram_metric.clone(),
+            base_histogram_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Histogram,
+                    samples: samples!(7.0 => 2, 9.9 => 1),
+                }),
+            base_histogram_metric
+                .clone()
+                .with_value(MetricValue::Distribution {
+                    statistic: StatisticKind::Histogram,
+                    samples: samples!(7.0 => 4, 10.2 => 1),
+                }),
+        ];
+
+        // Figure out what the merged distributions should add up to.
+        let mut merged_summary = base_summary_metric.clone();
+        assert!(merged_summary.update(&metrics[1]));
+        assert!(merged_summary.update(&metrics[2]));
+        let expected_summary = distribution_to_ddsketch(merged_summary)
+            .expect("input summary metric should have been distribution")
+            .into_absolute();
+
+        let mut merged_histogram = base_histogram_metric.clone();
+        assert!(merged_histogram.update(&metrics[4]));
+        assert!(merged_histogram.update(&metrics[5]));
+        let expected_histogram = distribution_to_ddsketch(merged_histogram)
+            .expect("input histogram metric should have been distribution")
+            .into_absolute();
+
+        // Now run the events through the sink and see what ends up in the internal metric map.
+        let metrics_handle = Arc::clone(&sink.metrics);
+
+        let events = metrics
+            .iter()
+            .cloned()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+        sink.run(Box::pin(futures::stream::iter(events)))
+            .await
+            .unwrap();
+
+        let metrics_after = metrics_handle.read().unwrap();
+
+        // Both metrics should be present, and both should be aggregated histograms.
+        assert_eq!(metrics_after.len(), 2);
+
+        let actual_summary = metrics_after
+            .get(&MetricRef::from_metric(&expected_summary))
+            .expect("summary metric should exist");
+        assert_eq!(actual_summary.0.value(), expected_summary.value());
+
+        let actual_histogram = metrics_after
+            .get(&MetricRef::from_metric(&expected_histogram))
+            .expect("histogram metric should exist");
+        assert_eq!(actual_histogram.0.value(), expected_histogram.value());
     }
 }
 
@@ -694,6 +975,7 @@ mod integration_tests {
 
         let config = PrometheusExporterConfig {
             address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            flush_period_secs: default_flush_period_secs(),
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -726,7 +1008,7 @@ mod integration_tests {
     async fn reset_on_flush_period() {
         let config = PrometheusExporterConfig {
             address: PROMETHEUS_ADDRESS.parse().unwrap(),
-            flush_period_secs: 3,
+            flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -780,7 +1062,7 @@ mod integration_tests {
     async fn expire_on_flush_period() {
         let config = PrometheusExporterConfig {
             address: PROMETHEUS_ADDRESS.parse().unwrap(),
-            flush_period_secs: 3,
+            flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
