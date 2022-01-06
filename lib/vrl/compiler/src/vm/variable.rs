@@ -5,6 +5,7 @@ use lookup::LookupBuf;
 pub enum Variable {
     Internal(crate::parser::Ident, Option<lookup::LookupBuf>),
     External(lookup::LookupBuf),
+    None,
 }
 
 impl From<&Target> for Variable {
@@ -12,7 +13,7 @@ impl From<&Target> for Variable {
         match target {
             Target::External(Some(path)) => Variable::External(path.clone()),
             Target::External(None) => Variable::External(LookupBuf::root()),
-            Target::Noop => todo!(),
+            Target::Noop => Variable::None,
             Target::Internal(ident, path) => Variable::Internal(ident.clone(), path.clone()),
         }
     }

@@ -36,16 +36,22 @@ impl Function for Exists {
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
         expr: &expression::Expr,
-    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+    ) -> CompiledArgument {
         if name == "field" {
             let query = match expr {
                 expression::Expr::Query(query) => query,
-                _ => panic!("No query"),
+                _ => {
+                    return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                        keyword: "field",
+                        expected: "query",
+                        expr: expr.clone(),
+                    }))
+                }
             };
 
-            Some(Box::new(query.clone()) as _)
+            Ok(Some(Box::new(query.clone()) as _))
         } else {
-            None
+            Ok(None)
         }
     }
 

@@ -114,6 +114,67 @@ impl Function for ParseKeyValue {
             standalone_key,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        name: &str,
+        expr: &expression::Expr,
+    ) -> CompiledArgument {
+        if name == "whitespace" {
+            match expr.as_value() {
+                None => Ok(None),
+                Some(value) => Ok(Some(
+                    Whitespace::from_str(
+                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
+                    )
+                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
+                    .map_err(|e| vrl::function::Error::InvalidEnumVariant {
+                        keyword: "whitespace",
+                        value,
+                        variants: Whitespace::all_value().to_vec(),
+                    })?,
+                )),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let bytes = value.try_bytes_utf8_lossy()?;
+
+        let key_value_delimiter = args
+            .optional("key_value_delimiter")
+            .unwrap_or_else(|| value!("="));
+        let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+
+        let field_delimiter = args
+            .optional("field_delimiter")
+            .unwrap_or_else(|| value!(" "));
+        let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+
+        let whitespace = match args.optional_any("whitespace") {
+            Some(whitespace) => *whitespace.downcast_ref::<Whitespace>().unwrap(),
+            None => Whitespace::default(),
+        };
+
+        let standalone_key = args
+            .optional("accept_standalone_key")
+            .unwrap_or_else(|| value!(true))
+            .try_boolean()?;
+
+        let values = parse(
+            &bytes,
+            &key_value_delimiter,
+            &field_delimiter,
+            whitespace,
+            standalone_key,
+        )?;
+
+        Ok(Value::from_iter(values))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -19,7 +19,9 @@ pub use bytes::Bytes;
 // pub use compiler::expression::Resolved;
 
 // commonly used function types
-pub use compiler::function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter};
+pub use compiler::function::{
+    ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
+};
 // commonly used macros
 pub use compiler::{
     bench_function, expr, expression::FunctionArgument, func_args, map, test_function,

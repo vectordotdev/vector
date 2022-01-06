@@ -408,16 +408,7 @@ where
                 expr.dump(vm)?;
                 vm.write_chunk(OpCode::SetPath);
 
-                let variable = match target {
-                    Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
-                    Target::External(None) => crate::vm::Variable::External(LookupBuf::root()),
-                    Target::Internal(ident, path) => {
-                        crate::vm::Variable::Internal(ident.clone(), path.clone())
-                    }
-                    Target::Noop => return Ok(()),
-                };
-
-                let target = vm.get_target(&variable);
+                let target = vm.get_target(&target.into());
                 vm.write_primitive(target);
             }
             Variant::Infallible {

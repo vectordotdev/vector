@@ -107,7 +107,7 @@ impl Function for ParseGroks {
         args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
         expr: &expression::Expr,
-    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+    ) -> CompiledArgument {
         if name == "patterns" {
             let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
                 if *name == "aliases" {
@@ -129,8 +129,7 @@ impl Function for ParseGroks {
                         .into_owned();
                     Ok(pattern)
                 })
-                .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()
-                .unwrap();
+                .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
 
             let aliases = aliases
                 .map(|aliases| {
@@ -153,12 +152,11 @@ impl Function for ParseGroks {
 
             // we use a datadog library here because it is a superset of grok
             let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
-                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)
-                .unwrap();
+                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?;
 
-            Some(Box::new(grok_rules) as _)
+            Ok(Some(Box::new(grok_rules) as _))
         } else {
-            None
+            Ok(None)
         }
     }
 

@@ -15,6 +15,8 @@ use crate::{
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type CompiledArgument =
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
 
 pub trait Function: Sync + fmt::Debug {
     /// The identifier by which the function can be called.
@@ -65,8 +67,8 @@ pub trait Function: Sync + fmt::Debug {
         _args: &[(&'static str, Option<FunctionArgument>)],
         _name: &str,
         _expr: &Expr,
-    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
-        None
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+        Ok(None)
     }
 
     fn call(

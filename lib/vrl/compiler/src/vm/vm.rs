@@ -252,6 +252,7 @@ impl Vm {
                             }
                         }
                         Variable::External(path) => ctx.target_mut().insert(path, value)?,
+                        Variable::None => (),
                     }
                 }
                 OpCode::SetPathInfallible => {
@@ -284,6 +285,7 @@ impl Vm {
                                     }
                                 }
                                 Variable::External(path) => ctx.target_mut().insert(path, err)?,
+                                Variable::None => (),
                             }
                         }
                         None => {
@@ -309,6 +311,7 @@ impl Vm {
                                     }
                                 }
                                 Variable::External(path) => ctx.target_mut().insert(path, value)?,
+                                Variable::None => (),
                             }
                         }
                     }
@@ -335,6 +338,7 @@ impl Vm {
 
                             state.stack.push(value);
                         }
+                        Variable::None => state.stack.push(Value::Null),
                     }
                 }
                 OpCode::Call => {

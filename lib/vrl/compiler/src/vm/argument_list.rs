@@ -61,6 +61,7 @@ impl<'a> VmArgumentList<'a> {
         // Return the parameter found at this position.
         self.values[pos].take().map(|v| v.as_value())
     }
+
     /// Returns the parameter with the given name.
     /// Note the this can only be called once per parameter since the value is
     /// removed from the list.
@@ -74,5 +75,20 @@ impl<'a> VmArgumentList<'a> {
 
         // Return the parameter found at this position.
         self.values[pos].take().unwrap().as_any()
+    }
+
+    /// Returns the parameter with the given name.
+    /// Note the this can only be called once per parameter since the value is
+    /// removed from the list.
+    pub fn optional_any(&mut self, name: &str) -> Option<&'a Box<dyn Any + Send + Sync>> {
+        // Get the position the given argument is found in the parameter stack.
+        let pos = self
+            .args
+            .iter()
+            .position(|param| param.keyword == name)
+            .expect("parameter doesn't exist");
+
+        // Return the parameter found at this position.
+        self.values[pos].take().map(|v| v.as_any())
     }
 }

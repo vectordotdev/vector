@@ -76,19 +76,31 @@ impl Function for MatchDatadogQuery {
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
         expr: &expression::Expr,
-    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+    ) -> CompiledArgument {
         if name == "query" {
             let query_value = match expr {
                 expression::Expr::Literal(literal) => literal.to_value(),
                 expression::Expr::Variable(var) if var.value().is_some() => {
                     match var.value().unwrap().clone().into_expr() {
                         expression::Expr::Literal(literal) => literal.to_value(),
-                        _expr => panic!("arg"),
+                        expr => {
+                            return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                                keyword: "query",
+                                expected: "literal",
+                                expr,
+                            }))
+                        }
                     }
                 }
-                _expr => panic!("literal"),
+                expr => {
+                    return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                        keyword: "query",
+                        expected: "literal",
+                        expr: expr.clone(),
+                    }))
+                }
             };
-            //let query_value = query_value.to_value();
+
             let query = query_value
                 .try_bytes_utf8_lossy()
                 .expect("datadog search query should be a UTF8 string");
@@ -105,9 +117,11 @@ impl Function for MatchDatadogQuery {
             // VRL `Value` against the Datadog Search Syntax literal.
             let filter = build_matcher(&node, &VrlFilter::default());
 
-            Some(Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>)
+            Ok(Some(
+                Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>
+            ))
         } else {
-            None
+            Ok(None)
         }
     }
 

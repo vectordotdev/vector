@@ -385,7 +385,10 @@ impl Expression for FunctionCall {
                     // We can't reuse the previous call to `function` since that lands us with a
                     // bunch of borrow errors.
                     let fun = vm.function(self.function_id).unwrap();
-                    match fun.compile_argument(&args, keyword, argument.inner()) {
+                    match fun
+                        .compile_argument(&args, keyword, argument.inner())
+                        .map_err(|err| err.to_string())?
+                    {
                         Some(stat) => {
                             // The function has compiled this argument as a static
                             let stat = vm.add_static(stat);
