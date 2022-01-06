@@ -73,6 +73,7 @@ use crate::{
     Result,
 };
 
+#[cfg(feature = "codecs")]
 pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
 pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 pub use config::EncodingConfig;
