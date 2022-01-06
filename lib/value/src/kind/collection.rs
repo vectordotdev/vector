@@ -371,18 +371,8 @@ pub enum MergeStrategy {
 }
 
 impl MergeStrategy {
-    pub(super) fn is_shallow(&self) -> bool {
-        match self {
-            Self::Shallow => true,
-            _ => false,
-        }
-    }
-
-    pub(super) fn is_deep(&self) -> bool {
-        match self {
-            Self::Deep => true,
-            _ => false,
-        }
+    pub(super) fn is_shallow(self) -> bool {
+        matches!(self, Self::Shallow)
     }
 }
 
