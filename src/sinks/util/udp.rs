@@ -46,7 +46,6 @@ pub enum UdpError {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct UdpSinkConfig {
     address: String,
     send_buffer_bytes: Option<usize>,

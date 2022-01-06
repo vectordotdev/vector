@@ -53,7 +53,6 @@ enum TcpError {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,

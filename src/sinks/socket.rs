@@ -12,8 +12,6 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
