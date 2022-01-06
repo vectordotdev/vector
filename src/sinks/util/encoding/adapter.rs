@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 use super::{EncodingConfiguration, TimestampFormat};
 use crate::{
     codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
@@ -6,9 +8,14 @@ use crate::{
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
+/// Trait used to migrate from a sink-specific `Codec` enum to the new
+/// `Box<dyn FramingConfig>`/`Box<dyn SerializerConfig>` encoding configuration.
 pub trait EncodingConfigMigrator {
+    /// The sink-specific encoding type to be migrated.
     type Codec;
 
+    /// Returns the framing/serializer configuration that is functionally equivalent to the given
+    /// legacy codec.
     fn migrate(
         codec: &Self::Codec,
     ) -> (
@@ -17,6 +24,9 @@ pub trait EncodingConfigMigrator {
     );
 }
 
+/// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
+/// `Box<dyn FramingConfig>`/`Box<dyn SerializerConfig>` encoding configuration - while keeping
+/// backwards-compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EncodingConfigAdapter<
@@ -25,7 +35,9 @@ pub enum EncodingConfigAdapter<
         + Debug
         + Clone,
 > {
+    /// The encoding configuration.
     Encoding(EncodingConfig),
+    /// The legacy sink-specific encoding configuration.
     LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig>, Migrator),
 }
 
@@ -36,6 +48,7 @@ impl<
             + Clone,
     > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 {
+    /// Create a new encoding configuration.
     pub fn new(
         framing: Option<Box<dyn FramingConfig>>,
         encoding: Option<Box<dyn SerializerConfig>>,
@@ -50,6 +63,7 @@ impl<
         })
     }
 
+    /// Create a legacy sink-specific encoding configuration.
     pub fn legacy(encoding: LegacyEncodingConfig, migrator: Migrator) -> Self {
         Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper { encoding }, migrator)
     }
@@ -62,6 +76,7 @@ impl<
             + Clone,
     > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 {
+    /// Build a `Transformer` that applies the encoding rules to an event before serialization.
     pub fn transformer(&self) -> Transformer {
         match self {
             Self::Encoding(config) => {
@@ -110,6 +125,7 @@ impl<
         }
     }
 
+    /// Build the framer and serializer for this configuration.
     pub fn encoding(
         &self,
     ) -> crate::Result<(Option<Box<dyn Framer>>, Option<Box<dyn Serializer>>)> {
