@@ -1,8 +1,6 @@
-use std::{fmt, marker::PhantomData};
-
 use indexmap::map::IndexMap;
-use serde::{de, Deserialize, Serialize};
-pub use vector_core::serde::skip_serializing_if_default;
+use serde::{Deserialize, Serialize};
+pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 #[cfg(feature = "codecs")]
 use crate::codecs::{
@@ -71,44 +69,4 @@ impl<V: 'static> Fields<V> {
             })
             .flatten()
     }
-}
-
-/// Enables deserializing from a value that could be a bool or a struct.
-/// Example:
-/// healthcheck: bool
-/// healthcheck.enabled: bool
-/// Both are accepted.
-pub fn bool_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: Deserialize<'de> + From<bool>,
-    D: de::Deserializer<'de>,
-{
-    struct BoolOrStruct<T>(PhantomData<fn() -> T>);
-
-    impl<'de, T> de::Visitor<'de> for BoolOrStruct<T>
-    where
-        T: Deserialize<'de> + From<bool>,
-    {
-        type Value = T;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("bool or map")
-        }
-
-        fn visit_bool<E>(self, value: bool) -> Result<T, E>
-        where
-            E: de::Error,
-        {
-            Ok(value.into())
-        }
-
-        fn visit_map<M>(self, map: M) -> Result<T, M::Error>
-        where
-            M: de::MapAccess<'de>,
-        {
-            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
-        }
-    }
-
-    deserializer.deserialize_any(BoolOrStruct(PhantomData))
 }

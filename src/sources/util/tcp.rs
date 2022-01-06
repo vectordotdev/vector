@@ -114,6 +114,8 @@ where
         acknowledgements: AcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+
         let out = cx
             .out
             .sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -193,7 +195,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled,
+                                acknowledgements.enabled(),
                             );
 
                             tokio::spawn(

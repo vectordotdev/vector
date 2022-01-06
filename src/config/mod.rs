@@ -12,7 +12,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::GlobalOptions,
+    config::{AcknowledgementsConfig, GlobalOptions},
     transform::{DataType, ExpandType, TransformConfig, TransformContext},
 };
 
@@ -52,7 +52,7 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use unit_test::build_unit_tests_main as build_unit_tests;
+pub use unit_test::{build_unit_tests_main as build_unit_tests, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
@@ -153,17 +153,6 @@ macro_rules! impl_generate_config_from_default {
             }
         }
     };
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

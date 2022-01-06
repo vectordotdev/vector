@@ -15,13 +15,17 @@ use crate::{
     test_util::{components, random_lines_with_stream, random_string},
 };
 
+fn kinesis_address() -> String {
+    std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
+
 #[tokio::test]
 async fn kinesis_put_records() {
     let stream = gen_stream();
 
     let region = Region::Custom {
         name: "localstack".into(),
-        endpoint: "http://localhost:4566".into(),
+        endpoint: kinesis_address(),
     };
 
     ensure_stream(region.clone(), stream.clone()).await;
@@ -32,7 +36,7 @@ async fn kinesis_put_records() {
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+        region: RegionOrEndpoint::with_endpoint(kinesis_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch,

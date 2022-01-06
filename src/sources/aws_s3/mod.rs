@@ -81,12 +81,13 @@ impl SourceConfig for AwsS3Config {
             .as_ref()
             .map(|config| config.try_into())
             .transpose()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, self.acknowledgements),
+                    .run(cx, acknowledgements),
             )),
         }
     }
@@ -479,9 +480,13 @@ mod integration_tests {
         .await;
     }
 
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
@@ -632,7 +637,7 @@ mod integration_tests {
     fn s3_client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         S3Client::new(region)
@@ -641,7 +646,7 @@ mod integration_tests {
     fn sqs_client() -> SqsClient {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         SqsClient::new(region)

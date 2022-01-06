@@ -451,10 +451,14 @@ mod integration_tests {
         test_util::random_string,
     };
 
+    fn cloudwatch_address() -> String {
+        std::env::var("CLOUDWATCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
             ..Default::default()
         }
     }
