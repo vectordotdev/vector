@@ -1044,15 +1044,33 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
 
-    async fn test_instance(endpoint: &'static str) {
-        let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
+    fn primary_mongo_address() -> String {
+        std::env::var("PRIMARY_MONGODB_ADDRESS")
+            .unwrap_or_else(|_| "mongodb://localhost:27017".into())
+    }
+
+    fn secondary_mongo_address() -> String {
+        std::env::var("SECONDARY_MONGODB_ADDRESS")
+            .unwrap_or_else(|_| "mongodb://localhost:27019".into())
+    }
+
+    fn remove_creds(address: &str) -> String {
+        let mut url = url::Url::parse(address).unwrap();
+        url.set_password(None).unwrap();
+        url.set_username("").unwrap();
+        url.to_string()
+    }
+
+    async fn test_instance(endpoint: String) {
+        let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
         let (sender, mut recv) = Pipeline::new_test();
 
+        let endpoints = vec![endpoint.clone()];
         tokio::spawn(async move {
             MongoDbMetricsConfig {
-                endpoints: vec![endpoint.to_owned()],
+                endpoints,
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
@@ -1063,7 +1081,7 @@ mod integration_tests {
             .unwrap()
         });
 
-        let event = timeout(Duration::from_secs(3), recv.next())
+        let event = timeout(Duration::from_secs(30), recv.next())
             .await
             .expect("fetch metrics timeout")
             .expect("failed to get metrics from a stream");
@@ -1076,6 +1094,8 @@ mod integration_tests {
             }
         }
 
+        let clean_endpoint = remove_creds(&endpoint);
+
         assert!(events.len() > 100);
         for event in events {
             let metric = event.into_metric();
@@ -1086,7 +1106,7 @@ mod integration_tests {
             assert!((timestamp - Utc::now()).num_seconds() < 1);
             // validate basic tags
             let tags = metric.tags().expect("existed tags");
-            assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
+            assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
             assert_eq!(tags.get("host"), Some(&host));
         }
     }
@@ -1094,7 +1114,7 @@ mod integration_tests {
     #[tokio::test]
     async fn fetch_metrics_mongod() {
         trace_init();
-        test_instance("mongodb://localhost:27017").await;
+        test_instance(primary_mongo_address()).await;
     }
 
     // TODO
@@ -1107,6 +1127,6 @@ mod integration_tests {
     #[tokio::test]
     async fn fetch_metrics_replset() {
         trace_init();
-        test_instance("mongodb://localhost:27019").await;
+        test_instance(secondary_mongo_address()).await;
     }
 }
