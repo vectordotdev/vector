@@ -374,7 +374,7 @@ impl Expression for FunctionCall {
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let args = match vm.function(self.function_id) {
             Some(fun) => self.resolve_arguments(fun),
-            None => Err(format!("Function {} not found.", self.function_id))?,
+            None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
         for (keyword, argument) in &args {
@@ -409,6 +409,10 @@ impl Expression for FunctionCall {
 
         vm.write_chunk(crate::vm::OpCode::Call);
         vm.write_primitive(self.function_id);
+
+        // We need to write the spans for error reporting.
+        vm.write_primitive(self.span.start());
+        vm.write_primitive(self.span.end());
 
         Ok(())
     }

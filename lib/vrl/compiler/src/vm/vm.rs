@@ -343,6 +343,8 @@ impl Vm {
                 }
                 OpCode::Call => {
                     let function_id = state.next_primitive();
+                    let span_start = state.next_primitive();
+                    let span_end = state.next_primitive();
                     let parameters = &self.fns[function_id].parameters();
 
                     let len = state.parameter_stack().len();
@@ -368,11 +370,10 @@ impl Vm {
                                 // labels.push(Label::primary(message.clone(), self.span));
                                 state.error = Some(ExpressionError::Error {
                                     message: format!(
-                                        //r#"function call error for "{}" at ({}:{}): {}"#,
-                                        r#"function call error for "{}": {}"#,
+                                        r#"function call error for "{}" at ({}:{}): {}"#,
                                         function.identifier(),
-                                        //self.span.start(),
-                                        //self.span.end(),
+                                        span_start,
+                                        span_end,
                                         message
                                     ),
                                     labels,
@@ -427,11 +428,15 @@ where
     E: Into<ExpressionError>,
     F: Fn(Value, Value) -> Result<Value, E>,
 {
-    let rhs = state.pop_stack()?;
-    let lhs = state.pop_stack()?;
-    match fun(lhs, rhs) {
-        Ok(value) => state.stack.push(value),
-        Err(err) => state.error = Some(err.into()),
+    // If we are in an error state we don't want to perform the operation
+    // so we pass the error along.
+    if state.error.is_none() {
+        let rhs = state.pop_stack()?;
+        let lhs = state.pop_stack()?;
+        match fun(lhs, rhs) {
+            Ok(value) => state.stack.push(value),
+            Err(err) => state.error = Some(err.into()),
+        }
     }
 
     Ok(())
