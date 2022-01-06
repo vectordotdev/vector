@@ -10,61 +10,8 @@ use crate::{
     },
     event::Event,
     internal_events::RouteEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::Transform,
 };
-
-//------------------------------------------------------------------------------
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct LaneConfig {
-    condition: AnyCondition,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "lane")]
-impl TransformConfig for LaneConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Lane::new(
-            self.condition.build(&context.enrichment_tables)?,
-        )))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Any
-    }
-
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "lane"
-    }
-}
-
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
-pub struct Lane {
-    #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
-}
-
-impl Lane {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
-        Self { condition }
-    }
-}
-
-impl FunctionTransform for Lane {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        if self.condition.check(&event) {
-            output.push(event);
-        } else {
-            emit!(&RouteEventDiscarded);
-        }
-    }
-}
 
 //------------------------------------------------------------------------------
 
@@ -207,13 +154,17 @@ mod test {
     fn can_serialize_remap() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let config = LaneConfig {
-            condition: AnyCondition::String("foo".to_string()),
-        };
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+        "#,
+        )
+        .unwrap();
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"condition":"foo"}"#
+            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\""}}}"#
         );
     }
 
@@ -223,18 +174,15 @@ mod test {
         // changed when reloading.
         let config = toml::from_str::<RouteConfig>(
             r#"
-            lanes.first.type = "check_fields"
-            lanes.first."message.eq" = "foo"
+            route.first.type = "check_fields"
+            route.first."message.eq" = "foo"
         "#,
         )
-        .unwrap()
-        .expand()
-        .unwrap()
         .unwrap();
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},{"Parallel":{"aggregates":false}}]"#
+            r#"{"route":{"first":{"type":"check_fields","message.eq":"foo"}}}"#
         );
     }
 }
