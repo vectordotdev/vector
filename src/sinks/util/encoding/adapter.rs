@@ -16,12 +16,7 @@ pub trait EncodingConfigMigrator {
 
     /// Returns the framing/serializer configuration that is functionally equivalent to the given
     /// legacy codec.
-    fn migrate(
-        codec: &Self::Codec,
-    ) -> (
-        Option<Box<dyn FramingConfig>>,
-        Option<Box<dyn SerializerConfig>>,
-    );
+    fn migrate(codec: &Self::Codec) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>);
 }
 
 /// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
@@ -51,15 +46,15 @@ impl<
     /// Create a new encoding configuration.
     pub fn new(
         framing: Option<Box<dyn FramingConfig>>,
-        encoding: Option<Box<dyn SerializerConfig>>,
+        encoding: Box<dyn SerializerConfig>,
     ) -> Self {
         Self::Encoding(EncodingConfig {
             framing,
-            encoding: encoding.map(|encoding| EncodingWithTransformationConfig {
+            encoding: EncodingWithTransformationConfig {
                 encoding,
                 filter: None,
                 timestamp_format: None,
-            }),
+            },
         })
     }
 
@@ -80,26 +75,28 @@ impl<
     pub fn transformer(&self) -> Transformer {
         match self {
             Self::Encoding(config) => {
-                let only_fields = config.encoding.as_ref().and_then(|encoding| {
-                    encoding.filter.as_ref().and_then(|filter| match filter {
+                let only_fields = config
+                    .encoding
+                    .filter
+                    .as_ref()
+                    .and_then(|filter| match filter {
                         OnlyOrExceptFieldsConfig::OnlyFields(fields) => {
                             Some(fields.only_fields.clone())
                         }
                         _ => None,
-                    })
-                });
-                let except_fields = config.encoding.as_ref().and_then(|encoding| {
-                    encoding.filter.as_ref().and_then(|filter| match filter {
-                        OnlyOrExceptFieldsConfig::ExceptFields(fields) => {
-                            Some(fields.except_fields.clone())
-                        }
-                        _ => None,
-                    })
-                });
-                let timestamp_format = config
-                    .encoding
-                    .as_ref()
-                    .and_then(|encoding| encoding.timestamp_format);
+                    });
+                let except_fields =
+                    config
+                        .encoding
+                        .filter
+                        .as_ref()
+                        .and_then(|filter| match filter {
+                            OnlyOrExceptFieldsConfig::ExceptFields(fields) => {
+                                Some(fields.except_fields.clone())
+                            }
+                            _ => None,
+                        });
+                let timestamp_format = config.encoding.timestamp_format;
 
                 Transformer {
                     only_fields,
@@ -126,19 +123,14 @@ impl<
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(
-        &self,
-    ) -> crate::Result<(Option<Box<dyn Framer>>, Option<Box<dyn Serializer>>)> {
+    pub fn encoding(&self) -> crate::Result<(Option<Box<dyn Framer>>, Box<dyn Serializer>)> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => {
                 let framer = match &config.framing {
                     Some(framing) => Some(framing.build()?),
                     None => None,
                 };
-                let serializer = match &config.encoding {
-                    Some(encoding) => Some(encoding.encoding.build()?),
-                    None => None,
-                };
+                let serializer = config.encoding.encoding.build()?;
 
                 (framer, serializer)
             }
@@ -148,10 +140,7 @@ impl<
                     Some(framing) => Some(framing.build()?),
                     None => None,
                 };
-                let serializer = match migration.1 {
-                    Some(serializer) => Some(serializer.build()?),
-                    None => None,
-                };
+                let serializer = migration.1.build()?;
 
                 (framer, serializer)
             }
@@ -169,7 +158,7 @@ pub struct LegacyEncodingConfigWrapper<EncodingConfig> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodingConfig {
     framing: Option<Box<dyn FramingConfig>>,
-    encoding: Option<EncodingWithTransformationConfig>,
+    encoding: EncodingWithTransformationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -251,7 +240,7 @@ mod tests {
         "#;
 
         let config = serde_json::from_str::<EncodingConfig>(string).unwrap();
-        let encoding = config.encoding.unwrap();
+        let encoding = config.encoding;
 
         assert_eq!(encoding.timestamp_format.unwrap(), TimestampFormat::Unix);
         assert_eq!(
