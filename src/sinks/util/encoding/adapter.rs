@@ -95,10 +95,10 @@ impl<
             Self::LegacyEncodingConfig(config, _) => Transformer {
                 only_fields: config.encoding.only_fields().as_ref().map(|fields| {
                     fields
-                        .into_iter()
+                        .iter()
                         .map(|field| {
                             field
-                                .into_iter()
+                                .iter()
                                 .map(|component| component.clone().into_static())
                                 .collect()
                         })
