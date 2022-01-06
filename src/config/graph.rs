@@ -141,6 +141,12 @@ impl Graph {
         }
     }
 
+    /// Return the input type of a given component.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the given key is not present in the graph or identifies a source, which can't
+    /// have inputs.
     fn get_input_type(&self, key: &ComponentKey) -> DataType {
         match self.nodes[key] {
             Node::Source { .. } => panic!("no inputs on sources"),
@@ -149,6 +155,12 @@ impl Graph {
         }
     }
 
+    /// Return the output type associated with a given `OutputId`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the given id is not present in the graph or identifies a sink, which can't
+    /// have inputs.
     fn get_output_type(&self, id: &OutputId) -> DataType {
         match &self.nodes[&id.component] {
             Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
@@ -165,8 +177,6 @@ impl Graph {
 
         // check that all edges connect components with compatible data types
         for edge in &self.edges {
-            // TODO: these panic on unknown nodes, where previously we'd skip them. which is
-            // correct?
             let from_ty = self.get_output_type(&edge.from);
             let to_ty = self.get_input_type(&edge.to);
 
