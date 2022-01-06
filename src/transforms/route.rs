@@ -109,12 +109,6 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(context).await
     }
 
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        self.0.expand()
-    }
-
     fn input_type(&self) -> DataType {
         self.0.input_type()
     }
