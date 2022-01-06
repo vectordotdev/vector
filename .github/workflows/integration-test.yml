@@ -56,7 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-metrics'
           - test: 'docker-logs'
@@ -67,7 +66,6 @@ jobs:
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'loki'
-          - test: 'mongodb_metrics'
           - test: 'postgresql_metrics'
           - test: 'prometheus'
           - test: 'pulsar'
@@ -102,10 +100,12 @@ jobs:
       matrix:
         include:
           - test: 'aws'
+          - test: 'azure'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'elasticsearch'
           - test: 'logstash'
+          - test: 'mongo'
           - test: 'nginx'
           - test: 'redis'
     steps:
