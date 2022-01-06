@@ -75,6 +75,11 @@ resource "kubernetes_deployment" "vector" {
           image             = var.vector_image
           name              = "vector"
 
+          env {
+            name = "VECTOR_THREADS"
+            value = var.vector_cpus
+          }
+
           volume_mount {
             mount_path = "/var/lib/vector"
             name       = "var-lib-vector"

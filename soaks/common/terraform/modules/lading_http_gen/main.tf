@@ -113,6 +113,7 @@ resource "kubernetes_deployment" "http-gen" {
               port = 9090
               path = "/metrics"
             }
+            initial_delay_seconds = 10
           }
         }
 
