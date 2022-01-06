@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, io::Read, net::SocketAddr, sync::Arc};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{TimeZone, Utc};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ use crate::{
         util::{ErrorMessage, StreamDecodingError},
     },
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -208,15 +208,15 @@ impl DatadogAgentSource {
     async fn handle_request(
         events: Result<Vec<Event>, ErrorMessage>,
         acknowledgements: bool,
-        mut out: Pipeline,
+        mut out: SourceSender,
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-                let mut events = futures::stream::iter(events).map(Ok);
+                let mut events = futures::stream::iter(events);
                 out.send_all(&mut events)
-                    .map_err(move |error: crate::pipeline::ClosedError| {
+                    .map_err(move |error: crate::source_sender::ClosedError| {
                         // can only fail if receiving end disconnected, so we are shutting down,
                         // probably not gracefully.
                         error!(message = "Failed to forward events, downstream is closed.");
@@ -243,7 +243,7 @@ impl DatadogAgentSource {
         }
     }
 
-    fn event_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(self, acknowledgements: bool, out: SourceSender) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
             .and(warp::path::full())
@@ -275,7 +275,11 @@ impl DatadogAgentSource {
             .boxed()
     }
 
-    fn series_v1_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn series_v1_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "v1" / "series" / ..))
             .and(warp::path::full())
@@ -323,7 +327,11 @@ impl DatadogAgentSource {
             .boxed()
     }
 
-    fn sketches_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn sketches_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "beta" / "sketches" / ..))
             .and(warp::path::full())

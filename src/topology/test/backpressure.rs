@@ -5,7 +5,7 @@ use tokio::time::Duration;
 
 use crate::config::SinkOuter;
 
-use crate::topology::builder::PIPELINE_BUFFER_SIZE;
+use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
 
 use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
@@ -13,7 +13,7 @@ use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 // Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.
 // https://docs.rs/futures/0.3.19/futures/channel/mpsc/fn.channel.html
-pub const EXTRA_SENDER_EVENTS: usize = 3;
+pub const EXTRA_SENDER_EVENTS: usize = 2;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
@@ -25,7 +25,7 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -63,7 +63,7 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -110,7 +110,7 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -162,7 +162,7 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE * 2
+        + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SENDER_EVENTS * 2;
 
     let source_counter_1 = Arc::new(AtomicUsize::new(0));
@@ -255,7 +255,7 @@ mod test_source {
     use crate::event::Event;
     use crate::sources::Source;
     use async_trait::async_trait;
-    use futures::{FutureExt, SinkExt};
+    use futures::FutureExt;
     use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;

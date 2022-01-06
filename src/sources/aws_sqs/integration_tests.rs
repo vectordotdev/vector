@@ -15,7 +15,7 @@ use crate::{
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
     test_util::random_string,
-    Pipeline,
+    SourceSender,
 };
 
 fn sqs_address() -> String {
@@ -78,7 +78,7 @@ pub async fn test() {
         ..Default::default()
     };
 
-    let (tx, rx) = Pipeline::new_test();
+    let (tx, rx) = SourceSender::new_test();
     tokio::spawn(async move {
         config
             .build(SourceContext::new_test(tx))

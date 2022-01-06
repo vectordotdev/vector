@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, time::Instant};
 use chrono::Utc;
 use futures::{
     future::{join_all, try_join_all},
-    stream, SinkExt, StreamExt,
+    stream, StreamExt,
 };
 use mongodb::{
     bson::{self, doc, from_document},
@@ -109,7 +109,7 @@ impl_generate_config_from_default!(MongoDbMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(
@@ -118,10 +118,6 @@ impl SourceConfig for MongoDbMetricsConfig {
                 .map(|endpoint| MongoDbMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
-
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
@@ -138,9 +134,12 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let mut stream = stream::iter(metrics)
                     .map(stream::iter)
                     .flatten()
-                    .map(Event::Metric)
-                    .map(Ok);
-                out.send_all(&mut stream).await?;
+                    .map(Event::Metric);
+
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending mongodb metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())
@@ -1042,7 +1041,7 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
 
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, SourceSender};
 
     fn primary_mongo_address() -> String {
         std::env::var("PRIMARY_MONGODB_ADDRESS")
@@ -1065,7 +1064,7 @@ mod integration_tests {
         let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         let endpoints = vec![endpoint.clone()];
         tokio::spawn(async move {

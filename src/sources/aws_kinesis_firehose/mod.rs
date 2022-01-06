@@ -138,7 +138,7 @@ mod tests {
         event::{Event, EventStatus},
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
@@ -178,7 +178,7 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {

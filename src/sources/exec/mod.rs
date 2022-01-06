@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snafu::Snafu;
@@ -31,7 +31,7 @@ use crate::{
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 pub mod sized_bytes_codec;
@@ -232,7 +232,7 @@ async fn run_scheduled(
     exec_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     debug!("Starting scheduled exec runs.");
     let schedule = Duration::from_secs(exec_interval_secs);
@@ -283,7 +283,7 @@ async fn run_streaming(
     respawn_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     if respawn_on_exit {
         let duration = Duration::from_secs(respawn_interval_secs);
@@ -338,7 +338,7 @@ async fn run_command(
     hostname: Option<String>,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
     debug!("Starting command run.");
     let mut command = build_command(&config);
@@ -421,7 +421,6 @@ async fn run_command(
     };
 
     debug!("Finished command run.");
-    let _ = out.flush().await;
 
     result
 }
@@ -538,6 +537,9 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
+    #[cfg(not(target_os = "windows"))]
+    use futures::task::Poll;
 
     use super::*;
     use crate::test_util::trace_init;
@@ -665,7 +667,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
         let shutdown = ShutdownSignal::noop();
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = SourceSender::new_test();
 
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
@@ -680,7 +682,7 @@ mod tests {
             .expect("command error");
         assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
-        if let Ok(Some(event)) = rx.try_next() {
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());

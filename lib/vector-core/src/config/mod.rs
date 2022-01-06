@@ -12,6 +12,34 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
     buffers::config::memory_buffer_default_max_events();
 
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum DataType {
+    Any,
+    Log,
+    Metric,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Output {
+    pub port: Option<String>,
+    pub ty: DataType,
+}
+
+impl Output {
+    pub fn default(ty: DataType) -> Self {
+        Self { port: None, ty }
+    }
+}
+
+impl<T: Into<String>> From<(T, DataType)> for Output {
+    fn from((name, ty): (T, DataType)) -> Self {
+        Self {
+            port: Some(name.into()),
+            ty,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AcknowledgementsConfig {
     enabled: Option<bool>,

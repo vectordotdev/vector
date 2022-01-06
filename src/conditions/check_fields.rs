@@ -552,13 +552,6 @@ pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
-impl CheckFields {
-    #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
-    pub(crate) fn new(predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>) -> Self {
-        Self { predicates }
-    }
-}
-
 impl Condition for CheckFields {
     fn check(&self, e: &Event) -> bool {
         self.predicates.iter().all(|(_, p)| p.check(e))

@@ -38,14 +38,14 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    Pipeline,
+    SourceSender,
 };
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
-pub const PIPELINE_BUFFER_SIZE: usize = 1000;
+pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -146,8 +146,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (tx, rx) = futures::channel::mpsc::channel(PIPELINE_BUFFER_SIZE);
-        let pipeline = Pipeline::from_sender(tx, vec![]);
+        let (pipeline, mut rx) = SourceSender::new_with_buffer(SOURCE_SENDER_BUFFER_SIZE);
 
         let typetag = source.inner.source_type();
 
@@ -168,8 +167,14 @@ pub async fn build_pieces(
             Ok(server) => server,
         };
 
-        let (output, control) = Fanout::new();
-        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
+        let (mut output, control) = Fanout::new();
+        let pump = async move {
+            while let Some(event) = rx.next().await {
+                output.feed(event).await?;
+            }
+            output.flush().await?;
+            Ok(TaskOutput::Source)
+        };
         let pump = Task::new(key.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
