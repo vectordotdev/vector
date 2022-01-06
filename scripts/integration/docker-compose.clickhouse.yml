@@ -1,0 +1,36 @@
+services:
+  clickhouse:
+    image: yandex/clickhouse-server:19
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "clickhouse-integration-tests"
+      - "--lib"
+      - "::clickhouse::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - CLICKHOUSE_ADDRESS=http://clickhouse:8123
+    depends_on:
+      - clickhouse
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

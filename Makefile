@@ -330,18 +330,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh azure stop
 endif
 
-.PHONY: test-integration-clickhouse
-test-integration-clickhouse: ## Runs Clickhouse integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-	@scripts/setup_integration_env.sh clickhouse start
-	sleep 5 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-endif
-
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
