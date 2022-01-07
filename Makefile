@@ -487,7 +487,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop --volumes
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
