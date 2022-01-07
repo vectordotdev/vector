@@ -85,6 +85,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, transform.with_inputs(inputs))
         })
         .collect();
+    let tests = tests
+        .into_iter()
+        .map(|test| test.resolve_outputs(&graph))
+        .collect();
 
     if errors.is_empty() {
         let config = Config {

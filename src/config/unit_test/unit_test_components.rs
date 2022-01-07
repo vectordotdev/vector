@@ -8,7 +8,7 @@ use futures_util::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
-    config::DataType,
+    config::{DataType, Output},
     event::Event,
     sink::{StreamSink, VectorSink},
 };
@@ -44,8 +44,8 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn source_type(&self) -> &'static str {
