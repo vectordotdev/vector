@@ -2,10 +2,12 @@ use super::{state::VmState, Variable, VmArgumentList};
 use crate::{
     expression::Literal, vm::argument_list::VmArgument, Context, ExpressionError, Function, Value,
 };
+use diagnostic::Span;
 use std::collections::BTreeMap;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
+    Abort,
     Return,
     GetLocal,
     SetLocal,
@@ -94,15 +96,6 @@ impl Vm {
         self.fns.get(function_id)
     }
 
-    /*
-    pub fn get_constant(&self, constant: &str) -> Option<usize> {
-        self.values.iter().position(|obj| match obj {
-            Value::Bytes(c) => c == constant,
-            _ => false,
-        })
-    }
-    */
-
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.
     pub fn get_target(&mut self, target: &Variable) -> usize {
         match self.targets.iter().position(|t| t == target) {
@@ -153,6 +146,13 @@ impl Vm {
             let next = state.next();
 
             match next {
+                OpCode::Abort => {
+                    let start = state.next_primitive();
+                    let end = state.next_primitive();
+                    return Err(ExpressionError::Abort {
+                        span: Span::new(start, end),
+                    });
+                }
                 OpCode::Return => {
                     return Ok(state.stack.pop().unwrap_or(Value::Null));
                 }
@@ -234,7 +234,7 @@ impl Vm {
                     let variable = state.next_primitive();
                     let variable = &self.targets[variable];
                     let value = state.pop_stack()?;
-		    
+
                     set_variable(ctx, variable, value.clone())?;
                     state.push_stack(value);
                 }

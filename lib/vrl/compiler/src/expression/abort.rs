@@ -25,8 +25,24 @@ impl Expression for Abort {
         TypeDef::new().infallible().null()
     }
 
-    fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
-        todo!()
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        use crate::vm::OpCode;
+        vm.write_chunk(OpCode::Abort);
+        vm.write_primitive(self.span.start());
+        vm.write_primitive(self.span.end());
+        Ok(())
+    }
+
+    fn as_value(&self) -> Option<crate::Value> {
+        None
+    }
+
+    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
+        Ok(())
+    }
+
+    fn format(&self) -> Option<String> {
+        None
     }
 }
 
