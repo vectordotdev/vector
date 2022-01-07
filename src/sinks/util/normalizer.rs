@@ -26,7 +26,7 @@ where
     pub fn new(stream: St, normalizer: N) -> Self {
         Self {
             stream: stream.fuse(),
-            normalizer: MetricNormalizer::from_inner(normalizer),
+            normalizer: MetricNormalizer::from(normalizer),
         }
     }
 }

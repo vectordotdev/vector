@@ -91,36 +91,43 @@ impl Batch for MetricsBuffer {
 /// before sending the events to the `MetricsBuffer`
 pub struct MetricNormalizer<N> {
     state: MetricSet,
-    inner: N,
-}
-
-impl<N: Default> MetricNormalizer<N> {
-    pub fn default() -> Self {
-        Self {
-            state: MetricSet::default(),
-            inner: N::default(),
-        }
-    }
+    normalizer: N,
 }
 
 impl<N> MetricNormalizer<N> {
-    pub fn from_inner(inner: N) -> Self {
-        Self {
-            state: MetricSet::default(),
-            inner,
-        }
-    }
-
+    /// Gets a mutable reference to the current metric state for this normalizer.
     pub fn get_state_mut(&mut self) -> &mut MetricSet {
         &mut self.state
     }
 }
 
 impl<N: MetricNormalize> MetricNormalizer<N> {
-    /// This wraps `MetricNormalize::apply_state`, converting to/from
-    /// the `Metric` type wrapper. See that function for return values.
+    /// Applies normalization to the given metric, potentially returning an updated metric.
+    ///
+    /// Depending on the normalizer, a metric may or may not be returned.  In the case of converting
+    /// a metric from absolute to incremental, a metric must be seen twice in order to generate an
+    /// incremental delta, so the first call for the the same metric would return `None` while the
+    /// second call would return `Some(...)`.
     pub fn apply(&mut self, metric: Metric) -> Option<Metric> {
-        self.inner.apply_state(&mut self.state, metric)
+        self.normalizer.apply_state(&mut self.state, metric)
+    }
+}
+
+impl<N: Default> MetricNormalizer<N> {
+    pub fn default() -> Self {
+        Self {
+            state: MetricSet::default(),
+            normalizer: N::default(),
+        }
+    }
+}
+
+impl<N> From<N> for MetricNormalizer<N> {
+    fn from(normalizer: N) -> Self {
+        Self {
+            state: MetricSet::default(),
+            normalizer,
+        }
     }
 }
 

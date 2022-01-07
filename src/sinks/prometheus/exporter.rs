@@ -436,7 +436,7 @@ impl StreamSink for PrometheusExporter {
         self.start_server_if_needed().await;
 
         let mut last_flush = Instant::now();
-        let mut normalizer = MetricNormalizer::from_inner(PrometheusExporterMetricNormalizer {
+        let mut normalizer = MetricNormalizer::from(PrometheusExporterMetricNormalizer {
             distributions_as_summaries: self.config.distributions_as_summaries,
             buckets: self.config.buckets.clone(),
         });

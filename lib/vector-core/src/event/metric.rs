@@ -1058,8 +1058,9 @@ impl Display for Metric {
             MetricKind::Absolute => '=',
             MetricKind::Incremental => '+',
         };
-        write!(fmt, "{} {} ", &self.series, kind)?;
-        write!(fmt, "{}", &self.data.value)
+        self.series.fmt(fmt)?;
+        write!(fmt, " {} ", kind)?;
+        self.data.value.fmt(fmt)
     }
 }
 
