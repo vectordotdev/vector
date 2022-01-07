@@ -104,7 +104,8 @@ Overview for the current state of sinks regarding encoding:
 |`blackhole`| - | - | -
 |`clickhouse`| `EncodingConfigWithDefault<Encoding { Default }>` | ✔︎ | Serializes to JSON. Enveloped in HTTP request
 |`console`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | `Text` reads `message_key()`
-|`datadog`| `EncodingConfigFixed<DatadogLogsJsonEncoding>` | ✔︎ | Doesn't provide options to encode the event payload separately from the protocol
+|`datadog_logs`| `EncodingConfigFixed<DatadogLogsJsonEncoding>` | ✔︎ | Doesn't provide options to encode the event payload separately from the protocol
+|`datadog_events`| - | ✗ | -
 |`datadog_archives`| - | ✗ | Uses custom `DatadogArchivesEncoding`, which has a field `inner: StandardEncodings` which is not user-configurable
 |`elasticsearch`| `EncodingConfigFixed<ElasticSearchEncoder>` | ✔︎ | Reshapes event internally and implements custom `ElasticSearchEncoder` to serialize for the Elasticsearch protocol
 |`file`| `EncodingConfig<Encoding { Text, Ndjson }>` | ✔︎ | `Text` reads `message_key()`
