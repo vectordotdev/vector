@@ -176,7 +176,7 @@ which will emit the LLVM instruction
 
 it is our responsibility to initialize and drop the value accordingly. This can be accomplished by calling the implementations for `vrl_resolved_initialize` and `vrl_resolved_drop` shown further below.
 
-_TODO: Explain how constants are handled._
+Constants can be moved into the LLVM module by consuming the constant value of type `T`, transmuting it to `[i8]` and transmuting it back to `T` when unloading the LLVM module. This is safe since Rust's semantics allow all types to be moved in memory unless they are `Pin`. Writing constants into the LLVM module has the benefit of allowing LLVM to apply constant folding at compile time.
 
 Below we show a preliminary, work-in-progress excerpt of the precompiled functions. The LLVM module will be initialized with the resulting bitcode. Therefore, these function symbols possibly do not exist at runtime anymore if they are optimized out by LLVM.
 
