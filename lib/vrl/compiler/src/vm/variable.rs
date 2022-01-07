@@ -5,6 +5,7 @@ use lookup::LookupBuf;
 pub enum Variable {
     Internal(crate::parser::Ident, Option<lookup::LookupBuf>),
     External(lookup::LookupBuf),
+    Stack(lookup::LookupBuf),
     None,
 }
 

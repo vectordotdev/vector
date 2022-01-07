@@ -128,7 +128,14 @@ impl Expression for Query {
             Target::Internal(variable) => {
                 crate::vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
             }
-            _ => unimplemented!("Only external vars for now"),
+            Target::FunctionCall(call) => {
+                call.dump(vm)?;
+                crate::vm::Variable::Stack(self.path.clone())
+            }
+            Target::Container(container) => {
+                container.dump(vm)?;
+                crate::vm::Variable::Stack(self.path.clone())
+            }
         };
         let target = vm.get_target(&variable);
         vm.write_primitive(target);

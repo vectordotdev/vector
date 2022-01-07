@@ -290,6 +290,11 @@ impl Vm {
                             state.stack.push(value);
                         }
                         Variable::None => state.stack.push(Value::Null),
+                        Variable::Stack(path) => {
+                            let value = state.pop_stack()?;
+                            let value = value.get_by_path(path).cloned().unwrap_or(Value::Null);
+                            state.stack.push(value);
+                        }
                     }
                 }
                 OpCode::Call => {
@@ -419,7 +424,9 @@ fn set_variable<'a>(
             }
         }
         Variable::External(path) => ctx.target_mut().insert(path, value)?,
-        Variable::None => (),
+
+        // Setting these cases should not be allowed by the compiler
+        Variable::None | Variable::Stack(_) => (),
     }
 
     Ok(())
