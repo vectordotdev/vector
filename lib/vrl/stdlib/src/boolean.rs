@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn boolean(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Boolean(_) => Ok(v),
+        v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Boolean;
 
@@ -43,6 +50,15 @@ impl Function for Boolean {
 
         Ok(Box::new(BooleanFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        boolean(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +68,7 @@ struct BooleanFn {
 
 impl Expression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Boolean(_) => Ok(v),
-            v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
-        }
+        boolean(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

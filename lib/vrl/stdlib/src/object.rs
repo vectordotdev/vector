@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn object(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Object(_) => Ok(v),
+        v => Err(format!(r#"expected "object", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Object;
 
@@ -43,6 +50,15 @@ impl Function for Object {
 
         Ok(Box::new(ObjectFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        object(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +68,7 @@ struct ObjectFn {
 
 impl Expression for ObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Object(_) => Ok(v),
-            v => Err(format!(r#"expected "object", got {}"#, v.kind()).into()),
-        }
+        object(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

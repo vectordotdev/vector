@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn float(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Float(_) => Ok(v),
+        v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Float;
 
@@ -43,6 +50,15 @@ impl Function for Float {
 
         Ok(Box::new(FloatFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        float(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +68,7 @@ struct FloatFn {
 
 impl Expression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Float(_) => Ok(v),
-            v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
-        }
+        float(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn array(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Array(_) => Ok(v),
+        v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Array;
 
@@ -43,6 +50,15 @@ impl Function for Array {
 
         Ok(Box::new(ArrayFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        array(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +68,7 @@ struct ArrayFn {
 
 impl Expression for ArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Array(_) => Ok(v),
-            v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
-        }
+        array(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

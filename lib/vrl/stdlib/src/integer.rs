@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn int(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Integer(_) => Ok(v),
+        v => Err(format!(r#"expected "integer", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Integer;
 
@@ -43,6 +50,15 @@ impl Function for Integer {
 
         Ok(Box::new(IntegerFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        int(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +68,7 @@ struct IntegerFn {
 
 impl Expression for IntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Integer(_) => Ok(v),
-            v => Err(format!(r#"expected "integer", got {}"#, v.kind()).into()),
-        }
+        int(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
