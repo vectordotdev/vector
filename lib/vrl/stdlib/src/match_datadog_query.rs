@@ -1,10 +1,6 @@
 use std::borrow::Cow;
 
-use datadog_filter::{
-    build_matcher,
-    regex::{wildcard_regex, word_regex},
-    Filter, Matcher, Resolver, Run,
-};
+use datadog_filter::{build_matcher, regex, Filter, Matcher, Resolver, Run};
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use vrl::prelude::*;
@@ -159,7 +155,7 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Default fields are compared by word boundary.
             Field::Default(_) => {
-                let re = word_regex(to_match);
+                let re = regex::word_regex(to_match);
 
                 resolve_value(
                     buf,
@@ -213,7 +209,7 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Default fields are matched by word boundary.
             Field::Default(_) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = regex::word_regex(&format!("{}*", prefix));
 
                 resolve_value(
                     buf,
@@ -251,7 +247,7 @@ impl Filter<Value> for VrlFilter {
 
         match field {
             Field::Default(_) => {
-                let re = word_regex(wildcard);
+                let re = regex::word_regex(wildcard);
 
                 resolve_value(
                     buf,
@@ -259,22 +255,22 @@ impl Filter<Value> for VrlFilter {
                 )
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = regex::wildcard(&format!("{}:{}", tag, wildcard));
 
                 resolve_value(
                     buf,
                     Run::boxed(move |value| match value {
-                        Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
+                        Value::Array(v) => v.iter().any(|v| re.matches(&string_value(v))),
                         _ => false,
                     }),
                 )
             }
             _ => {
-                let re = wildcard_regex(wildcard);
+                let re = regex::wildcard(wildcard);
 
                 resolve_value(
                     buf,
-                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                    Run::boxed(move |value| re.matches(&string_value(value))),
                 )
             }
         }

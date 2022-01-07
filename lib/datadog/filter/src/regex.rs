@@ -1,4 +1,5 @@
 use regex::Regex;
+use wildmatch::WildMatch;
 
 /// Returns compiled word boundary regex.
 pub fn word_regex(to_match: &str) -> Regex {
@@ -10,10 +11,6 @@ pub fn word_regex(to_match: &str) -> Regex {
 }
 
 /// Returns compiled wildcard regex.
-pub fn wildcard_regex(to_match: &str) -> Regex {
-    Regex::new(&format!(
-        "^{}$",
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
+pub fn wildcard(to_match: &str) -> WildMatch {
+    WildMatch::new(to_match)
 }

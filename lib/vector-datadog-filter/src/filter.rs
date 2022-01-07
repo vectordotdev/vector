@@ -1,10 +1,7 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use datadog_filter::{
-    regex::{wildcard_regex, word_regex},
-    Filter, Matcher, Resolver, Run,
-};
+use datadog_filter::{regex, Filter, Matcher, Resolver, Run};
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
 use vector_core::event::{LogEvent, Value};
 
@@ -38,7 +35,7 @@ impl Filter<LogEvent> for EventFilter {
         match field {
             // Default fields are compared by word boundary.
             Field::Default(field) => {
-                let re = word_regex(to_match);
+                let re = regex::word_regex(to_match);
 
                 string_match(&field, move |value| re.is_match(&value))
             }
@@ -69,7 +66,7 @@ impl Filter<LogEvent> for EventFilter {
         match field {
             // Default fields are matched by word boundary.
             Field::Default(field) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = regex::word_regex(&format!("{}*", prefix));
 
                 string_match(field, move |value| re.is_match(&value))
             }
@@ -91,19 +88,19 @@ impl Filter<LogEvent> for EventFilter {
     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {
         match field {
             Field::Default(field) => {
-                let re = word_regex(wildcard);
+                let re = regex::word_regex(wildcard);
 
                 string_match(field, move |value| re.is_match(&value))
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = regex::wildcard(&format!("{}:{}", tag, wildcard));
 
-                any_string_match("tags", move |value| re.is_match(&value))
+                any_string_match("tags", move |value| re.matches(&value))
             }
             Field::Reserved(field) | Field::Facet(field) => {
-                let re = wildcard_regex(wildcard);
+                let re = regex::wildcard(wildcard);
 
-                string_match(field, move |value| re.is_match(&value))
+                string_match(field, move |value| re.matches(&value))
             }
         }
     }
