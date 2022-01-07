@@ -39,6 +39,11 @@ impl<'a> VmState<'a> {
         }
     }
 
+    /// Pushes the given value onto the stack.
+    pub fn push_stack(&mut self, value: Value) {
+        self.stack.push(value);
+    }
+
     pub fn pop_stack(&mut self) -> Result<Value, ExpressionError> {
         self.stack.pop().ok_or_else(|| "stack underflow".into())
     }

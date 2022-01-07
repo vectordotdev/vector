@@ -234,29 +234,9 @@ impl Vm {
                     let variable = state.next_primitive();
                     let variable = &self.targets[variable];
                     let value = state.pop_stack()?;
-
-                    match variable {
-                        Variable::Internal(ident, path) => {
-                            let path = match path {
-                                Some(path) => path,
-                                None => {
-                                    ctx.state_mut().insert_variable(ident.clone(), value);
-                                    continue;
-                                }
-                            };
-
-                            // Update existing variable using the provided path, or create a
-                            // new value in the store.
-                            match ctx.state_mut().variable_mut(ident) {
-                                Some(stored) => stored.insert_by_path(path, value),
-                                None => ctx
-                                    .state_mut()
-                                    .insert_variable(ident.clone(), value.at_path(path)),
-                            }
-                        }
-                        Variable::External(path) => ctx.target_mut().insert(path, value)?,
-                        Variable::None => (),
-                    }
+		    
+                    set_variable(ctx, variable, value.clone())?;
+                    state.push_stack(value);
                 }
                 OpCode::SetPathInfallible => {
                     let variable = state.next_primitive();
@@ -268,16 +248,22 @@ impl Vm {
                     let default = state.next_primitive();
                     let default = &self.values[default];
 
+                    // Note, after assignment the value is pushed back onto the stack since it is possible for
+                    // the value to be further used afterwards. This means the value is cloned when the variable is set.
+                    // A potential future enhancement would be for the compiler to determine if this value is used and
+                    // pass that as a hint to this OpCode so we only clone and fill up the stack when needed.
                     match state.error.take() {
                         Some(err) => {
                             let err = Value::from(err.to_string());
                             set_variable(ctx, variable, default.clone())?;
-                            set_variable(ctx, error, err)?;
+                            set_variable(ctx, error, err.clone())?;
+                            state.push_stack(err);
                         }
                         None => {
                             let value = state.pop_stack()?;
-                            set_variable(ctx, variable, value)?;
+                            set_variable(ctx, variable, value.clone())?;
                             set_variable(ctx, error, Value::Null)?;
+                            state.push_stack(value);
                         }
                     }
                 }
