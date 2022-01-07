@@ -1075,14 +1075,13 @@ impl Display for MetricSeries {
             write!(fmt, "_")?;
         }
         write_word(fmt, &self.name.name)?;
+        write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
-            write!(fmt, "{{")?;
             write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
                 write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
             })?;
-            write!(fmt, "}}")?;
         }
-        Ok(())
+        write!(fmt, "}}")
     }
 }
 
