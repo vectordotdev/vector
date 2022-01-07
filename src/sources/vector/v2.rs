@@ -13,7 +13,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
     internal_events::{EventsReceived, TcpBytesReceived},
     proto::vector as proto,
     serde::bool_or_struct,
@@ -125,8 +125,8 @@ impl VectorConfig {
         Ok(Box::pin(source))
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {

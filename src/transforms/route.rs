@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
@@ -33,8 +33,8 @@ impl TransformConfig for LaneConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -124,8 +124,8 @@ impl TransformConfig for RouteConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -154,8 +154,8 @@ impl TransformConfig for RouteCompatConfig {
         self.0.input_type()
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn transform_type(&self) -> &'static str {

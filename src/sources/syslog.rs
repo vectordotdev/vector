@@ -17,7 +17,7 @@ use crate::sources::util::build_unix_stream_source;
 use crate::{
     codecs::{self, BytesDecoder, OctetCountingDecoder, SyslogDeserializer},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
@@ -155,8 +155,8 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

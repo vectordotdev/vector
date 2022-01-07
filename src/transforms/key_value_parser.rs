@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -82,8 +84,8 @@ impl TransformConfig for KeyValueConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn enable_concurrency(&self) -> bool {

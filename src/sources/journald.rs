@@ -32,7 +32,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{BatchNotifier, Event, LogEvent, Value},
@@ -200,8 +200,8 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

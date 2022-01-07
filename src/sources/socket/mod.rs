@@ -12,7 +12,7 @@ use crate::serde::default_framing_message_based;
 use crate::{
     codecs::{decoding::DecodingConfig, NewlineDelimitedDecoderConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     sources::util::TcpSource,
@@ -187,8 +187,8 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

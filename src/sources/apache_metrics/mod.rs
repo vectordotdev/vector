@@ -14,7 +14,9 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -87,8 +89,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

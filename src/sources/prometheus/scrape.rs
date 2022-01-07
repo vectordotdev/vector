@@ -11,7 +11,9 @@ use tokio_stream::wrappers::IntervalStream;
 
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
     http::{Auth, HttpClient},
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
@@ -103,8 +105,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -148,8 +150,8 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

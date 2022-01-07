@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use toml::value::Value as TomlValue;
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
@@ -73,8 +75,8 @@ impl TransformConfig for AddFieldsConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

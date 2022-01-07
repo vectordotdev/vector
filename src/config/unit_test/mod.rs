@@ -30,7 +30,7 @@ use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
 
-use super::{compiler::expand_globs, graph::Graph};
+use super::{compiler::expand_globs, graph::Graph, OutputId};
 
 pub struct UnitTest {
     pub name: String,
@@ -122,7 +122,7 @@ pub struct UnitTestBuildMetadata {
     // with test input events to produces sources used in a particular test.
     template_sources: IndexMap<ComponentKey, UnitTestSourceConfig>,
     // A mapping from transform name to unit test sink name.
-    sink_ids: HashMap<ComponentKey, String>,
+    sink_ids: HashMap<OutputId, String>,
 }
 
 impl UnitTestBuildMetadata {
@@ -161,16 +161,14 @@ impl UnitTestBuildMetadata {
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
-                let mut extract_targets = vec![key.clone()];
-                extract_targets.extend(
-                    transform
-                        .inner
-                        .named_outputs()
-                        .iter()
-                        .map(|port| ComponentKey::from(format!("{}.{}", key, port)))
-                        .collect::<Vec<_>>(),
-                );
-                extract_targets
+                transform
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port,
+                    })
             })
             .collect::<HashSet<_>>();
 
@@ -232,7 +230,7 @@ impl UnitTestBuildMetadata {
         &self,
         test_name: &str,
         outputs: &[TestOutput],
-        no_outputs_from: &[ComponentKey],
+        no_outputs_from: &[OutputId],
     ) -> Result<
         (
             Vec<Receiver<UnitTestSinkResult>>,
@@ -318,9 +316,18 @@ fn get_relevant_test_components(
 
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
-    test: TestDefinition,
+    test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
+    let mut transform_only_config = config_builder.clone();
+    let _ = expand_macros(&mut transform_only_config);
+    let transform_only_graph = Graph::new_unchecked(
+        &transform_only_config.sources,
+        &transform_only_config.transforms,
+        &transform_only_config.sinks,
+    );
+    let test = test.resolve_outputs(&transform_only_graph);
+
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
         metadata.hydrate_into_sinks(&test.name, &test.outputs, &test.no_outputs_from)?;
@@ -428,8 +435,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs: IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
+) -> Result<IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
+    let mut outputs: IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {

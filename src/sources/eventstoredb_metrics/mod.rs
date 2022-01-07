@@ -8,7 +8,7 @@ use tokio_stream::wrappers::IntervalStream;
 
 use self::types::Stats;
 use crate::{
-    config::{self, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     http::HttpClient,
     internal_events::{
@@ -54,8 +54,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
