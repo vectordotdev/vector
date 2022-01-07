@@ -301,12 +301,16 @@ mod integration_tests {
         },
     };
 
+    fn clickhouse_address() -> String {
+        std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
+    }
+
     #[tokio::test]
     async fn insert_events() {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -354,7 +358,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -399,7 +403,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
         let encoding = EncodingConfigWithDefault {
             timestamp_format: Some(TimestampFormat::Unix),
             ..Default::default()
@@ -461,7 +465,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let config: ClickhouseConfig = toml::from_str(&format!(
             r#"
@@ -518,7 +522,7 @@ timestamp_format = "unix""#,
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
