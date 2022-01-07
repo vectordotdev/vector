@@ -7,6 +7,7 @@ use core_common::byte_size_of::ByteSizeOf;
 use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -45,6 +46,12 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
     }
 
     pow_gamma(gamma_v, f64::from(i32::from(k) - bias))
+}
+
+#[derive(Debug, Snafu)]
+pub enum MergeError {
+    #[snafu(display("cannot merge two sketches with mismatched configuration parameters"))]
+    MismatchedConfigs,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -649,9 +656,19 @@ impl AgentDDSketch {
             .or(Some(f64::NAN))
     }
 
-    pub fn merge(&mut self, other: &AgentDDSketch) -> bool {
+    /// Merges another sketch into this sketch, without a loss of accuracy.
+    ///
+    /// All samples present in the other sketch will be correctly represented in this sketch, and
+    /// summary statistics such as the sum, average, count, min, and max, will represent the sum of
+    /// samples from both sketches.
+    ///
+    /// ## Errors
+    ///
+    /// If there is an error while merging the two sketches together, an error variant will be
+    /// returned that describes the issue.
+    pub fn merge(&mut self, other: &AgentDDSketch) -> Result<(), MergeError> {
         if self.config != other.config {
-            return false;
+            return Err(MergeError::MismatchedConfigs);
         }
 
         // Merge the basic statistics together.
@@ -695,7 +712,7 @@ impl AgentDDSketch {
 
         self.bins = temp;
 
-        true
+        Ok(())
     }
 
     /// Converts a `Metric` to a sketch representation, if possible, using `AgentDDSketch`.
@@ -1153,7 +1170,7 @@ mod tests {
 
         all_values_many.insert_many(&values);
 
-        assert!(odd_values.merge(&even_values));
+        assert!(odd_values.merge(&even_values).is_ok());
         let merged_values = odd_values;
 
         // Number of bins should be equal to the number of values we inserted.
@@ -1203,7 +1220,7 @@ mod tests {
         // Subtly tweak the config of the second sketch to ensure that merging fails.
         second.config.norm_bias += 1;
 
-        assert!(!first.merge(&second));
+        assert!(first.merge(&second).is_err());
     }
 
     #[test]

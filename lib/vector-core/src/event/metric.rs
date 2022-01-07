@@ -932,7 +932,7 @@ impl MetricValue {
                     (
                         MetricSketch::AgentDDSketch(ddsketch),
                         MetricSketch::AgentDDSketch(ddsketch2),
-                    ) => ddsketch.merge(ddsketch2),
+                    ) => ddsketch.merge(ddsketch2).is_ok(),
                 }
             }
             _ => false,
