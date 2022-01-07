@@ -42,7 +42,7 @@ Externally, users are restricted by the available custom set of encodings implem
 
 Users should be able to set `encoding` and `framing` options on sinks, analogously to the `decoding` and `framing` options on sources. These options uniformly control how the event _payload_ is encoded. This distinction is important, as encoding for the sink specific _protocol_ and the event _payload_ are separate concerns. The payload should still be encoded according to the sink's protocol, and the sink should provide additional options if there are multiple protocols to choose from, e.g. under a `protocol` key. If there need to be any encoding options for the payload at all can be decided on a per-sink basis.
 
-The fields containing event transformations in sinks on the current `encoding` options (`schema`, `only_fields`, `except_fields`, `timestamp_format`) should be moved to a dedicated option, e.g. `schema` or `transform`. Thus, this would introduce a breaking change in configurations. However, migration would be relatively straight-forward by nesting these options under the new key.
+The fields containing event transformations in sinks on the current `encoding` options (`only_fields`, `except_fields`, `timestamp_format`) should also work with the new encoding options without breaking backwards compatibility. In the future, they may be moved to a dedicated key, e.g. `transform` or replaced by a mechanism provided by the upcoming schema support.
 
 ### Implementation
 
