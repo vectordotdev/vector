@@ -1,5 +1,11 @@
 *
+!README.md
+!LICENSE
+!NOTICE
+!.cargo
 !benches
+!config
+!distribution
 !lib
 !proto
 !src

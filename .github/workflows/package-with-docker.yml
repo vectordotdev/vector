@@ -1,0 +1,17 @@
+name: Package
+
+on: [pull_request]
+
+jobs:
+  package-gnu:
+    name: Build packages with gnu compilers
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v2
+      - name: setup buildx
+        uses: docker/setup-buildx-action@v2
+      - name: build deb packages
+        run: docker buildx build --platform linux/amd64,linux/arm64 --target deb --output ./target -f scripts/docker/gnu.dockerfile .
+      - name: build docker image
+        run: docker buildx build -t timberio/vector:dontpushme --platform linux/amd64,linux/arm64 --target image -f scripts/docker/gnu.dockerfile .
