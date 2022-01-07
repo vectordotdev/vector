@@ -318,18 +318,6 @@ test-integration-aws-sqs: ## Runs AWS SQS integration tests
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 	FILTER=::aws_cloudwatch_logs make test-integration-aws
 
-.PHONY: test-integration-clickhouse
-test-integration-clickhouse: ## Runs Clickhouse integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-	@scripts/setup_integration_env.sh clickhouse start
-	sleep 5 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-endif
-
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
@@ -499,7 +487,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop --volumes
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)

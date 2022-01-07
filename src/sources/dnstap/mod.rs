@@ -252,12 +252,12 @@ mod integration_tests {
     use tokio::time;
 
     use super::*;
-    use crate::{event::Value, test_util::trace_init, Pipeline};
+    use crate::{event::Value, test_util::trace_init, SourceSender};
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
         trace_init();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             let socket = get_socket(raw_data, query_type);

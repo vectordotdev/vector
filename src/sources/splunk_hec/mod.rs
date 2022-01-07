@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt};
+use futures::{stream, FutureExt};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -31,8 +31,9 @@ use crate::{
         SplunkHecRequestReceived,
     },
     serde::bool_or_struct,
+    source_sender::StreamSendError,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 mod acknowledgements;
@@ -199,7 +200,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
         let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
@@ -230,9 +231,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -271,10 +270,13 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         ));
 
-                        let res = out.send_all(&mut events).await;
-
-                        out.flush().await?;
-                        res.map(|_| maybe_ack_id)
+                        match out.send_result_stream(&mut events).await {
+                            Ok(()) => Ok(maybe_ack_id),
+                            Err(StreamSendError::Stream(error)) => Err(error),
+                            Err(StreamSendError::Closed(_)) => {
+                                Err(Rejection::from(ApiError::ServerShutdown))
+                            }
+                        }
                     }
                 },
             )
@@ -282,7 +284,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
@@ -305,9 +307,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -333,6 +333,7 @@ impl SplunkSource {
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
+                            .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
             )
@@ -984,7 +985,7 @@ mod tests {
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -1009,7 +1010,7 @@ mod tests {
         store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());

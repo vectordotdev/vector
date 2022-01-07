@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -32,7 +32,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 use async_stream::stream;
 
@@ -170,7 +170,7 @@ async fn kafka_source(
     headers_key: String,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
@@ -263,13 +263,12 @@ async fn kafka_source(
                         }
                     }
                 }
-                .map(Ok)
                 .boxed();
 
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
                             Err(err) => error!(message = "Error sending to sink.", error = %err),
                             Ok(_) => {
@@ -427,7 +426,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
@@ -496,7 +495,7 @@ mod integration_test {
         .await;
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
             create_consumer(&config).unwrap(),
             config.key_field,

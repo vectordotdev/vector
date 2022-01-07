@@ -56,7 +56,6 @@ pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
@@ -66,6 +65,7 @@ pub mod shutdown;
 pub mod signal;
 pub mod sink;
 pub mod sinks;
+pub mod source_sender;
 pub mod sources;
 pub(crate) mod stats;
 pub mod stream;
@@ -89,7 +89,7 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use pipeline::Pipeline;
+pub use source_sender::SourceSender;
 pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {

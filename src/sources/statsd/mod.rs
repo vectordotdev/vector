@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
@@ -17,7 +17,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 pub mod parser;
@@ -169,7 +169,7 @@ impl Deserializer for StatsdDeserializer {
 async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(&StatsdSocketError::bind(error)))
@@ -235,7 +235,7 @@ impl TcpSource for StatsdTcpSource {
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
-    use futures::channel::mpsc;
+    use futures::{channel::mpsc, SinkExt};
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::{
         io::AsyncWriteExt,

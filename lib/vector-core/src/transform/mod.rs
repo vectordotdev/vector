@@ -10,7 +10,7 @@ use crate::{
 
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
-pub use config::{DataType, ExpandType, TransformConfig, TransformContext};
+pub use config::{ExpandType, TransformConfig, TransformContext};
 
 mod config;
 

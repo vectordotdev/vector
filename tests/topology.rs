@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use futures::{future, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, stream, StreamExt};
 use tokio::time::{sleep, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
@@ -45,7 +45,7 @@ async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let (in1, rx) = vector::Pipeline::new_with_buffer(1000, vec![]);
+    let (mut in1, rx) = vector::SourceSender::new_with_buffer(1000);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
     let transform1 = transform(" transformed", 0.0);
@@ -59,10 +59,8 @@ async fn topology_shutdown_while_active() {
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let pump_handle = tokio::spawn(async move {
-        futures::stream::repeat(Event::from("test"))
-            .map(Ok)
-            .forward(in1)
-            .await
+        let mut stream = futures::stream::repeat(Event::from("test"));
+        in1.send_all(&mut stream).await
     });
 
     // Wait until at least 100 events have been seen by the source so we know the pump is running
@@ -417,7 +415,7 @@ async fn topology_swap_transform() {
 #[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
-    let (in1, source1) = source();
+    let (mut in1, source1) = source();
     let transform1v1 = transform(" transformed", 0.0);
     let (out1, sink1) = sink(10);
 
@@ -437,11 +435,10 @@ async fn topology_swap_transform_is_atomic() {
             None
         }
     };
-    let input = stream::iter(iter::from_fn(events));
-    let input = input
-        .map(Ok)
-        .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
-        .map(|_| ());
+    let mut input = stream::iter(iter::from_fn(events));
+    let input = async move {
+        in1.send_all(&mut input).await.unwrap();
+    };
     let output = out1.for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
         future::ready(())
