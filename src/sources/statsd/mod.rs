@@ -242,10 +242,9 @@ mod test {
     use vector_core::config::ComponentKey;
 
     use super::*;
+    use crate::series;
     use crate::test_util::{
-        metrics::{
-            assert_counter, assert_distribution, assert_gauge, assert_set, series, MetricState,
-        },
+        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set, MetricState},
         next_addr,
     };
 
@@ -376,51 +375,5 @@ mod test {
             &[(1.0, 0), (2.0, 0), (4.0, 500), (f64::INFINITY, 500)],
         );
         assert_set(&metrics, series!("set"), &["0", "1"]);
-
-        /*
-        // Flush test
-        {
-            // Wait for flush to happen
-            sleep(Duration::from_millis(2000)).await;
-
-            let response = client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
-            assert!(response.status().is_success());
-
-            let body = body_to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
-
-            // Check rested
-            assert_eq!(parse_count(&lines, "set"), 0);
-
-            // Re-check that set is also reset------------
-
-            sender.send(b"set:0|s\nset:1|s\n").await.unwrap();
-            // Give packets some time to flow through
-            sleep(Duration::from_millis(100)).await;
-
-            let response = client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
-            assert!(response.status().is_success());
-
-            let body = body_to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
-
-            // Set test
-            assert_eq!(parse_count(&lines, "set"), 2);
-        }
-
-        // Shut down server
-        topology.stop().await;*/
     }
 }

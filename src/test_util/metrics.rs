@@ -102,6 +102,7 @@ pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<H
         .flatten()
 }
 
+#[macro_export]
 macro_rules! series {
 	($name:expr) => {
 		vector_core::event::metric::MetricSeries {
@@ -211,5 +212,3 @@ pub fn assert_set(metrics: &SplitMetrics, series: MetricSeries, expected_values:
 
     assert_eq!(actual_values, expected_values);
 }
-
-pub(crate) use series;
