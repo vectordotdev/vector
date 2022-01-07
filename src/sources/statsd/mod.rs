@@ -245,11 +245,11 @@ mod test {
     use vector_core::config::ComponentKey;
 
     use super::*;
-    use crate::series;
     use crate::test_util::{
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set, MetricState},
         next_addr,
     };
+    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -357,7 +357,7 @@ mod test {
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
         // cumulative values for incremental metrics, etc.  This will represent the final/cumulative
         // values for each metric sent by the source into the pipeline.
-        let state = rx.collect::<MetricState>().await;
+        let state = rx.collect::<AbsoluteMetricState>().await;
         let metrics = state.finish();
 
         assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);

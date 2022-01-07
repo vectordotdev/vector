@@ -8,24 +8,34 @@ use vector_core::event::{
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
+pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
+pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 
 #[derive(Default)]
-struct PassthroughNormalizer;
+pub struct AbsoluteMetricNormalizer;
 
-impl MetricNormalize for PassthroughNormalizer {
+impl MetricNormalize for AbsoluteMetricNormalizer {
     fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
 
 #[derive(Default)]
-pub struct MetricState {
+pub struct IncrementalMetricNormalizer;
+
+impl MetricNormalize for IncrementalMetricNormalizer {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        state.make_incremental(metric)
+    }
+}
+
+pub struct MetricState<N> {
     intermediate: MetricSet,
-    normalizer: PassthroughNormalizer,
+    normalizer: N,
     latest: HashMap<MetricSeries, (MetricData, EventMetadata)>,
 }
 
-impl MetricState {
+impl<N: MetricNormalize> MetricState<N> {
     pub fn merge(&mut self, metric: Metric) {
         if let Some(output) = self.normalizer.apply_state(&mut self.intermediate, metric) {
             let (series, data, metadata) = output.into_parts();
@@ -51,10 +61,30 @@ impl MetricState {
     }
 }
 
-impl Extend<Event> for MetricState {
+impl<N: MetricNormalize> Extend<Event> for MetricState<N> {
     fn extend<T: IntoIterator<Item = Event>>(&mut self, iter: T) {
         for event in iter.into_iter() {
             self.merge(event.into_metric());
+        }
+    }
+}
+
+impl<N> From<N> for MetricState<N> {
+    fn from(normalizer: N) -> Self {
+        Self {
+            intermediate: MetricSet::default(),
+            normalizer,
+            latest: HashMap::default(),
+        }
+    }
+}
+
+impl<N: Default> Default for MetricState<N> {
+    fn default() -> Self {
+        Self {
+            intermediate: MetricSet::default(),
+            normalizer: N::default(),
+            latest: HashMap::default(),
         }
     }
 }
