@@ -337,27 +337,10 @@ mod test {
     use crate::{
         event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
+        test_util::metrics::{AbsoluteMetricNormalizer, IncrementalMetricNormalizer},
     };
 
     type Buffer = Vec<Vec<Metric>>;
-
-    #[derive(Default)]
-    struct AbsoluteMetricNormalize;
-
-    impl MetricNormalize for AbsoluteMetricNormalize {
-        fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-            state.make_absolute(metric)
-        }
-    }
-
-    #[derive(Default)]
-    struct IncrementalMetricNormalize;
-
-    impl MetricNormalize for IncrementalMetricNormalize {
-        fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-            state.make_incremental(metric)
-        }
-    }
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -424,7 +407,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_counters() {
-        let buffer = rebuffer_incremental_counters::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_incremental_counters::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -451,7 +434,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_counters() {
-        let buffer = rebuffer_incremental_counters::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_incremental_counters::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -494,7 +477,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_counters() {
-        let buffer = rebuffer_absolute_counters::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_absolute_counters::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -513,7 +496,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_counters() {
-        let buffer = rebuffer_absolute_counters::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_absolute_counters::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -544,7 +527,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_gauges() {
-        let buffer = rebuffer_incremental_gauges::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_incremental_gauges::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -562,7 +545,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_gauges() {
-        let buffer = rebuffer_incremental_gauges::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_incremental_gauges::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -596,7 +579,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_gauges() {
-        let buffer = rebuffer_absolute_gauges::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_absolute_gauges::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -613,7 +596,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_gauges() {
-        let buffer = rebuffer_absolute_gauges::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_absolute_gauges::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -645,7 +628,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_sets() {
-        let buffer = rebuffer_incremental_sets::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_incremental_sets::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -660,7 +643,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_sets() {
-        let buffer = rebuffer_incremental_sets::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_incremental_sets::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -688,7 +671,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_distributions() {
-        let buffer = rebuffer_incremental_distributions::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_incremental_distributions::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -705,7 +688,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_distributions() {
-        let buffer = rebuffer_incremental_distributions::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_incremental_distributions::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -759,7 +742,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_aggregated_histograms() {
-        let buffer = rebuffer_absolute_aggregated_histograms::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_absolute_aggregated_histograms::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -775,7 +758,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_aggregated_histograms() {
-        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -797,7 +780,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_aggregated_histograms() {
-        let buffer = rebuffer_incremental_aggregated_histograms::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_incremental_aggregated_histograms::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -809,7 +792,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_aggregated_histograms() {
-        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -836,7 +819,7 @@ mod test {
 
     #[test]
     fn abs_buffer_aggregated_summaries() {
-        let buffer = rebuffer_aggregated_summaries::<AbsoluteMetricNormalize>();
+        let buffer = rebuffer_aggregated_summaries::<AbsoluteMetricNormalizer>();
 
         assert_eq!(
             buffer[0],
@@ -851,7 +834,7 @@ mod test {
 
     #[test]
     fn inc_buffer_aggregated_summaries() {
-        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalize>();
+        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalizer>();
 
         // Since aggregated summaries cannot be added, they don't work
         // as incremental metrics and this results in an empty buffer.
