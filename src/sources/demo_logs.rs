@@ -3,7 +3,7 @@ use std::task::Poll;
 use bytes::Bytes;
 use chrono::Utc;
 use fakedata::logs::*;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -20,7 +20,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -138,7 +138,7 @@ async fn demo_logs_source(
     format: OutputFormat,
     decoder: codecs::Decoder,
     mut shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let maybe_interval: Option<f64> = if interval != 0.0 {
         Some(interval)
@@ -173,7 +173,7 @@ async fn demo_logs_source(
 
                         out.send(event)
                             .await
-                            .map_err(|_: crate::pipeline::ClosedError| {
+                            .map_err(|_: crate::source_sender::ClosedError| {
                                 error!(message = "Failed to forward events; downstream is closed.");
                             })?;
                     }
@@ -251,18 +251,21 @@ impl SourceConfig for DemoLogsCompatConfig {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{channel::mpsc, poll, StreamExt};
+    use futures::{poll, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, Pipeline};
+    use crate::{
+        config::log_schema, event::Event, shutdown::ShutdownSignal, source_sender::ReceiverStream,
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> mpsc::Receiver<Event> {
-        let (tx, rx) = Pipeline::new_test();
+    async fn runit(config: &str) -> ReceiverStream<Event> {
+        let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
         let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())
             .build()

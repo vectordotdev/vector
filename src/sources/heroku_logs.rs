@@ -289,7 +289,7 @@ mod tests {
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
         test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender);
         tokio::spawn(async move {

@@ -12,8 +12,8 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::GlobalOptions,
-    transform::{DataType, ExpandType, TransformConfig, TransformContext},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    transform::{ExpandType, TransformConfig, TransformContext},
 };
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
     sinks::{self, util::UriSerde},
     sources,
     transforms::noop::Noop,
-    Pipeline,
+    SourceSender,
 };
 
 pub mod api;
@@ -155,17 +155,6 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
     #[serde(
@@ -205,7 +194,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
-    pub out: Pipeline,
+    pub out: SourceSender,
     pub proxy: ProxyConfig,
 }
 
@@ -213,7 +202,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
         key: &ComponentKey,
-        out: Pipeline,
+        out: SourceSender,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(key);
@@ -230,7 +219,7 @@ impl SourceContext {
     }
 
     #[cfg(test)]
-    pub fn new_test(out: Pipeline) -> Self {
+    pub fn new_test(out: SourceSender) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),

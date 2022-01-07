@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use futures::{stream, FutureExt, SinkExt, StreamExt};
+use futures::{stream, FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
@@ -67,11 +67,8 @@ fn eventstoredb(
     endpoint: &str,
     interval: u64,
     namespace: Option<String>,
-    cx: SourceContext,
+    mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
-    let mut out = cx
-        .out
-        .sink_map_err(|error| error!(message = "Error sending metric.", %error));
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
@@ -119,8 +116,9 @@ fn eventstoredb(
                                     byte_size: bytes.len(),
                                 });
 
-                                let mut metrics = stream::iter(metrics).map(Event::Metric).map(Ok);
-                                if out.send_all(&mut metrics).await.is_err() {
+                                let mut metrics = stream::iter(metrics).map(Event::Metric);
+                                if let Err(error) = cx.out.send_all(&mut metrics).await {
+                                    error!(message = "Error sending metric.", %error);
                                     break;
                                 }
                             }
@@ -139,7 +137,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, Pipeline};
+    use crate::{test_util, SourceSender};
 
     const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
 
@@ -152,7 +150,7 @@ mod integration_tests {
             default_namespace: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

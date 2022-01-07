@@ -15,8 +15,12 @@ use crate::{
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
     test_util::random_string,
-    Pipeline,
+    SourceSender,
 };
+
+fn sqs_address() -> String {
+    std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
 
 fn gen_queue_name() -> String {
     random_string(10).to_lowercase()
@@ -47,7 +51,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(AwsAuthentication::test_auth().credentials_provider().await)
         .endpoint_resolver(Endpoint::immutable(
-            Uri::from_str("http://localhost:4566").unwrap(),
+            Uri::from_str(sqs_address().as_str()).unwrap(),
         ))
         .region(Some(Region::new("us-east-1")))
         .build();
@@ -68,13 +72,13 @@ pub async fn test() {
     send_test_events(num_events, &queue_url, &sqs_client).await;
 
     let config = AwsSqsConfig {
-        region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
+        region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
         auth: AwsAuthentication::test_auth(),
         queue_url: queue_url.clone(),
         ..Default::default()
     };
 
-    let (tx, rx) = Pipeline::new_test();
+    let (tx, rx) = SourceSender::new_test();
     tokio::spawn(async move {
         config
             .build(SourceContext::new_test(tx))
