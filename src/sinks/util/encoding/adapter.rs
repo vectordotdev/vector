@@ -7,6 +7,7 @@ use crate::{
 };
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 /// Trait used to migrate from a sink-specific `Codec` enum to the new
 /// `Box<dyn FramingConfig>`/`Box<dyn SerializerConfig>` encoding configuration.
@@ -33,7 +34,7 @@ pub enum EncodingConfigAdapter<
     /// The encoding configuration.
     Encoding(EncodingConfig),
     /// The legacy sink-specific encoding configuration.
-    LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig>, Migrator),
+    LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig, Migrator>),
 }
 
 impl<
@@ -59,8 +60,11 @@ impl<
     }
 
     /// Create a legacy sink-specific encoding configuration.
-    pub fn legacy(encoding: LegacyEncodingConfig, migrator: Migrator) -> Self {
-        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper { encoding }, migrator)
+    pub fn legacy(encoding: LegacyEncodingConfig) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper {
+            encoding,
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -104,7 +108,7 @@ impl<
                     timestamp_format,
                 }
             }
-            Self::LegacyEncodingConfig(config, _) => Transformer {
+            Self::LegacyEncodingConfig(config) => Transformer {
                 only_fields: config.encoding.only_fields().as_ref().map(|fields| {
                     fields
                         .iter()
@@ -134,7 +138,7 @@ impl<
 
                 (framer, serializer)
             }
-            Self::LegacyEncodingConfig(config, _) => {
+            Self::LegacyEncodingConfig(config) => {
                 let migration = Migrator::migrate(config.encoding.codec());
                 let framer = match migration.0 {
                     Some(framing) => Some(framing.build()?),
@@ -151,8 +155,10 @@ impl<
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LegacyEncodingConfigWrapper<EncodingConfig> {
+pub struct LegacyEncodingConfigWrapper<EncodingConfig, Migrator> {
     encoding: EncodingConfig,
+    #[serde(skip)]
+    phantom: PhantomData<Migrator>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -250,5 +256,80 @@ mod tests {
             },
             vec!["ignore_me".to_owned()]
         );
+    }
+
+    #[test]
+    fn deserialize_new_config() {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum LegacyEncoding {
+            Foo,
+        }
+
+        #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+        struct Migrator;
+
+        impl EncodingConfigMigrator for Migrator {
+            type Codec = LegacyEncoding;
+
+            fn migrate(
+                _: &Self::Codec,
+            ) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>) {
+                panic!()
+            }
+        }
+
+        let string = r#"{ "encoding": { "codec": "text" } }"#;
+
+        let config = serde_json::from_str::<
+            EncodingConfigAdapter<crate::sinks::util::EncodingConfig<LegacyEncoding>, Migrator>,
+        >(string)
+        .unwrap();
+
+        let encoding = match config {
+            EncodingConfigAdapter::Encoding(encoding) => encoding.encoding.encoding,
+            EncodingConfigAdapter::LegacyEncodingConfig(_) => panic!(),
+        };
+
+        assert_eq!(encoding.typetag_name(), "text");
+    }
+
+    #[test]
+    fn deserialize_legacy_config() {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum LegacyEncoding {
+            Foo,
+        }
+
+        #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+        struct Migrator;
+
+        impl EncodingConfigMigrator for Migrator {
+            type Codec = LegacyEncoding;
+
+            fn migrate(
+                _: &Self::Codec,
+            ) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>) {
+                panic!()
+            }
+        }
+
+        for string in [
+            r#"{ "encoding": "foo" }"#,
+            r#"{ "encoding": { "codec": "foo" } }"#,
+        ] {
+            let config = serde_json::from_str::<
+                EncodingConfigAdapter<crate::sinks::util::EncodingConfig<LegacyEncoding>, Migrator>,
+            >(string)
+            .unwrap();
+
+            let encoding = match config {
+                EncodingConfigAdapter::LegacyEncodingConfig(config) => config.encoding,
+                EncodingConfigAdapter::Encoding(_) => panic!(),
+            };
+
+            assert!(matches!(encoding.codec(), LegacyEncoding::Foo));
+        }
     }
 }
