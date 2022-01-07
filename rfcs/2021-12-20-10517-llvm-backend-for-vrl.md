@@ -142,7 +142,39 @@ Calling `context.context_ref()` returns a reference to the VRL [`Context`](https
 
 For anything less trivial than emitting branches or calling functions, we want to leverage the Rust compiler. For one, this allows us to not concern ourselves with memory layout and doesn't force us to define an FFI when we only use basic integer types or pointers/references. It also provides us with Rust's memory safety guarantees for large parts of the emitted LLVM IR.
 
-_TODO: Elaborate on the expression compilation a bit more._
+Most expressions which rely predominantly on precompiled Rust build LLVM IR similar to the following
+
+```rust
+let fn_ident = "vrl_resolved_initialize";
+let fn_impl = ctx
+    .module()
+    .get_function(fn_ident)
+    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+ctx.builder()
+    .build_call(fn_impl, &[result_ref.into()], fn_ident);
+```
+
+which will emit the LLVM instruction
+
+```llvm
+call void @vrl_resolved_initialize(%"std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>"* %result)
+```
+
+This call refers to a function compiled by Rust in the same LLVM module. However, we don't need to actually call this function, the implementation can be inlined and optimized by LLVM since the whole source code is known. This way of emitting LLVM IR is merely very convenient to stitch together code fragments.
+
+For temporary values needed e.g. in binary operations we can allocate uninitialized stack values:
+
+```rust
+let result_temp_ref = ctx.build_alloca_resolved("temp")?;
+```
+
+which will emit the LLVM instruction
+
+```llvm
+%temp = alloca %"std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>", align 8
+```
+
+it is our responsibility to initialize and drop the value accordingly. This can be accomplished by calling the implementations for `vrl_resolved_initialize` and `vrl_resolved_drop` shown further below.
 
 _TODO: Explain how constants are handled._
 
