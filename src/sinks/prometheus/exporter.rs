@@ -19,16 +19,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use vector_core::{
-    buffers::Acker,
-    event::metric::{MetricSeries, MetricSketch},
-    metrics::AgentDDSketch,
-};
+use vector_core::{buffers::Acker, event::metric::MetricSeries};
 
-use super::{
-    collector::{MetricCollector, StringCollector},
-    samples_to_buckets,
-};
+use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::{
@@ -186,20 +179,26 @@ struct PrometheusExporter {
 /// Expiration metadata for a metric.
 #[derive(Clone, Copy, Debug)]
 struct MetricMetadata {
-    should_clear: bool,
-    last_updated: Instant,
+    expiration_window: Duration,
+    expires_at: Instant,
 }
 
 impl MetricMetadata {
-    pub fn new(should_clear: bool) -> Self {
+    pub fn new(expiration_window: Duration) -> Self {
         Self {
-            should_clear,
-            last_updated: Instant::now(),
+            expiration_window,
+            expires_at: Instant::now() + expiration_window,
         }
     }
 
-    pub fn has_expired(&self, timeout: Duration) -> bool {
-        self.last_updated.elapsed() > timeout
+    /// Resets the expiration deadline.
+    pub fn refresh(&mut self) {
+        self.expires_at = Instant::now() + self.expiration_window;
+    }
+
+    /// Whether or not the referenced metric has expired yet.
+    pub fn has_expired(&self, now: Instant) -> bool {
+        self.expires_at >= now
     }
 }
 
@@ -212,12 +211,12 @@ impl MetricMetadata {
 // specifically to look up the entry in a map for a metric in the sense of "get the metric whose
 // name is X and type is Y and has these tags".
 #[derive(Clone, Debug)]
-struct MetricRef(
-    MetricSeries,
-    MetricKind,
-    Discriminant<MetricValue>,
-    Option<Vec<f64>>,
-);
+struct MetricRef {
+    series: MetricSeries,
+    kind: MetricKind,
+    value: Discriminant<MetricValue>,
+    bounds: Option<Vec<f64>>,
+}
 
 impl MetricRef {
     /// Creates a `MetricRef` based on the given `Metric`.
@@ -233,18 +232,21 @@ impl MetricRef {
             _ => None,
         };
 
-        Self(
-            metric.series().clone(),
-            metric.kind(),
-            discriminant(metric.value()),
+        Self {
+            series: metric.series().clone(),
+            kind: metric.kind(),
+            value: discriminant(metric.value()),
             bounds,
-        )
+        }
     }
 }
 
 impl PartialEq for MetricRef {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 && self.1 == other.1 && self.2 == other.2 && self.3 == other.3
+        self.series == other.series
+            && self.kind == other.kind
+            && self.value == other.value
+            && self.bounds == other.bounds
     }
 }
 
@@ -252,10 +254,10 @@ impl Eq for MetricRef {}
 
 impl Hash for MetricRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-        self.1.hash(state);
-        self.2.hash(state);
-        if let Some(bounds) = &self.3 {
+        self.series.hash(state);
+        self.kind.hash(state);
+        self.value.hash(state);
+        if let Some(bounds) = &self.bounds {
             for bound in bounds {
                 bound.to_bits().hash(state);
             }
@@ -276,33 +278,18 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
                 let (series, data, metadata) = metric.into_parts();
                 let (ts, kind, value) = data.into_parts();
 
-                let new_value = match value {
-                    MetricValue::Distribution { samples, .. } => {
-                        if self.distributions_as_summaries {
-                            // We use a sketch when in summary mode because they're actually able to be
-                            // merged and provide correct output, unlike the aggregated summaries that
-                            // we handle from _sources_ like Prometheus.  The collector code already
-                            // renders sketches as an aggregated summary to begin with, so we're gucci.
-                            let mut sketch = AgentDDSketch::with_agent_defaults();
-                            for sample in samples {
-                                sketch.insert_n(sample.value, sample.rate);
-                            }
-
-                            MetricValue::Sketch {
-                                sketch: MetricSketch::AgentDDSketch(sketch),
-                            }
-                        } else {
-                            let (buckets, count, sum) =
-                                samples_to_buckets(samples.iter(), &self.buckets);
-
-                            MetricValue::AggregatedHistogram {
-                                buckets,
-                                count,
-                                sum,
-                            }
-                        }
-                    }
-                    _ => unreachable!(),
+                let new_value = if self.distributions_as_summaries {
+                    // We use a sketch when in summary mode because they're actually able to be
+                    // merged and provide correct output, unlike the aggregated summaries that
+                    // we handle from _sources_ like Prometheus.  The collector code itself
+                    // will render sketches as aggregated summaries, so we have continuity there.
+                    value
+                        .distribution_to_sketch()
+                        .expect("value should be distribution already")
+                } else {
+                    value
+                        .distribution_to_agg_histogram(&self.buckets)
+                        .expect("value should be distribution already")
                 };
 
                 let data = MetricData::from_parts(ts, kind, new_value);
@@ -436,6 +423,7 @@ impl StreamSink for PrometheusExporter {
         self.start_server_if_needed().await;
 
         let mut last_flush = Instant::now();
+        let flush_period = self.config.flush_period_secs;
         let mut normalizer = MetricNormalizer::from(PrometheusExporterMetricNormalizer {
             distributions_as_summaries: self.config.distributions_as_summaries,
             buckets: self.config.buckets.clone(),
@@ -445,23 +433,18 @@ impl StreamSink for PrometheusExporter {
             let metric = event.into_metric();
 
             if let Some(normalized) = normalizer.apply(metric) {
-                // Push this metric into the expiration tracker.  All metrics that we handle here
-                // have already been normalized into absolute metrics, so we're really just updating
-                // the "last updated" field for existing/tracked metrics, and add it in for
-                // not-yet-seen ones.
+                // We have a normalized metric, in absolute form.  If we're already aware of this
+                // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
 
                 let metric_ref = MetricRef::from_metric(&normalized);
                 match metrics.get_mut(&metric_ref) {
                     Some((data, metadata)) => {
                         *data = normalized;
-                        metadata.last_updated = Instant::now();
+                        metadata.refresh();
                     }
                     None => {
-                        // We specifically clear sets when they expire rather than totally delete
-                        // them, and this flag is how we know to do that.
-                        let should_clear = matches!(normalized.value(), MetricValue::Set { .. });
-                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(should_clear)));
+                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
                     }
                 }
             }
@@ -481,21 +464,13 @@ impl StreamSink for PrometheusExporter {
 
                 let metrics_to_expire = metrics
                     .iter()
-                    .filter(|(_, (_, metadata))| {
-                        !metadata.has_expired(self.config.flush_period_secs)
-                    })
-                    .map(|(metric_ref, (_, metadata))| (metric_ref.clone(), *metadata))
+                    .filter(|(_, (_, metadata))| !metadata.has_expired(last_flush))
+                    .map(|(metric_ref, _)| metric_ref.clone())
                     .collect::<Vec<_>>();
 
-                for (metric_ref, metadata) in metrics_to_expire {
-                    if metadata.should_clear {
-                        if let Some((metric, _)) = metrics.get_mut(&metric_ref) {
-                            metric.data_mut().value_mut().zero();
-                        }
-                    } else {
-                        metrics.remove(&metric_ref);
-                    }
-                    normalizer.get_state_mut().remove(&metric_ref.0);
+                for metric_ref in metrics_to_expire {
+                    metrics.remove(&metric_ref);
+                    normalizer.get_state_mut().remove(&metric_ref.series);
                 }
             }
 

@@ -246,7 +246,7 @@ mod test {
 
     use super::*;
     use crate::test_util::{
-        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set, MetricState},
+        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
     use crate::{series, test_util::metrics::AbsoluteMetricState};

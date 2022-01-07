@@ -224,6 +224,53 @@ impl MetricValue {
             Self::Sketch { sketch } => sketch.as_name(),
         }
     }
+
+    /// Converts a distribution to an aggregated histogram.
+    ///
+    /// Histogram bucket bounds are based on `buckets`, where the value is the upper bound of the
+    /// bucket.  Samples will be thus be ordered in a "less than" fashion: if the given sample is
+    /// less than or equal to a given bucket's upper bound, it will be counted towards that bucket
+    /// at the given sample rate.
+    ///
+    /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
+    /// `Some(MetricValue::AggregatedHistogram)` is returned.
+    pub fn distribution_to_agg_histogram(self, buckets: &[f64]) -> Option<MetricValue> {
+        match self {
+            MetricValue::Distribution { samples, .. } => {
+                let (buckets, count, sum) = samples_to_buckets(&samples, buckets);
+
+                Some(MetricValue::AggregatedHistogram {
+                    buckets,
+                    count,
+                    sum,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Converts a distribution to a sketch.
+    ///
+    /// This conversion specifically use the `AgentDDSketch` sketch variant, in the default
+    /// configuration that matches the Datadog Agent, parameter-wise.
+    ///
+    /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
+    /// `Some(MetricValue::Sketch)` is returned.
+    pub fn distribution_to_sketch(self) -> Option<MetricValue> {
+        match self {
+            MetricValue::Distribution { samples, .. } => {
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                for sample in samples {
+                    sketch.insert_n(sample.value, sample.rate);
+                }
+
+                Some(MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch),
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 impl ByteSizeOf for MetricValue {
@@ -1188,6 +1235,35 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     } else {
         write!(fmt, "{}", word)
     }
+}
+
+pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
+    let mut counts = vec![0; buckets.len()];
+    let mut sum = 0.0;
+    let mut count = 0;
+    for sample in samples {
+        buckets
+            .iter()
+            .enumerate()
+            .skip_while(|&(_, b)| *b < sample.value)
+            .for_each(|(i, _)| {
+                counts[i] += sample.rate;
+            });
+
+        sum += sample.value * f64::from(sample.rate);
+        count += sample.rate;
+    }
+
+    let buckets = buckets
+        .iter()
+        .zip(counts.iter())
+        .map(|(b, c)| Bucket {
+            upper_limit: *b,
+            count: *c,
+        })
+        .collect();
+
+    (buckets, count, sum)
 }
 
 #[cfg(test)]

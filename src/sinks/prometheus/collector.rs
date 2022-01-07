@@ -3,14 +3,12 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{MetricSketch, Quantile};
+use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
-
-use super::samples_to_buckets;
 
 pub(super) trait MetricCollector {
     type Output;
@@ -61,7 +59,7 @@ pub(super) trait MetricCollector {
                     statistic: StatisticKind::Histogram,
                 } => {
                     // convert distributions into aggregated histograms
-                    let (buckets, count, sum) = samples_to_buckets(samples.iter(), buckets);
+                    let (buckets, count, sum) = samples_to_buckets(samples, buckets);
                     for bucket in buckets {
                         self.emit_value(
                             timestamp,
