@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn parse_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+    let bytes = value.try_bytes()?;
+    let value = serde_json::from_slice::<'_, Value>(&bytes)
+        .map_err(|e| format!("unable to parse json: {}", e))?;
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseJson;
 
@@ -81,6 +88,15 @@ impl Function for ParseJson {
 
         Ok(Box::new(ParseJsonFn { value }))
     }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        parse_json(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,11 +106,8 @@ struct ParseJsonFn {
 
 impl Expression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = serde_json::from_slice::<'_, Value>(&bytes)
-            .map_err(|e| format!("unable to parse json: {}", e))?;
-
-        Ok(value)
+        let value = self.value.resolve(ctx)?;
+        parse_json(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
