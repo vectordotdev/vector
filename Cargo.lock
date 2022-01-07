@@ -1829,7 +1829,8 @@ version = "0.1.0"
 dependencies = [
  "datadog-search-syntax",
  "dyn-clone",
- "regex",
+ "onig",
+ "regex-syntax",
 ]
 
 [[package]]

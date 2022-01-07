@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use datadog_filter::{
@@ -38,9 +39,9 @@ impl Filter<LogEvent> for EventFilter {
         match field {
             // Default fields are compared by word boundary.
             Field::Default(field) => {
-                let re = word_regex(to_match);
+                let re = Arc::new(word_regex(to_match));
 
-                string_match(&field, move |value| re.is_match(&value))
+                string_match(&field, move |value| re.is_match(value.as_ref()))
             }
             // A literal "tags" field should match by key.
             Field::Reserved(field) if field == "tags" => {
@@ -69,9 +70,9 @@ impl Filter<LogEvent> for EventFilter {
         match field {
             // Default fields are matched by word boundary.
             Field::Default(field) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = Arc::new(word_regex(&format!("{}*", prefix)));
 
-                string_match(field, move |value| re.is_match(&value))
+                string_match(field, move |value| re.is_match(value.as_ref()))
             }
             // Tags are recursed until a match is found.
             Field::Tag(tag) => {
@@ -91,19 +92,19 @@ impl Filter<LogEvent> for EventFilter {
     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {
         match field {
             Field::Default(field) => {
-                let re = word_regex(wildcard);
+                let re = Arc::new(word_regex(wildcard));
 
-                string_match(field, move |value| re.is_match(&value))
+                string_match(field, move |value| re.is_match(value.as_ref()))
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = Arc::new(wildcard_regex(&format!("{}:{}", tag, wildcard)));
 
-                any_string_match("tags", move |value| re.is_match(&value))
+                any_string_match("tags", move |value| re.is_match(value.as_ref()))
             }
             Field::Reserved(field) | Field::Facet(field) => {
-                let re = wildcard_regex(wildcard);
+                let re = Arc::new(wildcard_regex(wildcard));
 
-                string_match(field, move |value| re.is_match(&value))
+                string_match(field, move |value| re.is_match(value.as_ref()))
             }
         }
     }

@@ -8,5 +8,6 @@ publish = false
 [dependencies]
 datadog-search-syntax = { path = "../search-syntax" }
 
-regex = "1"
+onig = "6.3.1"
+regex-syntax = "0.6.25"
 dyn-clone = { version = "1.0.4", default-features = false }

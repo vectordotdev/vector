@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use datadog_filter::{
     build_matcher,
@@ -159,12 +160,12 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Default fields are compared by word boundary.
             Field::Default(_) => {
-                let re = word_regex(to_match);
+                let re = Arc::new(word_regex(to_match));
 
                 resolve_value(
                     buf,
                     Run::boxed(move |value| match value {
-                        Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
+                        Value::Bytes(val) => re.is_match(String::from_utf8_lossy(val).as_ref()),
                         _ => false,
                     }),
                 )
@@ -213,11 +214,11 @@ impl Filter<Value> for VrlFilter {
         match field {
             // Default fields are matched by word boundary.
             Field::Default(_) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = Arc::new(word_regex(&format!("{}*", prefix)));
 
                 resolve_value(
                     buf,
-                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                    Run::boxed(move |value| re.is_match(string_value(value).as_ref())),
                 )
             }
             // Tags are recursed until a match is found.
@@ -251,30 +252,30 @@ impl Filter<Value> for VrlFilter {
 
         match field {
             Field::Default(_) => {
-                let re = word_regex(wildcard);
+                let re = Arc::new(word_regex(wildcard));
 
                 resolve_value(
                     buf,
-                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                    Run::boxed(move |value| re.is_match(string_value(value).as_ref())),
                 )
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = Arc::new(wildcard_regex(&format!("{}:{}", tag, wildcard)));
 
                 resolve_value(
                     buf,
                     Run::boxed(move |value| match value {
-                        Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
+                        Value::Array(v) => v.iter().any(|v| re.is_match(string_value(v).as_ref())),
                         _ => false,
                     }),
                 )
             }
             _ => {
-                let re = wildcard_regex(wildcard);
+                let re = Arc::new(wildcard_regex(wildcard));
 
                 resolve_value(
                     buf,
-                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                    Run::boxed(move |value| re.is_match(string_value(value).as_ref())),
                 )
             }
         }
