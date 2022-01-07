@@ -1059,7 +1059,36 @@ impl Display for Metric {
             MetricKind::Incremental => '+',
         };
         write!(fmt, "{} {} ", &self.series, kind)?;
-        match &self.data.value {
+        write!(fmt, "{}", &self.data.value)
+    }
+}
+
+impl Display for MetricSeries {
+    /// Display a metric series name using something like Prometheus' text format:
+    ///
+    /// ```text
+    /// NAMESPACE_NAME{TAGS}
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(namespace) = &self.name.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
+        }
+        write_word(fmt, &self.name.name)?;
+        if let Some(tags) = &self.tags {
+            write!(fmt, "{{")?;
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+            write!(fmt, "}}")?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for MetricValue {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        match &self {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                 write!(fmt, "{}", value)
             }
@@ -1131,28 +1160,6 @@ impl Display for Metric {
                 }
             }
         }
-    }
-}
-
-impl Display for MetricSeries {
-    /// Display a metric series name using something like Prometheus' text format:
-    ///
-    /// ```text
-    /// NAMESPACE_NAME{TAGS}
-    /// ```
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        if let Some(namespace) = &self.name.namespace {
-            write_word(fmt, namespace)?;
-            write!(fmt, "_")?;
-        }
-        write_word(fmt, &self.name.name)?;
-        write!(fmt, "{{")?;
-        if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
-            })?;
-        }
-        write!(fmt, "}}")
     }
 }
 

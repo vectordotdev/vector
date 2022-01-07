@@ -158,6 +158,15 @@ impl MetricSet {
         Self(HashMap::with_capacity(capacity))
     }
 
+    /// Consumes this `MetricSet` and returns a vector of `Metric`.
+    #[cfg(test)]
+    pub fn into_metrics(self) -> Vec<Metric> {
+        self.0
+            .into_iter()
+            .map(|(series, (data, metadata))| Metric::from_parts(series, data, metadata))
+            .collect()
+    }
+
     /// Either pass the metric through as-is if absolute, or convert it
     /// to absolute if incremental.
     pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
