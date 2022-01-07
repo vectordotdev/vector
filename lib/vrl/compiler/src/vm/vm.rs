@@ -52,7 +52,7 @@ pub enum Instruction {
 pub struct Vm {
     fns: Vec<Box<dyn Function + Send + Sync>>,
     pub(super) instructions: Vec<Instruction>,
-    pub(super) values: Vec<Literal>,
+    pub(super) values: Vec<Value>,
     targets: Vec<Variable>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
 }
@@ -65,7 +65,7 @@ impl Vm {
         }
     }
 
-    pub fn add_constant(&mut self, object: Literal) -> usize {
+    pub fn add_constant(&mut self, object: Value) -> usize {
         self.values.push(object);
         self.values.len() - 1
     }
@@ -94,12 +94,14 @@ impl Vm {
         self.fns.get(function_id)
     }
 
+    /*
     pub fn get_constant(&self, constant: &str) -> Option<usize> {
         self.values.iter().position(|obj| match obj {
-            Literal::String(c) => c == constant,
+            Value::Bytes(c) => c == constant,
             _ => false,
         })
     }
+    */
 
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.
     pub fn get_target(&mut self, target: &Variable) -> usize {
@@ -118,6 +120,7 @@ impl Vm {
         self.static_params.len() - 1
     }
 
+    /// For debugging purposes, returns a list of strings representing the instructions and primitives.
     pub fn dissassemble(&self) -> Vec<String> {
         self.instructions
             .iter()
@@ -155,7 +158,7 @@ impl Vm {
                 }
                 OpCode::Constant => {
                     let value = state.read_constant()?;
-                    state.stack.push(value.to_value());
+                    state.stack.push(value);
                 }
                 OpCode::Negate => match state.stack.pop() {
                     None => return Err("Negating nothing".into()),
@@ -262,57 +265,19 @@ impl Vm {
                     let error = state.next_primitive();
                     let error = &self.targets[error];
 
+                    let default = state.next_primitive();
+                    let default = &self.values[default];
+
                     match state.error.take() {
                         Some(err) => {
                             let err = Value::from(err.to_string());
-                            match error {
-                                Variable::Internal(ident, path) => {
-                                    let path = match path {
-                                        Some(path) => path,
-                                        None => {
-                                            ctx.state_mut().insert_variable(ident.clone(), err);
-                                            continue;
-                                        }
-                                    };
-
-                                    // Update existing variable using the provided path, or create a
-                                    // new value in the store.
-                                    match ctx.state_mut().variable_mut(ident) {
-                                        Some(stored) => stored.insert_by_path(path, err),
-                                        None => ctx
-                                            .state_mut()
-                                            .insert_variable(ident.clone(), err.at_path(path)),
-                                    }
-                                }
-                                Variable::External(path) => ctx.target_mut().insert(path, err)?,
-                                Variable::None => (),
-                            }
+                            set_variable(ctx, variable, default.clone())?;
+                            set_variable(ctx, error, err)?;
                         }
                         None => {
                             let value = state.pop_stack()?;
-
-                            match variable {
-                                Variable::Internal(ident, path) => {
-                                    let path = match path {
-                                        Some(path) => path,
-                                        None => {
-                                            ctx.state_mut().insert_variable(ident.clone(), value);
-                                            continue;
-                                        }
-                                    };
-
-                                    // Update existing variable using the provided path, or create a
-                                    // new value in the store.
-                                    match ctx.state_mut().variable_mut(ident) {
-                                        Some(stored) => stored.insert_by_path(path, value),
-                                        None => ctx
-                                            .state_mut()
-                                            .insert_variable(ident.clone(), value.at_path(path)),
-                                    }
-                                }
-                                Variable::External(path) => ctx.target_mut().insert(path, value)?,
-                                Variable::None => (),
-                            }
+                            set_variable(ctx, variable, value)?;
+                            set_variable(ctx, error, Value::Null)?;
                         }
                     }
                 }
@@ -437,6 +402,38 @@ where
             Ok(value) => state.stack.push(value),
             Err(err) => state.error = Some(err.into()),
         }
+    }
+
+    Ok(())
+}
+
+/// Sets the value of the given variable to the provided value.
+fn set_variable<'a>(
+    ctx: &mut Context<'a>,
+    variable: &Variable,
+    value: Value,
+) -> Result<(), ExpressionError> {
+    match variable {
+        Variable::Internal(ident, path) => {
+            let path = match path {
+                Some(path) => path,
+                None => {
+                    ctx.state_mut().insert_variable(ident.clone(), value);
+                    return Ok(());
+                }
+            };
+
+            // Update existing variable using the provided path, or create a
+            // new value in the store.
+            match ctx.state_mut().variable_mut(ident) {
+                Some(stored) => stored.insert_by_path(path, value),
+                None => ctx
+                    .state_mut()
+                    .insert_variable(ident.clone(), value.at_path(path)),
+            }
+        }
+        Variable::External(path) => ctx.target_mut().insert(path, value)?,
+        Variable::None => (),
     }
 
     Ok(())

@@ -60,7 +60,7 @@ impl Expression for Object {
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         for (key, value) in &self.inner {
-            let keyidx = vm.add_constant(Literal::String(key.clone().into()));
+            let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
 
             vm.write_chunk(OpCode::Constant);
             vm.write_primitive(keyidx);

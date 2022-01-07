@@ -415,7 +415,7 @@ where
                 ok,
                 err,
                 expr,
-                default: _,
+                default,
             } => {
                 // This isn't handling the error case yet.
                 expr.dump(vm)?;
@@ -426,6 +426,9 @@ where
 
                 let target = vm.get_target(&err.into());
                 vm.write_primitive(target);
+
+                let default = vm.add_constant(default.clone());
+                vm.write_primitive(default);
             }
         }
         Ok(())

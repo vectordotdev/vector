@@ -59,7 +59,7 @@ impl<'a> VmState<'a> {
         &mut self.parameter_stack
     }
 
-    pub(super) fn read_constant(&mut self) -> Result<Literal, String> {
+    pub(super) fn read_constant(&mut self) -> Result<Value, String> {
         let idx = self.next_primitive();
         Ok(self.vm.values[idx].clone())
     }
