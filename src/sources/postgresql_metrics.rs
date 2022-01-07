@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt,
+    stream, FutureExt, StreamExt,
 };
 use openssl::{
     error::ErrorStack,
@@ -26,7 +26,7 @@ use tokio_postgres::{
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -132,7 +132,7 @@ impl_generate_config_from_default!(PostgresqlMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
             self.include_databases.clone().unwrap_or_default(),
             self.exclude_databases.clone().unwrap_or_default(),
@@ -149,10 +149,6 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
         .await?;
 
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending postgresql metrics.", %error));
-
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -165,16 +161,19 @@ impl SourceConfig for PostgresqlMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
-                out.send_all(&mut stream).await?;
+                let mut stream = stream::iter(metrics).flatten().map(Event::Metric);
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending postgresql metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -875,7 +874,7 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, tls, Pipeline};
+    use crate::{test_util::trace_init, tls, SourceSender};
 
     async fn test_postgresql_metrics(
         endpoint: String,
@@ -893,7 +892,7 @@ mod integration_tests {
             Host::Unix(path) => path.to_string_lossy().to_string(),
         };
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             PostgresqlMetricsConfig {

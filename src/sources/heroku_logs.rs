@@ -18,8 +18,8 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -108,8 +108,8 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -132,8 +132,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn source_type(&self) -> &'static str {
@@ -289,7 +289,7 @@ mod tests {
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
         test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender);
         tokio::spawn(async move {

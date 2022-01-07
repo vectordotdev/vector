@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -26,7 +26,7 @@ use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[async_trait]
@@ -53,6 +53,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -110,7 +111,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements.enabled, cx.out.clone())
+                        handle_request(events, acknowledgements.enabled(), cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -153,14 +154,14 @@ impl warp::reject::Reject for RejectShuttingDown {}
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-            out.send_all(&mut futures::stream::iter(events).map(Ok))
-                .map_err(move |error: crate::pipeline::ClosedError| {
+            out.send_all(&mut futures::stream::iter(events))
+                .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
                     error!(message = "Failed to forward events, downstream is closed.");

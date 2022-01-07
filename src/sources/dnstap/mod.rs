@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{DnstapEventReceived, DnstapParseDataError},
     Result,
@@ -97,8 +97,8 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -252,12 +252,12 @@ mod integration_tests {
     use tokio::time;
 
     use super::*;
-    use crate::{event::Value, test_util::trace_init, Pipeline};
+    use crate::{event::Value, test_util::trace_init, SourceSender};
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
         trace_init();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             let socket = get_socket(raw_data, query_type);

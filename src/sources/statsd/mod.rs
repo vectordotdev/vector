@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
@@ -11,13 +11,15 @@ use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
-    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 pub mod parser;
@@ -122,8 +124,8 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -169,7 +171,7 @@ impl Deserializer for StatsdDeserializer {
 async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(&StatsdSocketError::bind(error)))
@@ -235,6 +237,7 @@ impl TcpSource for StatsdTcpSource {
 #[cfg(test)]
 mod test {
     use futures::channel::mpsc;
+    use futures_util::SinkExt;
     use tokio::{
         io::AsyncWriteExt,
         time::{sleep, Duration, Instant},
@@ -313,7 +316,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, rx) = Pipeline::new_with_buffer(4096, vec![]);
+        let (tx, rx) = SourceSender::new_with_buffer(4096);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)

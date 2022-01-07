@@ -533,7 +533,7 @@ components: {
 		configuration: {
 			_acknowledgements: {
 				common:      true
-				description: "Controls how acknowledgements are handled by this source."
+				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings."
 				required:    false
 				type: object: options: {
 					enabled: {

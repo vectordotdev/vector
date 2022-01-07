@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt};
 use futures_util::future::ready;
 use rdkafka::{
     config::ClientConfig,
@@ -24,7 +24,7 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
@@ -33,7 +33,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -136,6 +136,7 @@ impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -147,12 +148,12 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled(),
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -169,7 +170,7 @@ async fn kafka_source(
     headers_key: String,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
@@ -246,7 +247,7 @@ async fn kafka_source(
                                 log.try_insert(headers_key, Value::from(headers_map.clone()));
                             }
 
-                            Some(Some(Ok(event)))
+                            Some(Some(event))
                         }
                         Err(e) => {
                             // Error is logged by `crate::codecs::Decoder`, no further handling
@@ -264,7 +265,7 @@ async fn kafka_source(
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
                             Err(err) => error!(message = "Error sending to sink.", error = %err),
                             Ok(_) => {
@@ -422,7 +423,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
@@ -491,7 +492,7 @@ mod integration_test {
         .await;
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
             create_consumer(&config).unwrap(),
             config.key_field,

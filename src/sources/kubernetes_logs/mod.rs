@@ -19,7 +19,7 @@ use shared::TimeZone;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, ProxyConfig,
         SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
@@ -32,6 +32,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
+    SourceSender,
 };
 
 mod k8s_paths_provider;
@@ -44,7 +45,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
+use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use namespace_metadata_annotator::NamespaceMetadataAnnotator;
@@ -180,8 +181,8 @@ impl SourceConfig for Config {
         })))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -260,11 +261,11 @@ impl Source {
         })
     }
 
-    async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
-    where
-        O: Sink<Event> + Send + 'static + Unpin,
-        <O as Sink<Event>>::Error: std::error::Error,
-    {
+    async fn run(
+        self,
+        mut out: SourceSender,
+        global_shutdown: ShutdownSignal,
+    ) -> crate::Result<()> {
         let Self {
             client,
             data_dir,
@@ -435,10 +436,8 @@ impl Source {
             futures::stream::iter(buf)
         });
 
-        let event_processing_loop = partial_events_merger
-            .transform(Box::pin(events))
-            .map(Ok)
-            .forward(out);
+        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let event_processing_loop = out.send_all(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
         {

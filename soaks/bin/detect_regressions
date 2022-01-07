@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import numpy as np
 import pandas as pd
 import scipy.stats
 import argparse
@@ -6,25 +7,9 @@ import math
 import glob
 import os
 import sys
+import gc
 
-parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
-parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
-parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
-parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
-parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
-parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
-args = parser.parse_args()
-
-erratic_soaks = args.erratic_soaks.split(',')
-
-capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
-captures = []
-for f in capture_paths:
-    captures.append(pd.read_csv(f))
-csv = pd.concat(captures)
-
-fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
-csv = csv[fetch_index_past_warmup]
+np.seterr(all='raise')
 
 # Use Tukey's method to detect values that sit 1.5 times outside the IQR.
 def total_outliers(df):
@@ -36,24 +21,66 @@ def total_outliers(df):
     outside_range = lambda b: (b < (q1 - scaled_iqr)) or (b > (q3 + scaled_iqr))
     return df['value'].apply(outside_range).sum()
 
-ttest_results = []
-for exp in csv.experiment.unique():
-    experiment = csv[csv['experiment'] == exp]
+# Opens our capture files, filtering as needed
+#
+# The capture files generated in our experiments can be quite large, relative to
+# the CI machine memory we have available, and we need to do a fair bit here to
+# ensure everything will fit into memory. We primarily achieve this by garbage
+# collecting after each read, filtering out columns this program does not need
+# and reading small chunks of each capture file at a time.
+def open_captures(capture_dir, metric_name, unwanted_labels):
+    capture_paths = glob.glob(os.path.join(capture_dir, "**/*.captures"))
+    for f in capture_paths:
+        with pd.read_json(f, lines=True, chunksize=16384) as reader:
+            for chunk in reader:
+                # Drop unwanted labels from the capture file. The more data we
+                # can shed here the less we have to hold in memory overall.
+                chunk = chunk[chunk.metric_name == metric_name]
+                chunk = chunk.drop(labels=unwanted_labels, axis=1)
+                if chunk.empty:
+                    continue
+                yield chunk
+        gc.collect()
 
-    baseline = experiment[experiment['variant'] == 'baseline']
-    comparison = experiment[experiment['variant'] == 'comparison']
-    baseline_mean = baseline['value'].mean()
-    comparison_mean = comparison['value'].mean()
+parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
+parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
+parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+args = parser.parse_args()
+
+erratic_soaks = args.erratic_soaks.split(',')
+
+bytes_written = pd.concat(open_captures(args.capture_dir,
+                                        'bytes_written',
+                                        unwanted_labels=['metric_name', 'metric_kind',
+                                                         'metric_labels', 'target', 'fetch_index']))
+
+bytes_written.throughput = np.nan
+for exp in bytes_written.experiment.unique():
+    for v in ['baseline', 'comparison']:
+        selector = (bytes_written.experiment == exp) & (bytes_written.variant == v)
+        run_ids = bytes_written.loc[selector, 'run_id'].unique()
+        for ri in run_ids:
+            sub_selector = selector & (bytes_written.run_id == ri)
+            subtable = bytes_written.loc[sub_selector]
+            throughput = np.gradient(subtable['value'], subtable['time'].div(1000)) # bytes/second/cpu
+            bytes_written.loc[sub_selector, 'throughput'] = throughput
+
+ttest_results = []
+for exp in bytes_written.experiment.unique():
+    baseline = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'baseline')]
+    comparison = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'comparison')]
+
+    baseline_mean = baseline.throughput.mean()
+    baseline_stdev = baseline.throughput.std()
+    comparison_mean = comparison.throughput.mean()
+    comparison_stdev = comparison.throughput.std()
     diff =  comparison_mean - baseline_mean
     percent_change = round(((comparison_mean - baseline_mean) / baseline_mean) * 100, 2)
 
     baseline_outliers = total_outliers(baseline)
     comparison_outliers = total_outliers(comparison)
-    trim = 0.0
-    if baseline_outliers + comparison_outliers > 0:
-        # When we have outliers we perform Yuen's test instead, dropping 10% of
-        # the data to remove the more extreme results.
-        trim = 0.1
 
     # The t-test here is calculating whether the expected mean of our two
     # distributions is equal, or, put another way, whether the samples we have
@@ -65,7 +92,13 @@ for exp in csv.experiment.unique():
     # samples actually have the same mean -- are from the same distribution --
     # and so there's some statistically interesting difference between the two
     # samples. For our purposes here that implies that performance has changed.
-    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'], equal_var=False, trim=trim)
+    res = scipy.stats.ttest_ind_from_stats(baseline_mean,
+                                           baseline_stdev,
+                                           len(baseline),
+                                           comparison_mean,
+                                           comparison_stdev,
+                                           len(comparison),
+                                           equal_var=False)
     ttest_results.append({'experiment': exp,
                           'Δ mean': diff.mean(),
                           'Δ mean %': percent_change,

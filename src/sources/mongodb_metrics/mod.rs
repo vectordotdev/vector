@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, time::Instant};
 use chrono::Utc;
 use futures::{
     future::{join_all, try_join_all},
-    stream, SinkExt, StreamExt,
+    stream, StreamExt,
 };
 use mongodb::{
     bson::{self, doc, from_document},
@@ -17,7 +17,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{self, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -109,7 +109,7 @@ impl_generate_config_from_default!(MongoDbMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(
@@ -118,10 +118,6 @@ impl SourceConfig for MongoDbMetricsConfig {
                 .map(|endpoint| MongoDbMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
-
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
@@ -138,17 +134,20 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let mut stream = stream::iter(metrics)
                     .map(stream::iter)
                     .flatten()
-                    .map(Event::Metric)
-                    .map(Ok);
-                out.send_all(&mut stream).await?;
+                    .map(Event::Metric);
+
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending mongodb metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())
         }))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -1042,17 +1041,35 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
 
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, SourceSender};
 
-    async fn test_instance(endpoint: &'static str) {
-        let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
+    fn primary_mongo_address() -> String {
+        std::env::var("PRIMARY_MONGODB_ADDRESS")
+            .unwrap_or_else(|_| "mongodb://localhost:27017".into())
+    }
+
+    fn secondary_mongo_address() -> String {
+        std::env::var("SECONDARY_MONGODB_ADDRESS")
+            .unwrap_or_else(|_| "mongodb://localhost:27019".into())
+    }
+
+    fn remove_creds(address: &str) -> String {
+        let mut url = url::Url::parse(address).unwrap();
+        url.set_password(None).unwrap();
+        url.set_username("").unwrap();
+        url.to_string()
+    }
+
+    async fn test_instance(endpoint: String) {
+        let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
+        let endpoints = vec![endpoint.clone()];
         tokio::spawn(async move {
             MongoDbMetricsConfig {
-                endpoints: vec![endpoint.to_owned()],
+                endpoints,
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
@@ -1063,7 +1080,7 @@ mod integration_tests {
             .unwrap()
         });
 
-        let event = timeout(Duration::from_secs(3), recv.next())
+        let event = timeout(Duration::from_secs(30), recv.next())
             .await
             .expect("fetch metrics timeout")
             .expect("failed to get metrics from a stream");
@@ -1076,6 +1093,8 @@ mod integration_tests {
             }
         }
 
+        let clean_endpoint = remove_creds(&endpoint);
+
         assert!(events.len() > 100);
         for event in events {
             let metric = event.into_metric();
@@ -1086,7 +1105,7 @@ mod integration_tests {
             assert!((timestamp - Utc::now()).num_seconds() < 1);
             // validate basic tags
             let tags = metric.tags().expect("existed tags");
-            assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
+            assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
             assert_eq!(tags.get("host"), Some(&host));
         }
     }
@@ -1094,7 +1113,7 @@ mod integration_tests {
     #[tokio::test]
     async fn fetch_metrics_mongod() {
         trace_init();
-        test_instance("mongodb://localhost:27017").await;
+        test_instance(primary_mongo_address()).await;
     }
 
     // TODO
@@ -1107,6 +1126,6 @@ mod integration_tests {
     #[tokio::test]
     async fn fetch_metrics_replset() {
         trace_init();
-        test_instance("mongodb://localhost:27019").await;
+        test_instance(secondary_mongo_address()).await;
     }
 }

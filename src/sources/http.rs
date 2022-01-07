@@ -15,8 +15,8 @@ use crate::{
         NewlineDelimitedDecoderConfig,
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding, default_framing_stream_based},
@@ -191,8 +191,8 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -246,7 +246,7 @@ mod tests {
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
         test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -266,7 +266,7 @@ mod tests {
         decoding: Option<Box<dyn DeserializerConfig>>,
     ) -> (impl Stream<Item = Event> + 'a, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();

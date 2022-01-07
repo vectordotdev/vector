@@ -2,7 +2,9 @@ use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
     serde::Fields,
@@ -50,8 +52,8 @@ impl TransformConfig for RenameFieldsConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

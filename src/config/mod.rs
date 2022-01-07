@@ -12,8 +12,8 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::GlobalOptions,
-    transform::{DataType, ExpandType, TransformConfig, TransformContext},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    transform::{ExpandType, TransformConfig, TransformContext},
 };
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
     sinks::{self, util::UriSerde},
     sources,
     transforms::noop::Noop,
-    Pipeline,
+    SourceSender,
 };
 
 pub mod api;
@@ -155,17 +155,6 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
     #[serde(
@@ -191,7 +180,7 @@ impl SourceOuter {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
-    fn output_type(&self) -> DataType;
+    fn outputs(&self) -> Vec<Output>;
 
     fn source_type(&self) -> &'static str;
 
@@ -205,7 +194,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
-    pub out: Pipeline,
+    pub out: SourceSender,
     pub proxy: ProxyConfig,
 }
 
@@ -213,7 +202,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
         key: &ComponentKey,
-        out: Pipeline,
+        out: SourceSender,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(key);
@@ -230,7 +219,7 @@ impl SourceContext {
     }
 
     #[cfg(test)]
-    pub fn new_test(out: Pipeline) -> Self {
+    pub fn new_test(out: SourceSender) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
@@ -630,15 +619,80 @@ impl Display for Resource {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition {
+pub struct TestDefinition<T = OutputId> {
     pub name: String,
     pub input: Option<TestInput>,
     #[serde(default)]
     pub inputs: Vec<TestInput>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput>,
+    pub outputs: Vec<TestOutput<T>>,
     #[serde(default)]
-    pub no_outputs_from: Vec<ComponentKey>,
+    pub no_outputs_from: Vec<T>,
+}
+
+impl TestDefinition<String> {
+    fn resolve_outputs(self, graph: &graph::Graph) -> TestDefinition<OutputId> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+
+        let output_map = graph.input_map().expect("ambiguous outputs");
+
+        let outputs = outputs
+            .into_iter()
+            .map(|old| TestOutput {
+                extract_from: output_map.get(&old.extract_from).unwrap().clone(),
+                conditions: old.conditions,
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from
+            .into_iter()
+            .map(|o| output_map.get(&o).unwrap().clone())
+            .collect();
+
+        TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        }
+    }
+}
+
+impl TestDefinition<OutputId> {
+    fn stringify(self) -> TestDefinition<String> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+
+        let outputs = outputs
+            .into_iter()
+            .map(|old| TestOutput {
+                extract_from: old.extract_from.to_string(),
+                conditions: old.conditions,
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from.iter().map(ToString::to_string).collect();
+
+        TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -667,8 +721,8 @@ fn default_test_input_type() -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput {
-    pub extract_from: ComponentKey,
+pub struct TestOutput<T = OutputId> {
+    pub extract_from: T,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 

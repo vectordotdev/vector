@@ -6,7 +6,7 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::{
     codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
-    config::{DataType, GenerateConfig, Resource, SourceContext},
+    config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
@@ -70,8 +70,8 @@ impl VectorConfig {
         )
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -155,7 +155,7 @@ mod test {
         sinks::vector::v1::VectorConfig as SinkConfig,
         test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -164,7 +164,7 @@ mod test {
     }
 
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
@@ -236,7 +236,7 @@ mod test {
     #[tokio::test]
     async fn it_closes_stream_on_garbage_data() {
         trace_init();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
 
         let config = VectorConfig::from_address(addr.into());
@@ -273,7 +273,7 @@ mod test {
     #[cfg(not(target_os = "windows"))]
     async fn it_processes_stream_of_protobufs() {
         trace_init();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
 
         let config = VectorConfig::from_address(addr.into());

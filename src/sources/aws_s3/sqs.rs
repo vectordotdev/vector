@@ -2,7 +2,7 @@ use std::{cmp, future::ready, panic, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -27,7 +27,7 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 lazy_static! {
@@ -111,7 +111,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::pipeline::ClosedError,
+        source: crate::source_sender::ClosedError,
         bucket: String,
         key: String,
     },
@@ -187,13 +187,14 @@ impl Ingestor {
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
     ) -> Result<(), ()> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
-                acknowledgements.enabled,
+                acknowledgements.enabled(),
             );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());
@@ -216,7 +217,7 @@ impl Ingestor {
 
 pub struct IngestorProcess {
     state: Arc<State>,
-    out: Pipeline,
+    out: SourceSender,
     shutdown: ShutdownSignal,
     acknowledgements: bool,
 }
@@ -224,7 +225,7 @@ pub struct IngestorProcess {
 impl IngestorProcess {
     pub fn new(
         state: Arc<State>,
-        out: Pipeline,
+        out: SourceSender,
         shutdown: ShutdownSignal,
         acknowledgements: bool,
     ) -> Self {
@@ -474,12 +475,12 @@ impl IngestorProcess {
                         }
                     }
 
-                    ready(Some(Ok(log.into())))
+                    ready(Some(log.into()))
                 });
 
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
-                    Err(_) => Some(crate::pipeline::ClosedError),
+                    Err(_) => Some(crate::source_sender::ClosedError),
                 };
 
                 // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,

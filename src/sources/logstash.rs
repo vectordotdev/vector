@@ -14,8 +14,8 @@ use tokio_util::codec::Decoder;
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
     serde::bool_or_struct,
@@ -74,8 +74,8 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -567,7 +567,7 @@ mod test {
     use crate::{
         event::EventStatus,
         test_util::{next_addr, spawn_collect_n, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -586,7 +586,7 @@ mod test {
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let source = LogstashConfig {
             address: address.into(),
@@ -670,7 +670,7 @@ mod integration_tests {
         event::EventStatus,
         test_util::{collect_n, trace_init, wait_for_tcp},
         tls::TlsOptions,
-        Pipeline,
+        SourceSender,
     };
 
     fn heartbeat_address() -> String {
@@ -736,7 +736,7 @@ mod integration_tests {
     }
 
     async fn source(address: String, tls: Option<TlsConfig>) -> impl Stream<Item = Event> {
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
         tokio::spawn(async move {
             LogstashConfig {

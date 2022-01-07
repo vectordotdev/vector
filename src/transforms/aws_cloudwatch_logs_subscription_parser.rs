@@ -8,7 +8,7 @@ use shared::aws_cloudwatch_logs_subscription::{
 use super::Transform;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
@@ -40,8 +40,8 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn enable_concurrency(&self) -> bool {

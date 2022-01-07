@@ -37,7 +37,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition>,
+    pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -52,7 +52,7 @@ struct ConfigBuilderHash<'a> {
     sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
-    tests: &'a Vec<TestDefinition>,
+    tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -94,6 +94,8 @@ impl From<Config> for ConfigBuilder {
             .into_iter()
             .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
             .collect();
+
+        let tests = tests.into_iter().map(TestDefinition::stringify).collect();
 
         ConfigBuilder {
             global,
