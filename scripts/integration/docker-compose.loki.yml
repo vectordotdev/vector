@@ -1,0 +1,43 @@
+services:
+
+  loki:
+    image: grafana/loki:${LOKI_VERSION:-2.1.0}
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ${PWD}/tests/data:/etc/loki
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "loki-integration-tests"
+      - "--lib"
+      - "::loki::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - loki
+    environment:
+      - LOKI_ADDRESS=http://loki:3100
+    volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - ${PWD}:/code
+
+networks:
+  backend: {}
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+
