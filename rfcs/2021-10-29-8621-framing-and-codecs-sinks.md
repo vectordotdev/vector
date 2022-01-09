@@ -78,6 +78,8 @@ pub struct Encoder {
 
 `Encoder` implements `tokio_util::codec::Encoder<Event>`. Internally, events first go through the `Serializer` which implements `tokio_util::codec::Encoder<Event>` and are then handed over to the `Framer` which implements `tokio_util::codec::Encoder<Bytes>`.
 
+Sinks which don't need the framing capabilities of the `Encoder`, e.g. Kafka where the protocol is already message based, may only add a `SerializerConfig` to their config. The `Serializer` that can be built from the config implements `tokio_util::codec::Encoder<Event>` and therefore conforms to the same trait as `Encoder`.
+
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
