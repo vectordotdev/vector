@@ -94,6 +94,7 @@ async fn source(
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: acknowledgements.into(),
+            multiple_outputs: false,
         }
         .build(context)
         .await
