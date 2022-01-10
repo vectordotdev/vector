@@ -1639,4 +1639,30 @@ mod test {
             assert_eq!(result, expected);
         }
     }
+
+    #[test]
+    fn value_conversions() {
+        let counter_value = MetricValue::Counter { value: 3.13 };
+        assert_eq!(counter_value.distribution_to_agg_histogram(&[1.0]), None);
+
+        let counter_value = MetricValue::Counter { value: 3.13 };
+        assert_eq!(counter_value.distribution_to_sketch(), None);
+
+        let distrib_value = MetricValue::Distribution {
+            samples: samples!(1.0 => 1),
+            statistic: StatisticKind::Summary,
+        };
+        let converted = distrib_value.distribution_to_agg_histogram(&[1.0]);
+        assert!(matches!(
+            converted,
+            Some(MetricValue::AggregatedHistogram { .. })
+        ));
+
+        let distrib_value = MetricValue::Distribution {
+            samples: samples!(1.0 => 1),
+            statistic: StatisticKind::Summary,
+        };
+        let converted = distrib_value.distribution_to_sketch();
+        assert!(matches!(converted, Some(MetricValue::Sketch { .. })));
+    }
 }

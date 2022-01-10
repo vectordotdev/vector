@@ -430,25 +430,6 @@ impl StreamSink for PrometheusExporter {
         });
 
         while let Some(event) = input.next().await {
-            let metric = event.into_metric();
-
-            if let Some(normalized) = normalizer.apply(metric) {
-                // We have a normalized metric, in absolute form.  If we're already aware of this
-                // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().unwrap();
-
-                let metric_ref = MetricRef::from_metric(&normalized);
-                match metrics.get_mut(&metric_ref) {
-                    Some((data, metadata)) => {
-                        *data = normalized;
-                        metadata.refresh();
-                    }
-                    None => {
-                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
-                    }
-                }
-            }
-
             // If we've exceed our flush interval, go through all of the metrics we're currently
             // tracking and remove any which have exceeded the the flush interval in terms of not
             // having been updated within that long of a time.
@@ -471,6 +452,25 @@ impl StreamSink for PrometheusExporter {
                 for metric_ref in metrics_to_expire {
                     metrics.remove(&metric_ref);
                     normalizer.get_state_mut().remove(&metric_ref.series);
+                }
+            }
+
+            // Now process the metric we got.
+            let metric = event.into_metric();
+            if let Some(normalized) = normalizer.apply(metric) {
+                // We have a normalized metric, in absolute form.  If we're already aware of this
+                // metric, update its expiration deadline, otherwise, start tracking it.
+                let mut metrics = self.metrics.write().unwrap();
+
+                let metric_ref = MetricRef::from_metric(&normalized);
+                match metrics.get_mut(&metric_ref) {
+                    Some((data, metadata)) => {
+                        *data = normalized;
+                        metadata.refresh();
+                    }
+                    None => {
+                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
+                    }
                 }
             }
 
@@ -950,7 +950,7 @@ mod integration_tests {
 
         let config = PrometheusExporterConfig {
             address: PROMETHEUS_ADDRESS.parse().unwrap(),
-            flush_period_secs: default_flush_period_secs(),
+            flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -990,15 +990,19 @@ mod integration_tests {
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
+        // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
         tx.send(event).expect("Failed to send.");
 
-        // Wait a bit for the prometheus server to scrape the metrics
+        println!("generated sets '{}' and '{}'", name1, name2);
+
+        // Wait for the Prometheus server to scrape them, and then query it to ensure both metrics
+        // have their correct set size value.
         time::sleep(time::Duration::from_secs(2)).await;
 
-        // Now try to download them from prometheus
+        // Now query Prometheus to make sure we see them there.
         let result = prometheus_query(&name1).await;
         assert_eq!(
             result["data"]["result"][0]["value"][1],
@@ -1010,23 +1014,20 @@ mod integration_tests {
             Value::String("3".into())
         );
 
-        // Wait a bit for expired metrics
+        // Wait a few more seconds to ensure that the two original sets have logically expired.
+        // We'll update `name2` but not `name1`, which should lead to both being expired, but
+        // `name2` being recreated with two values only, while `name1` is entirely gone.
         time::sleep(time::Duration::from_secs(3)).await;
 
-        let (name1, event) = tests::create_metric_set(Some(name1), vec!["6", "7"]);
-        tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
         tx.send(event).expect("Failed to send.");
 
-        // Wait a bit for the prometheus server to scrape the metrics
-        time::sleep(time::Duration::from_secs(2)).await;
+        println!("re-generated set '{}'", name2);
 
-        // Now try to download them from prometheus
+        // Again, wait for the Prometheus server to scrape the metrics, and then query it again.
+        time::sleep(time::Duration::from_secs(2)).await;
         let result = prometheus_query(&name1).await;
-        assert_eq!(
-            result["data"]["result"][0]["value"][1],
-            Value::String("2".into())
-        );
+        assert_eq!(result["data"]["result"][0]["value"][1], Value::Null);
         let result = prometheus_query(&name2).await;
         assert_eq!(
             result["data"]["result"][0]["value"][1],

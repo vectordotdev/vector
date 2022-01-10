@@ -248,10 +248,17 @@ mod integration_tests {
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
 
-    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9102";
 
     #[tokio::test]
     async fn receive_something() {
+        // TODO: This test depends on the single instance of Prometheus that we spin up for
+        // integration tests both scraping an endpoint and then also remote writing that stuff to
+        // this remote write source.  This makes sense from a "test the actual behavior" standpoint
+        // but it feels a little fragile.
+        //
+        // It could be nice to split tup the Prometheus integration tests in the future, or
+        // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
@@ -265,7 +272,7 @@ mod integration_tests {
 
         tokio::spawn(source);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         let events = test_util::collect_ready(rx).await;
         components::SOURCE_TESTS.assert(&["http_path"]);
