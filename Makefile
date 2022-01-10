@@ -327,10 +327,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
 
-.PHONY: test-integration-docker-logs
-test-integration-docker-logs: ## Runs Docker Logs integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
-
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
 ifeq ($(AUTOSPAWN), true)
