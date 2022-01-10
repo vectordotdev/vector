@@ -33,7 +33,7 @@ impl Value {
     ///    value:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use vrl_core::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -48,7 +48,7 @@ impl Value {
     ///    `None`:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use vrl_core::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -63,7 +63,7 @@ impl Value {
     ///    exists:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use vrl_core::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///    # use std::collections::BTreeMap;
@@ -93,7 +93,7 @@ impl Value {
     /// ## Insert At Field
     ///
     /// ```
-    /// # use vrl_compiler::Value;
+    /// # use vrl_core::Value;
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
@@ -116,7 +116,7 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use vrl_compiler::{value, Value};
+    /// # use vrl_core::{value, Value};
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
