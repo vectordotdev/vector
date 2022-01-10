@@ -93,8 +93,8 @@ pub struct NewRelicConfig {
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
-    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck(client, self.api, self.region.unwrap_or(NewRelicRegion::Us)).boxed())
+    pub fn build_healthcheck(&self, client: HttpClient, credentials: Arc<NewRelicCredentials>) -> crate::Result<super::Healthcheck> {
+        Ok(healthcheck(client, credentials).boxed())
     }
 }
 
@@ -115,16 +115,15 @@ impl SinkConfig for NewRelicConfig {
         let request_limits = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let credentials = Arc::from(NewRelicCredentials::from(self));
 
-        let healthcheck = self.build_healthcheck(client.clone())?;
+        let healthcheck = self.build_healthcheck(client.clone(), credentials.clone())?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, NewRelicApiRetry)
             .service(NewRelicApiService {
                 client
             });
-
-        let credentials = Arc::from(NewRelicCredentials::from(self));
 
         let sink = NewRelicSink {
             service,
