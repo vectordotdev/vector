@@ -2,14 +2,14 @@ use std::fmt;
 
 use vrl_core::{
     diagnostic::{DiagnosticError, ExpressionError, Label, Note, Span, Urls},
-    Kind, Resolved,
+    Context, Ident, Kind, Resolved,
 };
 
 use crate::{
     expression::{levenstein, FunctionArgument, Noop},
     function::{ArgumentList, FunctionCompileContext, Parameter},
-    parser::{Ident, Node},
-    Context, Expression, Function, State, TypeDef,
+    parser::Node,
+    Expression, Function, State, TypeDef,
 };
 
 #[derive(Clone)]

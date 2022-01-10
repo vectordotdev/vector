@@ -750,11 +750,11 @@ mod prelude {
     pub use vrl_compiler::{
         expr, expression, func_args, function,
         function::{ArgumentList, Compiled, Example, FunctionCompileContext},
-        map, state, test_function, test_type_def, type_def, Context, Expression, Function,
-        Parameter, TypeDef,
+        map, state, test_function, test_type_def, type_def, Expression, Function, Parameter,
+        TypeDef,
     };
     pub use vrl_core::{
         diagnostic::{DiagnosticError, ExpressionError, Label, Span},
-        kind, value, Error, Kind, NotNan, Regex, Resolved, Target, Value,
+        kind, value, Context, Error, Kind, NotNan, Regex, Resolved, Target, Value,
     };
 }

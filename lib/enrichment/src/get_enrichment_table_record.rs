@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use vrl_compiler::{
     expression,
     function::{ArgumentList, Compiled, Example, FunctionCompileContext},
-    map, state, Context, Expression, Function, Parameter, TypeDef,
+    map, state, Expression, Function, Parameter, TypeDef,
 };
 use vrl_core::{
     diagnostic::{DiagnosticError, ExpressionError},
-    kind, Error, Kind, Resolved, Value,
+    kind, Context, Error, Kind, Resolved, Value,
 };
 
 use crate::{

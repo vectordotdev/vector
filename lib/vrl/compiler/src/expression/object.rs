@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
-use vrl_core::{Resolved, Value};
+use vrl_core::{Context, Resolved, Value};
 
-use crate::{expression::Expr, Context, Expression, State, TypeDef};
+use crate::{expression::Expr, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {

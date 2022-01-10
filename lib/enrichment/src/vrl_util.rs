@@ -1,10 +1,10 @@
 //! Utilities shared between both VRL functions.
 use std::{collections::BTreeMap, fmt};
 
-use vrl_compiler::{expression, state, Context, Expression};
+use vrl_compiler::{expression, state, Expression};
 use vrl_core::{
     diagnostic::{DiagnosticError, ExpressionError, Label, Span},
-    Value,
+    Context, Value,
 };
 
 use crate::{Case, Condition, IndexHandle, TableRegistry};

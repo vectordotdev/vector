@@ -6,10 +6,10 @@ use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use vrl_core::{
     diagnostic::{DiagnosticError, Label, Note, Span, Urls},
-    Regex, Resolved, Value,
+    Context, Regex, Resolved, Value,
 };
 
-use crate::{Context, Expression, State, TypeDef};
+use crate::{Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {

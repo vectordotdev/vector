@@ -1,12 +1,8 @@
 use std::{fmt, ops::Deref};
 
-use vrl_core::diagnostic::Span;
+use vrl_core::{diagnostic::Span, Ident};
 
-use crate::{
-    expression::Expr,
-    parser::{Ident, Node},
-    Parameter,
-};
+use crate::{expression::Expr, parser::Node, Parameter};
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionArgument {

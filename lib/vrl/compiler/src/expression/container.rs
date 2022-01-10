@@ -1,10 +1,10 @@
 use std::fmt;
 
-use vrl_core::{Resolved, Value};
+use vrl_core::{Context, Resolved, Value};
 
 use crate::{
     expression::{Array, Block, Group, Object},
-    Context, Expression, State, TypeDef,
+    Expression, State, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

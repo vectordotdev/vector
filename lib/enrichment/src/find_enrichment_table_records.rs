@@ -4,11 +4,11 @@ use indoc::indoc;
 use vrl_compiler::{
     expression,
     function::{ArgumentList, Compiled, Example, FunctionCompileContext},
-    map, state, Context, Expression, Function, Parameter, TypeDef,
+    map, state, Expression, Function, Parameter, TypeDef,
 };
 use vrl_core::{
     diagnostic::{DiagnosticError, ExpressionError},
-    kind, Error, Kind, Resolved, Value,
+    kind, Context, Error, Kind, Resolved, Value,
 };
 
 use crate::{
@@ -208,7 +208,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_compiler::state::Runtime::default();
+        let mut runtime_state = vrl_core::Runtime::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
         registry.finish_load();

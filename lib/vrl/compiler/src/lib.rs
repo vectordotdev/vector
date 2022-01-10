@@ -1,5 +1,4 @@
 mod compiler;
-mod context;
 mod program;
 mod runtime;
 mod test_util;
@@ -11,7 +10,6 @@ pub mod type_def;
 
 use std::any::Any;
 
-pub use context::Context;
 pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
@@ -19,7 +17,7 @@ pub use program::Program;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub(crate) use state::Compiler as State;
 pub use type_def::TypeDef;
-pub use vrl_core::{diagnostic::Span, value, Value};
+pub use vrl_core::{diagnostic::Span, value, Context, Value};
 
 pub type Result = std::result::Result<Program, compiler::Errors>;
 
@@ -69,7 +67,7 @@ pub fn compile_ast_with_state(
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
     pub use ::parser::{
-        ast::{self, Ident, Node},
+        ast::{self, Node},
         Program,
     };
 }

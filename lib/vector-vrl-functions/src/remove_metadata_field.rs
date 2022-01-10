@@ -1,8 +1,8 @@
 use vrl_compiler::{
     function::{ArgumentList, Compiled, Example, FunctionCompileContext},
-    state, Context, Expression, Function, Parameter, TypeDef,
+    state, Expression, Function, Parameter, TypeDef,
 };
-use vrl_core::{kind, value, Resolved, Value};
+use vrl_core::{kind, value, Context, Resolved, Value};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RemoveMetadataField;

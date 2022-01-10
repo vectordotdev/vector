@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use crate::ast::*;
 use crate::lex::*;
-use vrl_core::diagnostic::span;
+use vrl_core::{diagnostic::span, Ident};
 use std::collections::BTreeMap;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
@@ -221,22 +221,22 @@ EndOfExpression: () = {
 
 NonterminalNewline: () = "\n";
 
-Ident: Ident = "identifier" => Ident(<>.to_owned());
+Ident: Ident = "identifier" => Ident::new(<>.to_owned());
 
-PathField: Ident = "path field" => Ident(<>.to_owned());
+PathField: Ident = "path field" => Ident::new(<>.to_owned());
 
 AbortExpr: Expr = Sp<"abort"> => Expr::Abort(<>.map(|_| ()));
 
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {
-    "identifier" => Ident(<>.to_owned()),
-    "reserved identifier" => Ident(<>.to_owned()),
-    "if" => Ident("if".to_owned()),
-    "else" => Ident("else".to_owned()),
-    "null" => Ident("null".to_owned()),
-    "true" => Ident("true".to_owned()),
-    "false" => Ident("false".to_owned()),
-    "abort" => Ident("abort".to_owned()),
+    "identifier" => Ident::new(<>.to_owned()),
+    "reserved identifier" => Ident::new(<>.to_owned()),
+    "if" => Ident::new("if".to_owned()),
+    "else" => Ident::new("else".to_owned()),
+    "null" => Ident::new("null".to_owned()),
+    "true" => Ident::new("true".to_owned()),
+    "false" => Ident::new("false".to_owned()),
+    "abort" => Ident::new("abort".to_owned()),
 };
 
 // -----------------------------------------------------------------------------
@@ -401,7 +401,7 @@ FunctionCall: FunctionCall = {
         NonterminalNewline*
         <arguments: CommaMultiline<Sp<FunctionArgument>>?>
     ")" => {
-        let ident = ident.map(|s| Ident(s.to_owned()));
+        let ident = ident.map(|s| Ident::new(s.to_owned()));
         let abort_on_error = abort_on_error.is_some();
         let arguments = arguments.unwrap_or_default();
 

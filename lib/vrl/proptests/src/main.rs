@@ -6,11 +6,11 @@ use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
     Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,
-    FunctionCall, Group, Ident, IfStatement, Literal, Node, Op, Opcode, Predicate, Program, Query,
+    FunctionCall, Group, IfStatement, Literal, Node, Op, Opcode, Predicate, Program, Query,
     QueryTarget, RootExpr,
 };
 use proptest::prelude::*;
-use vrl_core::diagnostic::Span;
+use vrl_core::{diagnostic::Span, Ident};
 
 static RESERVED: &[&str] = &[
     "if",

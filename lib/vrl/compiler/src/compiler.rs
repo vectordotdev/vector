@@ -5,7 +5,7 @@ use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
 use vrl_core::{
     diagnostic::{DiagnosticError, Span},
-    Value,
+    Ident, Value,
 };
 
 use crate::{expression::*, Function, Program, State};
@@ -364,7 +364,7 @@ impl<'a> Compiler<'a> {
         FunctionArgument::new(ident, expr)
     }
 
-    fn compile_variable(&mut self, node: Node<ast::Ident>) -> Variable {
+    fn compile_variable(&mut self, node: Node<Ident>) -> Variable {
         let (span, ident) = node.take();
 
         Variable::new(span, ident.clone(), self.state).unwrap_or_else(|err| {

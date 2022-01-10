@@ -2,10 +2,10 @@ use std::fmt;
 
 use vrl_core::{
     diagnostic::{ExpressionError, Span},
-    Resolved,
+    Context, Resolved,
 };
 
-use crate::{Context, Expression, State, TypeDef};
+use crate::{Expression, State, TypeDef};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Abort {

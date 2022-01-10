@@ -2,15 +2,15 @@ use std::{error::Error, fmt};
 
 use lookup::LookupBuf;
 use shared::TimeZone;
-use vrl_core::{diagnostic::ExpressionError, Target, Value};
+use vrl_core::{diagnostic::ExpressionError, Context, Target, Value};
 
-use crate::{state, Context, Program};
+use crate::Program;
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
 #[derive(Debug, Default)]
 pub struct Runtime {
-    state: state::Runtime,
+    state: vrl_core::Runtime,
     root_lookup: LookupBuf,
 }
 
@@ -44,7 +44,7 @@ impl Error for Terminate {
 }
 
 impl Runtime {
-    pub fn new(state: state::Runtime) -> Self {
+    pub fn new(state: vrl_core::Runtime) -> Self {
         Self {
             state,
             root_lookup: LookupBuf::root(),

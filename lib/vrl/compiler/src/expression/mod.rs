@@ -3,10 +3,10 @@ use std::{collections::BTreeMap, fmt};
 use dyn_clone::{clone_trait_object, DynClone};
 use vrl_core::{
     diagnostic::{DiagnosticError, ExpressionError, Label, Note, Span},
-    Resolved, Value,
+    Context, Resolved, Value,
 };
 
-use crate::{Context, State, TypeDef};
+use crate::{State, TypeDef};
 
 mod abort;
 mod array;

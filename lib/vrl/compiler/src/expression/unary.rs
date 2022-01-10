@@ -1,8 +1,10 @@
 use std::fmt;
 
+use vrl_core::Context;
+
 use crate::{
     expression::{Not, Resolved},
-    Context, Expression, State, TypeDef,
+    Expression, State, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

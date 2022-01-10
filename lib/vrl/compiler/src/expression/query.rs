@@ -2,12 +2,11 @@ use std::{collections::BTreeMap, fmt};
 
 use lookup::LookupBuf;
 
-use vrl_core::{Resolved, Value};
+use vrl_core::{Context, Ident, Resolved, Value};
 
 use crate::{
     expression::{assignment, Container, FunctionCall, Variable},
-    parser::ast::Ident,
-    Context, Expression, State, TypeDef,
+    Expression, State, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]

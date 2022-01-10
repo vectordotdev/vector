@@ -48,7 +48,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
-    let mut rt = Runtime::new(state::Runtime::default());
+    let mut rt = Runtime::new(vrl_core::Runtime::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
@@ -253,7 +253,7 @@ impl Validator for Repl {
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
         let mut compiler_state = state::Compiler::default();
-        let mut rt = Runtime::new(state::Runtime::default());
+        let mut rt = Runtime::new(vrl_core::Runtime::default());
         let target: Option<&mut Value> = None;
 
         let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {

@@ -8,7 +8,7 @@ use std::{
 
 use shared::TimeZone;
 use structopt::StructOpt;
-use vrl_compiler::{state, Program, Runtime};
+use vrl_compiler::{Program, Runtime};
 use vrl_core::{diagnostic::Formatter, Target, Value};
 
 #[cfg(feature = "repl")]
@@ -152,7 +152,7 @@ fn execute(
     program: &Program,
     timezone: &TimeZone,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
+    let state = vrl_core::Runtime::default();
     let mut runtime = Runtime::new(state);
 
     runtime

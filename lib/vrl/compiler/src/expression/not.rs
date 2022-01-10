@@ -2,13 +2,13 @@ use std::fmt;
 
 use vrl_core::{
     diagnostic::{DiagnosticError, Label, Note, Span, Urls},
-    Kind, Resolved,
+    Context, Kind, Resolved,
 };
 
 use crate::{
     expression::{Expr, Noop},
     parser::Node,
-    Context, Expression, State, TypeDef,
+    Expression, State, TypeDef,
 };
 
 pub type Result = std::result::Result<Not, Error>;

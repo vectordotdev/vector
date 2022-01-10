@@ -2,13 +2,13 @@ use std::fmt;
 
 use vrl_core::{
     diagnostic::{DiagnosticError, Label, Note, Span, Urls},
-    Resolved, Value,
+    Context, Resolved, Value,
 };
 
 use crate::{
     expression::{self, Expr, Noop},
     parser::{ast, Node},
-    Context, Expression, State, TypeDef,
+    Expression, State, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
