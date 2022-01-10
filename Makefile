@@ -395,18 +395,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh kafka stop
 endif
 
-.PHONY: test-integration-loki
-test-integration-loki: ## Runs Loki integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-	@scripts/setup_integration_env.sh loki start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-endif
-
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
 ifeq ($(AUTOSPAWN), true)
