@@ -275,12 +275,12 @@ impl TlsOptions {
 /// of openssl-probe on linux.
 #[cfg(windows)]
 fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
-    use super::Schannel;
+    use super::SchannelSnafu;
 
     let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
 
     let current_user_store =
-        schannel::cert_store::CertStore::open_current_user("ROOT").context(Schannel)?;
+        schannel::cert_store::CertStore::open_current_user("ROOT").context(SchannelSnafu)?;
 
     for cert in current_user_store.certs() {
         let cert = cert.to_der().to_vec();
