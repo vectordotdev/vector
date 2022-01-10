@@ -66,7 +66,6 @@ jobs:
           - test: 'kafka'
           - test: 'loki'
           - test: 'postgresql_metrics'
-          - test: 'prometheus'
           - test: 'pulsar'
           - test: 'splunk'
           - test: 'dnstap'
@@ -107,6 +106,7 @@ jobs:
           - test: 'logstash'
           - test: 'mongo'
           - test: 'nginx'
+          - test: 'prometheus'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
