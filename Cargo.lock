@@ -176,6 +176,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
 
 [[package]]
+name = "assert-json-diff"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50f1c3703dd33532d7f0ca049168930e9099ecac238e23cf932f3a69c42f06da"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "assert_cmd"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9103,10 +9113,11 @@ dependencies = [
 
 [[package]]
 name = "wiremock"
-version = "0.5.9"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8258886282e4e638166802e91fa2b09bac3a6409bf3a043e2ec7afc049f4d000"
+checksum = "70f7b70ff8dc8f85e456feb581ee05720f87a5bd4f868c018191d997994cabed"
 dependencies = [
+ "assert-json-diff",
  "async-trait",
  "deadpool",
  "futures 0.3.19",
