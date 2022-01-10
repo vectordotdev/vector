@@ -7,7 +7,7 @@ use snafu::ResultExt;
 use warp::{http::StatusCode, Filter};
 
 use super::{
-    errors::{Parse, RequestError},
+    errors::{ParseSnafu, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
     Compression,
@@ -77,7 +77,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                 }
                 .and_then(|r| {
                     serde_json::from_reader(r)
-                        .context(Parse {
+                        .context(ParseSnafu {
                             request_id: request_id.clone(),
                         })
                         .map_err(warp::reject::custom)

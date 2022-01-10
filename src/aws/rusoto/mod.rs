@@ -158,7 +158,8 @@ impl AwsCredentialsProvider {
                 None,
             );
 
-            let creds = AutoRefreshingProvider::new(provider).context(InvalidAwsCredentials)?;
+            let creds =
+                AutoRefreshingProvider::new(provider).context(InvalidAwsCredentialsSnafu)?;
             Ok(Self::Role(creds))
         } else {
             debug!("Using default credentials provider for AWS.");
@@ -167,7 +168,7 @@ impl AwsCredentialsProvider {
             // is 10 seconds.
             chain.set_timeout(Duration::from_secs(8));
 
-            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentials)?;
+            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentialsSnafu)?;
 
             Ok(Self::Default(creds))
         }
@@ -185,7 +186,7 @@ impl AwsCredentialsProvider {
             credentials_file,
             profile,
         ))
-        .context(InvalidAwsCredentials)?;
+        .context(InvalidAwsCredentialsSnafu)?;
         Ok(Self::File(creds))
     }
 }

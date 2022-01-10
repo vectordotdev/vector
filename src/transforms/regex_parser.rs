@@ -176,7 +176,7 @@ impl RegexParser {
             }
         };
 
-        let regexset = RegexSet::new(&patterns).context(super::InvalidRegex)?;
+        let regexset = RegexSet::new(&patterns).context(super::InvalidRegexSnafu)?;
 
         // Pre-compile individual patterns
         let patterns: Result<Vec<Regex>, _> = regexset
@@ -184,7 +184,7 @@ impl RegexParser {
             .iter()
             .map(|pattern| Regex::new(pattern))
             .collect();
-        let patterns = patterns.context(super::InvalidRegex)?;
+        let patterns = patterns.context(super::InvalidRegexSnafu)?;
 
         let names = &patterns
             .iter()

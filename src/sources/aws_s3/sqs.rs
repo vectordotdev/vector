@@ -334,7 +334,7 @@ impl IngestorProcess {
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
-            .context(InvalidSqsMessage {
+            .context(InvalidSqsMessageSnafu {
                 message_id: message.message_id.unwrap_or_else(|| "<empty>".to_owned()),
             })?;
 
@@ -388,7 +388,7 @@ impl IngestorProcess {
                 ..Default::default()
             })
             .await
-            .context(GetObject {
+            .context(GetObjectSnafu {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
             })?;

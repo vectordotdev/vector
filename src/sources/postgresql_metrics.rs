@@ -214,19 +214,18 @@ impl PostgresqlClient {
         let client = match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
-                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailedSnafu)?;
                 builder
                     .set_ca_file(tls_config.ca_file.clone())
-                    .context(TlsFailed)?;
+                    .context(TlsFailedSnafu)?;
                 let connector = MakeTlsConnector::new(builder.build());
 
                 let (client, connection) =
-                    self.config
-                        .connect(connector)
-                        .await
-                        .with_context(|| ConnectionFailed {
+                    self.config.connect(connector).await.with_context(|_| {
+                        ConnectionFailedSnafu {
                             endpoint: config_to_endpoint(&self.config),
-                        })?;
+                        }
+                    })?;
                 tokio::spawn(connection);
                 client
             }
@@ -235,7 +234,7 @@ impl PostgresqlClient {
                     self.config
                         .connect(NoTls)
                         .await
-                        .with_context(|| ConnectionFailed {
+                        .with_context(|_| ConnectionFailedSnafu {
                             endpoint: config_to_endpoint(&self.config),
                         })?;
                 tokio::spawn(connection);
@@ -248,12 +247,12 @@ impl PostgresqlClient {
             let version_row = client
                 .query_one("SELECT version()", &[])
                 .await
-                .with_context(|| SelectVersionFailed {
+                .with_context(|_| SelectVersionFailedSnafu {
                     endpoint: config_to_endpoint(&self.config),
                 })?;
             let version = version_row
                 .try_get::<&str, &str>("version")
-                .with_context(|| SelectVersionFailed {
+                .with_context(|_| SelectVersionFailedSnafu {
                     endpoint: config_to_endpoint(&self.config),
                 })?;
             debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
@@ -263,13 +262,13 @@ impl PostgresqlClient {
         let row = client
             .query_one("SHOW server_version_num", &[])
             .await
-            .with_context(|| SelectVersionFailed {
+            .with_context(|_| SelectVersionFailedSnafu {
                 endpoint: config_to_endpoint(&self.config),
             })?;
 
         let version = row
             .try_get::<&str, &str>("server_version_num")
-            .with_context(|| SelectVersionFailed {
+            .with_context(|_| SelectVersionFailedSnafu {
                 endpoint: config_to_endpoint(&self.config),
             })?;
 
@@ -433,7 +432,7 @@ impl PostgresqlMetrics {
         namespace: Option<String>,
         tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
-        let config: Config = endpoint.parse().context(InvalidEndpoint)?;
+        let config: Config = endpoint.parse().context(InvalidEndpointSnafu)?;
 
         let hosts = config.get_hosts();
         let host = match hosts.len() {
@@ -510,7 +509,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_database(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(20 * rows.len());
         for row in rows.iter() {
@@ -645,7 +644,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_database_conflicts(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(5 * rows.len());
         for row in rows.iter() {
@@ -687,7 +686,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_bgwriter(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         Ok(vec![
             self.create_metric(

@@ -423,7 +423,7 @@ fn start_journalctl(
     BoxStream<'static, Result<Bytes, BoxedFramingError>>,
     StopJournalctlFn,
 )> {
-    let mut child = command.spawn().context(JournalctlSpawn)?;
+    let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),

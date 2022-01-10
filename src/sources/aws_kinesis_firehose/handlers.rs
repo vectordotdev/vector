@@ -10,7 +10,7 @@ use vector_core::event::BatchNotifier;
 use warp::reject;
 
 use super::{
-    errors::{ParseRecords, RequestError},
+    errors::{ParseRecordsSnafu, RequestError},
     models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
     Compression,
 };
@@ -37,7 +37,7 @@ pub async fn firehose(
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
         let bytes = decode_record(&record, compression)
-            .with_context(|| ParseRecords {
+            .with_context(|_| ParseRecordsSnafu {
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
@@ -139,7 +139,7 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64 {})?;
+    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());
@@ -147,7 +147,7 @@ fn decode_record(
 
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
-        Compression::Gzip => decode_gzip(&buf[..]).with_context(|| Decompression {
+        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
             compression: compression.to_owned(),
         }),
         Compression::Auto => {

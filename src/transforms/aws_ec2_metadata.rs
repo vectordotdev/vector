@@ -320,7 +320,7 @@ impl MetadataClient {
             .await?
             .map(|body| {
                 serde_json::from_slice(&body[..])
-                    .context(ParseIdentityDocument {})
+                    .context(ParseIdentityDocumentSnafu {})
                     .map_err(Into::into)
             })
             .transpose()
@@ -393,7 +393,7 @@ impl MetadataClient {
                             mac
                         );
 
-                        let subnet_path = subnet_path.parse().context(ParsePath {
+                        let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),
                         })?;
 
@@ -406,7 +406,7 @@ impl MetadataClient {
                         let vpc_path =
                             format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
 
-                        let vpc_path = vpc_path.parse().context(ParsePath {
+                        let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
                         })?;
 
@@ -441,7 +441,10 @@ impl MetadataClient {
     }
 
     async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await.with_context(|| FetchToken {})?;
+        let token = self
+            .get_token()
+            .await
+            .with_context(|_| FetchTokenSnafu {})?;
 
         let mut parts = self.host.clone().into_parts();
 

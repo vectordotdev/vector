@@ -138,7 +138,7 @@ impl SqsSinkConfig {
             })
             .await
             .map(|_| ())
-            .context(GetQueueAttributes)
+            .context(GetQueueAttributesSnafu)
             .map_err(Into::into)
     }
 
@@ -171,7 +171,7 @@ impl SqsSink {
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
-            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplate)?),
+            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplateSnafu)?),
             (Some(_), false) => return Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
