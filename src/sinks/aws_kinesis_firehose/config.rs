@@ -132,7 +132,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             service,
             request_builder,
         };
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_stream(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

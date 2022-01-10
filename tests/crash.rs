@@ -27,7 +27,7 @@ struct PanicSink;
 impl SinkConfig for PanicSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Sink(Box::new(PanicSink)),
+            VectorSink::from_event_sink(PanicSink),
             future::ok(()).boxed(),
         ))
     }
@@ -113,7 +113,7 @@ struct ErrorSink;
 impl SinkConfig for ErrorSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Sink(Box::new(ErrorSink)),
+            VectorSink::from_event_sink(ErrorSink),
             future::ok(()).boxed(),
         ))
     }
