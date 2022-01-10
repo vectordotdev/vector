@@ -71,7 +71,9 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytesSnafu)?;
+    let bytes = hyper::body::to_bytes(body)
+        .await
+        .context(GetTokenBytesSnafu)?;
 
     // Token::from_str is irresponsible and may panic!
     match serde_json::from_slice::<Token>(&bytes) {
@@ -87,7 +89,9 @@ impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1Snafu)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token(&jwt, &creds).await.context(GetTokenSnafu)?;
+        let token = goauth::get_token(&jwt, &creds)
+            .await
+            .context(GetTokenSnafu)?;
         Ok(Self {
             creds: Some(creds),
             scope,
