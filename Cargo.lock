@@ -3567,7 +3567,7 @@ dependencies = [
 [[package]]
 name = "lading_common"
 version = "0.6.0"
-source = "git+https://github.com/blt/lading?branch=main#643785a5feb331bfe30274f07c752b21b4526353"
+source = "git+https://github.com/blt/lading?branch=main#5d07b36cd2743316697dd43dc280fa7962582120"
 dependencies = [
  "arbitrary",
  "bytecount",
@@ -4454,7 +4454,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7000c9392b545c4ba43e8abc086bf7d01cd2948690934c16980170b0549a2bd3"
 dependencies = [
  "lazy_static",
- "rand 0.8.4",
+ "rand 0.4.6",
 ]
 
 [[package]]
@@ -8020,7 +8020,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
