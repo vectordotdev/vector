@@ -3,14 +3,14 @@ use std::sync::Arc;
 use futures_util::{
     future,
     stream::{self, BoxStream},
-    FutureExt, SinkExt, StreamExt,
+    FutureExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
+    config::{DataType, Output},
     event::Event,
     sink::{StreamSink, VectorSink},
-    transform::DataType,
 };
 
 use crate::{
@@ -30,7 +30,7 @@ pub struct UnitTestSourceConfig {
 #[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let events = self.events.clone().into_iter().map(Ok);
+        let events = self.events.clone().into_iter();
 
         Ok(Box::pin(async move {
             let mut out = cx.out;
@@ -44,8 +44,8 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn source_type(&self) -> &'static str {

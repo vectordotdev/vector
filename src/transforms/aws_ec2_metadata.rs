@@ -16,7 +16,9 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
 
 use crate::{
-    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, Output, ProxyConfig, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -174,8 +176,8 @@ impl TransformConfig for Ec2Metadata {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {

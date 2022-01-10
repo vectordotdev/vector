@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
@@ -13,19 +13,19 @@ use vector_core::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
     internal_events::{EventsReceived, TcpBytesReceived},
     proto::vector as proto,
     serde::bool_or_struct,
     shutdown::ShutdownSignalToken,
     sources::{util::AfterReadExt as _, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Debug, Clone)]
 pub struct Service {
-    pipeline: Pipeline,
+    pipeline: SourceSender,
     acknowledgements: bool,
 }
 
@@ -51,7 +51,7 @@ impl proto::Service for Service {
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events).map(Ok))
+            .send_all(&mut futures::stream::iter(events))
             .map_err(|err| Status::unavailable(err.to_string()))
             .and_then(|_| handle_batch_status(receiver))
             .await?;
@@ -125,8 +125,8 @@ impl VectorConfig {
         Ok(Box::pin(source))
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -210,7 +210,7 @@ mod tests {
         config::SinkContext,
         sinks::vector::v2::VectorConfig as SinkConfig,
         test_util::{self, components},
-        Pipeline,
+        SourceSender,
     };
 
     #[tokio::test]
@@ -220,7 +220,7 @@ mod tests {
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         components::init_test();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
         test_util::wait_for_tcp(addr).await;

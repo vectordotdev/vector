@@ -2,7 +2,7 @@ use super::DatadogAgentConfig;
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 use crate::event::EventStatus;
 use crate::test_util::spawn_collect_n;
-use crate::Pipeline;
+use crate::SourceSender;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::time::{Duration, SystemTime};
@@ -41,7 +41,7 @@ async fn wait_for_agent() {
 #[tokio::test]
 async fn wait_for_message() {
     wait_for_agent().await;
-    let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+    let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let context = SourceContext::new_test(sender);
     tokio::spawn(async move {
         let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();

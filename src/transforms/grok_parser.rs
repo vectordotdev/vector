@@ -7,7 +7,9 @@ use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -70,8 +72,8 @@ impl TransformConfig for GrokParserConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn enable_concurrency(&self) -> bool {

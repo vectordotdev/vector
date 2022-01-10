@@ -3,7 +3,7 @@ use std::{io::Read, sync::Arc};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::event::BatchNotifier;
@@ -22,7 +22,7 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
     },
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -33,7 +33,7 @@ pub async fn firehose(
     compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
         let bytes = decode_record(&record, compression)

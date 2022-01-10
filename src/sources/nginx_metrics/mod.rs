@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::join_all, stream, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -84,7 +84,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let http_client = HttpClient::new(tls, &cx.proxy)?;
 
@@ -98,10 +98,6 @@ impl SourceConfig for NginxMetricsConfig {
                 namespace.clone(),
             )?);
         }
-
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
@@ -118,17 +114,20 @@ impl SourceConfig for NginxMetricsConfig {
                 let mut stream = stream::iter(metrics)
                     .map(stream::iter)
                     .flatten()
-                    .map(Event::Metric)
-                    .map(Ok);
-                out.send_all(&mut stream).await?;
+                    .map(Event::Metric);
+
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending mongodb metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -251,7 +250,7 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
+    use crate::{config::ProxyConfig, test_util::trace_init, SourceSender};
 
     fn nginx_proxy_address() -> String {
         std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())
@@ -268,7 +267,7 @@ mod integration_tests {
     async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         let mut ctx = SourceContext::new_test(sender);
         ctx.proxy = proxy;

@@ -9,7 +9,7 @@ use crate::{
     },
     serde::{default_decoding, default_framing_message_based},
     test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
-    Pipeline,
+    SourceSender,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -83,7 +83,7 @@ async fn source(
     acknowledgements: bool,
     store_api_key: bool,
 ) -> (impl Stream<Item = Event>, SocketAddr) {
-    let (sender, recv) = Pipeline::new_test_finalize(status);
+    let (sender, recv) = SourceSender::new_test_finalize(status);
     let address = next_addr();
     let context = SourceContext::new_test(sender);
     tokio::spawn(async move {

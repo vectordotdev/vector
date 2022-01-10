@@ -15,7 +15,7 @@ use crate::{
         rusoto::{self, RegionOrEndpoint},
     },
     config::{
-        AcknowledgementsConfig, DataType, ProxyConfig, SourceConfig, SourceContext,
+        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
         SourceDescription,
     },
     line_agg,
@@ -92,8 +92,8 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -322,7 +322,7 @@ mod integration_tests {
         test_util::{
             collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[tokio::test]
@@ -535,7 +535,7 @@ mod integration_tests {
 
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
-        let (tx, rx) = Pipeline::new_test_finalize(status);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
         let cx = SourceContext::new_test(tx);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });

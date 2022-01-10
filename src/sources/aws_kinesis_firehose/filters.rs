@@ -15,7 +15,7 @@ use super::{
 use crate::{
     codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
-    Pipeline,
+    SourceSender,
 };
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
@@ -24,7 +24,7 @@ pub fn firehose(
     record_compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    out: Pipeline,
+    out: SourceSender,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
         .and(emit_received())

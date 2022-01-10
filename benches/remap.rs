@@ -5,6 +5,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use shared::TimeZone;
 use vector::{
+    config::{DataType, Output},
     event::{Event, Value},
     transforms::{
         add_fields::AddFields,
@@ -29,7 +30,8 @@ fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result[0].as_log();
@@ -98,7 +100,8 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result[0].as_log();
@@ -172,7 +175,8 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+            let mut outputs =
+                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();
             let output_1 = result[0].as_log();

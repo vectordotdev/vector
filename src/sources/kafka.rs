@@ -6,8 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures_util::future::ready;
+use futures::{FutureExt, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -24,7 +23,7 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
@@ -33,8 +32,9 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
+use async_stream::stream;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -152,8 +152,8 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -170,7 +170,7 @@ async fn kafka_source(
     headers_key: String,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
@@ -233,39 +233,42 @@ async fn kafka_source(
 
                 let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-                let mut stream = FramedRead::new(payload, decoder.clone())
-                    .map(|input| match input {
-                        Ok((mut events, _)) => {
-                            let mut event = events.pop().expect("event must exist");
-                            if let Event::Log(ref mut log) = event {
-                                log.try_insert(schema.source_type_key(), Bytes::from("kafka"));
-                                log.try_insert(schema.timestamp_key(), timestamp);
-                                log.try_insert(key_field, msg_key.clone());
-                                log.try_insert(topic_key, Value::from(msg_topic.clone()));
-                                log.try_insert(partition_key, Value::from(msg_partition));
-                                log.try_insert(offset_key, Value::from(msg_offset));
-                                log.try_insert(headers_key, Value::from(headers_map.clone()));
-                            }
+                let mut stream = FramedRead::new(payload, decoder.clone());
+                let mut stream = stream! {
+                    loop {
+                        match stream.next().await {
+                            Some(Ok((events, _))) => {
+                                for mut event in events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.insert(schema.source_type_key(), Bytes::from("kafka"));
+                                        log.insert(schema.timestamp_key(), timestamp);
+                                        log.insert(key_field, msg_key.clone());
+                                        log.insert(topic_key, Value::from(msg_topic.clone()));
+                                        log.insert(partition_key, Value::from(msg_partition));
+                                        log.insert(offset_key, Value::from(msg_offset));
+                                        log.insert(headers_key, Value::from(headers_map.clone()));
+                                    }
 
-                            Some(Some(Ok(event)))
-                        }
-                        Err(e) => {
-                            // Error is logged by `crate::codecs::Decoder`, no further handling
-                            // is needed here.
-                            if !e.can_continue() {
-                                Some(None)
-                            } else {
-                                None
+                                    yield event;
+                                }
+                            },
+                            Some(Err(error)) => {
+                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                                // is needed here.
+                                if !error.can_continue() {
+                                    break;
+                                }
                             }
+                            None => break,
                         }
-                    })
-                    .take_while(|x| ready(x.is_some()))
-                    .filter_map(|x| ready(x.expect("should have inner value")));
+                    }
+                }
+                .boxed();
 
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
                             Err(err) => error!(message = "Error sending to sink.", error = %err),
                             Ok(_) => {
@@ -423,7 +426,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
@@ -492,7 +495,7 @@ mod integration_test {
         .await;
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
             create_consumer(&config).unwrap(),
             config.key_field,

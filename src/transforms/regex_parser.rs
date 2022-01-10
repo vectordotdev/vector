@@ -7,7 +7,7 @@ use shared::TimeZone;
 use snafu::ResultExt;
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -55,8 +55,8 @@ impl TransformConfig for RegexParserConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn enable_concurrency(&self) -> bool {

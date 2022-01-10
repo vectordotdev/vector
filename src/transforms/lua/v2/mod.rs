@@ -6,7 +6,7 @@ pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::{
-    config::{self, DataType, CONFIG_PATHS},
+    config::{self, DataType, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::Transform,
@@ -97,8 +97,8 @@ impl LuaConfig {
         DataType::Any
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub const fn transform_type(&self) -> &'static str {

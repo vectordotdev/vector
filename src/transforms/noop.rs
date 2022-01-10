@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext},
+    config::{DataType, Output, TransformConfig, TransformContext},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -20,8 +20,8 @@ impl TransformConfig for Noop {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {

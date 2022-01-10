@@ -186,7 +186,7 @@ smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.20", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.19", default-features = false, optional = true }
+async-graphql-warp = { version = "3.0.20", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -199,7 +199,7 @@ tui = { version = "0.16.0", optional = true, default-features = false, features 
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 datadog-filter = { path = "lib/datadog/filter" }
 vector-datadog-filter = { path = "lib/vector-datadog-filter" }
-sha2 = { version = "0.10.0", optional = true }
+sha2 = { version = "0.10.1", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
@@ -242,7 +242,7 @@ http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.16", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-infer = { version = "0.5.0", default-features = false, optional = true}
+infer = { version = "0.6.0", default-features = false, optional = true}
 indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
@@ -272,7 +272,7 @@ pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.2", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.21.4", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.8.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
@@ -333,7 +333,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
-wiremock = "0.5.9"
+wiremock = "0.5.10"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }

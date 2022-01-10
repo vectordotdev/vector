@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 #[cfg(unix)]
 use codecs::Decoder;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
@@ -17,7 +17,7 @@ use crate::sources::util::build_unix_stream_source;
 use crate::{
     codecs::{self, BytesDecoder, OctetCountingDecoder, SyslogDeserializer},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
@@ -26,7 +26,7 @@ use crate::{
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    udp, SourceSender,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -155,8 +155,8 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -207,10 +207,8 @@ pub fn udp(
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> super::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
-
     Box::pin(async move {
         let socket = UdpSocket::bind(&addr)
             .await
@@ -228,7 +226,7 @@ pub fn udp(
             r#type = "udp"
         );
 
-        UdpFramed::new(
+        let mut stream = UdpFramed::new(
             socket,
             codecs::Decoder::new(Box::new(BytesDecoder::new()), Box::new(SyslogDeserializer)),
         )
@@ -249,10 +247,18 @@ pub fn udp(
                 }
             }
         })
-        .map(Ok)
-        .forward(out)
-        .inspect(|_| info!("Finished sending."))
-        .await
+        .boxed();
+
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Error sending line.", %error);
+                Err(())
+            }
+        }
     })
 }
 
