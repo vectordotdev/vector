@@ -199,7 +199,7 @@ tui = { version = "0.16.0", optional = true, default-features = false, features 
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 datadog-filter = { path = "lib/datadog/filter" }
 vector-datadog-filter = { path = "lib/vector-datadog-filter" }
-sha2 = { version = "0.10.0", optional = true }
+sha2 = { version = "0.10.1", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
