@@ -119,6 +119,18 @@ impl SourceSender {
             .await
     }
 
+    pub async fn send_all_named(
+        &mut self,
+        name: &str,
+        events: impl Stream<Item = Event> + Unpin,
+    ) -> Result<(), ClosedError> {
+        self.named_inners
+            .get_mut(name)
+            .expect("unknown output")
+            .send_all(events)
+            .await
+    }
+
     pub async fn send_all(
         &mut self,
         events: impl Stream<Item = Event> + Unpin,
