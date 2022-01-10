@@ -151,7 +151,7 @@ rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
 aws-config = { version = "0.3.0", optional = true }
-aws-types = { version = "0.3.0", optional = true, features = ["hardcoded-credentials"]}
+aws-types = { version = "0.4.0", optional = true, features = ["hardcoded-credentials"]}
 aws-sdk-sqs = { version = "0.3.0", optional = true }
 
 # Azure
@@ -333,7 +333,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
-wiremock = "0.5.9"
+wiremock = "0.5.10"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
