@@ -277,20 +277,20 @@ impl TlsOptions {
 fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
     use super::Schannel;
 
-    let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+    let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
 
     let current_user_store =
         schannel::cert_store::CertStore::open_current_user("ROOT").context(Schannel)?;
 
     for cert in current_user_store.certs() {
         let cert = cert.to_der().to_vec();
-        let cert = X509::from_der(&cert[..]).context(super::X509SystemParseError)?;
-        store.add_cert(cert).context(AddCertToStore)?;
+        let cert = X509::from_der(&cert[..]).context(super::X509SystemParseSnafu)?;
+        store.add_cert(cert).context(AddCertToStoreSnafu)?;
     }
 
     builder
         .set_verify_cert_store(store.build())
-        .context(SetVerifyCert)?;
+        .context(SetVerifyCertSnafu)?;
 
     Ok(())
 }
