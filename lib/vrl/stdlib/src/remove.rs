@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use shared::btreemap;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Remove;
@@ -155,7 +155,7 @@ impl Expression for RemoveFn {
                 lookup
             }
             value => {
-                return Err(value::Error::Expected {
+                return Err(Error::Expected {
                     got: value.kind(),
                     expected: Kind::Array,
                 }

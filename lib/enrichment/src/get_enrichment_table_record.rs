@@ -1,6 +1,14 @@
 use std::collections::BTreeMap;
 
-use vrl_core::prelude::*;
+use vrl_compiler::{
+    expression,
+    function::{ArgumentList, Compiled, Example, FunctionCompileContext},
+    map, state, Context, Expression, Function, Parameter, TypeDef,
+};
+use vrl_core::{
+    diagnostic::{DiagnosticError, ExpressionError},
+    kind, Error, Kind, Resolved, Value,
+};
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -113,7 +121,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             .condition
             .iter()
             .map(|(key, value)| evaluate_condition(ctx, key, value))
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<Result<Vec<Condition>, ExpressionError>>()?;
 
         let select = self
             .select
@@ -123,7 +131,7 @@ impl Expression for GetEnrichmentTableRecordFn {
                     .iter()
                     .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                     .collect::<std::result::Result<Vec<_>, _>>(),
-                value => Err(value::Error::Expected {
+                value => Err(Error::Expected {
                     got: value.kind(),
                     expected: Kind::Array,
                 }),
@@ -168,6 +176,7 @@ mod tests {
 
     use chrono::{TimeZone as _, Utc};
     use shared::{btreemap, TimeZone};
+    use vrl_core::value;
 
     use super::*;
     use crate::test_util::{
@@ -190,7 +199,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_core::state::Runtime::default();
+        let mut runtime_state = vrl_compiler::state::Runtime::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
         registry.finish_load();

@@ -1,9 +1,12 @@
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
-use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
+use vrl_core::{
+    diagnostic::{DiagnosticError, ExpressionError, Label, Note, Span},
+    Resolved, Value,
+};
 
-use crate::{Context, Span, State, TypeDef, Value};
+use crate::{Context, State, TypeDef};
 
 mod abort;
 mod array;
@@ -44,8 +47,6 @@ pub use predicate::Predicate;
 pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
-
-pub type Resolved = Result<Value, ExpressionError>;
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
@@ -204,6 +205,48 @@ impl fmt::Display for Expr {
 
 // -----------------------------------------------------------------------------
 
+impl Expr {
+    /// Convert a given [`Value`] into an [`Expr`] enum variant.
+    ///
+    /// This is a non-public function because we want to avoid exposing internal
+    /// details about the expression variants.
+    pub(crate) fn from_value(value: Value) -> Self {
+        use Value::*;
+
+        match value {
+            Bytes(v) => Literal::from(v).into(),
+            Integer(v) => Literal::from(v).into(),
+            Float(v) => Literal::from(v).into(),
+            Boolean(v) => Literal::from(v).into(),
+            Object(v) => {
+                let object = crate::expression::Object::from(
+                    v.into_iter()
+                        .map(|(k, v)| (k, Expr::from_value(v)))
+                        .collect::<BTreeMap<_, _>>(),
+                );
+
+                Container::new(container::Variant::from(object)).into()
+            }
+            Array(v) => {
+                let array = crate::expression::Array::from(
+                    v.into_iter().map(Expr::from_value).collect::<Vec<_>>(),
+                );
+
+                Container::new(container::Variant::from(array)).into()
+            }
+            Timestamp(v) => Literal::from(v).into(),
+            Regex(v) => Literal::from(v).into(),
+            Null => Literal::from(()).into(),
+        }
+    }
+}
+
+pub fn value_into_expression(value: Value) -> Box<dyn Expression> {
+    Box::new(Expr::from_value(value))
+}
+
+// -----------------------------------------------------------------------------
+
 impl From<Literal> for Expr {
     fn from(literal: Literal) -> Self {
         Expr::Literal(literal)
@@ -304,82 +347,5 @@ impl DiagnosticError for Error {
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ExpressionError {
-    Abort {
-        span: Span,
-    },
-    Error {
-        message: String,
-        labels: Vec<Label>,
-        notes: Vec<Note>,
-    },
-}
-
-impl std::fmt::Display for ExpressionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message().fmt(f)
-    }
-}
-
-impl std::error::Error for ExpressionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl DiagnosticError for ExpressionError {
-    fn code(&self) -> usize {
-        0
-    }
-
-    fn message(&self) -> String {
-        use ExpressionError::*;
-
-        match self {
-            Abort { .. } => "aborted".to_owned(),
-            Error { message, .. } => message.clone(),
-        }
-    }
-
-    fn labels(&self) -> Vec<Label> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { span } => {
-                vec![Label::primary("aborted", span)]
-            }
-            Error { labels, .. } => labels.clone(),
-        }
-    }
-
-    fn notes(&self) -> Vec<Note> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { .. } => vec![],
-            Error { notes, .. } => notes.clone(),
-        }
-    }
-}
-
-impl From<String> for ExpressionError {
-    fn from(message: String) -> Self {
-        ExpressionError::Error {
-            message,
-            labels: vec![],
-            notes: vec![],
-        }
-    }
-}
-
-impl From<&str> for ExpressionError {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
     }
 }

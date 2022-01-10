@@ -10,7 +10,7 @@ use nom::{
     sequence::{preceded, terminated},
     IResult,
 };
-use vrl_compiler::Value;
+use vrl_core::Value;
 
 use crate::{
     ast::{Function, FunctionArgument},

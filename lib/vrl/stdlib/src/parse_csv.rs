@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use csv::ReaderBuilder;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseCsv;

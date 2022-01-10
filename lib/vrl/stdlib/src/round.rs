@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 use crate::util::round_to_precision;
 
@@ -71,7 +71,7 @@ impl Expression for RoundFn {
         match self.value.resolve(ctx)? {
             Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
             value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Float | Kind::Integer,
             }

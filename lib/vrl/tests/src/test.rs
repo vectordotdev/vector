@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
-use vrl::{function::Example, Value};
+use vrl_compiler::function::Example;
+use vrl_core::Value;
 
 #[derive(Debug)]
 pub struct Test {

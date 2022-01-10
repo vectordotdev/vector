@@ -12,7 +12,8 @@ path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../../shared", default-features = false }
-vrl = { path = "../core" }
+vrl-compiler = { path = "../compiler" }
+vrl-core = { path = "../core" }
 bytes = "1.1.0"
 exitcode = "1"
 prettytable-rs = { version = "0.8", default-features = false, optional = true }

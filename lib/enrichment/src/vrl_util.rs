@@ -1,9 +1,10 @@
 //! Utilities shared between both VRL functions.
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
+use vrl_compiler::{expression, state, Context, Expression};
 use vrl_core::{
-    diagnostic::{Label, Span},
-    prelude::*,
+    diagnostic::{DiagnosticError, ExpressionError, Label, Span},
+    Value,
 };
 
 use crate::{Case, Condition, IndexHandle, TableRegistry};
@@ -45,7 +46,7 @@ pub(crate) fn evaluate_condition<'a>(
     ctx: &mut Context,
     key: &'a str,
     value: &expression::Expr,
-) -> Result<Condition<'a>> {
+) -> Result<Condition<'a>, ExpressionError> {
     let value = value.resolve(ctx)?;
 
     Ok(match value {

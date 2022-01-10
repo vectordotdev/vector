@@ -1,6 +1,6 @@
 use codespan_reporting::diagnostic;
 
-use crate::Span;
+use crate::diagnostic::Span;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Label {

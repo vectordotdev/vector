@@ -1,12 +1,11 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label};
-
-use crate::{
-    expression::{levenstein, Resolved},
-    parser::ast::Ident,
-    Context, Expression, Span, State, TypeDef, Value,
+use vrl_core::{
+    diagnostic::{DiagnosticError, Label, Span},
+    Resolved, Value,
 };
+
+use crate::{expression::levenstein, parser::ast::Ident, Context, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {

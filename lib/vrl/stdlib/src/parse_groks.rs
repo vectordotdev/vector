@@ -4,10 +4,8 @@ use datadog_grok::{
     parse_grok,
     parse_grok_rules::{self, GrokRule},
 };
-use vrl::{
-    diagnostic::{Label, Span},
-    prelude::*,
-};
+
+use crate::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -116,7 +114,7 @@ impl Function for ParseGroks {
             .map(|expr| {
                 let pattern = expr
                     .as_value()
-                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                    .ok_or(function::Error::ExpectedStaticExpression {
                         keyword: "patterns",
                         expr,
                     })?
@@ -125,7 +123,7 @@ impl Function for ParseGroks {
                     .into_owned();
                 Ok(pattern)
             })
-            .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
+            .collect::<std::result::Result<Vec<String>, function::Error>>()?;
 
         let aliases = arguments
             .optional_object("aliases")?
@@ -134,7 +132,7 @@ impl Function for ParseGroks {
             .map(|(key, expr)| {
                 let alias = expr
                     .as_value()
-                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                    .ok_or(function::Error::ExpectedStaticExpression {
                         keyword: "aliases",
                         expr,
                     })
@@ -145,7 +143,7 @@ impl Function for ParseGroks {
                     })?;
                 Ok((key, alias))
             })
-            .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>()?;
+            .collect::<std::result::Result<BTreeMap<String, String>, function::Error>>()?;
 
         // we use a datadog library here because it is a superset of grok
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)

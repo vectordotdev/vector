@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use crate::ast::*;
 use crate::lex::*;
-use diagnostic::span;
+use vrl_core::diagnostic::span;
 use std::collections::BTreeMap;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;

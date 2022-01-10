@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
@@ -8,7 +9,6 @@ use nom::{
     sequence::{delimited, preceded},
     IResult,
 };
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
@@ -109,7 +109,7 @@ fn inner_type_def() -> BTreeMap<&'static str, Kind> {
     }
 }
 
-fn parse_log(mut input: &str) -> Result<Value> {
+fn parse_log(mut input: &str) -> Result<Value, ExpressionError> {
     let mut log = BTreeMap::new();
 
     macro_rules! get_value {

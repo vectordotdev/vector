@@ -10,7 +10,8 @@ parser = { package = "vrl-parser", path = "../parser" }
 shared = { path = "../../shared", default-features = false }
 enrichment = { path = "../../enrichment" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
-vrl = { path = "../core" }
+vrl-compiler = { path = "../compiler" }
+vrl-core = { path = "../core" }
 
 ansi_term = "0.12"
 chrono = "0.4"

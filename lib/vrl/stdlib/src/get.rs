@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use lookup_lib::{LookupBuf, SegmentBuf};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Get;
@@ -133,7 +133,7 @@ impl Expression for GetFn {
                 get
             }
             value => {
-                return Err(value::Error::Expected {
+                return Err(Error::Expected {
                     got: value.kind(),
                     expected: Kind::Array,
                 }

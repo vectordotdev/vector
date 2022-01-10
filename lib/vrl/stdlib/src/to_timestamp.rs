@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use chrono::{TimeZone as _, Utc};
 use shared::{conversion::Conversion, TimeZone};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
@@ -160,15 +160,15 @@ impl Expression for ToTimestampFn {
 mod tests {
     use std::collections::BTreeMap;
 
+    use expression::Literal;
     use shared::TimeZone;
-    use vrl::prelude::expression::Literal;
 
     use super::*;
 
     #[test]
     fn out_of_range_integer() {
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = state::Runtime::default();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn out_of_range_float() {
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = state::Runtime::default();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {

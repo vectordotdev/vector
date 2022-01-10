@@ -1,9 +1,8 @@
 use std::fmt;
 
-use crate::{
-    expression::{Expr, Resolved},
-    Context, Expression, State, TypeDef,
-};
+use vrl_core::Resolved;
+
+use crate::{expression::Expr, Context, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {

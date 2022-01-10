@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use vrl::prelude::*;
 
 lazy_static! {
     static ref REGEX_GLOG: Regex = Regex::new(

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 use crate::util;
 
@@ -181,7 +181,7 @@ impl Expression for CompactFn {
         match self.value.resolve(ctx)? {
             Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Array | Kind::Object,
             }

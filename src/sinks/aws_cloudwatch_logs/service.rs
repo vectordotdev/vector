@@ -21,7 +21,6 @@ use tower::{
     Service, ServiceBuilder, ServiceExt,
 };
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
-use vrl::prelude::fmt::Debug;
 
 use crate::{
     event::EventStatus,

@@ -1,8 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use crate::prelude::*;
 use lazy_static::lazy_static;
 use regex::Regex;
-use vrl::prelude::*;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"/(?P<subnet>\d*)").unwrap();
@@ -104,7 +104,7 @@ impl Expression for IpSubnetFn {
 }
 
 /// Parses a subnet in the form "/8" returns the number.
-fn parse_subnet(subnet: &str) -> Result<u32> {
+fn parse_subnet(subnet: &str) -> Result<u32, ExpressionError> {
     let subnet = RE
         .captures(subnet)
         .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
@@ -115,7 +115,7 @@ fn parse_subnet(subnet: &str) -> Result<u32> {
 }
 
 /// Masks the address by performing a bitwise AND between the two addresses.
-fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr> {
+fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr, ExpressionError> {
     match (ip, mask) {
         (IpAddr::V4(addr), IpAddr::V4(mask)) => {
             let addr: u32 = addr.into();

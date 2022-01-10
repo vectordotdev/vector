@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use shared::tokenize;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTokens;

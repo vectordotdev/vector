@@ -1,9 +1,6 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
-use vrl::{
-    diagnostic::{Label, Span},
-    prelude::*,
-};
+use crate::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {

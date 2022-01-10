@@ -495,7 +495,7 @@ pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 
-pub fn all() -> Vec<Box<dyn vrl::Function>> {
+pub fn all() -> Vec<Box<dyn vrl_compiler::Function>> {
     vec![
         #[cfg(feature = "append")]
         Box::new(Append),
@@ -742,4 +742,19 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "uuid_v4")]
         Box::new(UuidV4),
     ]
+}
+
+mod prelude {
+    pub use indoc::indoc;
+    pub use std::fmt;
+    pub use vrl_compiler::{
+        expr, expression, func_args, function,
+        function::{ArgumentList, Compiled, Example, FunctionCompileContext},
+        map, state, test_function, test_type_def, type_def, Context, Expression, Function,
+        Parameter, TypeDef,
+    };
+    pub use vrl_core::{
+        diagnostic::{DiagnosticError, ExpressionError, Label, Span},
+        kind, value, Error, Kind, NotNan, Regex, Resolved, Target, Value,
+    };
 }

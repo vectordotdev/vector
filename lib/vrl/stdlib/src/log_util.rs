@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use chrono::prelude::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use shared::TimeZone;
-use vrl::prelude::*;
 
 lazy_static! {
     // Information about the common log format taken from the

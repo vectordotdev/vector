@@ -1,6 +1,6 @@
 use std::collections::btree_map;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Flatten;
@@ -60,7 +60,7 @@ impl Expression for FlattenFn {
                     .map(|(k, v)| (k, v.clone()))
                     .collect(),
             )),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Array | Kind::Object,
             }

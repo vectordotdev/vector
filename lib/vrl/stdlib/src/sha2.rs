@@ -1,5 +1,6 @@
+use crate::prelude::*;
+use bytes::Bytes;
 use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Sha2;

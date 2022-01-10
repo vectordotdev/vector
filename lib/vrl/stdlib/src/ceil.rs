@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 use crate::util::round_to_precision;
 
@@ -62,7 +62,7 @@ impl Expression for CeilFn {
         match self.value.resolve(ctx)? {
             Value::Float(f) => Ok(round_to_precision(*f, precision, f64::ceil).into()),
             value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Float | Kind::Integer,
             }

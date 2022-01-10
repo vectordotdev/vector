@@ -2,10 +2,12 @@ use std::{collections::BTreeMap, fmt};
 
 use lookup::LookupBuf;
 
+use vrl_core::{Resolved, Value};
+
 use crate::{
-    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    expression::{assignment, Container, FunctionCall, Variable},
     parser::ast::Ident,
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, State, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -79,7 +81,7 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::get(&value, &self.path)
+        Ok(vrl_core::Target::get(&value, &self.path)
             .ok()
             .flatten()
             .unwrap_or(Value::Null))

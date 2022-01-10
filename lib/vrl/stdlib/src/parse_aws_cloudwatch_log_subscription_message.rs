@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;

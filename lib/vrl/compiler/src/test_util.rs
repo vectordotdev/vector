@@ -5,7 +5,7 @@
 macro_rules! expr {
     ($($v:tt)*) => {{
         let value = $crate::value!($($v)*);
-        value.into_expression()
+        $crate::expression::value_into_expression(value)
     }};
 }
 
@@ -19,7 +19,7 @@ macro_rules! test_type_def {
                 #[test]
                 fn $name() {
                     let mut state = $crate::state::Compiler::default();
-                    let expression = Box::new($expr(&mut state));
+                    let expression = $expr(&mut state);
 
                     assert_eq!(expression.type_def(&state), $def);
                 }
@@ -109,7 +109,7 @@ macro_rules! test_function {
                         assert_eq!(err
                                    // We have to map to a value just to make sure the types match even though
                                    // it will never be used.
-                                   .map(|_| Value::Null)
+                                   .map(|_| $crate::Value::Null)
                                    .map_err(|e| format!("{:#}", e.message())), want);
                     }
                 }
@@ -123,10 +123,11 @@ macro_rules! test_function {
 macro_rules! __prep_bench_or_test {
     ($func:path, $state:expr, $args:expr, $want:expr) => {{
         (
-            $func.compile(
+            $crate::Function::compile(
+                &$func,
                 &$state,
                 &$crate::function::FunctionCompileContext {
-                    span: vrl::diagnostic::Span::new(0, 0),
+                    span: $crate::Span::new(0, 0),
                 },
                 $args.into(),
             ),

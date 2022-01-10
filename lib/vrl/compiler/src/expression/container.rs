@@ -1,7 +1,9 @@
 use std::fmt;
 
+use vrl_core::{Resolved, Value};
+
 use crate::{
-    expression::{Array, Block, Group, Object, Resolved, Value},
+    expression::{Array, Block, Group, Object},
     Context, Expression, State, TypeDef,
 };
 

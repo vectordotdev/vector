@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use codespan_reporting::diagnostic;
 
-use crate::{DiagnosticError, Label, Note, Severity, Span};
+use crate::diagnostic::{DiagnosticError, Label, Note, Severity, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {

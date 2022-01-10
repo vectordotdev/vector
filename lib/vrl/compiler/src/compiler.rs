@@ -1,11 +1,14 @@
 use std::convert::TryFrom;
 
 use chrono::{TimeZone, Utc};
-use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
+use vrl_core::{
+    diagnostic::{DiagnosticError, Span},
+    Value,
+};
 
-use crate::{expression::*, Function, Program, State, Value};
+use crate::{expression::*, Function, Program, State};
 
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 
@@ -217,7 +220,7 @@ impl<'a> Compiler<'a> {
     /// Rewrites the ast for `a |= b` to be `a = a | b`.
     fn rewrite_to_merge(
         &mut self,
-        span: diagnostic::Span,
+        span: Span,
         target: &Node<ast::AssignmentTarget>,
         expr: Box<Node<ast::Expr>>,
     ) -> Box<Node<Expr>> {

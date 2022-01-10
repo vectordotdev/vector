@@ -1870,7 +1870,7 @@ dependencies = [
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
- "vrl-compiler",
+ "vrl-core",
 ]
 
 [[package]]
@@ -2142,8 +2142,10 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
+ "indoc",
  "shared",
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
 ]
 
 [[package]]
@@ -5265,7 +5267,7 @@ dependencies = [
  "lookup",
  "ordered-float",
  "proptest",
- "vrl-diagnostic",
+ "vrl-core",
  "vrl-parser",
 ]
 
@@ -8430,8 +8432,9 @@ dependencies = [
  "vector-datadog-filter",
  "vector-vrl-functions",
  "vector_core",
- "vrl",
  "vrl-cli",
+ "vrl-compiler",
+ "vrl-core",
  "vrl-stdlib",
  "walkdir",
  "warp",
@@ -8477,7 +8480,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
 ]
 
 [[package]]
@@ -8544,7 +8548,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
- "vrl",
+ "vrl-core",
 ]
 
 [[package]]
@@ -8558,21 +8562,6 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-
-[[package]]
-name = "vrl"
-version = "0.1.0"
-dependencies = [
- "bytes 1.1.0",
- "indoc",
- "lookup",
- "ordered-float",
- "shared",
- "thiserror",
- "vrl-compiler",
- "vrl-diagnostic",
- "vrl-parser",
-]
 
 [[package]]
 name = "vrl-cli"
@@ -8589,7 +8578,8 @@ dependencies = [
  "shared",
  "structopt",
  "thiserror",
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
  "vrl-stdlib",
  "webbrowser",
 ]
@@ -8598,7 +8588,6 @@ dependencies = [
 name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "bytes 1.1.0",
  "chrono",
  "criterion",
@@ -8609,21 +8598,31 @@ dependencies = [
  "ordered-float",
  "paste",
  "regex",
- "serde",
- "serde_json",
  "shared",
  "thiserror",
  "tracing 0.1.29",
- "vrl-diagnostic",
+ "vrl-core",
  "vrl-parser",
 ]
 
 [[package]]
-name = "vrl-diagnostic"
+name = "vrl-core"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
+ "bytes 1.1.0",
+ "chrono",
  "codespan-reporting",
+ "indoc",
+ "lookup",
+ "ordered-float",
+ "paste",
+ "regex",
+ "serde",
+ "serde_json",
+ "shared",
  "termcolor",
+ "thiserror",
 ]
 
 [[package]]
@@ -8637,7 +8636,7 @@ dependencies = [
  "paste",
  "test-case",
  "thiserror",
- "vrl-diagnostic",
+ "vrl-core",
 ]
 
 [[package]]
@@ -8660,6 +8659,7 @@ dependencies = [
  "hex",
  "hostname",
  "indexmap",
+ "indoc",
  "lazy_static",
  "lookup",
  "md-5 0.10.0",
@@ -8680,7 +8680,8 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
  "woothee",
 ]
 
@@ -8701,7 +8702,8 @@ dependencies = [
  "structopt",
  "tikv-jemallocator",
  "tracing-subscriber",
- "vrl",
+ "vrl-compiler",
+ "vrl-core",
  "vrl-parser",
  "vrl-stdlib",
 ]

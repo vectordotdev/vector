@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use vrl::prelude::*;
+use bytes::Bytes;
+
+use crate::prelude::*;
 
 use crate::log_util;
 

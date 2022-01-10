@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
+use crate::prelude::*;
 use dns_lookup::lookup_addr;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ReverseDns;

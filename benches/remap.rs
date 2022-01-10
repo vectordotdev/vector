@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
+use indoc::indoc;
 use shared::TimeZone;
 use vector::{
     config::{DataType, Output},
@@ -15,7 +16,6 @@ use vector::{
         SyncTransform, TransformOutputsBuf,
     },
 };
-use vrl::prelude::*;
 
 criterion_group!(
     name = benches;

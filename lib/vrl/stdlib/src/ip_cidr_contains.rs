@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use cidr_utils::cidr::IpCidr;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpCidrContains;

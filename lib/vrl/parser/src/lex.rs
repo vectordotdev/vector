@@ -1,7 +1,7 @@
 use std::{fmt, iter::Peekable, str::CharIndices};
 
-use diagnostic::{DiagnosticError, Label, Span};
 use ordered_float::NotNan;
+use vrl_core::diagnostic::{DiagnosticError, Label, Span};
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;

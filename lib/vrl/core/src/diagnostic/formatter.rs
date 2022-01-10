@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::DiagnosticList;
+use crate::diagnostic::DiagnosticList;
 
 /// A formatter to display diagnostics tied to a given source.
 pub struct Formatter<'a> {

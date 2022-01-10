@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
-use vrl::prelude::*;
+use bytes::Bytes;
+
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tally;

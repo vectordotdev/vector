@@ -1,8 +1,10 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
+use indoc::indoc;
 use regex::Regex;
 use shared::btreemap;
-use vrl::prelude::*;
+use vrl_compiler::{bench_function, func_args, value};
+use vrl_core::Value;
 
 criterion_group!(
     name = benches;

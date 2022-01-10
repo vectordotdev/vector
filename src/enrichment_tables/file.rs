@@ -11,7 +11,7 @@ use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
 use tracing::trace;
-use vrl::Value;
+use vrl_core::Value;
 
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 

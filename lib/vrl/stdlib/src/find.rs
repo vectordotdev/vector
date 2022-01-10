@@ -1,4 +1,5 @@
-use vrl::{prelude::*, value::Regex};
+use crate::prelude::*;
+use bytes::Bytes;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
@@ -79,7 +80,7 @@ impl FindFn {
         None
     }
 
-    fn find(value: Value, pattern: Value, offset: usize) -> Result<Option<usize>> {
+    fn find(value: Value, pattern: Value, offset: usize) -> Result<Option<usize>, ExpressionError> {
         match pattern {
             Value::Bytes(bytes) => Ok(Self::find_bytes_in_bytes(value.try_bytes()?, bytes, offset)),
             Value::Regex(regex) => Ok(Self::find_regex_in_str(
@@ -87,7 +88,7 @@ impl FindFn {
                 regex,
                 offset,
             )),
-            other => Err(value::Error::Expected {
+            other => Err(Error::Expected {
                 got: other.kind(),
                 expected: Kind::Bytes | Kind::Regex,
             }

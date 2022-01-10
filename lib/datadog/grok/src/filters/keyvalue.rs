@@ -15,7 +15,7 @@ use nom::{
 use nom_regex::str::re_find;
 use ordered_float::NotNan;
 use regex::Regex;
-use vrl_compiler::Value;
+use vrl_core::Value;
 
 use crate::{
     ast::{Function, FunctionArgument},

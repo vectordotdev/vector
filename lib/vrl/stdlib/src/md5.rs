@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use md5::Digest;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Md5;

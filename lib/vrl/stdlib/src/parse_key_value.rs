@@ -1,5 +1,6 @@
 use std::{iter::FromIterator, str::FromStr};
 
+use crate::prelude::*;
 use nom::{
     self,
     branch::alt,
@@ -11,7 +12,6 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseKeyValue;
@@ -208,7 +208,7 @@ fn parse<'a>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> Result<Vec<(String, Value)>> {
+) -> Result<Vec<(String, Value)>, ExpressionError> {
     let (rest, result) = parse_line(
         input,
         key_value_delimiter,

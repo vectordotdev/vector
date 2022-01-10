@@ -10,6 +10,6 @@ edition = "2021"
 chrono = "0.4"
 proptest = "1.0"
 ordered-float = "2"
-parser = { package = "vrl-parser", path = "../parser/" }
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic/" }
-lookup = { path = "../../lookup/" }
+parser = { package = "vrl-parser", path = "../parser" }
+vrl-core = { path = "../core" }
+lookup = { path = "../../lookup" }

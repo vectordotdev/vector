@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use shared::conversion::Conversion;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToFloat;

@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, Value};
+use vrl_compiler::{Program, Runtime, RuntimeResult, Terminate};
+use vrl_core::{
+    diagnostic::{Diagnostic, DiagnosticError, Formatter},
+    Value,
+};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
@@ -48,7 +52,7 @@ impl ConditionConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let program = vrl::compile(
+        let program = vrl_compiler::compile(
             &self.source,
             &functions,
             Some(Box::new(enrichment_tables.clone())),
@@ -75,7 +79,7 @@ pub struct Vrl {
 }
 
 impl Vrl {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
+    fn run(&self, event: &Event) -> RuntimeResult {
         // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
         //
@@ -110,23 +114,19 @@ impl Condition for Vrl {
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         let value = self.run(event).map_err(|err| match err {
-            vrl::Terminate::Abort(err) => {
+            Terminate::Abort(err) => {
                 let err = Formatter::new(
                     &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
-                    ),
+                    Diagnostic::from(Box::new(err) as Box<dyn DiagnosticError>),
                 )
                 .colored()
                 .to_string();
                 format!("source execution aborted: {}", err)
             }
-            vrl::Terminate::Error(err) => {
+            Terminate::Error(err) => {
                 let err = Formatter::new(
                     &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
-                    ),
+                    Diagnostic::from(Box::new(err) as Box<dyn DiagnosticError>),
                 )
                 .colored()
                 .to_string();

@@ -1,17 +1,22 @@
 [package]
-name = "vrl"
+name = "vrl-core"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2021"
 publish = false
 
 [dependencies]
-compiler = { package = "vrl-compiler", path = "../compiler" }
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
-parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
 shared = { path = "../../shared", default-features = false }
+bitflags = "1"
 bytes = "1.1.0"
+chrono = "0.4"
+codespan-reporting = "0.11"
 indoc = "1"
 ordered-float = "2"
+paste = "1"
+regex = "1"
+serde = "1"
+serde_json = { version = "1", default-features = false, features = ["std"] }
+termcolor = "1"
 thiserror = "1"

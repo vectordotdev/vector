@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 use crate::util;
 

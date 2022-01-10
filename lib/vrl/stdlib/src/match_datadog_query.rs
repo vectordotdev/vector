@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::prelude::*;
+use bytes::Bytes;
 use datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
@@ -7,7 +9,6 @@ use datadog_filter::{
 };
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 use lookup_lib::{parser::parse_lookup, LookupBuf};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;

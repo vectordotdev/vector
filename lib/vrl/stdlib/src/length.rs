@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Length;
@@ -63,7 +63,7 @@ impl Expression for LengthFn {
             Array(v) => Ok(v.len().into()),
             Object(v) => Ok(v.len().into()),
             Bytes(v) => Ok(v.len().into()),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Array | Kind::Object | Kind::Bytes,
             }

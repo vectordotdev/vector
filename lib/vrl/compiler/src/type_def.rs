@@ -31,7 +31,8 @@ use std::{
 
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 
-use crate::{map, value::Kind};
+use crate::map;
+use vrl_core::Kind;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -43,7 +44,7 @@ pub struct TypeDef {
     /// custom function designed to be infallible).
     pub fallible: bool,
 
-    /// The [`value::Kind`][crate::value::Kind]s this definition represents.
+    /// The [`Kind`][vrl_core::Kind]s this definition represents.
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).

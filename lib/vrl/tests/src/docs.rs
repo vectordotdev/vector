@@ -120,7 +120,7 @@ fn examples_to_tests(
 
 impl Test {
     fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
-        use vrl::Value;
+        use vrl_core::Value;
 
         let Example {
             title,

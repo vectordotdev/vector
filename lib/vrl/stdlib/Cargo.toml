@@ -7,7 +7,8 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl = { path = "../core" }
+vrl-compiler = { path = "../compiler" }
+vrl-core = { path = "../core" }
 lookup_lib = {package = "lookup", path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
 datadog-filter = { path = "../../datadog/filter", optional = true }
@@ -23,6 +24,7 @@ grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.7.0", default-features = false, optional = true}
+indoc = "1"
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
@@ -189,10 +191,10 @@ encode_base64 = ["base64"]
 encode_json = ["serde_json"]
 encode_key_value = ["shared/encoding"]
 encode_logfmt = ["encode_key_value"]
-encode_percent = ["percent-encoding"]
+encode_percent = ["bytes", "percent-encoding"]
 ends_with = []
 exists = []
-find = []
+find = ["bytes"]
 find_table_row = []
 flatten = []
 float = []
@@ -223,16 +225,16 @@ is_string = []
 is_timestamp = []
 join = []
 length = []
-log = ["tracing"]
+log = ["bytes", "tracing"]
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "datadog-filter", "lazy_static", "regex"]
+match_datadog_query = ["bytes", "datadog-search-syntax", "datadog-filter", "lazy_static", "regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 object = []
-parse_apache_log = ["chrono", "lazy_static", "regex", "shared/conversion"]
+parse_apache_log = ["bytes", "chrono", "lazy_static", "regex", "shared/conversion"]
 parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
@@ -248,11 +250,11 @@ parse_key_value = ["nom"]
 parse_klog = ["chrono", "lazy_static", "regex"]
 parse_linux_authorization = ["parse_syslog", "chrono", "shared/conversion"]
 parse_logfmt = ["parse_key_value"]
-parse_nginx_log = ["chrono", "regex", "lazy_static", "shared/conversion"]
+parse_nginx_log = ["bytes", "chrono", "regex", "lazy_static", "shared/conversion"]
 parse_query_string = ["url"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
-parse_ruby_hash = ["nom"]
+parse_ruby_hash = ["bytes", "nom"]
 parse_syslog = ["syslog_loose", "chrono", "shared/conversion"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
@@ -267,16 +269,16 @@ reverse_dns = ["dns-lookup"]
 round = []
 set = ["shared/btreemap"]
 sha1 = ["sha-1", "hex"]
-sha2 = ["sha-2", "hex"]
-sha3 = ["sha-3", "hex"]
+sha2 = ["bytes", "sha-2", "hex"]
+sha3 = ["bytes", "sha-3", "hex"]
 slice = []
 split = []
-starts_with = ["utf8-width"]
+starts_with = ["bytes", "utf8-width"]
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
 tag_types_externally = ["shared/btreemap"]
-tally = []
+tally = ["bytes"]
 tally_value = []
 timestamp = []
 to_bool = ["shared/conversion"]

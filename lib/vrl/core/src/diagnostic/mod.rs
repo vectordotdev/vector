@@ -1,4 +1,6 @@
+#[allow(clippy::module_inception)]
 mod diagnostic;
+mod expression;
 mod formatter;
 mod label;
 mod note;
@@ -6,6 +8,7 @@ mod severity;
 mod span;
 
 pub use diagnostic::{Diagnostic, DiagnosticList};
+pub use expression::ExpressionError;
 pub use formatter::Formatter;
 pub use label::Label;
 pub use note::Note;

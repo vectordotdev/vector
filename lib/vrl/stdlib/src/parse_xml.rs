@@ -3,9 +3,9 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
 };
 
+use crate::prelude::*;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
-use vrl::prelude::*;
 
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,

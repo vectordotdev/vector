@@ -1,9 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
+use crate::prelude::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use vrl::prelude::*;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(

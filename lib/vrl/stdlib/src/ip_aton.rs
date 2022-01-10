@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpAton;

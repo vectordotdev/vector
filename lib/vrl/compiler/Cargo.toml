@@ -6,12 +6,11 @@ edition = "2021"
 publish = false
 
 [dependencies]
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+vrl-core = { path = "../core" }
 parser = { package = "vrl-parser", path = "../parser" }
 shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
 
-bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"
 dyn-clone = "1.0.4"
@@ -19,10 +18,8 @@ lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
 regex = "1"
-serde = "1"
 thiserror = "1"
 tracing = "0.1"
-serde_json = { version = "1", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 criterion = "0.3"

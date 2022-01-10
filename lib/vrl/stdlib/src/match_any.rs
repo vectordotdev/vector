@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use regex::bytes::RegexSet;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchAny;
@@ -52,7 +52,7 @@ impl Function for MatchAny {
         for expr in patterns {
             let value = expr
                 .as_value()
-                .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                .ok_or(function::Error::ExpectedStaticExpression {
                     keyword: "patterns",
                     expr,
                 })?;

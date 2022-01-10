@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Replace;
@@ -119,7 +119,7 @@ impl Expression for ReplaceFn {
 
                 Ok(replaced)
             }
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Regex | Kind::Bytes,
             }

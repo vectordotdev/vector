@@ -7,9 +7,9 @@ use std::{
     str::FromStr,
 };
 
-use diagnostic::Span;
 use lookup::LookupBuf;
 use ordered_float::NotNan;
+use vrl_core::diagnostic::Span;
 
 use crate::lex::Error;
 

@@ -13,7 +13,8 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use shared::TimeZone;
-use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
+use vrl_compiler::{state, Runtime};
+use vrl_core::{diagnostic::Formatter, value, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
@@ -144,7 +145,7 @@ fn resolve(
         Some(object) => object,
     };
 
-    let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
+    let program = match vrl_compiler::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
         Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
     };

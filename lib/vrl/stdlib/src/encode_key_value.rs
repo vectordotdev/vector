@@ -1,7 +1,7 @@
 use std::result::Result;
 
+use crate::prelude::*;
 use shared::encode_key_value;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
@@ -309,7 +309,7 @@ mod tests {
                 fields_ordering: value!(["lvl", 2])
             ],
             want: Err(format!(r"invalid field value type at index 1: {}",
-                    value::Error::Expected {
+                    Error::Expected {
                         got: Kind::Integer,
                         expected: Kind::Bytes
                     })),

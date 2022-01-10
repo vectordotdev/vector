@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Join;
@@ -59,7 +59,7 @@ impl Expression for JoinFn {
         let string_vec = array
             .iter()
             .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
-            .collect::<Result<Vec<Cow<'_, str>>>>()
+            .collect::<Result<Vec<Cow<'_, str>>, ExpressionError>>()
             .map_err(|_| "all array items must be strings")?;
 
         let separator: String = self

@@ -1,9 +1,11 @@
 use std::{fmt, ops::Deref};
 
+use vrl_core::diagnostic::Span;
+
 use crate::{
     expression::Expr,
     parser::{Ident, Node},
-    Parameter, Span,
+    Parameter,
 };
 
 #[derive(Debug, PartialEq)]

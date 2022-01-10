@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
+use bytes::Bytes;
+
+use crate::prelude::*;
 use regex::Regex;
-use vrl::prelude::*;
 
 use crate::log_util;
 

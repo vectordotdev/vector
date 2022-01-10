@@ -7,7 +7,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+use vrl_compiler::{Program, Runtime, Terminate};
+use vrl_core::diagnostic::{ExpressionError, Formatter};
 
 use crate::{
     config::{
@@ -106,7 +107,7 @@ impl Remap {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let program = vrl::compile(
+        let program = vrl_compiler::compile(
             &source,
             &functions,
             Some(Box::new(context.enrichment_tables.clone())),

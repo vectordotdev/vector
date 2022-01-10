@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use chrono::Utc;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Now;

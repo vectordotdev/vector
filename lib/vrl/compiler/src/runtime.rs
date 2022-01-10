@@ -1,10 +1,10 @@
 use std::{error::Error, fmt};
 
-use compiler::ExpressionError;
 use lookup::LookupBuf;
 use shared::TimeZone;
+use vrl_core::{diagnostic::ExpressionError, Target, Value};
 
-use crate::{state, Context, Program, Target, Value};
+use crate::{state, Context, Program};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 

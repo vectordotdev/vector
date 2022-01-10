@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatNumber;
@@ -76,7 +76,7 @@ impl Expression for FormatNumberFn {
             Value::Integer(v) => v.into(),
             Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
             value => {
-                return Err(value::Error::Expected {
+                return Err(Error::Expected {
                     got: value.kind(),
                     expected: Kind::Integer | Kind::Float,
                 }

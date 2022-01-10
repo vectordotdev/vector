@@ -3,15 +3,16 @@ use std::{
     fmt,
 };
 
-use diagnostic::{DiagnosticError, Label, Note};
+use vrl_core::{
+    diagnostic::{DiagnosticError, Label, Note, Span},
+    Kind, Value,
+};
 
 use crate::{
     expression::{
         container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
-    value::Kind,
-    Span, Value,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
@@ -123,7 +124,7 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
+                    match Expr::from_value(var.value().unwrap().clone()) {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -277,7 +278,7 @@ impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
         Self(
             map.into_iter()
-                .map(|(k, v)| (k, v.into_expr()))
+                .map(|(k, v)| (k, Expr::from_value(v)))
                 .collect::<HashMap<_, _>>(),
         )
     }
@@ -330,7 +331,7 @@ pub enum Error {
     },
 }
 
-impl diagnostic::DiagnosticError for Error {
+impl DiagnosticError for Error {
     fn code(&self) -> usize {
         use Error::*;
 
@@ -410,7 +411,7 @@ impl diagnostic::DiagnosticError for Error {
     }
 }
 
-impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
+impl From<Error> for Box<dyn DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
     }

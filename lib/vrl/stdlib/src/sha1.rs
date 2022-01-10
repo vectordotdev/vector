@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use ::sha1::Digest;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Sha1;

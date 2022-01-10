@@ -10,7 +10,7 @@ use itertools::{Itertools, Position};
 use lazy_static::lazy_static;
 use lookup::LookupBuf;
 use regex::Regex;
-use vrl_compiler::Value;
+use vrl_core::Value;
 
 use crate::{
     ast::{self, Destination, GrokPattern},

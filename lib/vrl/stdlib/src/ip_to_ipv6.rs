@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpToIpv6;

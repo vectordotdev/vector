@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use bytes::Bytes;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct UuidV4;
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn uuid_v4() {
-        let mut state = vrl::state::Runtime::default();
+        let mut state = state::Runtime::default();
         let mut object: Value = map![].into();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);

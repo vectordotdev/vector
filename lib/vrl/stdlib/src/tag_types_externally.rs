@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use shared::btreemap;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TagTypesExternally;

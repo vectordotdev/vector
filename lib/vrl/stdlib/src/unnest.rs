@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use lookup_lib::LookupBuf;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unnest;
@@ -99,7 +99,7 @@ impl Expression for UnnestFn {
         let values = root
             .get_by_path(path)
             .cloned()
-            .ok_or(value::Error::Expected {
+            .ok_or(Error::Expected {
                 got: Kind::Null,
                 expected: Kind::Array,
             })?
@@ -155,8 +155,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use shared::{btreemap, TimeZone};
-    use type_def::KindInfo;
-    use vrl::Index;
+    use type_def::Index;
 
     use super::*;
 
@@ -413,7 +412,7 @@ mod tests {
                 // error before we get to this point.
                 TypeDef {
                     fallible: false,
-                    kind: KindInfo::Known(BTreeSet::new()),
+                    kind: type_def::KindInfo::Known(BTreeSet::new()),
                 },
             ),
         ];
@@ -432,7 +431,7 @@ mod tests {
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
             let mut object = object.clone();
-            let mut runtime_state = vrl::state::Runtime::default();
+            let mut runtime_state = state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
             let typedef = func.type_def(&compiler);

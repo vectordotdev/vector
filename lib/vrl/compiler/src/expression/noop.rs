@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::{expression::Resolved, Context, Expression, State, TypeDef, Value};
+use vrl_core::{Resolved, Value};
+
+use crate::{Context, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Noop;

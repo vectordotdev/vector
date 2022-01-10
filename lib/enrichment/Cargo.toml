@@ -9,6 +9,7 @@ publish = false
 arc-swap = { version = "1.4.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
+indoc = "1"
 shared = { path = "../shared", default-features = false, features = [ "btreemap", "conversion" ] }
-vrl-core = { package = "vrl", path = "../vrl/core" }
-
+vrl-compiler = { path = "../vrl/compiler" }
+vrl-core = { path = "../vrl/core" }

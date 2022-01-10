@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
+use crate::prelude::*;
 use chrono::{DateTime, Datelike, Utc};
 use shared::TimeZone;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;

@@ -7,7 +7,7 @@ publish = false
 build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+vrl-core = { path = "../core" }
 lookup = { path = "../../lookup" }
 
 lalrpop-util = "0.19"

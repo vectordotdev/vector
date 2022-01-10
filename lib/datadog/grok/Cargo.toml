@@ -31,7 +31,7 @@ nom-regex = { version = "0.2.0", default-features = false }
 # Internal
 lookup = { path = "../../lookup" }
 shared = { path = "../../shared" }
-vrl-compiler = { path = "../../vrl/compiler" }
+vrl-core = { path = "../../vrl/core" }
 
 [build-dependencies]
 lalrpop = { version = "0.19.6", default-features = false }

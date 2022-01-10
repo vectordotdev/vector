@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Del;
@@ -201,7 +201,7 @@ mod tests {
         let tz = TimeZone::default();
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
-            let mut runtime_state = vrl::state::Runtime::default();
+            let mut runtime_state = state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
             let got = func
                 .resolve(&mut ctx)

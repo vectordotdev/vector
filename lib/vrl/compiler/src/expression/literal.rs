@@ -2,11 +2,14 @@ use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
+use vrl_core::{
+    diagnostic::{DiagnosticError, Label, Note, Span, Urls},
+    Regex, Resolved, Value,
+};
 
-use crate::{expression::Resolved, value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use crate::{Context, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {

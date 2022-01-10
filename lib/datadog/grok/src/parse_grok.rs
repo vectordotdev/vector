@@ -3,7 +3,7 @@ use itertools::{
     Itertools,
 };
 use shared::btreemap;
-use vrl_compiler::{Target, Value};
+use vrl_core::{Target, Value};
 
 use crate::{
     grok_filter::apply_filter,
@@ -103,7 +103,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
-    use vrl_compiler::Value;
+    use vrl_core::Value;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;

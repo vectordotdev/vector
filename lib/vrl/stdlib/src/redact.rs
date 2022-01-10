@@ -4,8 +4,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::prelude::*;
 use lazy_static::lazy_static;
-use vrl::prelude::*;
 
 lazy_static! {
     // https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
@@ -70,20 +70,21 @@ impl Function for Redact {
             .into_iter()
             .map(|expr| {
                 expr.as_value()
-                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                    .ok_or(function::Error::ExpectedStaticExpression {
                         keyword: "filters",
                         expr,
                     })
             })
             .map(|value| {
                 value.and_then(|value| {
-                    value.clone().try_into().map_err(|error| {
-                        vrl::function::Error::InvalidArgument {
+                    value
+                        .clone()
+                        .try_into()
+                        .map_err(|error| function::Error::InvalidArgument {
                             keyword: "filters",
                             value,
                             error,
-                        }
-                    })
+                        })
                 })
             })
             .collect::<std::result::Result<Vec<Filter>, _>>()?;

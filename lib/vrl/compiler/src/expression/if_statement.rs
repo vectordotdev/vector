@@ -1,8 +1,10 @@
 use std::fmt;
 
+use vrl_core::{Resolved, Value};
+
 use crate::{
-    expression::{Block, Expr, Literal, Predicate, Resolved},
-    Context, Expression, State, TypeDef, Value,
+    expression::{Block, Expr, Literal, Predicate},
+    Context, Expression, State, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

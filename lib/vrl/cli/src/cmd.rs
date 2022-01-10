@@ -8,7 +8,8 @@ use std::{
 
 use shared::TimeZone;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
+use vrl_compiler::{state, Program, Runtime};
+use vrl_core::{diagnostic::Formatter, Target, Value};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -109,9 +110,10 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let program =
+            vrl_compiler::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         for mut object in objects {
             let result = execute(&mut object, &program, &tz).map(|v| {
@@ -162,7 +164,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Value {
     use serde_json::Value;
 
     match value {
-        Value::Null => vrl::Value::Null,
+        Value::Null => vrl_core::Value::Null,
         Value::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))

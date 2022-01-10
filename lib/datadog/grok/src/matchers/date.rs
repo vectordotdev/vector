@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset,
 use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
 use regex::Regex;
-use vrl_compiler::Value;
+use vrl_core::Value;
 
 use crate::parse_grok::Error as GrokRuntimeError;
 

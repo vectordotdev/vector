@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use tracing::warn;
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToRegex;

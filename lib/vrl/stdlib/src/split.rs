@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Split;
@@ -92,7 +92,7 @@ impl Expression for SplitFn {
                     .collect::<Vec<_>>()
                     .into())
             }
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Regex | Kind::Bytes,
             }

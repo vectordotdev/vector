@@ -1,6 +1,6 @@
 use std::{convert::Into, fmt};
 
-use crate::Urls;
+use crate::diagnostic::Urls;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Note {

@@ -1,4 +1,6 @@
-use vrl::prelude::*;
+use crate::prelude::*;
+
+use bytes::Bytes;
 
 struct Chars<'a> {
     bytes: &'a Bytes,

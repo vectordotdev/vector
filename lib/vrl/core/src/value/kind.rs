@@ -5,8 +5,7 @@ use std::{fmt, ops::Deref};
 use chrono::{TimeZone, Utc};
 use regex::Regex;
 
-use super::Value;
-use crate::value;
+use crate::value::Value;
 
 pub const BYTES: u16 = 1 << 1;
 pub const INTEGER: u16 = 1 << 2;
@@ -137,12 +136,12 @@ impl Kind {
     /// results in an error.
     pub fn default_value(self) -> Value {
         match self {
-            Kind::Bytes => value!(""),
-            Kind::Integer => value!(0),
-            Kind::Float => value!(0.0),
-            Kind::Boolean => value!(false),
-            Kind::Object => value!({}),
-            Kind::Array => value!([]),
+            Kind::Bytes => crate::value!(""),
+            Kind::Integer => crate::value!(0),
+            Kind::Float => crate::value!(0.0),
+            Kind::Boolean => crate::value!(false),
+            Kind::Object => crate::value!({}),
+            Kind::Array => crate::value!([]),
             Kind::Timestamp => Utc.timestamp(0, 0).into(),
             #[allow(clippy::trivial_regex)]
             Kind::Regex => Regex::new("").unwrap().into(),

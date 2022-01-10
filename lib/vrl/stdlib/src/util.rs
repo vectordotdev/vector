@@ -23,7 +23,7 @@ pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
     numeric_groups: bool,
-) -> std::collections::BTreeMap<String, vrl::Value> {
+) -> std::collections::BTreeMap<String, vrl_core::Value> {
     let names = regex.capture_names().flatten().map(|name| {
         (
             name.to_owned(),
@@ -47,29 +47,31 @@ pub(crate) fn capture_regex_to_map(
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
 pub(crate) fn regex_type_def(
     regex: &regex::Regex,
-) -> std::collections::BTreeMap<String, vrl::value::Kind> {
+) -> std::collections::BTreeMap<String, vrl_core::Kind> {
     let mut inner_type = std::collections::BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
         inner_type.insert(
             num.to_string(),
-            vrl::value::Kind::Bytes | vrl::value::Kind::Null,
+            vrl_core::Kind::Bytes | vrl_core::Kind::Null,
         );
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().flatten() {
-        inner_type.insert(name.to_owned(), vrl::value::Kind::Bytes);
+        inner_type.insert(name.to_owned(), vrl_core::Kind::Bytes);
     }
 
     inner_type
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]
-pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
+pub(crate) fn is_nullish(value: &vrl_core::Value) -> bool {
+    use vrl_core::Value;
+
     match value {
-        vrl::Value::Bytes(v) => {
+        Value::Bytes(v) => {
             let s = &String::from_utf8_lossy(v)[..];
 
             match s {
@@ -77,7 +79,7 @@ pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
                 _ => s.chars().all(char::is_whitespace),
             }
         }
-        vrl::Value::Null => true,
+        Value::Null => true,
         _ => false,
     }
 }

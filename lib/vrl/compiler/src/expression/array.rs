@@ -1,9 +1,8 @@
 use std::{fmt, ops::Deref};
 
-use crate::{
-    expression::{Expr, Resolved},
-    Context, Expression, State, TypeDef, Value,
-};
+use vrl_core::{Resolved, Value};
+
+use crate::{expression::Expr, Context, Expression, State, TypeDef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
@@ -77,7 +76,8 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
-    use crate::{expr, map, test_type_def, value::Kind, TypeDef};
+    use crate::{expr, map, test_type_def, TypeDef};
+    use vrl_core::Kind;
 
     test_type_def![
         empty_array {

@@ -1,15 +1,18 @@
 use std::{convert::TryFrom, fmt};
 
-use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
+use vrl_core::{
+    diagnostic::{DiagnosticError, Label, Note, Span},
+    Resolved, Value,
+};
 
 use crate::{
-    expression::{Expr, Literal, Resolved},
+    expression::{Expr, Literal},
     parser::{
         ast::{self, Ident},
         Node,
     },
-    Context, Expression, Span, State, TypeDef, Value,
+    Context, Expression, State, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]

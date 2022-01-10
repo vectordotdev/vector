@@ -1,11 +1,14 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
+use vrl_core::{
+    diagnostic::{DiagnosticError, Label, Note, Span, Urls},
+    Resolved, Value,
+};
 
 use crate::{
-    expression::{self, Expr, Noop, Resolved},
+    expression::{self, Expr, Noop},
     parser::{ast, Node},
-    value, Context, Expression, State, TypeDef, Value,
+    Context, Expression, State, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -118,7 +121,7 @@ impl Expression for Op {
 
     fn type_def(&self, state: &State) -> TypeDef {
         use ast::Opcode::*;
-        use value::Kind as K;
+        use vrl_core::Kind as K;
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);
@@ -360,8 +363,8 @@ mod tests {
     use crate::{
         expression::{Block, IfStatement, Literal, Predicate},
         test_type_def,
-        value::Kind,
     };
+    use vrl_core::Kind;
 
     fn op(
         opcode: ast::Opcode,

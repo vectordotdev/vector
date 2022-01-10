@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Slice;
@@ -79,7 +79,7 @@ impl Expression for SliceFn {
             None => None,
         };
 
-        let range = |len: i64| -> Result<Range<usize>> {
+        let range = |len: i64| -> Result<Range<usize>, ExpressionError> {
             let start = match start {
                 start if start < 0 => start + len,
                 start => start,
@@ -108,7 +108,7 @@ impl Expression for SliceFn {
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
-            value => Err(value::Error::Expected {
+            value => Err(Error::Expected {
                 got: value.kind(),
                 expected: Kind::Bytes | Kind::Array,
             }

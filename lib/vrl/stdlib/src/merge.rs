@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use vrl::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Merge;
@@ -113,8 +113,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use value::Kind;
-
     use super::*;
 
     test_function! [

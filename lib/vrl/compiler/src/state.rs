@@ -1,6 +1,7 @@
 use std::{any::Any, collections::HashMap};
 
-use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
+use crate::{expression::assignment, parser::ast::Ident, TypeDef};
+use vrl_core::Value;
 
 /// The state held by the compiler.
 ///

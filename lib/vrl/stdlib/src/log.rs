@@ -1,5 +1,6 @@
+use crate::prelude::*;
+use bytes::Bytes;
 use tracing::{debug, error, info, trace, warn};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Log;
@@ -77,7 +78,7 @@ impl Function for Log {
 
 #[derive(Debug, Clone)]
 struct LogFn {
-    span: vrl::diagnostic::Span,
+    span: Span,
     value: Box<dyn Expression>,
     level: Bytes,
     rate_limit_secs: Option<Box<dyn Expression>>,

@@ -1,5 +1,6 @@
+use crate::prelude::*;
+use bytes::Bytes;
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
-use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Sha3;

@@ -1,6 +1,7 @@
 use shared::TimeZone;
+use vrl_core::Target;
 
-use crate::{state::Runtime, Target};
+use crate::state::Runtime;
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,
