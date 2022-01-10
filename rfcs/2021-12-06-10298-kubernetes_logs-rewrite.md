@@ -116,7 +116,8 @@ term the source can be decoupled and introduced as a standalone enrichment compo
 
 ## Outstanding Questions
 
-- Do we want to re-evaluate the usage of `evmap` in this component?
+- ~~Do we want to re-evaluate the usage of `evmap` in this component?~~ Not critical,
+we can review performance later.
 - ~~Do we want to make this change with a version change of the source, opting in
 to the change with a `version` option in the configuration?~~ No, the risk seems low
 enough to not warrant a version split between the old and new code.
