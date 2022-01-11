@@ -327,18 +327,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
 
-.PHONY: test-integration-eventstoredb_metrics
-test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-	@scripts/setup_integration_env.sh eventstoredb_metrics start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features eventstoredb_metrics-integration-tests --lib ::eventstoredb_metrics:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-endif
-
 .PHONY: test-integration-fluent
 test-integration-fluent: ## Runs Fluent integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
