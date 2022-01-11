@@ -451,7 +451,6 @@ components: {
 	#Output: {
 		name:        string
 		description: string
-		data?:       #OutputData
 	}
 
 	_default_output: #Output & {
