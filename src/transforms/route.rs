@@ -1,66 +1,47 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
-        TransformDescription,
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::Transform,
 };
 
 //------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct LaneConfig {
-    condition: AnyCondition,
+#[derive(Clone)]
+pub struct Route {
+    conditions: IndexMap<String, Box<dyn Condition>>,
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "lane")]
-impl TransformConfig for LaneConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Lane::new(
-            self.condition.build(&context.enrichment_tables)?,
-        )))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Any
-    }
-
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "lane"
+impl Route {
+    pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
+        let mut conditions = IndexMap::new();
+        for (output_name, condition) in config.route.iter() {
+            let condition = condition.build(&context.enrichment_tables)?;
+            conditions.insert(output_name.clone(), condition);
+        }
+        Ok(Self { conditions })
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
-pub struct Lane {
-    #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
-}
-
-impl Lane {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
-        Self { condition }
-    }
-}
-
-impl FunctionTransform for Lane {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        if self.condition.check(&event) {
-            output.push(event);
-        } else {
-            emit!(&RouteEventDiscarded);
+impl SyncTransform for Route {
+    fn transform(
+        &mut self,
+        event: Event,
+        output: &mut vector_core::transform::TransformOutputsBuf,
+    ) {
+        for (output_name, condition) in self.conditions.iter() {
+            if condition.check(&event) {
+                output.push_named(output_name, event.clone());
+            } else {
+                emit!(&RouteEventDiscarded);
+            }
         }
     }
 }
@@ -95,29 +76,9 @@ impl GenerateConfig for RouteConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Err("this transform must be expanded".into())
-    }
-
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-
-        while let Some((k, v)) = self.route.pop() {
-            if map
-                .insert(k.clone(), Box::new(LaneConfig { condition: v }))
-                .is_some()
-            {
-                return Err("duplicate route id".into());
-            }
-        }
-
-        if !map.is_empty() {
-            Ok(Some((map, ExpandType::Parallel { aggregates: false })))
-        } else {
-            Err("must specify at least one lane".into())
-        }
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let route = Route::new(self, context)?;
+        Ok(Transform::synchronous(route))
     }
 
     fn input_type(&self) -> DataType {
@@ -125,7 +86,10 @@ impl TransformConfig for RouteConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        self.route
+            .keys()
+            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .collect()
     }
 
     fn transform_type(&self) -> &'static str {
@@ -142,12 +106,6 @@ struct RouteCompatConfig(RouteConfig);
 impl TransformConfig for RouteCompatConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         self.0.build(context).await
-    }
-
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        self.0.expand()
     }
 
     fn input_type(&self) -> DataType {
@@ -167,6 +125,8 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
+    use vector_core::transform::TransformOutputsBuf;
+
     use super::*;
 
     #[test]
@@ -189,13 +149,17 @@ mod test {
     fn can_serialize_remap() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let config = LaneConfig {
-            condition: AnyCondition::String("foo".to_string()),
-        };
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+        "#,
+        )
+        .unwrap();
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"condition":"foo"}"#
+            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\""}}}"#
         );
     }
 
@@ -205,18 +169,91 @@ mod test {
         // changed when reloading.
         let config = toml::from_str::<RouteConfig>(
             r#"
-            lanes.first.type = "check_fields"
-            lanes.first."message.eq" = "foo"
+            route.first.type = "check_fields"
+            route.first."message.eq" = "foo"
         "#,
         )
-        .unwrap()
-        .expand()
-        .unwrap()
         .unwrap();
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},{"Parallel":{"aggregates":false}}]"#
+            r#"{"route":{"first":{"type":"check_fields","message.eq":"foo"}}}"#
         );
+    }
+
+    #[test]
+    fn route_pass_all_route_conditions() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(
+            serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
+        )
+        .unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            assert_eq!(events.len(), 1);
+            assert_eq!(events.pop().unwrap(), event);
+        }
+    }
+
+    #[test]
+    fn route_pass_one_route_condition() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(serde_json::json!({"message": "hello world"})).unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            if output_name == "first" {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            }
+            assert_eq!(events.len(), 0);
+        }
     }
 }

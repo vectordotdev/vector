@@ -933,7 +933,13 @@ mod integration_tests {
     use super::*;
     use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
-    const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
+    fn server_address() -> String {
+        std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
+    }
+
+    fn prometheus_address() -> String {
+        std::env::var("PROMETHEUS_ADDRESS").unwrap_or_else(|_| "localhost:9090".into())
+    }
 
     #[tokio::test]
     async fn prometheus_metrics() {
@@ -949,7 +955,7 @@ mod integration_tests {
         let start = Utc::now().timestamp();
 
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
@@ -968,10 +974,7 @@ mod integration_tests {
 
         let data = &result["data"]["result"][0];
         assert_eq!(data["metric"]["__name__"], Value::String(name));
-        assert_eq!(
-            data["metric"]["instance"],
-            Value::String(PROMETHEUS_ADDRESS.into())
-        );
+        assert_eq!(data["metric"]["instance"], Value::String(server_address()));
         assert_eq!(
             data["metric"]["some_tag"],
             Value::String("some_value".into())
@@ -982,7 +985,7 @@ mod integration_tests {
 
     async fn reset_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
@@ -995,8 +998,6 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
         tx.send(event).expect("Failed to send.");
-
-        println!("generated sets '{}' and '{}'", name1, name2);
 
         // Wait for the Prometheus server to scrape them, and then query it to ensure both metrics
         // have their correct set size value.
@@ -1022,8 +1023,6 @@ mod integration_tests {
         let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
         tx.send(event).expect("Failed to send.");
 
-        println!("re-generated set '{}'", name2);
-
         // Again, wait for the Prometheus server to scrape the metrics, and then query it again.
         time::sleep(time::Duration::from_secs(2)).await;
         let result = prometheus_query(&name1).await;
@@ -1037,7 +1036,7 @@ mod integration_tests {
 
     async fn expire_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
@@ -1079,7 +1078,7 @@ mod integration_tests {
     }
 
     async fn fetch_exporter_body() -> String {
-        let url = format!("http://{}/metrics", PROMETHEUS_ADDRESS);
+        let url = format!("http://{}/metrics", server_address());
         let request = Request::get(url)
             .body(Body::empty())
             .expect("Error creating request.");
@@ -1096,7 +1095,11 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let url = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
+        let url = format!(
+            "http://{}/api/v1/query?query={}",
+            prometheus_address(),
+            query
+        );
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
