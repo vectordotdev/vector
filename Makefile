@@ -473,6 +473,7 @@ tests/data/dnstap/socket:
 	mkdir -p tests/data/dnstap/socket
 	chmod 777 tests/data/dnstap/socket
 
+.PHONY: test-integration-dnstap
 test-integration-dnstap: tests/data/dnstap/socket
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
