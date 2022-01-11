@@ -235,10 +235,10 @@ impl DatadogAgentSource {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
                 let mut events = futures::stream::iter(events);
-                if output.is_none() {
-                    out.send_all(&mut events).await
+                if let Some(name) = output {
+                    out.send_all_named(name, &mut events).await
                 } else {
-                    out.send_all_named(output.unwrap(), &mut events).await
+                    out.send_all(&mut events).await
                 }
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
