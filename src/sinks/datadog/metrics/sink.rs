@@ -83,7 +83,7 @@ where
             // Converts "absolute" metrics to "incremental", and converts distributions and
             // aggregated histograms into sketches so that we can send them in a more DD-native
             // format and thus avoid needing to directly specify what quantiles to generate, etc.
-            .normalized::<DatadogMetricsNormalizer>()
+            .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint i.e. series (counter, gauge, set) vs sketch
             // (distributions, aggregated histograms, metrics that are already sketches)
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
