@@ -1,4 +1,4 @@
-use crate::{Parameter, Value};
+use crate::{value::Kind, ExpressionError, Parameter, Value};
 use std::any::Any;
 
 pub enum VmArgument<'a> {
@@ -18,6 +18,16 @@ impl<'a> VmArgument<'a> {
         match self {
             VmArgument::Any(any) => any,
             _ => panic!(),
+        }
+    }
+
+    /// Returns the kind that this parameter is.
+    /// If the parameter is an Any, we return None since the function that has created this parameter will
+    /// have already done the required typechecking.
+    fn kind(&self) -> Option<Kind> {
+        match self {
+            VmArgument::Value(value) => Some(value.kind()),
+            VmArgument::Any(_) => None,
         }
     }
 }
@@ -90,5 +100,19 @@ impl<'a> VmArgumentList<'a> {
 
         // Return the parameter found at this position.
         self.values[pos].take().map(|v| v.as_any())
+    }
+
+    /// Validates the arguments are correct.
+    pub fn check_arguments(&self) -> Result<(), ExpressionError> {
+        for (param, args) in self.args.iter().zip(self.values.iter()) {
+            match args.as_ref() {
+                None if param.required => return Err("parameter is required".into()),
+                Some(arg) if matches!( arg.kind(), Some(kind) if !param.kind().intersects(kind)) => {
+                    return Err("parameter type mismatch".into())
+                }
+                _ => (),
+            }
+        }
+        Ok(())
     }
 }

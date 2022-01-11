@@ -312,7 +312,11 @@ impl Vm {
                     let mut argumentlist = VmArgumentList::new(parameters, args);
                     let function = &self.fns[function_id];
 
-                    match function.call(ctx, &mut argumentlist) {
+                    let result = argumentlist
+                        .check_arguments()
+                        .and_then(|_| function.call(ctx, &mut argumentlist));
+
+                    match result {
                         Ok(result) => state.stack.push(result),
                         Err(err) => match err {
                             ExpressionError::Abort { .. } => {
