@@ -343,19 +343,6 @@ endif
 test-integration-fluent: ## Runs Fluent integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
 
-.PHONY: test-integration-gcp
-test-integration-gcp: ## Runs GCP integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-	@scripts/setup_integration_env.sh gcp start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
-	 --lib ::gcp::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-endif
-
 .PHONY: test-integration-humio
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
