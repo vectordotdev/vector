@@ -430,13 +430,11 @@ impl FromStr for Variant {
     type Err = VariantError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq("baseline") {
-            return Ok(Self::Baseline);
+        match s {
+            "baseline" => Ok(Self::Baseline),
+            "comparison" => Ok(Self::Comparison),
+            _ => Err(VariantError::Unknown),
         }
-        if s.eq("comparison") {
-            return Ok(Self::Comparison);
-        }
-        Err(VariantError::Unknown)
     }
 }
 
