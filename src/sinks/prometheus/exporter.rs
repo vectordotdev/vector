@@ -677,7 +677,13 @@ mod integration_tests {
     use super::*;
     use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
-    const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
+    fn server_address() -> String {
+        std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
+    }
+
+    fn prometheus_address() -> String {
+        std::env::var("PROMETHEUS_ADDRESS").unwrap_or_else(|_| "localhost:9090".into())
+    }
 
     #[tokio::test]
     async fn prometheus_metrics() {
@@ -693,7 +699,7 @@ mod integration_tests {
         let start = Utc::now().timestamp();
 
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -711,10 +717,7 @@ mod integration_tests {
 
         let data = &result["data"]["result"][0];
         assert_eq!(data["metric"]["__name__"], Value::String(name));
-        assert_eq!(
-            data["metric"]["instance"],
-            Value::String(PROMETHEUS_ADDRESS.into())
-        );
+        assert_eq!(data["metric"]["instance"], Value::String(server_address()));
         assert_eq!(
             data["metric"]["some_tag"],
             Value::String("some_value".into())
@@ -725,7 +728,7 @@ mod integration_tests {
 
     async fn reset_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             flush_period_secs: 3,
             ..Default::default()
         };
@@ -779,7 +782,7 @@ mod integration_tests {
 
     async fn expire_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            address: server_address().parse().unwrap(),
             flush_period_secs: 3,
             ..Default::default()
         };
@@ -821,7 +824,7 @@ mod integration_tests {
     }
 
     async fn fetch_exporter_body() -> String {
-        let url = format!("http://{}/metrics", PROMETHEUS_ADDRESS);
+        let url = format!("http://{}/metrics", server_address());
         let request = Request::get(url)
             .body(Body::empty())
             .expect("Error creating request.");
@@ -838,7 +841,11 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let url = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
+        let url = format!(
+            "http://{}/api/v1/query?query={}",
+            prometheus_address(),
+            query
+        );
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
