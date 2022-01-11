@@ -3386,34 +3386,12 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0eb5160c60ba1e809707918ee329adb99d222888155835c6feedba19f6c3fd4"
-dependencies = [
- "ctor",
- "ghost",
- "inventory-impl",
-]
-
-[[package]]
-name = "inventory"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1367fed6750ff2a5bcb967a631528303bb85631f167a75eb1bf7762d57eb7678"
 dependencies = [
  "ctor",
  "ghost",
-]
-
-[[package]]
-name = "inventory-impl"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e41b53715c6f0c4be49510bb82dee2c1e51c8586d885abe65396e82ed518548"
-dependencies = [
- "proc-macro2 1.0.32",
- "quote 1.0.10",
- "syn 1.0.84",
 ]
 
 [[package]]
@@ -8070,7 +8048,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4080564c5b2241b5bff53ab610082234e0c57b0417f4bd10596f183001505b8a"
 dependencies = [
  "erased-serde",
- "inventory 0.2.0",
+ "inventory",
  "once_cell",
  "serde",
  "typetag-impl",
@@ -8327,7 +8305,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.6.0",
- "inventory 0.1.11",
+ "inventory",
  "itertools",
  "k8s-openapi",
  "lazy_static",
