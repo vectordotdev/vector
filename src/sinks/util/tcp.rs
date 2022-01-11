@@ -146,7 +146,7 @@ impl TcpConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(TcpError::NoAddresses)?;
 
@@ -154,7 +154,7 @@ impl TcpConnector {
         self.tls
             .connect(&self.host, &addr)
             .await
-            .context(ConnectError)
+            .context(ConnectSnafu)
             .map(|mut maybe_tls| {
                 if let Some(keepalive) = self.keepalive {
                     if let Err(error) = maybe_tls.set_keepalive(keepalive) {

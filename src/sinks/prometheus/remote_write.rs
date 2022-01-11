@@ -82,7 +82,7 @@ impl SinkConfig for RemoteWriteConfig {
         &self,
         cx: config::SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
-        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
+        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());

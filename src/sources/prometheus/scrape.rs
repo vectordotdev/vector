@@ -88,7 +88,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
+            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(

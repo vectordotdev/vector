@@ -4,7 +4,7 @@ use warp::http::StatusCode;
 use super::handlers::RecordDecodeError;
 
 #[derive(Debug, Snafu)]
-#[snafu(visibility = "pub")]
+#[snafu(visibility(pub(crate)))]
 pub enum RequestError {
     #[snafu(display(
         "Missing access key. X-Amz-Firehose-Access-Key required for request: {}",

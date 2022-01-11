@@ -60,7 +60,7 @@ where
         let request = self
             .request_builder
             .build(watch_optional)
-            .context(invocation::RequestPreparation)?;
+            .context(invocation::RequestPreparationSnafu)?;
         emit!(&internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.

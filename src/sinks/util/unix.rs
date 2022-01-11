@@ -75,7 +75,7 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectError)
+        UnixStream::connect(&self.path).await.context(ConnectSnafu)
     }
 
     async fn connect_backoff(&self) -> UnixStream {
