@@ -602,11 +602,11 @@ where
     /// describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
-        debug!("seeking to the last record acknowledged for this reader");
+        debug!("seeking to last acknowledged record for reader");
 
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
-            warn!("reader already seeked, skipping seek_to_next_record");
+            warn!("reader already initialized, skipping");
             return Ok(());
         }
 
@@ -617,7 +617,7 @@ where
         let starting_self_last = self.last_reader_record_id;
         let ledger_last = self.ledger.state().get_last_reader_record_id();
         debug!(
-            "currentl at {}, seeking to {} (per ledger)",
+            "starting from {}, seeking to {} (per ledger)",
             self.last_reader_record_id, ledger_last
         );
 
@@ -636,7 +636,7 @@ where
 
         self.last_acked_record_id = ledger_last;
 
-        debug!("seeked to {} without issue, reader ready", ledger_last);
+        debug!("seeked to {}, reader ready", ledger_last);
 
         self.ready_to_read = true;
 
@@ -736,24 +736,28 @@ where
             // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
             // reader's current data file, and need to move on.
             if self.ready_to_read {
-                self.ledger.wait_for_writer().await;
-
-                if self.ledger.is_writer_done() && self.ledger.get_total_buffer_size() == 0 {
-                    // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
-                    // `roll_to_next_data_file` -- versus total records, which needs a successful read
-                    // to catch any inconsistencies in the record IDs.
-                    //
-                    // This means that if we encountered a corrupted record as the last record we had to
-                    // read before the above if condition would be met, our `next` call would hit the
-                    // corrupted record, detect that, roll to the next file, which would do the buffer
-                    // size adjustments, and then the following call to `next` would fallthrough to
-                    // here.
-                    //
-                    // The same scenario with total records would be stuck waiting as we would have no
-                    // more records to read to drive the check that fixes total records when we detect
-                    // skipping record IDs.
-                    return Ok(None);
+                if self.ledger.is_writer_done() {
+                    if self.ledger.get_total_buffer_size() == 0 {
+                        // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
+                        // `roll_to_next_data_file` -- versus total records, which needs a successful read
+                        // to catch any inconsistencies in the record IDs.
+                        //
+                        // This means that if we encountered a corrupted record as the last record we had to
+                        // read before the above if condition would be met, our `next` call would hit the
+                        // corrupted record, detect that, roll to the next file, which would do the buffer
+                        // size adjustments, and then the following call to `next` would fallthrough to
+                        // here.
+                        //
+                        // The same scenario with total records would be stuck waiting as we would have no
+                        // more records to read to drive the check that fixes total records when we detect
+                        // skipping record IDs.
+                        return Ok(None);
+                    } else {
+                        debug!("writer done but buffer not yet empty");
+                    }
                 }
+
+                self.ledger.wait_for_writer().await;
             } else {
                 // We're currently just seeking to where we left off the last time this buffer was
                 // running, which might mean there's no records for us to read at all because we
@@ -795,6 +799,7 @@ where
 
 impl<T> Drop for Reader<T> {
     fn drop(&mut self) {
-        debug!("ledger state at reader drop: {:#?}", self.ledger.state());
+        // TODO: Remove me.
+        trace!("ledger state at reader drop: {:#?}", self.ledger);
     }
 }
