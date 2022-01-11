@@ -248,13 +248,15 @@ mod integration_tests {
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
 
-    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+    fn prometheus_receive_address() -> String {
+        std::env::var("PROMETHEUS_RECEIVE_ADDRESS").unwrap_or_else(|_| "0.0.0.0:9093".into())
+    }
 
     #[tokio::test]
     async fn receive_something() {
         components::init_test();
         let config = PrometheusRemoteWriteConfig {
-            address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
+            address: prometheus_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
             acknowledgements: AcknowledgementsConfig::default(),
@@ -265,9 +267,9 @@ mod integration_tests {
 
         tokio::spawn(source);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events = tokio::time::timeout(Duration::from_secs(30), test_util::collect_n(rx, 1))
+            .await
+            .expect("timeout on fetching events");
         components::SOURCE_TESTS.assert(&["http_path"]);
         assert!(!events.is_empty());
     }
