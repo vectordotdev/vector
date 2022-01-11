@@ -13,7 +13,7 @@ use crate::ByteSizeOf;
 /// conflict with the base implementation for the type aliases below.
 pub trait EventContainer: ByteSizeOf {
     /// The type of `Iterator` used to turn this container into events.
-    type IntoIter;
+    type IntoIter: Iterator<Item = Event>;
     /// Turn this container into an iterator of events.
     fn into_events(self) -> Self::IntoIter;
 }
