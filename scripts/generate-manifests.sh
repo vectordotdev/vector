@@ -6,9 +6,9 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if sed --version 2>/dev/null | grep -q "GNU sed"; then
-    SED=$(sed)
+    SED="sed"
 elif gsed --version 2>/dev/null | grep -q "GNU sed"; then
-    SED=$(gsed)
+    SED="gsed"
 fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -54,7 +54,7 @@ for values in "$TMPDIR"/values-*.yaml; do
         yq eval "$CLEANUP_INSTRUCTIONS" "$file" > "distribution/kubernetes/$type/$(basename "$file")"
     done
 
-    cat > "$type/README.md" <<EOF
+    cat > "distribution/kubernetes/$type/README.md" <<EOF
 The kubernetes manifests found in this directory have been automatically generated
 from the [helm chart \`vector/vector\`](https://github.com/vectordotdev/helm-charts/tree/master/charts/vector)
 version $(helm show chart vector/vector | yq e '.version' -) with the following \`values.yaml\`:
