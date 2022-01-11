@@ -154,19 +154,25 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
     fn encode(&mut self, item: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let len = buffer.len();
 
+        let mut payload = buffer.split_off(len);
+
         // Serialize the event.
-        self.serializer.encode(item, buffer).map_err(|error| {
-            emit!(&EncoderSerializeFailed { error: &error });
-            Error::SerializingError(error)
-        })?;
+        self.serializer
+            .encode(item, &mut payload)
+            .map_err(|error| {
+                emit!(&EncoderSerializeFailed { error: &error });
+                Error::SerializingError(error)
+            })?;
 
         // Frame the serialized event.
-        self.framer.encode((), buffer).map_err(|error| {
+        self.framer.encode((), &mut payload).map_err(|error| {
             emit!(&EncoderFramingFailed { error: &error });
-            // Truncate contents written by the serializer.
-            buffer.truncate(len);
             Error::FramingError(error)
-        })
+        })?;
+
+        buffer.unsplit(payload);
+
+        Ok(())
     }
 }
 
@@ -201,9 +207,34 @@ impl EncodingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codecs::{NewlineDelimitedEncoder, TextSerializer};
+    use crate::codecs::TextSerializer;
+    use bytes::BufMut;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
+
+    #[derive(Debug, Clone)]
+    struct ParenEncoder;
+
+    impl ParenEncoder {
+        pub const fn new() -> Self {
+            Self
+        }
+    }
+
+    impl tokio_util::codec::Encoder<()> for ParenEncoder {
+        type Error = BoxedFramingError;
+
+        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+            let len = dst.len();
+            let inner = dst.split();
+            dst.reserve(len + 2);
+            dst.put_u8(b'(');
+            dst.unsplit(inner);
+            dst.put_u8(b')');
+            Ok(())
+        }
+    }
+
     #[derive(Debug, Clone)]
     struct ErrorNthEncoder<T>(T, usize, usize)
     where
@@ -239,7 +270,7 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::new(
-            Box::new(NewlineDelimitedEncoder::new()),
+            Box::new(ParenEncoder::new()),
             Box::new(TextSerializer::new()),
         );
         let source = futures::stream::iter(vec![
@@ -252,13 +283,13 @@ mod tests {
         let mut framed = FramedWrite::new(sink, encoder);
         source.forward(&mut framed).await.unwrap();
         let sink = framed.into_inner();
-        assert_eq!(sink, b"foo\nbar\nbaz\n");
+        assert_eq!(sink, b"(foo)(bar)(baz)");
     }
 
     #[tokio::test]
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::new(
-            Box::new(NewlineDelimitedEncoder::new()),
+            Box::new(ParenEncoder::new()),
             Box::new(TextSerializer::new()),
         );
         let source = futures::stream::iter(vec![
@@ -267,17 +298,17 @@ mod tests {
             Event::from("bat"),
         ])
         .map(Ok);
-        let sink = Vec::from("foo\n");
+        let sink = Vec::from("(foo)");
         let mut framed = FramedWrite::new(sink, encoder);
         source.forward(&mut framed).await.unwrap();
         let sink = framed.into_inner();
-        assert_eq!(sink, b"foo\nbar\nbaz\nbat\n");
+        assert_eq!(sink, b"(foo)(bar)(baz)(bat)");
     }
 
     #[tokio::test]
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::new(
-            Box::new(ErrorNthEncoder::new(NewlineDelimitedEncoder::new(), 1)),
+            Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
             Box::new(TextSerializer::new()),
         );
         let source = futures::stream::iter(vec![
@@ -291,13 +322,13 @@ mod tests {
         assert!(source.forward(&mut framed).await.is_err());
         framed.flush().await.unwrap();
         let sink = framed.into_inner();
-        assert_eq!(sink, b"foo\n");
+        assert_eq!(sink, b"(foo)");
     }
 
     #[tokio::test]
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::new(
-            Box::new(ErrorNthEncoder::new(NewlineDelimitedEncoder::new(), 1)),
+            Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
             Box::new(TextSerializer::new()),
         );
         let source = futures::stream::iter(vec![
@@ -306,11 +337,11 @@ mod tests {
             Event::from("bat"),
         ])
         .map(Ok);
-        let sink = Vec::from("foo\n");
+        let sink = Vec::from("(foo)");
         let mut framed = FramedWrite::new(sink, encoder);
         assert!(source.forward(&mut framed).await.is_err());
         framed.flush().await.unwrap();
         let sink = framed.into_inner();
-        assert_eq!(sink, b"foo\nbar\n");
+        assert_eq!(sink, b"(foo)(bar)");
     }
 }
