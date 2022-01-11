@@ -170,16 +170,11 @@ impl CharacterDelimitedEncoder {
     }
 }
 
-impl Encoder<Bytes> for CharacterDelimitedEncoder {
+impl Encoder<()> for CharacterDelimitedEncoder {
     type Error = encoding::BoxedFramingError;
 
-    fn encode(
-        &mut self,
-        item: Bytes,
-        buf: &mut BytesMut,
-    ) -> Result<(), encoding::BoxedFramingError> {
-        buf.reserve(item.len() + 1);
-        buf.put(item);
+    fn encode(&mut self, _: (), buf: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
+        buf.reserve(buf.len() + 1);
         buf.put_u8(self.delimiter);
         Ok(())
     }
@@ -205,8 +200,8 @@ mod tests {
     fn character_delimited_encode() {
         let mut codec = CharacterDelimitedEncoder::new(b'\n');
 
-        let mut buf = BytesMut::new();
-        codec.encode("abc".into(), &mut buf).unwrap();
+        let mut buf = BytesMut::from("abc");
+        codec.encode((), &mut buf).unwrap();
 
         assert_eq!(b"abc\n", &buf[..]);
     }

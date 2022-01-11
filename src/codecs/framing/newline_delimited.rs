@@ -129,11 +129,11 @@ impl NewlineDelimitedEncoder {
     }
 }
 
-impl Encoder<Bytes> for NewlineDelimitedEncoder {
+impl Encoder<()> for NewlineDelimitedEncoder {
     type Error = encoding::BoxedFramingError;
 
-    fn encode(&mut self, item: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        self.0.encode(item, dst)
+    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+        self.0.encode((), dst)
     }
 }
 

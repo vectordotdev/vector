@@ -6,7 +6,7 @@ use crate::{
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -58,7 +58,7 @@ pub type BoxedFramingError = Box<dyn FramingError>;
 
 /// Wrap bytes into a frame.
 pub trait Framer:
-    tokio_util::codec::Encoder<Bytes, Error = BoxedFramingError> + DynClone + Debug + Send + Sync
+    tokio_util::codec::Encoder<(), Error = BoxedFramingError> + DynClone + Debug + Send + Sync
 {
 }
 
@@ -66,7 +66,7 @@ pub trait Framer:
 /// `tokio_util::codec::Encoder`.
 impl<Encoder> Framer for Encoder where
     Encoder:
-        tokio_util::codec::Encoder<Bytes, Error = BoxedFramingError> + Clone + Debug + Send + Sync
+        tokio_util::codec::Encoder<(), Error = BoxedFramingError> + Clone + Debug + Send + Sync
 {
 }
 
@@ -152,23 +152,21 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
     type Error = Error;
 
     fn encode(&mut self, item: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let mut payload = BytesMut::new();
+        let len = buffer.len();
 
         // Serialize the event.
-        self.serializer
-            .encode(item, &mut payload)
-            .map_err(|error| {
-                emit!(&EncoderSerializeFailed { error: &error });
-                Error::SerializingError(error)
-            })?;
+        self.serializer.encode(item, buffer).map_err(|error| {
+            emit!(&EncoderSerializeFailed { error: &error });
+            Error::SerializingError(error)
+        })?;
 
         // Frame the serialized event.
-        self.framer
-            .encode(payload.freeze(), buffer)
-            .map_err(|error| {
-                emit!(&EncoderFramingFailed { error: &error });
-                Error::FramingError(error)
-            })
+        self.framer.encode((), buffer).map_err(|error| {
+            emit!(&EncoderFramingFailed { error: &error });
+            // Truncate contents written by the serializer.
+            buffer.truncate(len);
+            Error::FramingError(error)
+        })
     }
 }
 
@@ -197,5 +195,122 @@ impl EncodingConfig {
         let serializer: BoxedSerializer = self.encoding.build()?;
 
         Ok(Encoder::new(framer, serializer))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codecs::{NewlineDelimitedEncoder, TextSerializer};
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_util::codec::FramedWrite;
+    #[derive(Debug, Clone)]
+    struct ErrorNthEncoder<T>(T, usize, usize)
+    where
+        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>;
+
+    impl<T> ErrorNthEncoder<T>
+    where
+        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
+    {
+        pub fn new(encoder: T, n: usize) -> Self {
+            Self(encoder, 0, n)
+        }
+    }
+
+    impl<T> tokio_util::codec::Encoder<()> for ErrorNthEncoder<T>
+    where
+        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
+    {
+        type Error = BoxedFramingError;
+
+        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+            self.0.encode((), dst)?;
+            let result = if self.1 == self.2 {
+                Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "error")) as _)
+            } else {
+                Ok(())
+            };
+            self.1 += 1;
+            result
+        }
+    }
+
+    #[tokio::test]
+    async fn test_encode_events_sink_empty() {
+        let encoder = Encoder::new(
+            Box::new(NewlineDelimitedEncoder::new()),
+            Box::new(TextSerializer::new()),
+        );
+        let source = futures::stream::iter(vec![
+            Event::from("foo"),
+            Event::from("bar"),
+            Event::from("baz"),
+        ])
+        .map(Ok);
+        let sink = Vec::new();
+        let mut framed = FramedWrite::new(sink, encoder);
+        source.forward(&mut framed).await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"foo\nbar\nbaz\n");
+    }
+
+    #[tokio::test]
+    async fn test_encode_events_sink_non_empty() {
+        let encoder = Encoder::new(
+            Box::new(NewlineDelimitedEncoder::new()),
+            Box::new(TextSerializer::new()),
+        );
+        let source = futures::stream::iter(vec![
+            Event::from("bar"),
+            Event::from("baz"),
+            Event::from("bat"),
+        ])
+        .map(Ok);
+        let sink = Vec::from("foo\n");
+        let mut framed = FramedWrite::new(sink, encoder);
+        source.forward(&mut framed).await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"foo\nbar\nbaz\nbat\n");
+    }
+
+    #[tokio::test]
+    async fn test_encode_events_sink_empty_handle_framing_error() {
+        let encoder = Encoder::new(
+            Box::new(ErrorNthEncoder::new(NewlineDelimitedEncoder::new(), 1)),
+            Box::new(TextSerializer::new()),
+        );
+        let source = futures::stream::iter(vec![
+            Event::from("foo"),
+            Event::from("bar"),
+            Event::from("baz"),
+        ])
+        .map(Ok);
+        let sink = Vec::new();
+        let mut framed = FramedWrite::new(sink, encoder);
+        assert!(source.forward(&mut framed).await.is_err());
+        framed.flush().await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"foo\n");
+    }
+
+    #[tokio::test]
+    async fn test_encode_events_sink_non_empty_handle_framing_error() {
+        let encoder = Encoder::new(
+            Box::new(ErrorNthEncoder::new(NewlineDelimitedEncoder::new(), 1)),
+            Box::new(TextSerializer::new()),
+        );
+        let source = futures::stream::iter(vec![
+            Event::from("bar"),
+            Event::from("baz"),
+            Event::from("bat"),
+        ])
+        .map(Ok);
+        let sink = Vec::from("foo\n");
+        let mut framed = FramedWrite::new(sink, encoder);
+        assert!(source.forward(&mut framed).await.is_err());
+        framed.flush().await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"foo\nbar\n");
     }
 }
