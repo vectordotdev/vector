@@ -237,7 +237,7 @@ impl MetricValue {
     pub fn distribution_to_agg_histogram(&self, buckets: &[f64]) -> Option<MetricValue> {
         match self {
             MetricValue::Distribution { samples, .. } => {
-                let (buckets, count, sum) = samples_to_buckets(&samples, buckets);
+                let (buckets, count, sum) = samples_to_buckets(samples, buckets);
 
                 Some(MetricValue::AggregatedHistogram {
                     buckets,
