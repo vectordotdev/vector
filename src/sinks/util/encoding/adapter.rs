@@ -25,24 +25,25 @@ pub trait EncodingConfigMigrator {
 /// backwards-compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum EncodingConfigAdapter<
+pub enum EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+where
     LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
     Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
         + Debug
         + Clone,
-> {
+{
     /// The encoding configuration.
     Encoding(EncodingConfig),
     /// The legacy sink-specific encoding configuration.
     LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig, Migrator>),
 }
 
-impl<
-        LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-        Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
-            + Debug
-            + Clone,
-    > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
+        + Debug
+        + Clone,
 {
     /// Create a new encoding configuration.
     pub fn new(
@@ -68,12 +69,12 @@ impl<
     }
 }
 
-impl<
-        LegacyEncodingConfig: EncodingConfiguration + Debug + Clone,
-        Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
-            + Debug
-            + Clone,
-    > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone,
+    Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
+        + Debug
+        + Clone,
 {
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
     pub fn transformer(&self) -> Transformer {
