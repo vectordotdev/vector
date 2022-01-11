@@ -28,9 +28,9 @@ start_podman () {
 start_docker () {
   docker network create vector-test-integration-splunk
   docker run -d --network=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 \
-   -p 8089:8089 --name splunk timberio/splunk-hec-test:latest
+   -p 8089:8089 --name splunk timberio/splunk-hec-test:8.2.4
   wait_for_splunk
-  docker exec splunk /opt/splunk/bin/splunk add index testmetrics -datatype metric
+  docker exec splunk /opt/splunk/bin/splunk add index testmetrics -datatype metric -auth admin:password
 }
 
 stop_podman () {
