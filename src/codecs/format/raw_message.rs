@@ -7,36 +7,36 @@ use bytes::BufMut;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
-/// Config used to build a `TextSerializer`.
+/// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct TextSerializerConfig;
+pub struct RawMessageSerializerConfig;
 
-impl TextSerializerConfig {
-    /// Creates a new `TextSerializerConfig`.
+impl RawMessageSerializerConfig {
+    /// Creates a new `RawMessageSerializerConfig`.
     pub const fn new() -> Self {
         Self
     }
 }
 
 #[typetag::serde(name = "text")]
-impl SerializerConfig for TextSerializerConfig {
+impl SerializerConfig for RawMessageSerializerConfig {
     fn build(&self) -> crate::Result<BoxedSerializer> {
-        Ok(Box::new(TextSerializer))
+        Ok(Box::new(RawMessageSerializer))
     }
 }
 
 /// Serializer that converts an `Event` to bytes by extracting the message key.
 #[derive(Debug, Clone)]
-pub struct TextSerializer;
+pub struct RawMessageSerializer;
 
-impl TextSerializer {
-    /// Creates a new `TextSerializer`.
+impl RawMessageSerializer {
+    /// Creates a new `RawMessageSerializer`.
     pub const fn new() -> Self {
         Self
     }
 }
 
-impl Encoder<Event> for TextSerializer {
+impl Encoder<Event> for RawMessageSerializer {
     type Error = crate::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn serialize_bytes() {
         let input = Event::from("foo");
-        let mut serializer = TextSerializer;
+        let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();
         serializer.encode(input, &mut buffer).unwrap();

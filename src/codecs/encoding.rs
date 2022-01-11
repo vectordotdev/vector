@@ -2,7 +2,7 @@
 //! events into bytes.
 
 use crate::{
-    codecs::{NewlineDelimitedEncoder, TextSerializer},
+    codecs::{NewlineDelimitedEncoder, RawMessageSerializer},
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
 };
@@ -134,7 +134,7 @@ impl Default for Encoder {
     fn default() -> Self {
         Self {
             framer: Box::new(NewlineDelimitedEncoder::new()),
-            serializer: Box::new(TextSerializer::new()),
+            serializer: Box::new(RawMessageSerializer::new()),
         }
     }
 }
@@ -207,7 +207,7 @@ impl EncodingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codecs::TextSerializer;
+    use crate::codecs::RawMessageSerializer;
     use bytes::BufMut;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
@@ -271,7 +271,7 @@ mod tests {
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::new(
             Box::new(ParenEncoder::new()),
-            Box::new(TextSerializer::new()),
+            Box::new(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -290,7 +290,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::new(
             Box::new(ParenEncoder::new()),
-            Box::new(TextSerializer::new()),
+            Box::new(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),
@@ -309,7 +309,7 @@ mod tests {
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::new(
             Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
-            Box::new(TextSerializer::new()),
+            Box::new(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -329,7 +329,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::new(
             Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
-            Box::new(TextSerializer::new()),
+            Box::new(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),

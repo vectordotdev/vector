@@ -5,12 +5,12 @@
 
 mod bytes;
 mod json;
+mod raw_message;
 #[cfg(feature = "sources-syslog")]
 mod syslog;
-mod text;
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
 #[cfg(feature = "sources-syslog")]
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
-pub use text::{TextSerializer, TextSerializerConfig};
+pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
