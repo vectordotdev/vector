@@ -453,15 +453,12 @@ components: {
 		description: string
 	}
 
-	#Outputs: {
-		_default_output: #Output & {
-			name:        ""
-			description: "Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks."
-		}
-
-		default_output: *_default_output | #Output | null
-		named_outputs: [...#Output]
+	_default_output: #Output & {
+		name:        "<component_id>"
+		description: "Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks."
 	}
+
+	#Outputs: *[_default_output] | [#Output, ...#Output]
 
 	#IAM: {
 		#Policy: {

@@ -207,23 +207,22 @@ components: transforms: "remap": {
 		}
 	}
 
-	outputs: {
-		named_outputs: [
-			{
-				name: "dropped"
-				description: """
-					This transform also implements an additional `dropped` output. When the
-					`drop_on_error` or `drop_on_abort` configuration values are set to `true`
-					and `reroute_dropped` is also set to `true`, events that result in runtime
-					errors or aborts will be dropped from the default output stream and sent to
-					the `dropped` output instead. For a transform component named `foo`, this
-					output can be accessed by specifying `foo.dropped` as the input to another
-					component. Events sent to this output will be in their original form,
-					omitting any partial modification that took place before the error or abort.
-					"""
-			},
-		]
-	}
+	outputs: [
+		components._default_output,
+		{
+			name: "dropped"
+			description: """
+				This transform also implements an additional `dropped` output. When the
+				`drop_on_error` or `drop_on_abort` configuration values are set to `true`
+				and `reroute_dropped` is also set to `true`, events that result in runtime
+				errors or aborts will be dropped from the default output stream and sent to
+				the `dropped` output instead. For a transform component named `foo`, this
+				output can be accessed by specifying `foo.dropped` as the input to another
+				component. Events sent to this output will be in their original form,
+				omitting any partial modification that took place before the error or abort.
+				"""
+		},
+	]
 
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
