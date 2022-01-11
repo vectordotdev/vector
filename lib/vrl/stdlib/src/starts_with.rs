@@ -136,7 +136,11 @@ impl Function for StartsWith {
     fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
-        let case_sensitive = arguments.required("case_sensitive").try_boolean()?;
+        let case_sensitive = arguments
+            .optional("case_sensitive")
+            .map(|arg| arg.try_boolean())
+            .transpose()?
+            .unwrap_or(true);
         let substring = {
             let value = substring;
             let string = value.try_bytes_utf8_lossy()?;
