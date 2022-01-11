@@ -22,6 +22,18 @@ use crate::{
     tls::{self, TlsOptions},
 };
 
+fn aws_server() -> String {
+    std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+}
+
+fn http_server() -> String {
+    std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
+}
+
+fn https_server() -> String {
+    std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
+}
+
 impl ElasticSearchCommon {
     async fn flush_request(&self) -> crate::Result<()> {
         let url = format!("{}/_flush", self.base_url)
@@ -115,7 +127,7 @@ fn ensure_pipeline_in_params() {
 async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticSearchConfig {
-        endpoint: "http://localhost:9200".into(),
+        endpoint: http_server(),
         bulk: Some(BulkConfig {
             index: Some(index.clone()),
             action: None,
@@ -192,7 +204,7 @@ async fn insert_events_over_http() {
 
     run_insert_tests(
         ElasticSearchConfig {
-            endpoint: "http://localhost:9200".into(),
+            endpoint: http_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -213,7 +225,7 @@ async fn insert_events_over_https() {
                 user: "elastic".into(),
                 password: "vector".into(),
             }),
-            endpoint: "https://localhost:9201".into(),
+            endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             tls: Some(TlsOptions {
@@ -235,7 +247,7 @@ async fn insert_events_on_aws() {
     run_insert_tests(
         ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-            endpoint: "http://localhost:4571".into(),
+            endpoint: aws_server(),
             ..config()
         },
         false,
@@ -251,7 +263,7 @@ async fn insert_events_on_aws_with_compression() {
     run_insert_tests(
         ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-            endpoint: "http://localhost:4571".into(),
+            endpoint: aws_server(),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -267,7 +279,7 @@ async fn insert_events_with_failure() {
 
     run_insert_tests(
         ElasticSearchConfig {
-            endpoint: "http://localhost:9200".into(),
+            endpoint: http_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -285,7 +297,7 @@ async fn insert_events_in_data_stream() {
     let stream_index = format!("my-stream-{}", gen_index());
 
     let cfg = ElasticSearchConfig {
-        endpoint: "http://localhost:9200".into(),
+        endpoint: http_server(),
         mode: ElasticSearchMode::DataStream,
         bulk: Some(BulkConfig {
             index: Some(stream_index.clone()),

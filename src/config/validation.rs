@@ -142,15 +142,36 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
-    let transform_names = config
-        .transforms
-        .keys()
-        .map(|name| ("transform", name.clone()));
+    let source_ids = config.sources.iter().flat_map(|(key, source)| {
+        source
+            .inner
+            .outputs()
+            .iter()
+            .map(|output| {
+                if let Some(port) = &output.port {
+                    ("source", OutputId::from((key, port.clone())))
+                } else {
+                    ("source", OutputId::from(key))
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+    let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
+        transform
+            .inner
+            .outputs()
+            .iter()
+            .map(|output| {
+                if let Some(port) = &output.port {
+                    ("transform", OutputId::from((key, port.clone())))
+                } else {
+                    ("transform", OutputId::from(key))
+                }
+            })
+            .collect::<Vec<_>>()
+    });
 
-    // TODO: maybe warn about no consumers for named outputs as well?
-    for (input_type, name) in transform_names.chain(source_names) {
-        let id = OutputId::from(&name);
+    for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms
             .iter()
@@ -163,7 +184,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
             warnings.push(format!(
                 "{} \"{}\" has no consumers",
                 capitalize(input_type),
-                name
+                id
             ));
         }
     }

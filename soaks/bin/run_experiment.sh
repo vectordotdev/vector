@@ -82,8 +82,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TOTAL_SAMPLES=180
+TOTAL_SAMPLES=200
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
+SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
 
 pushd "${__dir}"
 ./boot_minikube.sh --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}"
@@ -99,13 +100,31 @@ pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
 terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
           -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" \
-          -var "lading_image=ghcr.io/blt/lading:sha-0da91906d56acc899b829cea971d79f13e712e21" \
+          -var "lading_image=ghcr.io/blt/lading:sha-a3340ad8b31a7480bc73e0a2c9d7d8c7e2df5a9e" \
           -auto-approve -compact-warnings -input=false -no-color
 echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
 echo "[${VARIANT}] Sleeping for ${WARMUP_SECONDS} seconds to allow warm-up"
 sleep "${WARMUP_SECONDS}"
-echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}"
-sleep "${TOTAL_SAMPLES}"
+echo "[${VARIANT}] Waiting for captures file to become available"
+while [ ! -f "${SOAK_CAPTURE_FILE}" ]; do sleep 1; done
+echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}. Waiting for ${TOTAL_SAMPLES} sample periods."
+periods=0
+recorded_samples=0
+while [ $periods -le $TOTAL_SAMPLES ]
+do
+    # Check that the capture file grows monotonically. If it shrinks this
+    # indicates a serious problem.
+    observed_samples=$(wc -l "${SOAK_CAPTURE_FILE}" | awk '{print $1}')
+    # shellcheck disable=SC2086
+    if [ $recorded_samples -gt $observed_samples ]; then
+        echo "SAMPLES LOST. THIS IS A CATASTROPHIC, UNRECOVERABLE FAILURE."
+        exit 1
+    fi
+    recorded_samples=$observed_samples
+    (( periods = periods + 1 ))
+    sleep 1
+done
+echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR} complete. At least ${recorded_samples} collected."
 kill "${CAPTURE_MOUNT_PID}"
 popd
 

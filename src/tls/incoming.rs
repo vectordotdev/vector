@@ -17,8 +17,8 @@ use tokio::{
 use tokio_openssl::SslStream;
 
 use super::{
-    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError,
-    TcpBind, TlsError, TlsSettings,
+    CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
+    SslBuildSnafu, TcpBindSnafu, TlsError, TlsSettings,
 };
 #[cfg(feature = "sources-utils-tcp-socket")]
 use crate::tcp;
@@ -30,8 +30,8 @@ impl TlsSettings {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
-                let mut acceptor =
-                    SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptor)?;
+                let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())
+                    .context(CreateAcceptorSnafu)?;
                 self.apply_context(&mut acceptor)?;
                 Ok(acceptor.build())
             }
@@ -41,7 +41,7 @@ impl TlsSettings {
 
 impl MaybeTlsSettings {
     pub(crate) async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBind)?;
+        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
         let acceptor = match self {
             Self::Tls(tls) => Some(tls.acceptor()?),
@@ -65,7 +65,7 @@ impl MaybeTlsListener {
             .map(|(stream, peer_addr)| {
                 MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
             })
-            .context(IncomingListener)
+            .context(IncomingListenerSnafu)
     }
 
     async fn into_accept(
@@ -225,9 +225,12 @@ impl MaybeTlsIncomingStream<TcpStream> {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
                 async move {
-                    let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
-                    let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
-                    Pin::new(&mut stream).accept().await.context(Handshake)?;
+                    let ssl = Ssl::new(acceptor.context()).context(SslBuildSnafu)?;
+                    let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
+                    Pin::new(&mut stream)
+                        .accept()
+                        .await
+                        .context(HandshakeSnafu)?;
                     Ok(stream)
                 }
                 .boxed(),

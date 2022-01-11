@@ -18,9 +18,10 @@ In order to run a soak locally you will need:
 * at least 6 CPUs
 * at least 6Gb of RAM
 * minikube
-* [miller](https://github.com/johnkerl/miller)
 * docker
 * terraform
+* python-pandas
+* python-numpy
 
 The CPU and RAM requirements are currently hard-coded but might be made
 flexible, possibly on a per-soak basis.

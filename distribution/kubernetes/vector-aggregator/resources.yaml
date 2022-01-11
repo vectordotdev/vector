@@ -1,203 +1,249 @@
-# This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector-aggregator" or the
-# documentation on our website at https://vector.dev/docs.
-# If you copied this file into you local setup - feel free to change it however
-# you please.
-# If you want to create a PR to the Vector's Kubernetes config - please do not
-# edit this file directly. Instead, apply your changes to the Helm Chart.
 ---
-# Source: vector-aggregator/templates/serviceaccount.yaml
+# Source: vector/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: vector-aggregator
+  name: vector
   labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
+    helm.sh/chart: vector-0.3.0
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: Aggregator
+    app.kubernetes.io/version: "0.19.0-distroless-libc"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
+    
 automountServiceAccountToken: true
 ---
-# Source: vector-aggregator/templates/configmap.yaml
+# Source: vector/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vector-aggregator
+  name: vector
   labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
+    helm.sh/chart: vector-0.3.0
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: Aggregator
+    app.kubernetes.io/version: "0.19.0-distroless-libc"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
+    
 data:
-  # We leave `vector.toml` file name available to let externally managed config
-  # maps to provide it.
-  managed.toml: |
-    # Configuration for vector.
-    # Docs: https://vector.dev/docs/
-    
-    data_dir = "/vector-data-dir"
-    
-    [api]
-      enabled = false
-      address = "0.0.0.0:8686"
-      playground = true
-    
-    [log_schema]
-      host_key = "host"
-      message_key = "message"
-      source_type_key = "source_type"
-      timestamp_key = "timestamp"
-    
-    # Accept logs from Vector agents.
-    [sources.vector]
-      address = "0.0.0.0:9000"
-      type = "vector"
-      version = "2"
-    
-    
-    # Emit internal Vector metrics.
-    [sources.internal_metrics]
-      type = "internal_metrics"
-    
-    # Expose metrics for scraping in the Prometheus format.
-    [sinks.prometheus_sink]
-      address = "0.0.0.0:9090"
-      inputs = ["internal_metrics"]
-      type = "prometheus"
+  aggregator.yaml: |
+    data_dir: /vector-data-dir
+    api:
+      enabled: true
+      address: 127.0.0.1:8686
+      playground: false
+    sources:
+      datadog_agent:
+        address: 0.0.0.0:8282
+        type: datadog_agent
+      fluent:
+        address: 0.0.0.0:24224
+        type: fluent
+      internal_metrics:
+        type: internal_metrics
+      logstash:
+        address: 0.0.0.0:5044
+        type: logstash
+      splunk_hec:
+        address: 0.0.0.0:8080
+        type: splunk_hec
+      statsd:
+        address: 0.0.0.0:8125
+        mode: tcp
+        type: statsd
+      syslog:
+        address: 0.0.0.0:9000
+        mode: tcp
+        type: syslog
+      vector:
+        address: 0.0.0.0:6000
+        type: vector
+        version: "2"
+    sinks:
+      prom_exporter:
+        type: prometheus_exporter
+        inputs: [internal_metrics]
+        address: 0.0.0.0:9090
+      stdout:
+        type: console
+        inputs: [datadog_agent, fluent, logstash, splunk_hec, statsd, syslog, vector]
+        encoding:
+          codec: json
 ---
-# Source: vector-aggregator/templates/service-headless.yaml
+# Source: vector/templates/service-headless.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: vector-aggregator-headless
+  name: vector-headless
   labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
+    helm.sh/chart: vector-0.3.0
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: Aggregator
+    app.kubernetes.io/version: "0.19.0-distroless-libc"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
+    
+  annotations:
 spec:
   clusterIP: None
   ports:
-  - port: 9000
-    name: vector
-    protocol: TCP
+    - name: datadog-agent
+      port: 8282
+      protocol: TCP
+    - name: fluent
+      port: 24224
+      protocol: TCP
+    - name: logstash
+      port: 5044
+      protocol: TCP
+    - name: splunk-hec
+      port: 8080
+      protocol: TCP
+    - name: statsd
+      port: 8125
+      protocol: TCP
+    - name: syslog
+      port: 9000
+      protocol: TCP
+    - name: vector
+      port: 6000
+      protocol: TCP
+    - name: prom-exporter
+      port: 9090
+      protocol: TCP
   selector:
-    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: aggregator
+    app.kubernetes.io/component: Aggregator
+  type: ClusterIP
 ---
-# Source: vector-aggregator/templates/service.yaml
+# Source: vector/templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: vector-aggregator
+  name: vector
   labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
+    helm.sh/chart: vector-0.3.0
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: Aggregator
+    app.kubernetes.io/version: "0.19.0-distroless-libc"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
+    
+  annotations:
 spec:
-  type: ClusterIP
   ports:
-  - port: 9000
-    targetPort: 9000
-    name: vector
-    protocol: TCP
+    - name: datadog-agent
+      port: 8282
+      protocol: TCP
+    - name: fluent
+      port: 24224
+      protocol: TCP
+    - name: logstash
+      port: 5044
+      protocol: TCP
+    - name: splunk-hec
+      port: 8080
+      protocol: TCP
+    - name: statsd
+      port: 8125
+      protocol: TCP
+    - name: syslog
+      port: 9000
+      protocol: TCP
+    - name: vector
+      port: 6000
+      protocol: TCP
+    - name: prom-exporter
+      port: 9090
+      protocol: TCP
   selector:
-    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: aggregator
+    app.kubernetes.io/component: Aggregator
+  type: ClusterIP
 ---
-# Source: vector-aggregator/templates/statefulset.yaml
+# Source: vector/templates/statefulset.yaml
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: vector-aggregator
+  name: vector
   labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
+    helm.sh/chart: vector-0.3.0
+    app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: Aggregator
+    app.kubernetes.io/version: "0.19.0-distroless-libc"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
+    
 spec:
-  serviceName: vector-aggregator-headless
+  replicas: 1
+  podManagementPolicy: OrderedReady
   selector:
     matchLabels:
-      app.kubernetes.io/name: vector-aggregator
+      app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
-      app.kubernetes.io/component: aggregator
-  podManagementPolicy: "Parallel"
-  replicas: 1
+      app.kubernetes.io/component: Aggregator
+  serviceName: vector-headless
   template:
     metadata:
       annotations:
-        
-        
+        checksum/config: e18335eca6777df9f06084f7fb9a7c919aaf60f4daadae082b0ee2576fd39c6f
       labels:
-        app.kubernetes.io/name: vector-aggregator
+        app.kubernetes.io/name: vector
         app.kubernetes.io/instance: vector
-        app.kubernetes.io/component: aggregator
-        vector.dev/exclude: "true"
-    spec:      
-      serviceAccountName: vector-aggregator
-      securityContext:
-        {}
+        app.kubernetes.io/component: Aggregator
+    spec:
+      serviceAccountName: vector
+      dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          securityContext:
-            {}
-          image: "timberio/vector:latest-debian"
-          imagePullPolicy: "IfNotPresent"
+          image: "timberio/vector:0.19.0-distroless-libc"
+          imagePullPolicy: IfNotPresent
           args:
             - --config-dir
             - /etc/vector/
           env:
-            
-            - name: LOG
-              value: info
           ports:
-            - name: metrics
+            - name: datadog-agent
+              containerPort: 8282
+              protocol: TCP
+            - name: fluent
+              containerPort: 24224
+              protocol: TCP
+            - name: logstash
+              containerPort: 5044
+              protocol: TCP
+            - name: splunk-hec
+              containerPort: 8080
+              protocol: TCP
+            - name: statsd
+              containerPort: 8125
+              protocol: TCP
+            - name: syslog
+              containerPort: 9000
+              protocol: TCP
+            - name: vector
+              containerPort: 6000
+              protocol: TCP
+            - name: prom-exporter
               containerPort: 9090
               protocol: TCP
-          resources:
-            {}
           volumeMounts:
-            # Vector data dir mount.
-            - name: data-dir
+            - name: data
               mountPath: "/vector-data-dir"
-            # Vector config dir mount.
-            - name: config-dir
-              mountPath: /etc/vector
+            - name: config
+              mountPath: "/etc/vector/"
               readOnly: true
-            # Extra volumes.
       terminationGracePeriodSeconds: 60
-      tolerations:
-        - effect: NoSchedule
-          key: node-role.kubernetes.io/master
       volumes:
-        # Vector will store it's data here.
-        - name: data-dir
+        - name: data
           emptyDir: {}
-        # Vector config dir.
-        - name: config-dir
+        - name: config
           projected:
             sources:
               - configMap:
-                  name: vector-aggregator
-                  optional: true
-              - configMap:
-                  name: vector-aggregator-config
-                  optional: true
-              - secret:
-                  name: vector-aggregator-config
-                  optional: true
+                  name: vector
   volumeClaimTemplates:

@@ -27,7 +27,7 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 #### Agent
 
-The [Agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
+The Vector [Agent] lets you collect data from your [sources] and then deliver it to a variety of destinations with [sinks].
 
 ##### Define Vector's namespace
 
@@ -37,58 +37,30 @@ We recommend running Vector in its own Kubernetes namespace. In the instructions
 kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 ```
 
-##### Prepare kustomization
+##### Prepare your kustomization file
+
+This example configuration file deploys Vector as an Agent, the full default configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Override the namespace of all of the resources we manage.
 namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
-
-images:
-  # Override the Vector image to avoid use of the sliding tag.
-  - name: timberio/vector
-    newName: timberio/vector
-    newTag: {{< version >}}-debian
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent
 
 resources:
-  # A namespace to keep the resources at.
+  # The namespace previously created to keep the resources in.
   - namespace.yaml
-
-configMapGenerator:
-  # Provide a custom `ConfigMap` for Vector.
-  - name: vector-agent-config
-    files:
-      - vector.toml
-
-generatorOptions:
-  # We don't want a suffix for the `ConfigMap` name.
-  disableNameSuffixHash: true
 KUSTOMIZATION
 ```
 
-##### Configure Vector
-
-```shell
-cat <<-'VECTORCFG' > vector.toml
-# The Vector Kubernetes integration automatically defines a
-# kubernetes_logs source that is made available to you.
-# You do not need to define a log source.
-[sinks.stdout]
-# Adjust as necessary. By default we use the console sink
-# to print all data. This allows you to see Vector working.
-# /docs/reference/sinks/
-type = "console"
-inputs = ["kubernetes_logs"]
-target = "stdout"
-encoding = "json"
-VECTORCFG
-```
-
-##### Verify the configuration
+##### Verify your kustomization file
 
 ```shell
 kubectl kustomize
@@ -103,7 +75,7 @@ kubectl apply -k .
 ##### Tail Vector logs
 
 ```shell
-"kubectl logs -n vector daemonset/vector-agent"
+kubectl logs -n vector daemonset/vector
 ```
 
 #### Aggregator
@@ -118,73 +90,30 @@ We recommend running Vector in its own Kubernetes namespace. In the instructions
 kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 ```
 
-##### Prepare kustomization
+##### Prepare your kustomization file
+
+This example configuration deploys Vector as an Aggragator, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Override the namespace of all of the resources we manage.
 namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
-
-images:
-  # Override the Vector image to avoid use of the sliding tag.
-  - name: timberio/vector
-    newName: timberio/vector
-    newTag: {{< version >}}-debian
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator
 
 resources:
-  # A namespace to keep the resources at.
+  # The namespace previously created to keep the resources in.
   - namespace.yaml
-
-configMapGenerator:
-  # Provide a custom `ConfigMap` for Vector.
-  - name: vector-aggregator-config
-    files:
-      - vector.toml
-
-generatorOptions:
-  # We don't want a suffix for the `ConfigMap` name.
-  disableNameSuffixHash: true
 KUSTOMIZATION
 ```
 
-##### Configure Vector
-
-```shell
-cat <<-'VECTORCFG' > vector.toml
-# The Vector Aggregator chart defines a
-# vector source that is made available to you.
-# You do not need to define a log source.
-[transforms.remap]
-# Adjust as necessary. This remap transform parses a JSON
-# formatted log message, emitting a log if the contents are
-# not valid JSON
-# /docs/reference/transforms/
-type = "remap"
-inputs = ["vector"]
-source = '''
-  structured, err = parse_json(.message)
-  if err != null {
-    log("Unable to parse JSON: " + err, level: "error")
-  } else {
-    . = merge(., object!(structured))
-  }
-'''
-[sinks.stdout]
-# Adjust as necessary. By default we use the console sink
-# to print all data. This allows you to see Vector working.
-# /docs/reference/sinks/
-type = "console"
-inputs = ["kubernetes_logs"]
-target = "stdout"
-encoding = "json"
-VECTORCFG
-```
-
-##### Verify the configuration
+##### Verify your kustomization file
 
 ```shell
 kubectl kustomize
@@ -199,7 +128,7 @@ kubectl apply -k .
 ##### Tail Vector logs
 
 ```shell
-"kubectl logs -n vector statefulset/vector-aggregator"
+"kubectl logs -n vector statefulset/vector"
 ```
 
 ## Deployment

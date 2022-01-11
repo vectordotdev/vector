@@ -171,7 +171,6 @@ install_from_archive() {
       local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
-      printf " ✓\n"
     fi
 
     printf "%s Install succeeded! 🚀\n" "$_prompt"
@@ -200,6 +199,8 @@ add_to_path() {
   else
     grep -qxF "${new_path}" "${file}" || echo "${new_path}" >> "${file}"
   fi
+
+  printf " ✓\n"
 }
 
 # ------------------------------------------------------------------------------
@@ -213,22 +214,23 @@ get_gnu_musl_glibc() {
   need_cmd awk
   # Detect both gnu and musl
   # Also detect glibc versions older than 2.18 and return musl for these
-  # Required until we address https://github.com/timberio/vector/issues/5412.
+  # Required until we identify minimum supported version
+  # TODO: https://github.com/vectordotdev/vector/issues/10807
   local _ldd_version
   local _glibc_version
-  _ldd_version=$(ldd --version)
-  if [[ $_ldd_version =~ "GNU" ]]; then
+  _ldd_version=$(ldd --version 2>&1)
+  if [[ $_ldd_version =~ "GNU" ]] || [[ $_ldd_version =~ "GLIBC" ]]; then
     _glibc_version=$(echo "$_ldd_version" | awk '/ldd/{print $NF}')
     if [ 1 -eq "$(echo "${_glibc_version} < 2.18" | bc)" ]; then
       echo "musl"
     else
       echo "gnu"
     fi
-elif [[ $_ldd_version =~ "musl" ]]; then
-  echo "musl"
-else
-  err "Unknown architecture from ldd: ${_ldd_version}"
-fi
+  elif [[ $_ldd_version =~ "musl" ]]; then
+    echo "musl"
+  else
+    err "Unknown architecture from ldd: ${_ldd_version}"
+  fi
 }
 
 get_bitness() {
