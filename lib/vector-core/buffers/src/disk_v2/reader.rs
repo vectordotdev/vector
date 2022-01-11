@@ -658,6 +658,20 @@ where
             // Handle any pending acknowledgements first.
             self.handle_pending_acknowledgements().await.context(Io)?;
 
+            // If the writer has marked themselves as done, and the buffer has been emptied, then
+            // we're done and can return.  We have to look at something besides simply the writer
+            // being marked as done to know if we're actually done or not, and "buffer size" is better
+            // than "total records" because we update buffer size when handling acknowledgements,
+            // whether it's an individual ack or an entire file being deleted.
+            //
+            // If we used "total records", we could end up stuck in cases where we skipped
+            // corrupted records, but hadn't yet had a "good" record that we could read, since the
+            // "we skipped records due to corruption" logic requires performing valid read to
+            // detect, and calculate a valid delta from.
+            if self.ledger.is_writer_done() && self.ledger.get_total_buffer_size() == 0 {
+                return Ok(None);
+            }
+
             self.ensure_ready_for_read().await.context(Io)?;
 
             let reader = self
@@ -711,23 +725,18 @@ where
             // 2. we've hit the end of the data file and need to go to the next one
             // 3. the writer has closed/dropped/finished/etc
             //
-            // When we're at this point, we first "wait" for the writer to wake us up.  This might
+            // When we're at this point, we "wait" for the writer to wake us up.  This might
             // be an existing buffered wake-up, or we might actually be waiting for the next
             // wake-up.  Regardless of which type of wakeup it is, we wait for a wake up.  The
             // writer will always issue a wake-up when it finishes any major operation: creating a
             // new data file, flushing, closing, etc.
-            //
-            // After that, we check to see if the writer is done: this means the writer has
-            // explicitly closed itself and will send no more messages to this specific
-            // reader/writer pair.  We only return `None` ourselves if we've also drained all
-            // remaining records from the buffer.
             //
             // After that, we check the reader/writer file IDs.  If the file IDs were identical, it
             // would imply that reader is still on the writer's current data file.  We simply
             // continue the loop in this case.  It may lead to the same thing --`try_read_record`
             // returning `None` with an identical reader/writer file ID -- but that's OK, because it
             // would mean we were actually waiting for the writer to make progress now.  If the
-            // wake-up was valid, due to writer progress, then, well...  we'd actually be able to
+            // wake-up was valid, due to writer progress, then, well... we'd actually be able to
             // read data.
             //
             // If the file IDs were not identical, we now know the writer has moved on.  Crucially,
@@ -735,28 +744,19 @@ where
             // file, then we know that if the reader/writer were not identical at the start the
             // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
             // reader's current data file, and need to move on.
+            //
+            // The case of "the writer has closed/dropped/finished/etc" is handled at the top of the
+            // loop, because otherwise we could get stuck waiting for the writer after an empty
+            // `try_read_record` attempt when the writer is done and we're at the end of the file,
+            // etc.
+            //
+            // TODO: We may want to explore adding logic to the reader that returns a sentinel value
+            // when we're trying to read a length delimiter from a position that is past the maximum
+            // file size, since that is theoretically not possible.  We could _start_ a read that is
+            // below the limit, and continue it past the limit, but we should never be able to read
+            // a length delimiter past the limit, because we can't write a length delimiter that
+            // _starts_ past the limit.
             if self.ready_to_read {
-                if self.ledger.is_writer_done() {
-                    if self.ledger.get_total_buffer_size() == 0 {
-                        // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
-                        // `roll_to_next_data_file` -- versus total records, which needs a successful read
-                        // to catch any inconsistencies in the record IDs.
-                        //
-                        // This means that if we encountered a corrupted record as the last record we had to
-                        // read before the above if condition would be met, our `next` call would hit the
-                        // corrupted record, detect that, roll to the next file, which would do the buffer
-                        // size adjustments, and then the following call to `next` would fallthrough to
-                        // here.
-                        //
-                        // The same scenario with total records would be stuck waiting as we would have no
-                        // more records to read to drive the check that fixes total records when we detect
-                        // skipping record IDs.
-                        return Ok(None);
-                    } else {
-                        debug!("writer done but buffer not yet empty");
-                    }
-                }
-
                 self.ledger.wait_for_writer().await;
             } else {
                 // We're currently just seeking to where we left off the last time this buffer was

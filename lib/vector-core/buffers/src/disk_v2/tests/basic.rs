@@ -117,16 +117,9 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             acker.ack(1);
 
             // Our blocked read should be woken up, and when we poll it, it should be also be ready,
-            // albeit with a return value of `None`.
+            // albeit with a return value of `None`... because the writer is closed, and we read all
+            // the records, so nothing is left. :)
             assert!(blocked_read.is_woken());
-
-            // TODO: arghhh, this is tricky, because when it polls, it's stuck on
-            // `read_length_delimiter` and waiting for it to be ready, which it won't be because the
-            // file is closed; we might need the check for writer done-ness at the very top, with
-            // the writer wait left where it is, which is the same logic as before but without
-            // allowing ourselves to get stuck at the end waiting for a length delimiter that will
-            // never come
-
             let second_read = assert_ready!(blocked_read.poll());
             assert_eq!(second_read.expect("read should not fail"), None);
 
