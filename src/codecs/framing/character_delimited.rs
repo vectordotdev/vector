@@ -174,7 +174,6 @@ impl Encoder<()> for CharacterDelimitedEncoder {
     type Error = encoding::BoxedFramingError;
 
     fn encode(&mut self, _: (), buf: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
-        buf.reserve(buf.len() + 1);
         buf.put_u8(self.delimiter);
         Ok(())
     }

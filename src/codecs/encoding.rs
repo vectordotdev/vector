@@ -225,9 +225,8 @@ mod tests {
         type Error = BoxedFramingError;
 
         fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-            let len = dst.len();
+            dst.reserve(2);
             let inner = dst.split();
-            dst.reserve(len + 2);
             dst.put_u8(b'(');
             dst.unsplit(inner);
             dst.put_u8(b')');
