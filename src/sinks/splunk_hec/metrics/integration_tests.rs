@@ -201,6 +201,9 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
             "https://localhost:8089/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
             metric_name
         ))
+        .form(&vec![
+            ("filter", "index=*"),
+        ])
         .basic_auth(USERNAME, Some(PASSWORD))
         .send()
         .await

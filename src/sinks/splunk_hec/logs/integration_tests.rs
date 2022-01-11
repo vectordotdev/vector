@@ -37,7 +37,7 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
     // https://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
     let search_query = match index {
         Some(index) => format!("search index={}", index),
-        None => "search *".into(),
+        None => "search index=*".into(),
     };
     let res = client
         .post("https://localhost:8089/services/search/jobs?output_mode=json")
