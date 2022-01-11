@@ -354,9 +354,7 @@ impl Ledger {
     /// This will occur when a record is written, or when a new data file is created.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
-        debug!("waiting for notification from writer");
         self.writer_notify.notified().await;
-        debug!("writer notified");
     }
 
     /// Notifies all tasks waiting on progress by the reader.

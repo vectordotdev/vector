@@ -796,10 +796,3 @@ where
         reader.read_record(token).map(Some)
     }
 }
-
-impl<T> Drop for Reader<T> {
-    fn drop(&mut self) {
-        // TODO: Remove me.
-        trace!("ledger state at reader drop: {:#?}", self.ledger);
-    }
-}
