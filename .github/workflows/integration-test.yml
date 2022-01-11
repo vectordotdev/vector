@@ -58,7 +58,6 @@ jobs:
         include:
           - test: 'datadog-metrics'
           - test: 'eventstoredb_metrics'
-          - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
           - test: 'influxdb'
@@ -102,6 +101,7 @@ jobs:
           - test: 'datadog-logs'
           - test: 'docker'
           - test: 'elasticsearch'
+          - test: 'fluent'
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongo'
