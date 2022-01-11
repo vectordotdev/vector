@@ -257,7 +257,7 @@ mod integration_tests {
         // this remote write source.  This makes sense from a "test the actual behavior" standpoint
         // but it feels a little fragile.
         //
-        // It could be nice to split tup the Prometheus integration tests in the future, or
+        // It could be nice to split up the Prometheus integration tests in the future, or
         // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         components::init_test();
         let config = PrometheusRemoteWriteConfig {

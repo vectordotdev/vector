@@ -234,7 +234,7 @@ impl MetricValue {
     ///
     /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
     /// `Some(MetricValue::AggregatedHistogram)` is returned.
-    pub fn distribution_to_agg_histogram(self, buckets: &[f64]) -> Option<MetricValue> {
+    pub fn distribution_to_agg_histogram(&self, buckets: &[f64]) -> Option<MetricValue> {
         match self {
             MetricValue::Distribution { samples, .. } => {
                 let (buckets, count, sum) = samples_to_buckets(&samples, buckets);
@@ -256,7 +256,7 @@ impl MetricValue {
     ///
     /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
     /// `Some(MetricValue::Sketch)` is returned.
-    pub fn distribution_to_sketch(self) -> Option<MetricValue> {
+    pub fn distribution_to_sketch(&self) -> Option<MetricValue> {
         match self {
             MetricValue::Distribution { samples, .. } => {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
