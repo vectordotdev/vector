@@ -252,9 +252,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.20"
+version = "3.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7b72874e1b4bebe34cfd204a0d938225a7e25714315a5f714173842b6d16849"
+checksum = "c827154564efe63921d98aed34178283ddfc0111fa53530014967f74589cba48"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -283,9 +283,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "3.0.20"
+version = "3.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "646536d653be53fa2ff831d7a4083367d2ea7e333e5710e540596721e598ecad"
+checksum = "8d55632b238b8a485d1f3b3d4894c00b1c6e4557c38f8e79b99bf115cf4ba0cc"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -299,9 +299,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "3.0.20"
+version = "3.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b47576aba6c1474888689c5d67a2a7b7f9f650d3122157e00fa14f0c01945f8a"
+checksum = "d2b285684a43f5286c593013233e7788c8c792c653aa1ad1eee97fe38e2dc702"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -312,9 +312,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "3.0.20"
+version = "3.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28a266653068d17107cc3b5d9d9eb245b1a49a43501b2317af4f1959624346d5"
+checksum = "b6b2ade1091b86cc83a4691fcbca1937f9a09cea42290fdd8a3b3181ca03a8e2"
 dependencies = [
  "bytes 1.1.0",
  "indexmap",
@@ -1096,7 +1096,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.0.5",
+ "clap 3.0.6",
  "core_common",
  "crc32fast",
  "criterion",
@@ -1347,9 +1347,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.5"
+version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6f34b09b9ee8c7c7b400fe2f8df39cafc9538b03d6ba7f4ae13e4cb90bfbb7d"
+checksum = "1957aa4a5fb388f0a0a73ce7556c5b42025b874e5cdc2c670775e346e97adec0"
 dependencies = [
  "atty",
  "bitflags",
@@ -2427,6 +2427,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "float_eq"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1d53499e94f9a7828e63c574adf62bcade7f358c3738f9ea70d7c2edb61023d"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2840,9 +2846,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f072413d126e57991455e0a922b31e4c8ba7c2ffbebf6b78b4f8521397d65cd"
+checksum = "0c9de88456263e249e241fcd211d3954e2c9b0ef7ccfc235a444eb367cae3689"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
@@ -3305,9 +3311,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
+checksum = "282a6247722caba404c065016bbfa522806e51714c34f5dfc3e4a3a46fcb4223"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -5813,15 +5819,16 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.8"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c4e0a76dc12a116108933f6301b95e83634e0c47b0afbed6abbaa0601e99258"
+checksum = "87f242f1488a539a79bac6dbe7c8609ae43b7914b7736210f239a37cccb32525"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
  "encoding_rs",
  "futures-core",
  "futures-util",
+ "h2",
  "http",
  "http-body",
  "hyper",
@@ -6164,9 +6171,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.19.0"
+version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c2d4912d369fb95a351c221475657970678d344d70c1a788223f6e74d1e3732"
+checksum = "e0593ce4677e3800ddafb3de917e8397b1348e06e688128ade722d88fbe11ebf"
 dependencies = [
  "arrayvec 0.7.2",
  "num-traits",
@@ -6893,22 +6900,23 @@ dependencies = [
 
 [[package]]
 name = "snafu"
-version = "0.6.10"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eab12d3c261b2308b0d80c26fffb58d17eba81a4be97890101f416b478c79ca7"
+checksum = "2eba135d2c579aa65364522eb78590cdf703176ef71ad4c32b00f58f7afb2df5"
 dependencies = [
  "doc-comment",
  "futures-core",
- "pin-project 0.4.29",
+ "pin-project 1.0.10",
  "snafu-derive",
 ]
 
 [[package]]
 name = "snafu-derive"
-version = "0.6.10"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1508efa03c362e23817f96cde18abed596a25219a8b2c66e8db33c03543d315b"
+checksum = "7a7fe9b0669ef117c5cabc5549638528f36771f058ff977d7689deb517833a75"
 dependencies = [
+ "heck",
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "syn 1.0.84",
@@ -8507,6 +8515,7 @@ dependencies = [
  "dyn-clone",
  "enrichment",
  "env-test-util",
+ "float_eq",
  "futures 0.3.19",
  "futures-util",
  "getset",

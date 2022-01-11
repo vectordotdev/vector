@@ -141,7 +141,7 @@ impl<T> TopologyBuilder<T> {
                 .untransformed
                 .into_buffer_parts(usage_handle.clone())
                 .await
-                .context(FailedToBuildStage { stage_idx })?;
+                .context(FailedToBuildStageSnafu { stage_idx })?;
 
             // Multiple components with "segmented" acknowledgements cannot be supported at the
             // moment.  Segmented acknowledgements refers to stages which split the

@@ -230,7 +230,7 @@ impl SourceConfig for FileConfig {
 
             if let Some(ref indicator) = self.message_start_indicator {
                 Regex::new(indicator)
-                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
+                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
             }
         }
 

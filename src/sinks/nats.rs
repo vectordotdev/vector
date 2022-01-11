@@ -128,7 +128,7 @@ impl NatsSink {
         Ok(NatsSink {
             options: (&config).into(),
             encoding: config.encoding,
-            subject: Template::try_from(config.subject).context(SubjectTemplate)?,
+            subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
             url: config.url,
             acker,
         })

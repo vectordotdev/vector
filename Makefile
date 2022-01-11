@@ -415,21 +415,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics stop
 endif
 
-.PHONY: test-integration-prometheus
-test-integration-prometheus: ## Runs Prometheus integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
-	@scripts/setup_integration_env.sh influxdb start
-	@scripts/setup_integration_env.sh prometheus start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
-endif
-
 .PHONY: test-integration-pulsar
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)

@@ -468,7 +468,7 @@ impl Decoder for LogstashDecoder {
                     rest = right;
 
                     let fields_result: Result<BTreeMap<String, serde_json::Value>, _> =
-                        serde_json::from_slice(slice).context(JsonFrameFailedDecode {});
+                        serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {});
 
                     let remaining = rest.remaining();
                     let byte_size = src.remaining() - remaining;
@@ -514,7 +514,7 @@ impl Decoder for LogstashDecoder {
 
                         let res = ZlibDecoder::new(io::Cursor::new(slice))
                             .read_to_end(&mut buf)
-                            .context(DecompressionFailed)
+                            .context(DecompressionFailedSnafu)
                             .map(|_| BytesMut::from(&buf[..]));
 
                         let remaining = rest.remaining();

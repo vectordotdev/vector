@@ -126,11 +126,15 @@ impl Conversion {
             Self::Bytes => bytes.into(),
             Self::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<i64>().with_context(|| IntParse { s })?.into()
+                s.parse::<i64>()
+                    .with_context(|_| IntParseSnafu { s })?
+                    .into()
             }
             Self::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<f64>().with_context(|| FloatParse { s })?.into()
+                s.parse::<f64>()
+                    .with_context(|_| FloatParseSnafu { s })?
+                    .into()
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
             Self::Timestamp(tz) => parse_timestamp(*tz, &String::from_utf8_lossy(&bytes))?.into(),
@@ -138,14 +142,14 @@ impl Conversion {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
                     .datetime_from_str(&s, format)
-                    .context(TimestampParse { s })?;
+                    .context(TimestampParseSnafu { s })?;
 
                 datetime_to_utc(dt).into()
             }
             Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                let dt =
-                    DateTime::parse_from_str(&s, format).with_context(|| TimestampParse { s })?;
+                let dt = DateTime::parse_from_str(&s, format)
+                    .with_context(|_| TimestampParseSnafu { s })?;
 
                 datetime_to_utc(dt).into()
             }
