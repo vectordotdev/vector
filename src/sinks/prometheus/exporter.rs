@@ -933,12 +933,51 @@ mod integration_tests {
     use super::*;
     use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
-    fn server_address() -> String {
-        std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
+    fn sink_exporter_address() -> String {
+        std::env::var("SINK_EXPORTER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
     }
 
     fn prometheus_address() -> String {
         std::env::var("PROMETHEUS_ADDRESS").unwrap_or_else(|_| "localhost:9090".into())
+    }
+
+    async fn fetch_exporter_body() -> String {
+        let url = format!("http://{}/metrics", sink_exporter_address());
+        let request = Request::get(url)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not send request");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        String::from_utf8_lossy(&result).to_string()
+    }
+
+    async fn prometheus_query(query: &str) -> Value {
+        let url = format!(
+            "http://{}/api/v1/query?query={}",
+            prometheus_address(),
+            query
+        );
+        let request = Request::post(url)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not fetch query");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        let result = String::from_utf8_lossy(&result);
+        serde_json::from_str(result.as_ref()).expect("Invalid JSON from prometheus")
     }
 
     #[tokio::test]
@@ -955,7 +994,7 @@ mod integration_tests {
         let start = Utc::now().timestamp();
 
         let config = PrometheusExporterConfig {
-            address: server_address().parse().unwrap(),
+            address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
@@ -974,7 +1013,10 @@ mod integration_tests {
 
         let data = &result["data"]["result"][0];
         assert_eq!(data["metric"]["__name__"], Value::String(name));
-        assert_eq!(data["metric"]["instance"], Value::String(server_address()));
+        assert_eq!(
+            data["metric"]["instance"],
+            Value::String(sink_exporter_address())
+        );
         assert_eq!(
             data["metric"]["some_tag"],
             Value::String("some_value".into())
@@ -985,7 +1027,7 @@ mod integration_tests {
 
     async fn reset_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: server_address().parse().unwrap(),
+            address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
@@ -1036,7 +1078,7 @@ mod integration_tests {
 
     async fn expire_on_flush_period() {
         let config = PrometheusExporterConfig {
-            address: server_address().parse().unwrap(),
+            address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
@@ -1071,48 +1113,6 @@ mod integration_tests {
         // Exporter should present only the one that got updated
         let body = fetch_exporter_body().await;
         assert!(body.contains(&name1));
-        dbg!(&name1);
-        dbg!(&name2);
-        println!("{}", &body);
         assert!(!body.contains(&name2));
-    }
-
-    async fn fetch_exporter_body() -> String {
-        let url = format!("http://{}/metrics", server_address());
-        let request = Request::get(url)
-            .body(Body::empty())
-            .expect("Error creating request.");
-        let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
-            .unwrap()
-            .send(request)
-            .await
-            .expect("Could not send request");
-        let result = hyper::body::to_bytes(result.into_body())
-            .await
-            .expect("Error fetching body");
-        String::from_utf8_lossy(&result).to_string()
-    }
-
-    async fn prometheus_query(query: &str) -> Value {
-        let url = format!(
-            "http://{}/api/v1/query?query={}",
-            prometheus_address(),
-            query
-        );
-        let request = Request::post(url)
-            .body(Body::empty())
-            .expect("Error creating request.");
-        let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
-            .unwrap()
-            .send(request)
-            .await
-            .expect("Could not fetch query");
-        let result = hyper::body::to_bytes(result.into_body())
-            .await
-            .expect("Error fetching body");
-        let result = String::from_utf8_lossy(&result);
-        serde_json::from_str(result.as_ref()).expect("Invalid JSON from prometheus")
     }
 }
