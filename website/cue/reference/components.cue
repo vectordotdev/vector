@@ -122,7 +122,7 @@ components: {
 			output: #OutputData
 		}
 
-		if Kind == "transform" {
+		if Kind != "sink" {
 			outputs: #Outputs
 		}
 
@@ -451,6 +451,7 @@ components: {
 	#Output: {
 		name:        string
 		description: string
+		data?:       #OutputData
 	}
 
 	_default_output: #Output & {
