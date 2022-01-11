@@ -1,5 +1,36 @@
 use vrl::prelude::*;
 
+fn del(
+    query: &expression::Query,
+    ctx: &mut Context,
+) -> std::result::Result<Value, ExpressionError> {
+    let path = query.path();
+    if query.is_external() {
+        return Ok(ctx
+            .target_mut()
+            .remove(path, false)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::Null));
+    }
+    if let Some(ident) = query.variable_ident() {
+        return match ctx.state_mut().variable_mut(ident) {
+            Some(value) => {
+                let new_value = value.get_by_path(path).cloned();
+                value.remove_by_path(path, false);
+                Ok(new_value.unwrap_or(Value::Null))
+            }
+            None => Ok(Value::Null),
+        };
+    }
+    if let Some(expr) = query.expression_target() {
+        let value = expr.resolve(ctx)?;
+
+        return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+    }
+    Ok(Value::Null)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Del;
 
@@ -59,6 +90,39 @@ impl Function for Del {
 
         Ok(Box::new(DelFn { query }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        name: &str,
+        expr: &expression::Expr,
+    ) -> CompiledArgument {
+        if name == "target" {
+            let query = match expr {
+                expression::Expr::Query(query) => query,
+                _ => {
+                    return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                        keyword: "field",
+                        expected: "query",
+                        expr: expr.clone(),
+                    }))
+                }
+            };
+
+            Ok(Some(Box::new(query.clone()) as _))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn call(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let query = args
+            .required_any("target")
+            .downcast_ref::<expression::Query>()
+            .unwrap();
+
+        del(query, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,35 +160,7 @@ impl Expression for DelFn {
     //
     // see tracking issue: https://github.com/timberio/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.query.path();
-
-        if self.query.is_external() {
-            return Ok(ctx
-                .target_mut()
-                .remove(path, false)
-                .ok()
-                .flatten()
-                .unwrap_or(Value::Null));
-        }
-
-        if let Some(ident) = self.query.variable_ident() {
-            return match ctx.state_mut().variable_mut(ident) {
-                Some(value) => {
-                    let new_value = value.get_by_path(path).cloned();
-                    value.remove_by_path(path, false);
-                    Ok(new_value.unwrap_or(Value::Null))
-                }
-                None => Ok(Value::Null),
-            };
-        }
-
-        if let Some(expr) = self.query.expression_target() {
-            let value = expr.resolve(ctx)?;
-
-            return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
-        }
-
-        Ok(Value::Null)
+        del(&self.query, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
