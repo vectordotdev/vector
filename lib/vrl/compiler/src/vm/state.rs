@@ -1,5 +1,5 @@
 use super::{argument_list::VmArgument, OpCode, Vm};
-use crate::{expression::Literal, vm::vm::Instruction, ExpressionError, Value};
+use crate::{vm::vm::Instruction, ExpressionError, Value};
 
 /// `VmState` contains the mutable state used to run the Vm.
 pub struct VmState<'a> {
@@ -21,21 +21,21 @@ impl<'a> VmState<'a> {
         }
     }
 
-    pub(super) fn next(&mut self) -> OpCode {
+    pub(super) fn next(&mut self) -> Result<OpCode, ExpressionError> {
         let byte = self.vm.instructions[self.ip];
         self.ip += 1;
         match byte {
-            Instruction::OpCode(opcode) => opcode,
-            _ => panic!("Expecting opcode at {}", self.ip - 1),
+            Instruction::OpCode(opcode) => Ok(opcode),
+            _ => Err(format!("Expecting opcode at {}", self.ip - 1).into()),
         }
     }
 
-    pub(super) fn next_primitive(&mut self) -> usize {
+    pub(super) fn next_primitive(&mut self) -> Result<usize, ExpressionError> {
         let byte = self.vm.instructions[self.ip];
         self.ip += 1;
         match byte {
-            Instruction::Primitive(primitive) => primitive,
-            _ => panic!("Expecting primitive"),
+            Instruction::Primitive(primitive) => Ok(primitive),
+            _ => Err("Expecting primitive".into()),
         }
     }
 
@@ -64,8 +64,8 @@ impl<'a> VmState<'a> {
         &mut self.parameter_stack
     }
 
-    pub(super) fn read_constant(&mut self) -> Result<Value, String> {
-        let idx = self.next_primitive();
+    pub(super) fn read_constant(&mut self) -> Result<Value, ExpressionError> {
+        let idx = self.next_primitive()?;
         Ok(self.vm.values[idx].clone())
     }
 }

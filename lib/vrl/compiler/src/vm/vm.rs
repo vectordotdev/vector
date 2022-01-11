@@ -143,12 +143,12 @@ impl Vm {
         let mut state: VmState = VmState::new(self);
 
         loop {
-            let next = state.next();
+            let next = state.next()?;
 
             match next {
                 OpCode::Abort => {
-                    let start = state.next_primitive();
-                    let end = state.next_primitive();
+                    let start = state.next_primitive()?;
+                    let end = state.next_primitive()?;
                     return Err(ExpressionError::Abort {
                         span: Span::new(start, end),
                     });
@@ -197,41 +197,41 @@ impl Vm {
                     state.error = None;
                 }
                 OpCode::GetLocal => {
-                    let slot = state.next_primitive();
+                    let slot = state.next_primitive()?;
                     state.stack.push(state.stack[slot].clone());
                 }
                 OpCode::SetLocal => {
-                    let slot = state.next_primitive();
+                    let slot = state.next_primitive()?;
                     state.stack[slot] = state.peek_stack()?.clone();
                 }
                 OpCode::JumpIfFalse => {
-                    let jump = state.next_primitive();
+                    let jump = state.next_primitive()?;
                     if !is_truthy(state.peek_stack()?) {
                         state.ip += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
-                    let jump = state.next_primitive();
+                    let jump = state.next_primitive()?;
                     if is_truthy(state.peek_stack()?) {
                         state.ip += jump;
                     }
                 }
                 OpCode::JumpIfNotErr => {
-                    let jump = state.next_primitive();
+                    let jump = state.next_primitive()?;
                     if state.error.is_none() {
                         state.ip += jump;
                     }
                 }
                 OpCode::Jump => {
-                    let jump = state.next_primitive();
+                    let jump = state.next_primitive()?;
                     state.ip += jump;
                 }
                 OpCode::Loop => {
-                    let jump = state.next_primitive();
+                    let jump = state.next_primitive()?;
                     state.ip -= jump;
                 }
                 OpCode::SetPath => {
-                    let variable = state.next_primitive();
+                    let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
                     let value = state.pop_stack()?;
 
@@ -239,13 +239,13 @@ impl Vm {
                     state.push_stack(value);
                 }
                 OpCode::SetPathInfallible => {
-                    let variable = state.next_primitive();
+                    let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
 
-                    let error = state.next_primitive();
+                    let error = state.next_primitive()?;
                     let error = &self.targets[error];
 
-                    let default = state.next_primitive();
+                    let default = state.next_primitive()?;
                     let default = &self.values[default];
 
                     // Note, after assignment the value is pushed back onto the stack since it is possible for
@@ -268,7 +268,7 @@ impl Vm {
                     }
                 }
                 OpCode::GetPath => {
-                    let variable = state.next_primitive();
+                    let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
 
                     match &variable {
@@ -298,9 +298,9 @@ impl Vm {
                     }
                 }
                 OpCode::Call => {
-                    let function_id = state.next_primitive();
-                    let span_start = state.next_primitive();
-                    let span_end = state.next_primitive();
+                    let function_id = state.next_primitive()?;
+                    let span_start = state.next_primitive()?;
+                    let span_end = state.next_primitive()?;
                     let parameters = &self.fns[function_id].parameters();
 
                     let len = state.parameter_stack().len();
@@ -344,7 +344,7 @@ impl Vm {
                     }
                 }
                 OpCode::CreateArray => {
-                    let count = state.next_primitive();
+                    let count = state.next_primitive()?;
                     let mut arr = Vec::new();
 
                     for _ in 0..count {
@@ -355,7 +355,7 @@ impl Vm {
                     state.stack.push(Value::Array(arr));
                 }
                 OpCode::CreateObject => {
-                    let count = state.next_primitive();
+                    let count = state.next_primitive()?;
                     let mut object = BTreeMap::new();
 
                     for _ in 0..count {
@@ -373,7 +373,7 @@ impl Vm {
                     .parameter_stack
                     .push(state.stack.pop().map(VmArgument::Value)),
                 OpCode::MoveStatic => {
-                    let idx = state.next_primitive();
+                    let idx = state.next_primitive()?;
                     state
                         .parameter_stack
                         .push(Some(VmArgument::Any(&self.static_params[idx])));
@@ -437,5 +437,5 @@ fn set_variable<'a>(
 }
 
 fn is_truthy(object: &Value) -> bool {
-    !matches!(object, Value::Null | Value::Boolean(false))
+    !matches!(object, Value::Boolean(false))
 }
