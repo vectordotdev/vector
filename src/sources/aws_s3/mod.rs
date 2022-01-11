@@ -15,7 +15,7 @@ use crate::{
         rusoto::{self, RegionOrEndpoint},
     },
     config::{
-        AcknowledgementsConfig, DataType, ProxyConfig, SourceConfig, SourceContext,
+        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
         SourceDescription,
     },
     line_agg,
@@ -92,8 +92,8 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -109,13 +109,13 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
-        let region: Region = (&self.region).try_into().context(RegionParse {})?;
+        let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|| Client {})?;
+        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
-            .context(Credentials {})?
+            .context(CredentialsSnafu {})?
             .into();
         let s3_client = S3Client::new_with(
             client.clone(),
@@ -140,7 +140,7 @@ impl AwsS3Config {
                     multiline,
                 )
                 .await
-                .context(Initialize {})
+                .context(InitializeSnafu {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
@@ -322,7 +322,7 @@ mod integration_tests {
         test_util::{
             collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[tokio::test]
@@ -535,7 +535,7 @@ mod integration_tests {
 
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
-        let (tx, rx) = Pipeline::new_test_finalize(status);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
         let cx = SourceContext::new_test(tx);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });

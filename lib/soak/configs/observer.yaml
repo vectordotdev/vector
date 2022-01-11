@@ -2,11 +2,9 @@ experiment_name: "foobar"
 variant: "baseline"
 capture_path: "/tmp/captures-baseline.txt"
 targets:
-  - id: vector
-    url: "http://localhost:9598/metrics"
   - id: lading_http_gen
     url: "http://localhost:9001"
-  - id: lading_http_blackhole
-    url: "http://localhost:9002"
+    metrics:
+      - bytes_written
   - id: lading_tcp_gen
     url: "http://localhost:9003"

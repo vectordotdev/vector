@@ -9,7 +9,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
@@ -68,8 +68,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn output_type(&self) -> crate::config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -134,7 +134,7 @@ mod test {
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, components},
         tls::MaybeTlsSettings,
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -155,7 +155,7 @@ mod test {
     async fn receives_metrics(tls: Option<TlsConfig>) {
         components::init_test();
         let address = test_util::next_addr();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let proto = MaybeTlsSettings::from_config(&tls, true)
             .unwrap()
@@ -246,29 +246,37 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, test_util::components, Pipeline};
+    use crate::{test_util, test_util::components, SourceSender};
 
-    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+    fn source_receive_address() -> String {
+        std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
+    }
 
     #[tokio::test]
     async fn receive_something() {
+        // TODO: This test depends on the single instance of Prometheus that we spin up for
+        // integration tests both scraping an endpoint and then also remote writing that stuff to
+        // this remote write source.  This makes sense from a "test the actual behavior" standpoint
+        // but it feels a little fragile.
+        //
+        // It could be nice to split up the Prometheus integration tests in the future, or
+        // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         components::init_test();
         let config = PrometheusRemoteWriteConfig {
-            address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
+            address: source_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
             acknowledgements: AcknowledgementsConfig::default(),
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_with_buffer(4096);
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
-
         tokio::spawn(source);
 
         tokio::time::sleep(Duration::from_secs(2)).await;
-
         let events = test_util::collect_ready(rx).await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
         assert!(!events.is_empty());
+
+        components::SOURCE_TESTS.assert(&["http_path"]);
     }
 }

@@ -1,4 +1,5 @@
 cargo-timing*.html
+*.pyc
 *.iml
 *.tmp
 **/*.rs.bk

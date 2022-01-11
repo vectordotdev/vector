@@ -23,7 +23,7 @@ impl TryFrom<&RegionOrEndpoint> for Region {
 
     fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
         match (&r.region, &r.endpoint) {
-            (Some(region), None) => region.parse().context(RegionParseError),
+            (Some(region), None) => region.parse().context(RegionParseSnafu),
             (None, Some(endpoint)) => region_from_endpoint(endpoint),
             (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
@@ -40,7 +40,7 @@ impl TryFrom<RegionOrEndpoint> for Region {
 
 /// Translate an endpoint URL into a Region
 pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
-    let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
+    let uri = endpoint.parse::<Uri>().context(EndpointParseSnafu)?;
     let name = uri
         .host()
         .and_then(region_name_from_host)

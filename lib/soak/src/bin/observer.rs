@@ -3,13 +3,15 @@
 use argh::FromArgs;
 use prometheus_parser::GroupKind;
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::collections::HashSet;
 use std::{
     borrow::Cow,
     fmt,
     fmt::Debug,
     io::Read,
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -21,7 +23,7 @@ use tokio::{
     io::{AsyncWriteExt, BufWriter},
     runtime::Builder,
     sync::mpsc::{channel, Receiver, Sender},
-    time::sleep,
+    time::{interval_at, Instant},
 };
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
@@ -45,6 +47,9 @@ struct Opts {
 pub struct Target {
     id: String,
     url: String,
+    /// Collection of metrics to filter _for_. If empty all metrics are collected.
+    #[serde(default)]
+    metrics: HashSet<String>,
 }
 
 /// Main configuration struct for this program
@@ -53,7 +58,7 @@ pub struct Config {
     /// The name of the experiment being observed
     pub experiment_name: String,
     /// The variant of the experiment, generally 'baseline' or 'comparison'
-    pub variant: soak::Variant,
+    pub variant: Variant,
     /// The targets for this experiment.
     pub targets: Vec<Target>,
     /// The file to record captures into
@@ -62,6 +67,8 @@ pub struct Config {
 
 #[derive(Debug, Snafu)]
 enum Error {
+    #[snafu(display("File manager channel closed before receiving samples"))]
+    NoSamples,
     #[snafu(display("Reqwest error: {}", error))]
     Reqwest { error: reqwest::Error },
     #[snafu(display("Not a valid URI with error: {}", error))]
@@ -151,7 +158,18 @@ impl CaptureManager {
 
     #[instrument]
     async fn run(mut self) -> Result<(), Error> {
-        let mut wtr = BufWriter::new(fs::File::create(self.capture_path).await?);
+        // Wait until the first capture comes across the receiver before
+        // creating the capture file. This allows control to observe wehther the
+        // capture file exists and act accordingly.
+        let mut wtr = if let Some(msg) = self.rcv.recv().await {
+            let mut wtr = BufWriter::new(fs::File::create(self.capture_path).await?);
+            wtr.write_all(msg.as_bytes()).await?;
+            wtr.write_all(b"\n").await?;
+            wtr
+        } else {
+            return Err(Error::NoSamples);
+        };
+        // Capture any remaining samples and write them out to capture file.
         while let Some(msg) = self.rcv.recv().await {
             wtr.write_all(msg.as_bytes()).await?;
             wtr.write_all(b"\n").await?;
@@ -168,7 +186,8 @@ struct TargetWorker {
     target_id: String,
     url: Url,
     run_id: Arc<Uuid>,
-    variant: soak::Variant,
+    variant: Variant,
+    target_metrics: HashSet<String>,
 }
 
 impl fmt::Debug for TargetWorker {
@@ -176,6 +195,7 @@ impl fmt::Debug for TargetWorker {
         f.debug_struct("TargetWorker")
             .field("run_id", &self.run_id)
             .field("target_id", &self.target_id)
+            .field("target_metrics", &self.target_metrics)
             .field("url", &self.url.as_str())
             .finish()
     }
@@ -188,7 +208,8 @@ impl TargetWorker {
         target_id: String,
         url: Url,
         run_id: Arc<Uuid>,
-        variant: soak::Variant,
+        variant: Variant,
+        target_metrics: HashSet<String>,
     ) -> Self {
         Self {
             snd,
@@ -197,60 +218,97 @@ impl TargetWorker {
             url,
             run_id,
             variant,
+            target_metrics,
         }
     }
 
     #[instrument]
     async fn run(self) -> Result<(), Error> {
         let client: reqwest::Client = reqwest::Client::new();
+        let mut timer = interval_at(Instant::now(), Duration::from_secs(1));
 
-        for fetch_index in 0..u64::max_value() {
-            if TERMINATE.load(Ordering::Relaxed) {
-                info!("Received terminate signal");
-                break;
-            }
-            sleep(Duration::from_millis(307)).await;
+        let mut fetch_index = 0;
+        while !TERMINATE.load(Ordering::Relaxed) {
+            timer.tick().await;
 
             let now_ms: u128 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
             let request = client.get(self.url.clone()).build()?;
-            let response = match client.execute(request).await {
-                Ok(resp) => resp,
+            match client.execute(request).await {
+                Ok(response) => {
+                    let body = response.text().await?;
+                    let metric_groups = prometheus_parser::parse_text(&body)?;
+                    if metric_groups.is_empty() {
+                        debug!("failed to request body: {:?}", body);
+                    }
+                    // Note that the target is up and online.
+                    let output = Output {
+                        run_id: Cow::Borrowed(&self.run_id),
+                        experiment: Cow::Borrowed(&self.experiment_name),
+                        variant: self.variant,
+                        target: Cow::Borrowed(&self.target_id),
+                        time: now_ms,
+                        fetch_index,
+                        metric_name: Cow::Borrowed("up"),
+                        metric_kind: MetricKind::Gauge,
+                        value: 1.0,
+                    };
+                    let buf = serde_json::to_string(&output)?;
+                    self.snd
+                        .send(buf)
+                        .await
+                        .expect("could not send over channel");
+                    // Pull the metrics set in configuration, re-emit them in our format.
+                    for (kind, metric_name, mm) in metric_groups
+                        .into_iter()
+                        .filter(|m| {
+                            self.target_metrics.is_empty() || self.target_metrics.contains(&m.name)
+                        })
+                        .filter_map(|m| match m.metrics {
+                            GroupKind::Summary(..)
+                            | GroupKind::Histogram(..)
+                            | GroupKind::Untyped(..) => None,
+                            GroupKind::Counter(mm) => Some((MetricKind::Counter, m.name, mm)),
+                            GroupKind::Gauge(mm) => Some((MetricKind::Gauge, m.name, mm)),
+                        })
+                    {
+                        for (k, v) in mm.iter() {
+                            let timestamp = k.timestamp.map(|x| x as u128).unwrap_or(now_ms);
+                            let value = v.value;
+                            let output = Output {
+                                run_id: Cow::Borrowed(&self.run_id),
+                                experiment: Cow::Borrowed(&self.experiment_name),
+                                variant: self.variant,
+                                target: Cow::Borrowed(&self.target_id),
+                                time: timestamp,
+                                fetch_index,
+                                metric_name: Cow::Borrowed(&metric_name),
+                                metric_kind: kind,
+                                value,
+                            };
+                            let buf = serde_json::to_string(&output)?;
+                            self.snd
+                                .send(buf)
+                                .await
+                                .expect("could not send over channel");
+                        }
+                    }
+                }
                 Err(e) => {
                     debug!(
                         "Did not receive a response from {} with error: {}",
                         self.target_id, e
                     );
-                    continue;
-                }
-            };
-            let body = response.text().await?;
-            let metric_groups = prometheus_parser::parse_text(&body)?;
-            if metric_groups.is_empty() {
-                debug!("failed to request body: {:?}", body);
-            }
-            for metric in metric_groups {
-                let metric_name = metric.name;
-                let (kind, mm) = match metric.metrics {
-                    GroupKind::Summary(..) | GroupKind::Histogram(..) | GroupKind::Untyped(..) => {
-                        continue
-                    }
-                    GroupKind::Counter(mm) => (soak::MetricKind::Counter, mm),
-                    GroupKind::Gauge(mm) => (soak::MetricKind::Gauge, mm),
-                };
-                for (k, v) in mm.iter() {
-                    let timestamp = k.timestamp.map(|x| x as u128).unwrap_or(now_ms);
-                    let value = v.value;
-                    let output = soak::Output {
+                    // Note that the target is NOT online.
+                    let output = Output {
                         run_id: Cow::Borrowed(&self.run_id),
                         experiment: Cow::Borrowed(&self.experiment_name),
                         variant: self.variant,
                         target: Cow::Borrowed(&self.target_id),
-                        time: timestamp,
+                        time: now_ms,
                         fetch_index,
-                        metric_name: Cow::Borrowed(&metric_name),
-                        metric_kind: kind,
-                        metric_labels: k.labels.clone(),
-                        value,
+                        metric_name: Cow::Borrowed("up"),
+                        metric_kind: MetricKind::Gauge,
+                        value: 0.0,
                     };
                     let buf = serde_json::to_string(&output)?;
                     self.snd
@@ -258,15 +316,18 @@ impl TargetWorker {
                         .await
                         .expect("could not send over channel");
                 }
-            }
+            };
+            fetch_index = fetch_index.wrapping_add(1);
         }
+
+        info!("Received terminate signal");
         Ok(())
     }
 }
 
 struct Worker {
     experiment_name: String,
-    variant: soak::Variant,
+    variant: Variant,
     targets: Vec<(Target, Url)>,
     capture_path: String,
 }
@@ -304,6 +365,7 @@ impl Worker {
                 url,
                 Arc::clone(&run_id),
                 self.variant,
+                target.metrics,
             );
             tokio::spawn(tp.run());
         }
@@ -336,6 +398,61 @@ impl Worker {
 
         Ok(())
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum Variant {
+    Baseline,
+    Comparison,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricKind {
+    Counter,
+    Gauge,
+}
+
+pub enum VariantError {
+    Unknown,
+}
+
+impl fmt::Display for VariantError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            VariantError::Unknown => write!(f, "unknown, must be baseline|comparison"),
+        }
+    }
+}
+
+impl FromStr for Variant {
+    type Err = VariantError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "baseline" => Ok(Self::Baseline),
+            "comparison" => Ok(Self::Comparison),
+            _ => Err(VariantError::Unknown),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Output<'a> {
+    #[serde(borrow)]
+    /// An id that is mostly unique to this run, allowing us to distinguish
+    /// duplications of the same observational setup.
+    pub run_id: Cow<'a, Uuid>,
+    #[serde(borrow)]
+    pub experiment: Cow<'a, str>,
+    pub variant: Variant,
+    pub target: Cow<'a, str>,
+    pub time: u128,
+    pub fetch_index: u64,
+    pub metric_name: Cow<'a, str>,
+    pub metric_kind: MetricKind,
+    pub value: f64,
 }
 
 fn get_config() -> Result<Config, Error> {
