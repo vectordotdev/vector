@@ -5,7 +5,7 @@ namespace: vector
 
 resources:
   - configmap.yaml
+  - deployment.yaml
   - service-headless.yaml
   - service.yaml
   - serviceaccount.yaml
-  - statefulset.yaml
