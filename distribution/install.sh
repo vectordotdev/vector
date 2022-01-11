@@ -210,13 +210,22 @@ add_to_path() {
 
 get_gnu_musl_glibc() {
   need_cmd ldd
+  need_cmd bc
   need_cmd awk
   # Detect both gnu and musl
+  # Also detect glibc versions older than 2.18 and return musl for these
+  # Required until we identify minimum supported version
+  # TODO: https://github.com/vectordotdev/vector/issues/10807
   local _ldd_version
   local _glibc_version
   _ldd_version=$(ldd --version 2>&1)
   if [[ $_ldd_version =~ "GNU" ]] || [[ $_ldd_version =~ "GLIBC" ]]; then
-    echo "gnu"
+    _glibc_version=$(echo "$_ldd_version" | awk '/ldd/{print $NF}')
+    if [ 1 -eq "$(echo "${_glibc_version} < 2.18" | bc)" ]; then
+      echo "musl"
+    else
+      echo "gnu"
+    fi
   elif [[ $_ldd_version =~ "musl" ]]; then
     echo "musl"
   else
