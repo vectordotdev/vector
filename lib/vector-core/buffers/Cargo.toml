@@ -27,7 +27,7 @@ snafu = { version = "0.7.0", default-features = false, features = ["std"] }
 tokio = { version = "1.15.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
-tracing = { version = "0.1.29", default-features = false }
+tracing = { version = "0.1.29", default-features = false, features = ["attributes"] }
 
 [dev-dependencies]
 clap = "3.0.6"
@@ -44,10 +44,9 @@ metrics-exporter-prometheus = "0.7"
 metrics-util = { version = "0.10.2", default-features = false }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
-tracing = { version = "0.1.29", features = ["attributes"] }
 # https://github.com/tobz/tracing-fluent-assertions/pull/1
 tracing-fluent-assertions = { git = "https://github.com/vectordotdev/tracing-fluent-assertions", branch = "bump-tracing-subscriber" }
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["registry"] }
+tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
 human_bytes = "0.3.0"
 
 [[bench]]
