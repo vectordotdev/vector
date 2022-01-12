@@ -23,7 +23,7 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
-  depends_on      = [module.vector, module.http-gen]
+  depends_on      = [module.vector, module.tcp-gen, module.http-blackhole]
 }
 
 # Setup the soak pieces
@@ -43,12 +43,20 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
+  depends_on   = [module.http-blackhole]
 }
-module "http-gen" {
-  source        = "../../../common/terraform/modules/lading_http_gen"
-  type          = var.type
-  http-gen-yaml = file("${path.module}/../../../common/configs/http_gen_datadog_source.yaml")
-  namespace     = kubernetes_namespace.soak.metadata[0].name
-  lading_image  = var.lading_image
-  depends_on    = [module.vector]
+module "http-blackhole" {
+  source              = "../../../common/terraform/modules/lading_http_blackhole"
+  type                = var.type
+  http-blackhole-yaml = file("${path.module}/../../../common/configs/http_blackhole.yaml")
+  namespace           = kubernetes_namespace.soak.metadata[0].name
+  lading_image        = var.lading_image
+}
+module "tcp-gen" {
+  source       = "../../../common/terraform/modules/lading_tcp_gen"
+  type         = var.type
+  tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_fluent_source.yaml")
+  namespace    = kubernetes_namespace.soak.metadata[0].name
+  depends_on   = [module.vector]
+  lading_image = var.lading_image
 }

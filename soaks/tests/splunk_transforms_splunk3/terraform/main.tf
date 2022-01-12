@@ -1,6 +1,3 @@
-# Set up the providers needed to run this soak and other terraform related
-# business. Here we only require 'kubernetes' to interact with the soak
-# minikube.
 terraform {
   required_providers {
     kubernetes = {
@@ -10,8 +7,6 @@ terraform {
   }
 }
 
-# Rig the kubernetes provider to communicate with minikube. The details of
-# adjusting `~/.kube/config` are addressed by the soak control scripts.
 provider "kubernetes" {
   config_path = "~/.kube/config"
 }
@@ -23,7 +18,7 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
-  depends_on      = [module.vector, module.http-gen]
+  depends_on      = [module.vector, module.http-blackhole, module.http-gen]
 }
 
 # Setup the soak pieces
@@ -43,11 +38,19 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
+  depends_on   = [module.http-blackhole]
+}
+module "http-blackhole" {
+  source              = "../../../common/terraform/modules/lading_http_blackhole"
+  type                = var.type
+  http-blackhole-yaml = file("${path.module}/../../../common/configs/http_blackhole.yaml")
+  namespace           = kubernetes_namespace.soak.metadata[0].name
+  lading_image        = var.lading_image
 }
 module "http-gen" {
   source        = "../../../common/terraform/modules/lading_http_gen"
   type          = var.type
-  http-gen-yaml = file("${path.module}/../../../common/configs/http_gen_datadog_source.yaml")
+  http-gen-yaml = file("${path.module}/../../../common/configs/http_gen_splunk_source.yaml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
   lading_image  = var.lading_image
   depends_on    = [module.vector]

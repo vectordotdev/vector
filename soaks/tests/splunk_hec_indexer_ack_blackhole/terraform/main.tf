@@ -23,13 +23,13 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
-  depends_on      = [module.vector, module.http-gen]
+  depends_on      = [module.vector, module.splunk-hec-gen]
 }
 
 # Setup the soak pieces
 #
-# This soak config sets up a vector soak with lading/http-gen feeding into vector,
-# lading/http-blackhole receiving.
+# This soak config sets up a vector soak with lading/splunk-hec-gen feeding into vector,
+# blackhole receiving.
 resource "kubernetes_namespace" "soak" {
   metadata {
     name = "soak"
@@ -44,10 +44,10 @@ module "vector" {
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
 }
-module "http-gen" {
-  source        = "../../../common/terraform/modules/lading_http_gen"
+module "splunk-hec-gen" {
+  source        = "../../../common/terraform/modules/lading_splunk_hec_gen"
   type          = var.type
-  http-gen-yaml = file("${path.module}/../../../common/configs/http_gen_datadog_source.yaml")
+  splunk-hec-gen-yaml = file("${path.module}/../../../common/configs/splunk_hec_gen.yaml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
   lading_image  = var.lading_image
   depends_on    = [module.vector]
