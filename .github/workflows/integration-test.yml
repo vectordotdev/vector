@@ -56,7 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'eventstoredb_metrics'
           - test: 'gcp'
           - test: 'humio'
           - test: 'kafka'
@@ -100,6 +99,7 @@ jobs:
           - test: 'dnstap'
           - test: 'docker'
           - test: 'elasticsearch'
+          - test: 'eventstoredb'
           - test: 'fluent'
           - test: 'influxdb'
           - test: 'logstash'
