@@ -346,6 +346,7 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
