@@ -1,11 +1,9 @@
-use std::{io, usize};
-
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
+use crate::codecs::{decoding, encoding};
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -26,8 +24,8 @@ pub struct CharacterDelimitedDecoderOptions {
 }
 
 #[typetag::serde(name = "character_delimited")]
-impl FramingConfig for CharacterDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
+impl decoding::FramingConfig for CharacterDelimitedDecoderConfig {
+    fn build(&self) -> crate::Result<decoding::BoxedFramer> {
         if let Some(max_length) = self.character_delimited.max_length {
             Ok(Box::new(CharacterDelimitedDecoder::new_with_max_length(
                 self.character_delimited.delimiter,
@@ -77,7 +75,7 @@ impl CharacterDelimitedDecoder {
 
 impl Decoder for CharacterDelimitedDecoder {
     type Item = Bytes;
-    type Error = BoxedFramingError;
+    type Error = decoding::BoxedFramingError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         loop {
@@ -137,17 +135,46 @@ impl Decoder for CharacterDelimitedDecoder {
     }
 }
 
-impl<T> Encoder<T> for CharacterDelimitedDecoder
-where
-    T: AsRef<[u8]>,
-{
-    type Error = io::Error;
+/// Config used to build a `CharacterDelimitedEncoder`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CharacterDelimitedEncoderConfig {
+    character_delimited: CharacterDelimitedEncoderOptions,
+}
 
-    fn encode(&mut self, item: T, buf: &mut BytesMut) -> Result<(), io::Error> {
-        let item = item.as_ref();
-        buf.reserve(item.len() + 1);
-        buf.put(item);
-        buf.put_u8(self.delimiter as u8);
+/// Options for building a `CharacterDelimitedEncoder`.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct CharacterDelimitedEncoderOptions {
+    /// The character that delimits byte sequences.
+    delimiter: u8,
+}
+
+#[typetag::serde(name = "character_delimited")]
+impl encoding::FramingConfig for CharacterDelimitedEncoderConfig {
+    fn build(&self) -> crate::Result<encoding::BoxedFramer> {
+        Ok(Box::new(CharacterDelimitedEncoder::new(
+            self.character_delimited.delimiter,
+        )))
+    }
+}
+
+/// An encoder for handling bytes that are delimited by (a) chosen character(s).
+#[derive(Debug, Clone)]
+pub struct CharacterDelimitedEncoder {
+    delimiter: u8,
+}
+
+impl CharacterDelimitedEncoder {
+    /// Creates a `CharacterDelimitedEncoder` with the specified delimiter.
+    pub const fn new(delimiter: u8) -> Self {
+        Self { delimiter }
+    }
+}
+
+impl Encoder<()> for CharacterDelimitedEncoder {
+    type Error = encoding::BoxedFramingError;
+
+    fn encode(&mut self, _: (), buf: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
+        buf.put_u8(self.delimiter);
         Ok(())
     }
 }
@@ -170,10 +197,10 @@ mod tests {
 
     #[test]
     fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedDecoder::new(b'\n');
+        let mut codec = CharacterDelimitedEncoder::new(b'\n');
 
-        let mut buf = BytesMut::new();
-        codec.encode(b"abc", &mut buf).unwrap();
+        let mut buf = BytesMut::from("abc");
+        codec.encode((), &mut buf).unwrap();
 
         assert_eq!(b"abc\n", &buf[..]);
     }
