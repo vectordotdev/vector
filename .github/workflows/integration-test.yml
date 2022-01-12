@@ -92,8 +92,14 @@ jobs:
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'
+            env:
+              CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           - test: 'datadog-logs'
+            env:
+              CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           - test: 'datadog-metrics'
+            env:
+              CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           - test: 'dnstap'
           - test: 'docker'
           - test: 'elasticsearch'
@@ -108,12 +114,13 @@ jobs:
           - test: 'prometheus'
           - test: 'redis'
           - test: 'splunk'
-          - test: 'splunk-7'
+            env:
+              SPLUNK_VERSION: 7.3.9
+          - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
-        env:
-          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+        env: ${{ matrix.env }}
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 
