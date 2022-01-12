@@ -383,15 +383,11 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
-.PHONY: test-integration-splunk
-test-integration-splunk: ## Runs Splunk integration tests
+.PHONY: test-integration-splunk-7
+test-integration-splunk-7: ## Runs Splunk v7.3 integration tests
+	SPLUNK_VERSION=7.3.9 make test-integration-splunk
 ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
-	@scripts/setup_integration_env.sh splunk start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
+	make test-integration-splunk-cleanup
 endif
 
 tests/data/dnstap/socket:

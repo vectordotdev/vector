@@ -60,7 +60,6 @@ jobs:
           - test: 'kafka'
           - test: 'postgresql_metrics'
           - test: 'pulsar'
-          - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
@@ -108,6 +107,8 @@ jobs:
           - test: 'nginx'
           - test: 'prometheus'
           - test: 'redis'
+          - test: 'splunk'
+          - test: 'splunk-7'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
