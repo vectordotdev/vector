@@ -51,7 +51,7 @@ impl UnixSinkConfig {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::from_event_stream(sink),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }

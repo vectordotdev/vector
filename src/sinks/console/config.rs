@@ -45,12 +45,12 @@ impl SinkConfig for ConsoleSinkConfig {
         let encoding = self.encoding.clone();
 
         let sink: VectorSink = match self.target {
-            Target::Stdout => VectorSink::from_event_stream(WriterSink {
+            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stdout(),
                 encoding,
             }),
-            Target::Stderr => VectorSink::from_event_stream(WriterSink {
+            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stderr(),
                 encoding,

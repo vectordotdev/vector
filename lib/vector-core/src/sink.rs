@@ -57,11 +57,7 @@ impl VectorSink {
     }
 
     /// Converts an event stream into a `VectorSink`
-    ///
-    /// # Panics
-    ///
-    /// TODO
-    pub fn from_event_stream(sink: impl StreamSink<Event> + Send + 'static) -> Self {
+    pub fn from_event_streamsink(sink: impl StreamSink<Event> + Send + 'static) -> Self {
         let sink = Box::new(sink);
         VectorSink::Stream(Box::new(EventStream { sink }))
     }

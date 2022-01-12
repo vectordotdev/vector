@@ -143,6 +143,6 @@ impl HecMetricsSinkConfig {
             default_namespace: self.default_namespace.clone(),
         };
 
-        Ok(VectorSink::from_event_stream(sink))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }

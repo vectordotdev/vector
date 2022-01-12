@@ -117,7 +117,7 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(config, client).boxed();
 
-        Ok((VectorSink::from_event_stream(sink), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

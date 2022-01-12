@@ -83,7 +83,7 @@ impl UdpSinkConfig {
         let connector = self.build_connector(cx.clone())?;
         let sink = UdpSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::from_event_stream(sink),
+            VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
         ))
     }

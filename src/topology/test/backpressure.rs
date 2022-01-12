@@ -237,7 +237,7 @@ mod test_sink {
                 num_to_consume: self.num_to_consume,
             };
             let healthcheck = futures::future::ok(()).boxed();
-            Ok((VectorSink::from_event_stream(sink), healthcheck))
+            Ok((VectorSink::from_event_streamsink(sink), healthcheck))
         }
 
         fn input_type(&self) -> DataType {

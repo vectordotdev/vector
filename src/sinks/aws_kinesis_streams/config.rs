@@ -137,7 +137,7 @@ impl SinkConfig for KinesisSinkConfig {
             request_builder,
             partition_key_field: self.partition_key_field.clone(),
         };
-        Ok((VectorSink::from_event_stream(sink), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

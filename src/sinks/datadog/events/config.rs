@@ -84,7 +84,7 @@ impl DatadogEventsConfig {
             acker: cx.acker(),
         };
 
-        Ok(VectorSink::from_event_stream(sink))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 

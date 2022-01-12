@@ -104,7 +104,7 @@ impl SinkConfig for UnitTestSinkConfig {
         };
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::from_event_stream(sink), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn sink_type(&self) -> &'static str {

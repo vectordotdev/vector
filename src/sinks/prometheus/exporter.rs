@@ -125,7 +125,7 @@ impl SinkConfig for PrometheusExporterConfig {
         let sink = PrometheusExporter::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::from_event_stream(sink), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

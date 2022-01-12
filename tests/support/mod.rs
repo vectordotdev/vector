@@ -380,7 +380,7 @@ impl SinkConfig for MockSinkConfig {
             future::err(HealthcheckError::Unhealthy.into())
         };
 
-        Ok((VectorSink::from_event_stream(sink), healthcheck.boxed()))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
     fn input_type(&self) -> DataType {

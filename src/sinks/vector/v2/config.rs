@@ -84,7 +84,7 @@ impl VectorConfig {
         };
 
         Ok((
-            VectorSinkType::from_event_stream(sink),
+            VectorSinkType::from_event_streamsink(sink),
             Box::pin(healthcheck),
         ))
     }
