@@ -247,8 +247,9 @@ toby@consigliere:~/src/vector/bugs/github-10430$ ./vector-fix -c config.toml
 2022-01-12T20:42:49.559612Z  INFO vector::app: Log level is enabled. level="vector=info,codec=info,vrl=info,file_source=info,tower_limit=trace,rdkafka=info,buffers=info"
 2022-01-12T20:42:49.559657Z  INFO vector::app: Loading configs. paths=["config.toml"]
 2022-01-12T20:42:49.560448Z  INFO vector::sources::stdin: Capturing STDIN.
-2022-01-12T20:42:49.573613Z  WARN buffers::disk: 
-this may indicate that you upgraded to 0.19.x prior to a regression being fixed which deals with disk buffer directory names.  see https://github.com/vectordotdev/vector/issues/10430 for more information about this situation. existing_record_count=5 existing_byte_size=565
+2022-01-12T20:42:49.573613Z  WARN buffers::disk: this may indicate that you upgraded to 0.19.x prior to a regression being fixed which deals with disk buffer directory names.
+
+see https://github.com/vectordotdev/vector/issues/10430 for more information about this situation. existing_record_count=5 existing_byte_size=565
 2022-01-12T20:42:49.596575Z  INFO vector::topology::running: Running healthchecks.
 2022-01-12T20:42:49.596612Z  INFO vector::topology::running: Starting source. key=stdin
 2022-01-12T20:42:49.596624Z  INFO vector::topology::builder: Healthcheck: Passed.
