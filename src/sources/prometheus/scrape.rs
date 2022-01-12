@@ -88,7 +88,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
+            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
@@ -578,7 +578,8 @@ mod test {
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
-                flush_period_secs: 1,
+                distributions_as_summaries: false,
+                flush_period_secs: Duration::from_secs(1),
             },
         );
 

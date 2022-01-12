@@ -188,7 +188,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
-        .context(super::UriParseError)
+        .context(super::UriParseSnafu)
         .map_err(Into::into)
 }
 

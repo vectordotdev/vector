@@ -93,9 +93,9 @@ impl Remap {
                 let mut buffer = String::new();
 
                 File::open(path)
-                    .with_context(|| FileOpenFailed { path })?
+                    .with_context(|_| FileOpenFailedSnafu { path })?
                     .read_to_string(&mut buffer)
-                    .with_context(|| FileReadFailed { path })?;
+                    .with_context(|_| FileReadFailedSnafu { path })?;
 
                 buffer
             }

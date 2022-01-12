@@ -96,7 +96,7 @@ impl GlobalOptions {
         DirBuilder::new()
             .recursive(true)
             .create(&data_subdir)
-            .with_context(|| CouldNotCreate { subdir, data_dir })?;
+            .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
     }
 }

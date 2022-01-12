@@ -56,9 +56,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'datadog-metrics'
           - test: 'eventstoredb_metrics'
-          - test: 'fluent'
           - test: 'humio'
           - test: 'influxdb'
           - test: 'kafka'
@@ -99,8 +97,10 @@ jobs:
           - test: 'clickhouse'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
+          - test: 'datadog-metrics'
           - test: 'docker'
           - test: 'elasticsearch'
+          - test: 'fluent'
           - test: 'gcp'
           - test: 'logstash'
           - test: 'loki'
