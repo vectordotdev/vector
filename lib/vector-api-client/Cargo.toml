@@ -19,8 +19,8 @@ anyhow = "1.0.52"
 async-stream = "0.3.2"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.15.0", features = ["full"] }
-tokio-stream = { version = "0.1.8", features = ["sync"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", features = ["full"] }
+tokio-stream = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", features = ["sync"] }
 
 # GraphQL
 graphql_client = "0.10.0"

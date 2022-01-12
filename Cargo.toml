@@ -117,10 +117,10 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 async-stream = "0.3.2"
 async-trait = "0.1.52"
 futures = { version = "0.3.19", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.15.0", default-features = false, features = ["full"] }
-tokio-openssl = { version = "0.6.3", default-features = false }
-tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
-tokio-util = { version = "0.6", default-features = false, features = ["time"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", default-features = true, features = ["full"] }
+tokio-openssl = { version = "0.6.3", default-features = true }
+tokio-stream = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", default-features = true, features = ["net", "sync", "time"] }
+tokio-util = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", default-features = true, features = ["time", "codec"] }
 console-subscriber = { version = "0.1.0", optional = true }
 
 # Tracing
@@ -328,7 +328,7 @@ pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.9", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.2.0"
-tokio = { version = "1.15.0", features = ["test-util"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "49192be3de9fbac56b3db026a438640f0b27f0e5", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
