@@ -323,10 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-datadog-metrics
-test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
-
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
 ifeq ($(AUTOSPAWN), true)
