@@ -4,4 +4,7 @@ kind: Kustomization
 namespace: vector
 
 resources:
-  - resources.yaml
+  - configmap.yaml
+  - daemonset.yaml
+  - rbac.yaml
+  - serviceaccount.yaml

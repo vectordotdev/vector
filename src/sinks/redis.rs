@@ -130,7 +130,7 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-        let conn = self.build_client().await.context(RedisCreateFailed)?;
+        let conn = self.build_client().await.context(RedisCreateFailedSnafu)?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
         let sink = self.new(conn, cx)?;
         Ok((sink, healthcheck))
@@ -156,7 +156,7 @@ impl RedisSinkConfig {
             ..Default::default()
         });
 
-        let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
+        let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
         let encoding = self.encoding.clone();
 
         let method = self.list_option.map(|option| option.method);

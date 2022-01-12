@@ -24,12 +24,12 @@ where
 
         pin_mut!(body);
         while let Some(buf) = body.data().await {
-            let buf = buf.context(Reading)?;
+            let buf = buf.context(ReadingSnafu)?;
             let chunk = buf.chunk();
             let responses = decoder.process_next_chunk(chunk.as_ref());
             emit!(&internal_events::ChunkProcessed{ byte_size: chunk.len() });
             for response in responses {
-                let response = response.context(Parsing)?;
+                let response = response.context(ParsingSnafu)?;
                 yield response;
             }
         }

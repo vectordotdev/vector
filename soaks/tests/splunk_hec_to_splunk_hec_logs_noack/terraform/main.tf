@@ -23,6 +23,7 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
+  depends_on      = [module.vector, module.splunk-hec-blackhole, module.splunk-hec-gen]
 }
 
 # Setup the soak pieces

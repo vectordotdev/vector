@@ -65,7 +65,7 @@ impl TransformConfig for GrokParserConfig {
                 paths: HashMap::new(),
             })
             .map(Transform::function)
-            .context(InvalidGrok)?)
+            .context(InvalidGrokSnafu)?)
     }
 
     fn input_type(&self) -> DataType {
