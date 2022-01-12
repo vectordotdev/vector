@@ -16,7 +16,9 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
 
 use crate::{
-    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, Output, ProxyConfig, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -174,8 +176,8 @@ impl TransformConfig for Ec2Metadata {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -320,7 +322,7 @@ impl MetadataClient {
             .await?
             .map(|body| {
                 serde_json::from_slice(&body[..])
-                    .context(ParseIdentityDocument {})
+                    .context(ParseIdentityDocumentSnafu {})
                     .map_err(Into::into)
             })
             .transpose()
@@ -393,7 +395,7 @@ impl MetadataClient {
                             mac
                         );
 
-                        let subnet_path = subnet_path.parse().context(ParsePath {
+                        let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),
                         })?;
 
@@ -406,7 +408,7 @@ impl MetadataClient {
                         let vpc_path =
                             format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
 
-                        let vpc_path = vpc_path.parse().context(ParsePath {
+                        let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
                         })?;
 
@@ -441,7 +443,10 @@ impl MetadataClient {
     }
 
     async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await.with_context(|| FetchToken {})?;
+        let token = self
+            .get_token()
+            .await
+            .with_context(|_| FetchTokenSnafu {})?;
 
         let mut parts = self.host.clone().into_parts();
 
@@ -551,7 +556,10 @@ mod integration_tests {
         transforms::TaskTransform,
     };
 
-    const HOST: &str = "http://localhost:8111";
+    fn ec2_metadata_address() -> String {
+        std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
+    }
+
     const TEST_METADATA: [(&str, &str); 12] = [
         (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
         (PUBLIC_IPV4_KEY, "192.1.1.1"),
@@ -593,7 +601,7 @@ mod integration_tests {
         trace_init();
 
         let transform = make_transform(Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
+            endpoint: Some(ec2_metadata_address()),
             ..Default::default()
         })
         .await;
@@ -621,7 +629,7 @@ mod integration_tests {
         trace_init();
 
         let transform = make_transform(Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
+            endpoint: Some(ec2_metadata_address()),
             ..Default::default()
         })
         .await;
@@ -647,7 +655,7 @@ mod integration_tests {
     #[tokio::test]
     async fn fields_log() {
         let transform = make_transform(Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
+            endpoint: Some(ec2_metadata_address()),
             fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
             ..Default::default()
         })
@@ -673,7 +681,7 @@ mod integration_tests {
     #[tokio::test]
     async fn fields_metric() {
         let transform = make_transform(Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
+            endpoint: Some(ec2_metadata_address()),
             fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
             ..Default::default()
         })
@@ -700,7 +708,7 @@ mod integration_tests {
     async fn namespace_log() {
         {
             let transform = make_transform(Ec2Metadata {
-                endpoint: Some(HOST.to_string()),
+                endpoint: Some(ec2_metadata_address()),
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
             })
@@ -726,7 +734,7 @@ mod integration_tests {
         {
             // Set an empty namespace to ensure we don't prepend one.
             let transform = make_transform(Ec2Metadata {
-                endpoint: Some(HOST.to_string()),
+                endpoint: Some(ec2_metadata_address()),
                 namespace: Some("".into()),
                 ..Default::default()
             })
@@ -754,7 +762,7 @@ mod integration_tests {
     async fn namespace_metric() {
         {
             let transform = make_transform(Ec2Metadata {
-                endpoint: Some(HOST.to_string()),
+                endpoint: Some(ec2_metadata_address()),
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
             })
@@ -782,7 +790,7 @@ mod integration_tests {
         {
             // Set an empty namespace to ensure we don't prepend one.
             let transform = make_transform(Ec2Metadata {
-                endpoint: Some(HOST.to_string()),
+                endpoint: Some(ec2_metadata_address()),
                 namespace: Some("".into()),
                 ..Default::default()
             })

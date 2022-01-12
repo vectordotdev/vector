@@ -138,7 +138,7 @@ impl SqsSinkConfig {
             })
             .await
             .map(|_| ())
-            .context(GetQueueAttributes)
+            .context(GetQueueAttributesSnafu)
             .map_err(Into::into)
     }
 
@@ -171,7 +171,7 @@ impl SqsSink {
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
-            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplate)?),
+            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplateSnafu)?),
             (Some(_), false) => return Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
@@ -396,13 +396,17 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string};
 
+    fn sqs_address() -> String {
+        std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     #[tokio::test]
     async fn sqs_send_message_batch() {
         let cx = SinkContext::new_test();
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4566".into(),
+            endpoint: sqs_address(),
         };
 
         let queue_name = gen_queue_name();
@@ -413,7 +417,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+            region: RegionOrEndpoint::with_endpoint(sqs_address().as_str()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             message_deduplication_id: None,

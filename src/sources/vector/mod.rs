@@ -4,7 +4,7 @@ pub mod v2;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{
-    DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription,
+    GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -68,10 +68,10 @@ impl SourceConfig for VectorConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
+    fn outputs(&self) -> Vec<Output> {
         match self {
-            VectorConfig::V1(v1) => v1.config.output_type(),
-            VectorConfig::V2(v2) => v2.config.output_type(),
+            VectorConfig::V1(v1) => v1.config.outputs(),
+            VectorConfig::V2(v2) => v2.config.outputs(),
         }
     }
 
@@ -81,6 +81,7 @@ impl SourceConfig for VectorConfig {
             VectorConfig::V2(v2) => v2.config.source_type(),
         }
     }
+
     fn resources(&self) -> Vec<Resource> {
         match self {
             VectorConfig::V1(v1) => v1.config.resources(),

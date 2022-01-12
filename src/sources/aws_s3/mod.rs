@@ -15,7 +15,7 @@ use crate::{
         rusoto::{self, RegionOrEndpoint},
     },
     config::{
-        AcknowledgementsConfig, DataType, ProxyConfig, SourceConfig, SourceContext,
+        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
         SourceDescription,
     },
     line_agg,
@@ -81,18 +81,19 @@ impl SourceConfig for AwsS3Config {
             .as_ref()
             .map(|config| config.try_into())
             .transpose()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, self.acknowledgements),
+                    .run(cx, acknowledgements),
             )),
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -108,13 +109,13 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
-        let region: Region = (&self.region).try_into().context(RegionParse {})?;
+        let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|| Client {})?;
+        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
-            .context(Credentials {})?
+            .context(CredentialsSnafu {})?
             .into();
         let s3_client = S3Client::new_with(
             client.clone(),
@@ -139,7 +140,7 @@ impl AwsS3Config {
                     multiline,
                 )
                 .await
-                .context(Initialize {})
+                .context(InitializeSnafu {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
@@ -321,7 +322,7 @@ mod integration_tests {
         test_util::{
             collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[tokio::test]
@@ -479,9 +480,13 @@ mod integration_tests {
         .await;
     }
 
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
@@ -530,7 +535,7 @@ mod integration_tests {
 
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
-        let (tx, rx) = Pipeline::new_test_finalize(status);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
         let cx = SourceContext::new_test(tx);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
@@ -632,7 +637,7 @@ mod integration_tests {
     fn s3_client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         S3Client::new(region)
@@ -641,7 +646,7 @@ mod integration_tests {
     fn sqs_client() -> SqsClient {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         SqsClient::new(region)

@@ -10,7 +10,7 @@ license = "MPL-2.0"
 
 # Serde
 serde = { version = "1.0.133", features = ["derive"] }
-serde_json = { version = "1.0.73", features = ["raw_value"] }
+serde_json = { version = "1.0.74", features = ["raw_value"] }
 
 # Error handling
 anyhow = "1.0.52"
@@ -26,7 +26,7 @@ tokio-stream = { version = "0.1.8", features = ["sync"] }
 graphql_client = "0.10.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.8", features = ["json"] }
+reqwest = { version = "0.11.9", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs

@@ -9,28 +9,25 @@ use std::{
     fs::{create_dir, OpenOptions},
     io::Write,
     path::PathBuf,
-    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
-    task::Context,
 };
 
 use async_trait::async_trait;
 use futures::{
-    channel::mpsc,
     future,
     stream::{self, BoxStream},
     task::Poll,
-    FutureExt, Sink, SinkExt, StreamExt,
+    FutureExt, Stream, StreamExt,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
         TransformContext,
     },
     event::{
@@ -38,15 +35,15 @@ use vector::{
         Event, Value,
     },
     sinks::{util::StreamSink, Healthcheck, VectorSink},
+    source_sender::{ReceiverStream, SourceSender},
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
-    Pipeline,
 };
 use vector_core::buffers::Acker;
 
-pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
+pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
@@ -54,39 +51,39 @@ pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipel
 pub fn sink_with_data(
     channel_size: usize,
     data: &str,
-) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
+) -> (impl Stream<Item = Event>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new_with_data(tx, true, data);
     (rx, sink)
 }
 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
-) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
+) -> (impl Stream<Item = Event>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
 
-pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
-    MockSinkConfig::new(DeadSink::new(), false)
+pub fn sink_dead() -> MockSinkConfig {
+    MockSinkConfig::new_dead(false)
 }
 
-pub fn source() -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
+pub fn source() -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
 
-pub fn source_with_data(data: &str) -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
+pub fn source_with_data(data: &str) -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new_with_data(rx, data);
     (tx, source)
 }
 
-pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsize>) {
+pub fn source_with_event_counter() -> (SourceSender, MockSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
+    let (tx, rx) = SourceSender::new_with_buffer(1);
     let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
     (tx, source, event_counter)
 }
@@ -125,7 +122,7 @@ pub fn create_directory() -> PathBuf {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
     #[serde(skip)]
-    receiver: Arc<Mutex<Option<mpsc::Receiver<Event>>>>,
+    receiver: Arc<Mutex<Option<ReceiverStream<Event>>>>,
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
@@ -135,7 +132,7 @@ pub struct MockSourceConfig {
 }
 
 impl MockSourceConfig {
-    pub fn new(receiver: mpsc::Receiver<Event>) -> Self {
+    pub fn new(receiver: ReceiverStream<Event>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -144,7 +141,7 @@ impl MockSourceConfig {
         }
     }
 
-    pub fn new_with_data(receiver: mpsc::Receiver<Event>, data: &str) -> Self {
+    pub fn new_with_data(receiver: ReceiverStream<Event>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -154,7 +151,7 @@ impl MockSourceConfig {
     }
 
     pub fn new_with_event_counter(
-        receiver: mpsc::Receiver<Event>,
+        receiver: ReceiverStream<Event>,
         event_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {
@@ -179,9 +176,9 @@ impl SourceConfig for MockSourceConfig {
         let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(cx.shutdown);
         let mut _token = None;
-        let out = cx.out;
+        let mut out = cx.out;
         Ok(Box::pin(async move {
-            stream::poll_fn(move |cx| {
+            let mut stream = stream::poll_fn(move |cx| {
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll_unpin(cx) {
                         Poll::Ready(res) => {
@@ -199,16 +196,23 @@ impl SourceConfig for MockSourceConfig {
                 if let Some(counter) = &event_counter {
                     counter.fetch_add(1, Ordering::Relaxed);
                 }
-            })
-            .map(Ok)
-            .forward(out.sink_map_err(|error| error!(message = "Error sending in sink..", %error)))
-            .inspect(|_| info!("Finished sending."))
-            .await
+            });
+
+            match out.send_all(&mut stream).await {
+                Ok(()) => {
+                    info!("Finished sending.");
+                    Ok(())
+                }
+                Err(error) => {
+                    error!(message = "Error sending in sink..", %error);
+                    Err(())
+                }
+            }
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        self.data_type.unwrap()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.data_type.unwrap())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -298,8 +302,8 @@ impl TransformConfig for MockTransformConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -308,35 +312,47 @@ impl TransformConfig for MockTransformConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSinkConfig<T>
-where
-    T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Display,
-{
+pub struct MockSinkConfig {
     #[serde(skip)]
-    sink: Option<T>,
+    sink: Mode,
     #[serde(skip)]
     healthy: bool,
     // something for serde to use, so we can trigger rebuilds
     data: Option<String>,
 }
 
-impl<T> MockSinkConfig<T>
-where
-    T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Display,
-{
-    pub fn new(sink: T, healthy: bool) -> Self {
+#[derive(Debug, Clone)]
+enum Mode {
+    Normal(SourceSender),
+    Dead,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Mode::Dead
+    }
+}
+
+impl MockSinkConfig {
+    pub fn new(sink: SourceSender, healthy: bool) -> Self {
         Self {
-            sink: Some(sink),
+            sink: Mode::Normal(sink),
             healthy,
             data: None,
         }
     }
 
-    pub fn new_with_data(sink: T, healthy: bool, data: &str) -> Self {
+    pub fn new_dead(healthy: bool) -> Self {
         Self {
-            sink: Some(sink),
+            sink: Mode::Dead,
+            healthy,
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(sink: SourceSender, healthy: bool, data: &str) -> Self {
+        Self {
+            sink: Mode::Normal(sink),
             healthy,
             data: Some(data.into()),
         }
@@ -351,15 +367,11 @@ enum HealthcheckError {
 
 #[async_trait]
 #[typetag::serialize(name = "mock")]
-impl<T> SinkConfig for MockSinkConfig<T>
-where
-    T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Display,
-{
+impl SinkConfig for MockSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = MockSink {
             acker: cx.acker(),
-            sink: self.sink.clone().unwrap(),
+            sink: self.sink.clone(),
         };
 
         let healthcheck = if self.healthy {
@@ -384,57 +396,31 @@ where
     }
 }
 
-struct MockSink<S> {
+struct MockSink {
     acker: Acker,
-    sink: S,
+    sink: Mode,
 }
 
 #[async_trait]
-impl<S> StreamSink for MockSink<S>
-where
-    S: Sink<Event> + Send + std::marker::Unpin,
-    <S as Sink<Event>>::Error: std::fmt::Display,
-{
+impl StreamSink for MockSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
-            if let Err(error) = self.sink.send(event).await {
-                error!(message = "Ingesting an event failed at mock sink.", %error);
-            }
+        match self.sink {
+            Mode::Normal(mut sink) => {
+                // We have an inner sink, so forward the input normally
+                while let Some(event) = input.next().await {
+                    if let Err(error) = sink.send(event).await {
+                        error!(message = "Ingesting an event failed at mock sink.", %error);
+                    }
 
-            self.acker.ack(1);
+                    self.acker.ack(1);
+                }
+            }
+            Mode::Dead => {
+                // Simulate a dead sink and never poll the input
+                futures::future::pending::<()>().await;
+            }
         }
 
         Ok(())
-    }
-}
-
-/// Represents a sink that's never ready.
-/// Useful to simulate an upstream sink server that is down.
-#[derive(Debug, Clone)]
-pub struct DeadSink<T>(std::marker::PhantomData<T>);
-
-impl<T> DeadSink<T> {
-    pub fn new() -> Self {
-        Self(std::marker::PhantomData)
-    }
-}
-
-impl<T> Sink<T> for DeadSink<T> {
-    type Error = &'static str;
-
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Pending
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Pending
-    }
-
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Pending
-    }
-
-    fn start_send(self: Pin<&mut Self>, _item: T) -> Result<(), Self::Error> {
-        Err("never ready")
     }
 }

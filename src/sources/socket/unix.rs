@@ -18,7 +18,7 @@ use crate::{
         util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
-    Pipeline,
+    SourceSender,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -79,7 +79,7 @@ pub(super) fn unix_datagram(
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     build_unix_datagram_source(
         path,
@@ -98,7 +98,7 @@ pub(super) fn unix_stream(
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     build_unix_stream_source(
         path,

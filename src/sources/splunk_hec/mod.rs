@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt};
+use futures::{stream, FutureExt};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -24,15 +24,18 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
     serde::bool_or_struct,
+    source_sender::StreamSendError,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
 
 mod acknowledgements;
@@ -85,7 +88,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: HecAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             store_hec_token: false,
         }
     }
@@ -148,8 +151,8 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -171,6 +174,10 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+        let acknowledgements = cx
+            .globals
+            .acknowledgements
+            .merge(&config.acknowledgements.inner);
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
@@ -178,7 +185,7 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = config.acknowledgements.inner.enabled.then(|| {
+        let idx_ack = acknowledgements.enabled().then(|| {
             Arc::new(IndexerAcknowledgement::new(
                 config.acknowledgements.clone(),
                 shutdown,
@@ -195,7 +202,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
         let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
@@ -226,9 +233,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -267,10 +272,13 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         ));
 
-                        let res = out.send_all(&mut events).await;
-
-                        out.flush().await?;
-                        res.map(|_| maybe_ack_id)
+                        match out.send_result_stream(&mut events).await {
+                            Ok(()) => Ok(maybe_ack_id),
+                            Err(StreamSendError::Stream(error)) => Err(error),
+                            Err(StreamSendError::Closed(_)) => {
+                                Err(Rejection::from(ApiError::ServerShutdown))
+                            }
+                        }
                     }
                 },
             )
@@ -278,7 +286,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
@@ -301,9 +309,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -329,6 +335,7 @@ impl SplunkSource {
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
+                            .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
             )
@@ -980,7 +987,7 @@ mod tests {
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
         },
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -1005,7 +1012,7 @@ mod tests {
         store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());

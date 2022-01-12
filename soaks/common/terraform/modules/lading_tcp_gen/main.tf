@@ -97,6 +97,7 @@ resource "kubernetes_deployment" "tcp-gen" {
               port = 9090
               path = "/metrics"
             }
+            initial_delay_seconds = 10
           }
         }
 

@@ -526,14 +526,16 @@ impl Ledger {
         usage_handle: BufferUsageHandle,
     ) -> Result<Ledger, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
-        fs::create_dir_all(&config.data_dir).await.context(Io)?;
+        fs::create_dir_all(&config.data_dir)
+            .await
+            .context(IoSnafu)?;
 
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
-        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(Io)?;
-        if !ledger_lock.try_lock().context(Io)? {
+        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
+        if !ledger_lock.try_lock().context(IoSnafu)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
 
@@ -545,11 +547,11 @@ impl Ledger {
             .create(true)
             .open(&ledger_path)
             .await
-            .context(Io)?;
+            .context(IoSnafu)?;
 
         // If we just created the ledger file, then we need to create the default ledger state, and
         // then serialize and write to the file, before trying to load it as a memory-mapped file.
-        let ledger_metadata = ledger_handle.metadata().await.context(Io)?;
+        let ledger_metadata = ledger_handle.metadata().await.context(IoSnafu)?;
         let ledger_len = ledger_metadata.len();
         if ledger_len == 0 {
             debug!("ledger file is brand new, populating with default state");
@@ -560,7 +562,7 @@ impl Ledger {
                         ledger_handle
                             .write_all(archive.get_backing_ref())
                             .await
-                            .context(Io)?;
+                            .context(IoSnafu)?;
                         break;
                     }
                     Err(SerializeError::FailedToSerialize(reason)) => {
@@ -575,7 +577,11 @@ impl Ledger {
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
         let ledger_handle = ledger_handle.into_std().await;
-        let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle).context(Io)? };
+        let ledger_mmap = unsafe {
+            MmapOptions::new()
+                .map_mut(&ledger_handle)
+                .context(IoSnafu)?
+        };
         let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
             // Deserialized the ledger state without issue from an existing file.
             Ok(backed) => backed,
@@ -626,10 +632,10 @@ impl Ledger {
         // When the reader does any necessary seeking to get to the record it left off on, it will
         // adjust the "total buffer size" downwards for each record it runs through, leaving "total
         // buffer size" at the correct value.
-        let mut dat_reader = fs::read_dir(&self.config.data_dir).await.context(Io)?;
+        let mut dat_reader = fs::read_dir(&self.config.data_dir).await.context(IoSnafu)?;
 
         let mut total_buffer_size = 0;
-        while let Some(dir_entry) = dat_reader.next_entry().await.context(Io)? {
+        while let Some(dir_entry) = dat_reader.next_entry().await.context(IoSnafu)? {
             if let Some(file_name) = dir_entry.file_name().to_str() {
                 // I really _do_ want to only find files with a .dat extension, as that's what the
                 // code generates, and having them be .dAt or .Dat or whatever would indicate that
@@ -637,7 +643,7 @@ impl Ledger {
                 // of filenames from another program/OS, then it would be a different story.
                 #[allow(clippy::case_sensitive_file_extension_comparisons)]
                 if file_name.ends_with(".dat") {
-                    let file_size = dir_entry.metadata().await.context(Io)?;
+                    let file_size = dir_entry.metadata().await.context(IoSnafu)?;
                     total_buffer_size += file_size.len();
 
                     debug!(

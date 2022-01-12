@@ -1,0 +1,26 @@
+[transforms.droptest]
+  type = "remap"
+  inputs = []
+  drop_on_error = true
+  drop_on_abort = true
+  reroute_dropped = true
+  source = "abort"
+
+[[tests]]
+  name = "remap_dropped_branch"
+  no_outputs_from = [ "droptest" ]
+
+  [[tests.inputs]]
+    insert_at = "droptest"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "this is a dropped event"
+
+  [[tests.outputs]]
+    extract_from = "droptest.dropped"
+
+    [[tests.outputs.conditions]]
+      type = "vrl"
+      source = """
+          assert_eq!(.message, "this is a dropped event", "incorrect message")
+      """

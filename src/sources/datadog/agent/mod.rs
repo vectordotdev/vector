@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, io::Read, net::SocketAddr, sync::Arc};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{TimeZone, Utc};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, FutureExt};
 use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -30,8 +30,8 @@ use crate::{
     },
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue},
@@ -44,8 +44,11 @@ use crate::{
         util::{ErrorMessage, StreamDecodingError},
     },
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    SourceSender,
 };
+
+const LOGS: &str = "logs";
+const METRICS: &str = "metrics";
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -68,6 +71,8 @@ pub struct DatadogAgentConfig {
     decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    #[serde(default = "crate::serde::default_false")]
+    multiple_outputs: bool,
 }
 
 inventory::submit! {
@@ -88,7 +93,8 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
+            multiple_outputs: false,
         })
         .unwrap()
     }
@@ -102,15 +108,22 @@ impl SourceConfig for DatadogAgentConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
-        let log_service = source
-            .clone()
-            .event_service(self.acknowledgements.enabled, cx.out.clone());
-        let series_v1_service = source
-            .clone()
-            .series_v1_service(self.acknowledgements.enabled, cx.out.clone());
-        let sketches_service = source
-            .clone()
-            .sketches_service(self.acknowledgements.enabled, cx.out.clone());
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let log_service = source.clone().event_service(
+            acknowledgements.enabled(),
+            cx.out.clone(),
+            self.multiple_outputs,
+        );
+        let series_v1_service = source.clone().series_v1_service(
+            acknowledgements.enabled(),
+            cx.out.clone(),
+            self.multiple_outputs,
+        );
+        let sketches_service = source.clone().sketches_service(
+            acknowledgements.enabled(),
+            cx.out.clone(),
+            self.multiple_outputs,
+        );
         let series_v2_service = source.series_v2_service();
 
         let shutdown = cx.shutdown;
@@ -144,8 +157,15 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        if self.multiple_outputs {
+            vec![
+                Output::from((METRICS, DataType::Metric)),
+                Output::from((LOGS, DataType::Log)),
+            ]
+        } else {
+            vec![Output::default(DataType::Any)]
+        }
     }
 
     fn source_type(&self) -> &'static str {
@@ -207,22 +227,26 @@ impl DatadogAgentSource {
     async fn handle_request(
         events: Result<Vec<Event>, ErrorMessage>,
         acknowledgements: bool,
-        mut out: Pipeline,
+        mut out: SourceSender,
+        output: Option<&str>,
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-                let mut events = futures::stream::iter(events).map(Ok);
-                out.send_all(&mut events)
-                    .map_err(move |error: crate::pipeline::ClosedError| {
-                        // can only fail if receiving end disconnected, so we are shutting down,
-                        // probably not gracefully.
-                        error!(message = "Failed to forward events, downstream is closed.");
-                        error!(message = "Tried to send the following event.", %error);
-                        warp::reject::custom(ApiError::ServerShutdown)
-                    })
-                    .await?;
+                let mut events = futures::stream::iter(events);
+                if let Some(name) = output {
+                    out.send_all_named(name, &mut events).await
+                } else {
+                    out.send_all(&mut events).await
+                }
+                .map_err(move |error: crate::source_sender::ClosedError| {
+                    // can only fail if receiving end disconnected, so we are shutting down,
+                    // probably not gracefully.
+                    error!(message = "Failed to forward events, downstream is closed.");
+                    error!(message = "Tried to send the following event.", %error);
+                    warp::reject::custom(ApiError::ServerShutdown)
+                })?;
                 match receiver {
                     None => Ok(warp::reply().into_response()),
                     Some(receiver) => match receiver.await {
@@ -242,7 +266,12 @@ impl DatadogAgentSource {
         }
     }
 
-    fn event_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+        multiple_outputs: bool,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
             .and(warp::path::full())
@@ -268,13 +297,22 @@ impl DatadogAgentSource {
                             self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
                         )
                     });
-                    Self::handle_request(events, acknowledgements, out.clone())
+                    if multiple_outputs {
+                        Self::handle_request(events, acknowledgements, out.clone(), Some(LOGS))
+                    } else {
+                        Self::handle_request(events, acknowledgements, out.clone(), None)
+                    }
                 },
             )
             .boxed()
     }
 
-    fn series_v1_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn series_v1_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+        multiple_outputs: bool,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "v1" / "series" / ..))
             .and(warp::path::full())
@@ -299,7 +337,11 @@ impl DatadogAgentSource {
                             self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
                         )
                     });
-                    Self::handle_request(events, acknowledgements, out.clone())
+                    if multiple_outputs {
+                        Self::handle_request(events, acknowledgements, out.clone(), Some(METRICS))
+                    } else {
+                        Self::handle_request(events, acknowledgements, out.clone(), None)
+                    }
                 },
             )
             .boxed()
@@ -322,7 +364,12 @@ impl DatadogAgentSource {
             .boxed()
     }
 
-    fn sketches_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn sketches_service(
+        self,
+        acknowledgements: bool,
+        out: SourceSender,
+        multiple_outputs: bool,
+    ) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("api" / "beta" / "sketches" / ..))
             .and(warp::path::full())
@@ -347,7 +394,11 @@ impl DatadogAgentSource {
                             self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
                         )
                     });
-                    Self::handle_request(events, acknowledgements, out.clone())
+                    if multiple_outputs {
+                        Self::handle_request(events, acknowledgements, out.clone(), Some(METRICS))
+                    } else {
+                        Self::handle_request(events, acknowledgements, out.clone(), None)
+                    }
                 },
             )
             .boxed()
