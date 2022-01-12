@@ -327,9 +327,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
 
-.PHONY: test-integration-fluent
-test-integration-fluent: ## Runs Fluent integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
 
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
@@ -726,6 +723,10 @@ clean: environment-clean ## Clean everything
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
+
+.PHONY: generate-kubernetes-manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
+	scripts/generate-manifests.sh
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

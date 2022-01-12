@@ -57,7 +57,6 @@ jobs:
       matrix:
         include:
           - test: 'datadog-metrics'
-          - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
           - test: 'influxdb'
@@ -102,6 +101,7 @@ jobs:
           - test: 'docker'
           - test: 'elasticsearch'
           - test: 'eventstoredb'
+          - test: 'fluent'
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongo'

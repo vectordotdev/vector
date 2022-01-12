@@ -47,7 +47,7 @@ resource "kubernetes_deployment" "observer" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-64c5a94c2187581b93705e168a72d0f0a05325dc"
+          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-7b2b0d0d6bcaafcd83b3fe636d92d5242d7b550b"
           name              = "observer"
           args              = ["--config-path", "/etc/vector/soak/observer.yaml"]
 

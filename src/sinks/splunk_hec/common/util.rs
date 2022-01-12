@@ -13,7 +13,7 @@ use crate::{
     sinks::{
         self,
         util::{http::HttpBatchService, SinkBatchSettings},
-        UriParseError,
+        UriParseSnafu,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -68,7 +68,7 @@ pub async fn build_healthcheck(
     client: HttpClient,
 ) -> crate::Result<()> {
     let uri =
-        build_uri(endpoint.as_str(), "/services/collector/health/1.0").context(UriParseError)?;
+        build_uri(endpoint.as_str(), "/services/collector/health/1.0").context(UriParseSnafu)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))

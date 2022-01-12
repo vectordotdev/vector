@@ -19,7 +19,7 @@ use crate::{
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
-        Healthcheck, UriParseError, VectorSink,
+        Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -161,7 +161,7 @@ impl PubsubSink {
             uri = format!("{}?key={}", uri, key);
         }
         uri.parse::<Uri>()
-            .context(UriParseError)
+            .context(UriParseSnafu)
             .map_err(Into::into)
     }
 }

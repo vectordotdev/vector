@@ -116,14 +116,14 @@ impl UdpConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(UdpError::NoAddresses)?;
 
         let addr = SocketAddr::new(ip, self.port);
         let bind_address = find_bind_address(&addr);
 
-        let socket = UdpSocket::bind(bind_address).await.context(BindError)?;
+        let socket = UdpSocket::bind(bind_address).await.context(BindSnafu)?;
 
         if let Some(send_buffer_bytes) = self.send_buffer_bytes {
             if let Err(error) = udp::set_send_buffer_size(&socket, send_buffer_bytes) {
@@ -131,7 +131,7 @@ impl UdpConnector {
             }
         }
 
-        socket.connect(addr).await.context(ConnectError)?;
+        socket.connect(addr).await.context(ConnectSnafu)?;
 
         Ok(socket)
     }
@@ -198,7 +198,7 @@ impl tower::Service<Bytes> for UdpService {
                 }
                 UdpServiceState::Connected(_) => break,
                 UdpServiceState::Sending(fut) => {
-                    let socket = match ready!(fut.poll_unpin(cx)).context(ServiceChannelRecvError) {
+                    let socket = match ready!(fut.poll_unpin(cx)).context(ServiceChannelRecvSnafu) {
                         Ok(socket) => socket,
                         Err(error) => return Poll::Ready(Err(error)),
                     };
@@ -220,7 +220,7 @@ impl tower::Service<Bytes> for UdpService {
 
         Box::pin(async move {
             // TODO: Add reconnect support as TCP/Unix?
-            let result = udp_send(&mut socket, &msg).await.context(SendError);
+            let result = udp_send(&mut socket, &msg).await.context(SendSnafu);
             let _ = sender.send(socket);
             result
         })

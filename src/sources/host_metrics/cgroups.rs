@@ -250,12 +250,12 @@ impl CGroup {
         let filename = self.make_path(filename);
         File::open(&filename)
             .await
-            .with_context(|| Opening {
+            .with_context(|_| OpeningSnafu {
                 filename: filename.clone(),
             })?
             .read_to_string(buffer)
             .await
-            .with_context(|| Reading {
+            .with_context(|_| ReadingSnafu {
                 filename: filename.clone(),
             })?;
         Ok(filename)
@@ -267,7 +267,10 @@ impl CGroup {
         buffer: &mut String,
     ) -> CGroupsResult<T> {
         let filename = self.open_read(filename, buffer).await?;
-        buffer.trim().parse().with_context(|| Parsing { filename })
+        buffer
+            .trim()
+            .parse()
+            .with_context(|_| ParsingSnafu { filename })
     }
 
     async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
@@ -298,11 +301,11 @@ impl CGroup {
 fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
     let mut buffer = String::new();
     std::fs::File::open(&filename)
-        .with_context(|| Opening {
+        .with_context(|_| OpeningSnafu {
             filename: filename.to_path_buf(),
         })?
         .read_to_string(&mut buffer)
-        .with_context(|| Reading {
+        .with_context(|_| ReadingSnafu {
             filename: filename.to_path_buf(),
         })?;
     Ok(buffer.trim().split(' ').map(Into::into).collect())

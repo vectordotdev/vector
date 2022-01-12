@@ -41,9 +41,9 @@ impl Resolver {
                 (name_ref, dummy_port).to_socket_addrs()
             })
             .await
-            .context(JoinError)?
+            .context(JoinSnafu)?
             .map(LookupIp)
-            .context(UnableLookup)
+            .context(UnableLookupSnafu)
         }
     }
 }

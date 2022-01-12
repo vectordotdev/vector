@@ -109,13 +109,13 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
-        let region: Region = (&self.region).try_into().context(RegionParse {})?;
+        let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|| Client {})?;
+        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
-            .context(Credentials {})?
+            .context(CredentialsSnafu {})?
             .into();
         let s3_client = S3Client::new_with(
             client.clone(),
@@ -140,7 +140,7 @@ impl AwsS3Config {
                     multiline,
                 )
                 .await
-                .context(Initialize {})
+                .context(InitializeSnafu {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
