@@ -58,16 +58,6 @@ components: sinks: new_relic: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -75,23 +65,19 @@ components: sinks: new_relic: {
 
 	configuration: {
 		license_key: {
-			common:      true
 			description: "Your New Relic license key."
 			required:    true
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 				syntax: "literal"
 			}
 		}
 		account_id: {
-			common:      true
 			description: "Your New Relic account ID."
 			required:    true
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["xxxx", "${NEW_RELIC_ACCOUNT_ID}"]
 				syntax: "literal"
 			}
@@ -111,16 +97,14 @@ components: sinks: new_relic: {
 			}
 		}
 		api: {
-			common:      true
 			description: "The API selected to send data to."
 			required:    true
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
-					events: "Event API"
+					events:  "Event API"
 					metrics: "Metric API"
-					logs: "Log API"
+					logs:    "Log API"
 				}
 				syntax: "literal"
 			}
@@ -128,8 +112,15 @@ components: sinks: new_relic: {
 	}
 
 	input: {
-		logs:    true
-		metrics: true
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	telemetry: components.sinks.http.telemetry
