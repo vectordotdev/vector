@@ -323,19 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-gcp
-test-integration-gcp: ## Runs GCP integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-	@scripts/setup_integration_env.sh gcp start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
-	 --lib ::gcp::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-endif
-
 .PHONY: test-integration-humio
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
