@@ -103,6 +103,23 @@ impl SourceSender {
         (pipe, recv)
     }
 
+    #[cfg(test)]
+    pub fn add_outputs(
+        &mut self,
+        status: EventStatus,
+        name: String,
+    ) -> impl Stream<Item = Event> + Unpin {
+        let (inner, recv) = Inner::new_with_buffer(100);
+        let recv = recv.map(move |mut event| {
+            let metadata = event.metadata_mut();
+            metadata.update_status(status);
+            metadata.update_sources();
+            event
+        });
+        self.named_inners.insert(name, inner);
+        recv
+    }
+
     pub async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
         self.inner
             .as_mut()
@@ -116,6 +133,18 @@ impl SourceSender {
             .get_mut(name)
             .expect("unknown output")
             .send(event)
+            .await
+    }
+
+    pub async fn send_all_named(
+        &mut self,
+        name: &str,
+        events: impl Stream<Item = Event> + Unpin,
+    ) -> Result<(), ClosedError> {
+        self.named_inners
+            .get_mut(name)
+            .expect("unknown output")
+            .send_all(events)
             .await
     }
 

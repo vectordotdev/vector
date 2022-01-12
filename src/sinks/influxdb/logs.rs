@@ -715,7 +715,7 @@ mod integration_tests {
         config::SinkContext,
         sinks::influxdb::{
             logs::InfluxDbLogsConfig,
-            test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+            test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
         test_util::components::{self, HTTP_SINK_TAGS},
@@ -723,7 +723,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
-        onboarding_v2().await;
+        let endpoint = address_v2();
+        onboarding_v2(&endpoint).await;
 
         let measure = format!("vector-{}", Utc::now().timestamp_nanos());
 
@@ -732,7 +733,7 @@ mod integration_tests {
         let config = InfluxDbLogsConfig {
             namespace: None,
             measurement: Some(measure.clone()),
-            endpoint: "http://localhost:9999".to_string(),
+            endpoint: endpoint.clone(),
             tags: Default::default(),
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDb2Settings {
@@ -776,7 +777,7 @@ mod integration_tests {
             .unwrap();
 
         let res = client
-            .post("http://localhost:9999/api/v2/query?org=my-org")
+            .post(format!("{}/api/v2/query?org=my-org", endpoint))
             .json(&body)
             .header("accept", "application/json")
             .header("Authorization", "Token my-token")

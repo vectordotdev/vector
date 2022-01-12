@@ -247,12 +247,15 @@ mod integration_tests {
         random_events_with_stream, random_string, trace_init,
     };
 
-    const EMULATOR_HOST: &str = "http://localhost:8681";
+    fn emulator_address() -> String {
+        std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
+    }
+
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
-            endpoint: Some(EMULATOR_HOST.into()),
+            endpoint: Some(emulator_address()),
             skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
@@ -338,7 +341,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
+        let url = format!("{}/v1/projects/{}/{}", emulator_address(), PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)
