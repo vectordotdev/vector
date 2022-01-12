@@ -3,6 +3,20 @@ use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
+fn parse_regex(
+    value: Value,
+    numeric_groups: bool,
+    pattern: &Regex,
+) -> std::result::Result<Value, ExpressionError> {
+    let bytes = value.try_bytes()?;
+    let value = String::from_utf8_lossy(&bytes);
+    let parsed = pattern
+        .captures(&value)
+        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+        .ok_or("could not find any pattern matches")?;
+    Ok(parsed.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRegex;
 
@@ -108,20 +122,13 @@ impl Function for ParseRegex {
             .downcast_ref::<regex::Regex>()
             .ok_or("no pattern")?;
         let value = args.required("value");
-        let bytes = value.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
         let numeric_groups = args
             .optional("numeric_groups")
             .map(|value| value.try_boolean())
             .transpose()?
             .unwrap_or(false);
 
-        let parsed = pattern
-            .captures(&value)
-            .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
-            .ok_or("could not find any pattern matches")?;
-
-        Ok(parsed.into())
+        parse_regex(value, numeric_groups, pattern)
     }
 }
 
@@ -134,17 +141,11 @@ pub(crate) struct ParseRegexFn {
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
-        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
+        let value = self.value.resolve(ctx)?;
+        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+        let pattern = &self.pattern;
 
-        let parsed = self
-            .pattern
-            .captures(&value)
-            .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
-            .ok_or("could not find any pattern matches")?;
-
-        Ok(parsed.into())
+        parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
