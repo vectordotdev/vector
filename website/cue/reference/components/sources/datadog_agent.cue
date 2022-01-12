@@ -87,13 +87,13 @@ components: sources: datadog_agent: {
 		{
 			name: "logs"
 			description: """
-				If [multiple_outputs](#multiple_outputs) is enabled, received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks. 
+				If [multiple_outputs](#multiple_outputs) is enabled, received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
 				"""
 		},
 		{
 			name: "metrics"
 			description: """
-				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks. 
+				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
