@@ -59,6 +59,16 @@ components: sources: datadog_agent: {
 	configuration: {
 		acknowledgements: configuration._acknowledgements
 		address:          sources.http.configuration.address
+		multiple_outputs: {
+			common: false
+			description: """
+				If this setting is set to `true` metrics and logs will be sent to different ouputs. For a source component
+				named `agent` the received logs and metrics can then be accessed by specifying `agent.logs` and `agent.metrics`,
+				respectively, as the input to another component.
+				"""
+			required: false
+			type: bool: default: false
+		}
 		store_api_key: {
 			common:      false
 			description: "When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event metadata and will be used if the event is sent to a Datadog sink."
