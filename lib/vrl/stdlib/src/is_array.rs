@@ -46,6 +46,10 @@ impl Function for IsArray {
 
         Ok(Box::new(IsArrayFn { value }))
     }
+
+    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_array()))
+    }
 }
 
 #[derive(Clone, Debug)]
