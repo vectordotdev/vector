@@ -1,4 +1,5 @@
 use std::cmp;
+use bitmask_enum::bitmask;
 
 use async_graphql::{Enum, InputObject, Object};
 
@@ -13,9 +14,10 @@ use crate::{
     filter_check,
 };
 
-#[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
+// #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
+#[derive(Enum, Ord, PartialOrd)]
+#[bitmask(u8)]
 pub enum SourceOutputType {
-    Multiple,
     Log,
     Metric,
     Trace,
@@ -23,12 +25,11 @@ pub enum SourceOutputType {
 
 impl From<DataType> for SourceOutputType {
     fn from(data_type: DataType) -> Self {
-        match data_type {
-            DataType::Metric => SourceOutputType::Metric,
-            DataType::Log => SourceOutputType::Log,
-            DataType::Trace => SourceOutputType::Trace,
-            _ => SourceOutputType::Multiple,
-        }
+        let mut t = SourceOutputType::none();
+        data_type.contains(DataType::Metric).then(|| t = t & SourceOutputType::Metric);
+        data_type.contains(DataType::Log).then(|| t = t & SourceOutputType::Log);
+        data_type.contains(DataType::Trace).then(|| t = t & SourceOutputType::Trace);
+        t
     }
 }
 
@@ -129,7 +130,7 @@ impl Source {
 pub struct SourcesFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_type: Option<Vec<filter::StringFilter>>,
-    output_type: Option<Vec<filter::EqualityFilter<SourceOutputType>>>,
+    output_type: Option<Vec<filter::SourceOutputTypeFilter>>,
     or: Option<Vec<Self>>,
 }
 

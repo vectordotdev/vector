@@ -4277,7 +4277,7 @@
           "fields": null,
           "inputFields": [
             {
-              "name": "equals",
+              "name": "supports",
               "description": null,
               "type": {
                 "kind": "ENUM",
@@ -4287,7 +4287,7 @@
               "defaultValue": null
             },
             {
-              "name": "notEquals",
+              "name": "not_supports",
               "description": null,
               "type": {
                 "kind": "ENUM",

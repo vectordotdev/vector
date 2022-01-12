@@ -8202,6 +8202,7 @@ dependencies = [
  "azure_core",
  "azure_storage",
  "base64 0.13.0",
+ "bitmask-enum",
  "bloom",
  "bollard",
  "bytes 1.1.0",

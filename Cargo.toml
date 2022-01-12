@@ -215,6 +215,7 @@ lookup = { path = "lib/lookup" }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
+bitmask-enum = { version = "1.1.2", default-features = false }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }

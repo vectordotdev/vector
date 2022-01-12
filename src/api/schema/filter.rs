@@ -45,9 +45,27 @@ impl StringFilter {
     }
 }
 
+
+#[derive(Default, InputObject)]
+pub struct SourceOutputTypeFilter {
+    pub supports: Option<source::SourceOutputType>,
+    pub not_supports: Option<source::SourceOutputType>,
+}
+
+impl SourceOutputTypeFilter {
+    pub fn filter_value(&self, value: source::SourceOutputType) -> bool {
+        filter_check!(
+            // Supports
+            self.supports.as_ref().map(|s| s.contains(value)),
+            // Not Supports
+            self.not_supports.as_ref().map(|s| !s.contains(value))
+        );
+        true
+    }
+}
+
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentKindFilter", params(ComponentKind)))]
-#[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
 pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
     pub equals: Option<T>,
     pub not_equals: Option<T>,
