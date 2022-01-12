@@ -13,7 +13,6 @@ Vector has to hold in memory is also unbounded, causing excessive memory usage, 
 The goal here is to set an upper bound on the number of events held by Vector by propagating backpressure
 to the source of events.
 
-
 ## Context
 
 - [add config option to limit source tcp connections (off by default)](https://github.com/vectordotdev/vector/pull/10491)
@@ -21,28 +20,25 @@ to the source of events.
 
 ## Cross cutting concerns
 
-
 ## Scope
 
 ### In scope
 
 - Limit the number of in-flight events for TCP sources.
-    - fluent
-    - socket (tcp mode only)
-    - logstash
-    - statsd
-    - syslog
+  - fluent
+  - socket (tcp mode only)
+  - logstash
+  - statsd
+  - syslog
 
 - Reduce the number of config options required to solve this where possible (it should work by default)
 - Prevent performance regressions from any necessary changes
-
 
 ### Out of scope
 
 - Non-TCP based sources
 
 ## Pain
-
 
 It may be more clear why this is a problem if we look at a specific example. The `fluent` source collects logs from
 `fluentd` over TCP connections. For this source, the number of events held by Vector is
@@ -56,7 +52,6 @@ TCP connection that opens will compete with the existing connections trying to s
 connection will take longer and longer to process until they start timing out and `fluentd` retries those events,
 so you end up making no forward progress at all.
 
-
 ## Option 1 (static connection limit)
 
 The naive solution is to just pick static connection limit for each source. This would fix the issue because the
@@ -65,13 +60,14 @@ number of connections is bounded, so the number of requests in-flight would also
 Opt-in static connection limits have already been added to Vector. This option is proposing to make it a default.
 
 ### Rationale
+
 - Easy to implement
 - Effective
 
 ### Drawbacks
+
 - If this is a hard-coded limit, the maximum throughput of Vector may be limited.
 - If this is selected by the user, the user would need to understand how to set this value, and update it when needed.
-
 
 ## Option 2 (dynamic connection limit)
 
@@ -128,12 +124,13 @@ progress can be made. In addition, an upper-bound will be set equal to the numbe
 value higher than this has no benefit, but would use more memory.
 
 ### Rationale
+
 - No user facing config needed, this will work by default.
 
 ### Drawbacks
+
 - More complicated to implement than option 1.
 - Requires choosing an appropriate "target" value. If too low, it could limit overall throughput. If too high, it could use too much memory.
-
 
 ## Proposal
 
@@ -142,17 +139,14 @@ This will limit the number of requests being processed concurrently to balance m
 I don't think option 2 (dynamic connection limit) is feasible to implement, and option 1 (static connection limit) is
 too difficult for users to configure.
 
-
 ### User Experience
 
 - A concurrency limit will be applied to request decoding to ensure that TCP-based sources propagate backpressure appropriately, and don't consume too much memory.
-
 
 ## Prior Art
 
 - ARC is similar, but is ultimately solving a different problem and doesn't seem applicable here
 - Most other systems I'm aware of use configurable limits (or limits per "user"), which is option 1 above
-
 
 ## Outstanding Questions
 
@@ -160,10 +154,7 @@ TBD
 
 ## Plan Of Attack
 
-
 - [ ] Prototype option 3 to get initial performance numbers and make sure it is feasible
 - [ ] Submit the full PR with the changes
 
 ## Future Improvements
-
-
