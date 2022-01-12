@@ -290,22 +290,31 @@ mod integration_tests {
     use std::net::SocketAddr;
 
     use http::StatusCode;
+    use tokio::time::Duration;
     use vector_core::config::proxy::ProxyConfig;
     use warp::Filter;
 
-    use super::{build_healthcheck, create_client, integration_test_helpers::{get_token, splunk_hec_address}};
-    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
+    use super::{
+        build_healthcheck, create_client,
+        integration_test_helpers::{get_token, splunk_hec_address},
+    };
+    use crate::{
+        assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError,
+        test_util::retry_until,
+    };
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
         let client = create_client(&None, &ProxyConfig::default()).unwrap();
-        let healthcheck = build_healthcheck(
-            splunk_hec_address(),
-            get_token().await,
-            client,
-        );
+        let address = splunk_hec_address();
+        let token = get_token().await;
 
-        healthcheck.await.unwrap();
+        retry_until(
+            || build_healthcheck(address.clone(), token.clone(), client.clone()),
+            Duration::from_millis(500),
+            Duration::from_secs(30),
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -369,7 +378,10 @@ pub mod integration_test_helpers {
         let res = retry_until(
             || {
                 client
-                    .get(format!("{}/services/data/inputs/http?output_mode=json", splunk_api_address()))
+                    .get(format!(
+                        "{}/services/data/inputs/http?output_mode=json",
+                        splunk_api_address()
+                    ))
                     .basic_auth(USERNAME, Some(PASSWORD))
                     .send()
             },
