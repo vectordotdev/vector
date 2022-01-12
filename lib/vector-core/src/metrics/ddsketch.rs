@@ -4,8 +4,10 @@ use std::{
 };
 
 use core_common::byte_size_of::ByteSizeOf;
+use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -46,8 +48,14 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
     pow_gamma(gamma_v, f64::from(i32::from(k) - bias))
 }
 
-#[derive(Copy, Clone, Debug)]
-struct Config {
+#[derive(Debug, Snafu)]
+pub enum MergeError {
+    #[snafu(display("cannot merge two sketches with mismatched configuration parameters"))]
+    MismatchedConfigs,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Config {
     bin_limit: u16,
     // gamma_ln is the natural log of gamma_v, used to speed up calculating log base gamma.
     gamma_v: f64,
@@ -262,6 +270,10 @@ impl AgentDDSketch {
 
     pub fn bin_map(&self) -> BinMap {
         BinMap::from_bins(&self.bins)
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Whether or not this sketch is empty.
@@ -644,7 +656,21 @@ impl AgentDDSketch {
             .or(Some(f64::NAN))
     }
 
-    pub fn merge(&mut self, other: AgentDDSketch) {
+    /// Merges another sketch into this sketch, without a loss of accuracy.
+    ///
+    /// All samples present in the other sketch will be correctly represented in this sketch, and
+    /// summary statistics such as the sum, average, count, min, and max, will represent the sum of
+    /// samples from both sketches.
+    ///
+    /// ## Errors
+    ///
+    /// If there is an error while merging the two sketches together, an error variant will be
+    /// returned that describes the issue.
+    pub fn merge(&mut self, other: &AgentDDSketch) -> Result<(), MergeError> {
+        if self.config != other.config {
+            return Err(MergeError::MismatchedConfigs);
+        }
+
         // Merge the basic statistics together.
         self.count += other.count;
         if other.max > self.max {
@@ -661,7 +687,7 @@ impl AgentDDSketch {
         let mut temp = Vec::new();
 
         let mut bins_idx = 0;
-        for other_bin in other.bins {
+        for other_bin in &other.bins {
             let start = bins_idx;
             while bins_idx < self.bins.len() && self.bins[bins_idx].k < other_bin.k {
                 bins_idx += 1;
@@ -670,7 +696,7 @@ impl AgentDDSketch {
             temp.extend_from_slice(&self.bins[start..bins_idx]);
 
             if bins_idx >= self.bins.len() || self.bins[bins_idx].k > other_bin.k {
-                temp.push(other_bin);
+                temp.push(*other_bin);
             } else if self.bins[bins_idx].k == other_bin.k {
                 generate_bins(
                     &mut temp,
@@ -685,6 +711,8 @@ impl AgentDDSketch {
         trim_left(&mut temp, self.config.bin_limit);
 
         self.bins = temp;
+
+        Ok(())
     }
 
     /// Converts a `Metric` to a sketch representation, if possible, using `AgentDDSketch`.
@@ -729,12 +757,18 @@ impl AgentDDSketch {
 impl PartialEq for AgentDDSketch {
     fn eq(&self, other: &Self) -> bool {
         // We skip checking the configuration because we don't allow creating configurations by
-        // hand, and it's always locked to the constants used by the Datadog Agent.
+        // hand, and it's always locked to the constants used by the Datadog Agent.  We only check
+        // the configuration equality manually in `AgentDDSketch::merge`, to protect ourselves in
+        // the future if different configurations become allowed.
+        //
+        // Additionally, we also use floating-point-specific relative comparisons for sum/avg
+        // because they can be minimally different between sketches purely due to floating-point
+        // behavior, despite being fed the same exact data in terms of recorded samples.
         self.count == other.count
             && self.min == other.min
             && self.max == other.max
-            && self.sum == other.sum
-            && self.avg == other.avg
+            && self.sum.eq_ulps(&other.sum, &1)
+            && self.avg.eq_ulps(&other.avg, &1)
             && self.bins == other.bins
     }
 }
@@ -1136,7 +1170,7 @@ mod tests {
 
         all_values_many.insert_many(&values);
 
-        odd_values.merge(even_values);
+        assert!(odd_values.merge(&even_values).is_ok());
         let merged_values = odd_values;
 
         // Number of bins should be equal to the number of values we inserted.
@@ -1176,6 +1210,17 @@ mod tests {
 
             assert_eq!(target_bin_count, sketch.bin_count());
         }
+    }
+
+    #[test]
+    fn test_merge_different_configs() {
+        let mut first = AgentDDSketch::with_agent_defaults();
+        let mut second = AgentDDSketch::with_agent_defaults();
+
+        // Subtly tweak the config of the second sketch to ensure that merging fails.
+        second.config.norm_bias += 1;
+
+        assert!(first.merge(&second).is_err());
     }
 
     #[test]

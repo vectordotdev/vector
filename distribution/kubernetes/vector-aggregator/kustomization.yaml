@@ -4,4 +4,8 @@ kind: Kustomization
 namespace: vector
 
 resources:
-  - resources.yaml
+  - configmap.yaml
+  - service-headless.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - statefulset.yaml

@@ -301,7 +301,7 @@ pub(in crate::sinks) fn encode_uri(
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    Ok(url.parse::<Uri>().context(super::UriParseSnafu)?)
 }
 
 #[cfg(test)]

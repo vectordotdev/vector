@@ -353,9 +353,9 @@ fn create_consumer(
 
     let consumer = client_config
         .create_with_context::<_, StreamConsumer<_>>(KafkaStatisticsContext)
-        .context(KafkaCreateError)?;
+        .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
-    consumer.subscribe(&topics).context(KafkaSubscribeError)?;
+    consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
 
     Ok(consumer)
 }

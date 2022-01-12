@@ -12,13 +12,32 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 
 ## Install Vector
 
-We can install Vector using this installation script:
+We can install Vector using an installation script or Docker:
 
+{{< tabs default="Script" >}}
+{{< tab title="Script" >}}
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
+{{< /tab >}}
+{{< tab title="Docker" >}}
+```shell
+docker pull timberio/vector:{{< version >}}-distroless
+```
 
-Or you can [choose your preferred installation method][install].
+In addition to `distroless`, `alpine` and `debian` distributions are also available.
+
+If you install Vector using Docker, we recommend using an alias to run the commands throughout this tutorial:
+
+```shell
+alias vector='docker run -it --rm timberio/vector:{{< version >}}'
+```
+
+And now something after.
+{{< /tab >}}
+{{< /tabs >}}
+
+Other [installation methods][install] are available.
 
 Once Vector is installed, let's check to make sure that it's working correctly:
 
