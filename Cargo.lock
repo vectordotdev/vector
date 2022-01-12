@@ -84,15 +84,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arbitrary"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "510c76ecefdceada737ea728f4f9a84bd2e1ef29f1ba555e560940fe279954de"
-dependencies = [
- "derive_arbitrary",
-]
-
-[[package]]
 name = "arc-swap"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1107,7 +1098,6 @@ dependencies = [
  "futures 0.3.19",
  "hdrhistogram",
  "human_bytes",
- "lading_common",
  "leveldb",
  "memmap2",
  "metrics",
@@ -1167,12 +1157,6 @@ dependencies = [
  "quote 1.0.10",
  "syn 1.0.84",
 ]
-
-[[package]]
-name = "bytecount"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72feb31ffc86498dacdbd0fcebb56138e7177a8cc5cea4516031d15ae85a742e"
 
 [[package]]
 name = "bytemuck"
@@ -1926,17 +1910,6 @@ name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2 1.0.32",
- "quote 1.0.10",
- "syn 1.0.84",
-]
-
-[[package]]
-name = "derive_arbitrary"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b24629208e87a2d8b396ff43b15c4afb0a69cea3fbbaa9ed9b92b7c02f0aed73"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -3578,22 +3551,6 @@ checksum = "05a015d6ce61bfe539c715eb5dd67e851927f4ada5fecfd83d6c719a72eac9b5"
 dependencies = [
  "duct",
  "openssl-sys",
-]
-
-[[package]]
-name = "lading_common"
-version = "0.6.0"
-source = "git+https://github.com/blt/lading?branch=main#643785a5feb331bfe30274f07c752b21b4526353"
-dependencies = [
- "arbitrary",
- "bytecount",
- "metrics",
- "rand 0.8.4",
- "rmp-serde",
- "serde",
- "serde_json",
- "serde_tuple",
- "time 0.3.5",
 ]
 
 [[package]]
@@ -6569,27 +6526,6 @@ dependencies = [
  "percent-encoding",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "serde_tuple"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f025b91216f15a2a32aa39669329a475733590a015835d1783549a56d09427"
-dependencies = [
- "serde",
- "serde_tuple_macros",
-]
-
-[[package]]
-name = "serde_tuple_macros"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4076151d1a2b688e25aaf236997933c66e18b870d0369f8b248b8ab2be630d7e"
-dependencies = [
- "proc-macro2 1.0.32",
- "quote 1.0.10",
- "syn 1.0.84",
 ]
 
 [[package]]
