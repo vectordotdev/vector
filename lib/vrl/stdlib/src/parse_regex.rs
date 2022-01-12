@@ -1,5 +1,5 @@
 use regex::Regex;
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
@@ -72,6 +72,56 @@ impl Function for ParseRegex {
             }"# }),
             },
         ]
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        name: &str,
+        expr: &expression::Expr,
+    ) -> CompiledArgument {
+        if name == "pattern" {
+            let regex: regex::Regex = match expr {
+                expression::Expr::Literal(expression::Literal::Regex(regex)) => {
+                    Ok((**regex).clone())
+                }
+                expr => Err(Error::UnexpectedExpression {
+                    keyword: "pattern",
+                    expected: "regex",
+                    expr: expr.clone(),
+                }),
+            }?;
+
+            Ok(Some(Box::new(regex) as _))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn call(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let pattern = args
+            .required_any("pattern")
+            .downcast_ref::<regex::Regex>()
+            .ok_or("no pattern")?;
+        let value = args.required("value");
+        let bytes = value.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
+        let numeric_groups = args
+            .optional("numeric_groups")
+            .map(|value| value.try_boolean())
+            .transpose()?
+            .unwrap_or(false);
+
+        let parsed = pattern
+            .captures(&value)
+            .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+            .ok_or("could not find any pattern matches")?;
+
+        Ok(parsed.into())
     }
 }
 
