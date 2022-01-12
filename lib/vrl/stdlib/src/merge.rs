@@ -38,21 +38,6 @@ impl Function for Merge {
         }]
     }
 
-    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let mut to = arguments.required("to");
-        let mut to = to.as_object_mut().unwrap();
-        let from = arguments.required("from");
-        let from = from.as_object().unwrap();
-        let deep = arguments
-            .optional("deep")
-            .map(|val| val.as_boolean().unwrap_or(false))
-            .unwrap_or_else(|| false);
-
-        let to_value = merge_maps(&mut to, &from, deep);
-
-        Ok(to_value.into())
-    }
-
     fn compile(
         &self,
         _state: &state::Compiler,
@@ -64,6 +49,21 @@ impl Function for Merge {
         let deep = arguments.optional("deep").unwrap_or_else(|| expr!(false));
 
         Ok(Box::new(MergeFn { to, from, deep }))
+    }
+
+    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let to = arguments.required("to");
+        let mut to = to.try_object()?;
+        let from = arguments.required("from");
+        let from = from.try_object()?;
+        let deep = arguments
+            .optional("deep")
+            .map(|val| val.as_boolean().unwrap_or(false))
+            .unwrap_or_else(|| false);
+
+        merge_maps(&mut to, &from, deep);
+
+        Ok(to.into())
     }
 }
 
