@@ -1,22 +1,20 @@
 use crate::config::SinkDescription;
 
 mod config;
-mod model;
 mod encoding;
-mod sink;
-mod service;
 mod healthcheck;
+mod model;
+mod service;
+mod sink;
 
 pub use config::*;
-pub use model::*;
 pub use encoding::*;
-pub use sink::*;
-pub use service::*;
 pub use healthcheck::*;
+pub use model::*;
+pub use service::*;
+pub use sink::*;
 
-pub use super::{
-    VectorSink, Healthcheck
-};
+pub use super::{Healthcheck, VectorSink};
 
 #[cfg(test)]
 pub mod tests;

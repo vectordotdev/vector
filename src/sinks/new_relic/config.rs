@@ -1,33 +1,20 @@
+use super::{
+    healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
+};
 use crate::{
-    config::{
-        DataType, SinkConfig, SinkContext
-    },
+    config::{DataType, SinkConfig, SinkContext},
     http::HttpClient,
-    sinks::{
-        util::{
-            SinkBatchSettings,
-            service::ServiceBuilderExt,
-            retries::RetryLogic,
-            encoding::EncodingConfigFixed,
-            BatchConfig, Compression, TowerRequestConfig
-        }
+    sinks::util::{
+        encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
+        BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
     },
     tls::TlsSettings,
 };
 use futures::FutureExt;
 use http::Uri;
-use serde::{
-    Deserialize, Serialize
-};
-use std::{
-    fmt::Debug,
-    sync::Arc,
-    num::NonZeroU64
-};
+use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, num::NonZeroU64, sync::Arc};
 use tower::ServiceBuilder;
-use super::{
-    NewRelicSinkError, NewRelicApiResponse, Encoding, NewRelicApiService, NewRelicSink, healthcheck
-};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -45,7 +32,7 @@ pub enum NewRelicApi {
     #[derivative(Default)]
     Events,
     Metrics,
-    Logs
+    Logs,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -87,13 +74,17 @@ pub struct NewRelicConfig {
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig
+    pub request: TowerRequestConfig,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
-    pub fn build_healthcheck(&self, client: HttpClient, credentials: Arc<NewRelicCredentials>) -> crate::Result<super::Healthcheck> {
+    pub fn build_healthcheck(
+        &self,
+        client: HttpClient,
+        credentials: Arc<NewRelicCredentials>,
+    ) -> crate::Result<super::Healthcheck> {
         Ok(healthcheck(client, credentials).boxed())
     }
 }
@@ -107,7 +98,8 @@ impl SinkConfig for NewRelicConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let batcher_settings = self.batch
+        let batcher_settings = self
+            .batch
             .validate()?
             .limit_max_events(self.batch.max_events.unwrap_or(50))?
             .into_batcher_settings()?;
@@ -121,9 +113,7 @@ impl SinkConfig for NewRelicConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, NewRelicApiRetry)
-            .service(NewRelicApiService {
-                client
-            });
+            .service(NewRelicApiService { client });
 
         let sink = NewRelicSink {
             service,
@@ -134,10 +124,7 @@ impl SinkConfig for NewRelicConfig {
             batcher_settings,
         };
 
-        Ok((
-            super::VectorSink::Stream(Box::new(sink)),
-            healthcheck
-        ))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -149,36 +136,41 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct NewRelicCredentials {
     pub license_key: String,
     pub account_id: String,
     pub api: NewRelicApi,
-    pub region: NewRelicRegion
+    pub region: NewRelicRegion,
 }
 
 impl NewRelicCredentials {
     pub fn get_uri(&self) -> Uri {
         match self.api {
-            NewRelicApi::Events => {
-                match self.region {
-                    NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
-                    NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
+            NewRelicApi::Events => match self.region {
+                NewRelicRegion::Us => format!(
+                    "https://insights-collector.newrelic.com/v1/accounts/{}/events",
+                    self.account_id
+                )
+                .parse::<Uri>()
+                .unwrap(),
+                NewRelicRegion::Eu => format!(
+                    "https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events",
+                    self.account_id
+                )
+                .parse::<Uri>()
+                .unwrap(),
+            },
+            NewRelicApi::Metrics => match self.region {
+                NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
+                NewRelicRegion::Eu => {
+                    Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1")
                 }
             },
-            NewRelicApi::Metrics => {
-                match self.region {
-                    NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
-                    NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
-                }
+            NewRelicApi::Logs => match self.region {
+                NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
+                NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
             },
-            NewRelicApi::Logs => {
-                match self.region {
-                    NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
-                    NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
-                }
-            }
         }
     }
 }
@@ -189,7 +181,7 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
             license_key: config.license_key.clone(),
             account_id: config.account_id.clone(),
             api: config.api.clone(),
-            region: config.region.unwrap_or(NewRelicRegion::Us)
+            region: config.region.unwrap_or(NewRelicRegion::Us),
         }
     }
 }

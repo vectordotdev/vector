@@ -1,15 +1,8 @@
-use crate::{
-    http::HttpClient,
-    sinks::HealthcheckError
-};
-use serde::{
-    Deserialize, Serialize
-};
-use http::{
-    Request, StatusCode
-};
-use std::sync::Arc;
 use super::NewRelicCredentials;
+use crate::{http::HttpClient, sinks::HealthcheckError};
+use http::{Request, StatusCode};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct NewRelicStatusModel {
@@ -21,21 +14,20 @@ struct NewRelicStatusModel {
 struct NewRelicStatusPage {
     id: String,
     name: String,
-    url: String
+    url: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct NewRelicStatusComponent {
     id: String,
     name: String,
-    status: String
+    status: String,
 }
 
 pub async fn healthcheck(
     client: HttpClient,
-    credentials: Arc<NewRelicCredentials>
+    credentials: Arc<NewRelicCredentials>,
 ) -> crate::Result<()> {
-
     let request = Request::post(credentials.get_uri())
         .header("Api-Key", credentials.license_key.clone())
         .body(hyper::Body::empty())

@@ -1,34 +1,23 @@
-use crate::{
-    http::HttpClient,
-    sinks::util::Compression
-};
-use hyper::Body;
-use tracing::Instrument;
-use vector_core::{
-    stream::DriverResponse,
-    event::{
-        EventStatus, Finalizable, EventFinalizers
-    },
-    internal_event::EventsSent,
-    buffers::Ackable
-};
+use super::{NewRelicCredentials, NewRelicSinkError};
+use crate::{http::HttpClient, sinks::util::Compression};
 use futures::future::BoxFuture;
 use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request,
-    header::{
-        CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE
-    }
 };
+use hyper::Body;
 use std::{
     fmt::Debug,
-    task::{
-        Context, Poll
-    },
-    sync::Arc
+    sync::Arc,
+    task::{Context, Poll},
 };
 use tower::Service;
-use super::{
-    NewRelicCredentials, NewRelicSinkError
+use tracing::Instrument;
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
 };
 
 #[derive(Debug, Clone)]
@@ -37,7 +26,7 @@ pub struct NewRelicApiRequest {
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
     pub payload: Vec<u8>,
-    pub compression: Compression
+    pub compression: Compression,
 }
 
 impl Ackable for NewRelicApiRequest {
@@ -56,7 +45,7 @@ impl Finalizable for NewRelicApiRequest {
 pub struct NewRelicApiResponse {
     event_status: EventStatus,
     count: usize,
-    events_byte_size: usize
+    events_byte_size: usize,
 }
 
 impl DriverResponse for NewRelicApiResponse {
@@ -74,7 +63,7 @@ impl DriverResponse for NewRelicApiResponse {
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiService {
-    pub client: HttpClient
+    pub client: HttpClient,
 }
 
 impl Service<NewRelicApiRequest> for NewRelicApiService {
@@ -87,7 +76,6 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
     }
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
-
         debug!("Sending {} events.", request.batch_size);
 
         let mut client = self.client.clone();
@@ -117,7 +105,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
                     count: request.batch_size,
                     events_byte_size: payload_len,
                 }),
-                Err(_) => Err(NewRelicSinkError::new("HTTP request error"))
+                Err(_) => Err(NewRelicSinkError::new("HTTP request error")),
             }
         })
     }

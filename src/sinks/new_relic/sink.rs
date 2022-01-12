@@ -1,54 +1,40 @@
+use super::{
+    Encoding, EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
+    NewRelicApiRequest, NewRelicCredentials,
+};
 use crate::{
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt,
-        encoding::EncodingConfigFixed,
-        Compression, StreamSink, RequestBuilder
-    }
-};
-use vector_core::{
-    stream::{
-        BatcherSettings, DriverResponse
+        builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
+        StreamSink,
     },
-    event::{
-        Finalizable, EventFinalizers
-    },
-    buffers::Acker
 };
 use async_trait::async_trait;
-use futures::stream::{
-    BoxStream, StreamExt
-};
-use std::{
-    fmt::Debug,
-    convert::TryFrom,
-    num::NonZeroUsize,
-    sync::Arc
-};
+use futures::stream::{BoxStream, StreamExt};
+use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use tower::Service;
-use super::{
-    NewRelicApi, Encoding, NewRelicCredentials, NewRelicApiModel, NewRelicApiRequest,
-    EventsApiModel, MetricsApiModel, LogsApiModel
+use vector_core::{
+    buffers::Acker,
+    event::{EventFinalizers, Finalizable},
+    stream::{BatcherSettings, DriverResponse},
 };
 
 #[derive(Debug)]
 pub struct NewRelicSinkError {
-    message: String
+    message: String,
 }
 
 impl NewRelicSinkError {
     pub fn new(msg: &str) -> Self {
         NewRelicSinkError {
-            message: String::from(msg)
+            message: String::from(msg),
         }
     }
 
     pub fn boxed(msg: &str) -> Box<Self> {
-        Box::new(
-            NewRelicSinkError {
-                message: String::from(msg)
-            }
-        )
+        Box::new(NewRelicSinkError {
+            message: String::from(msg),
+        })
     }
 }
 
@@ -79,7 +65,7 @@ impl From<NewRelicSinkError> for std::io::Error {
 struct NewRelicRequestBuilder {
     encoding: EncodingConfigFixed<Encoding>,
     compression: Compression,
-    credentials: Arc<NewRelicCredentials>
+    credentials: Arc<NewRelicCredentials>,
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
@@ -104,26 +90,12 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
                 NewRelicApi::Events => {
-                    Ok(
-                        NewRelicApiModel::Events(
-                            EventsApiModel::try_from(input)?
-                        )
-                    )
-                },
+                    Ok(NewRelicApiModel::Events(EventsApiModel::try_from(input)?))
+                }
                 NewRelicApi::Metrics => {
-                    Ok(
-                        NewRelicApiModel::Metrics(
-                            MetricsApiModel::try_from(input)?
-                        )
-                    )
-                },
-                NewRelicApi::Logs => {
-                    Ok(
-                        NewRelicApiModel::Logs(
-                            LogsApiModel::try_from(input)?
-                        )
-                    )
-                },
+                    Ok(NewRelicApiModel::Metrics(MetricsApiModel::try_from(input)?))
+                }
+                NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();
         let metadata = (self.credentials.clone(), events_len, finalizers);
@@ -137,7 +109,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             finalizers,
             credentials: self.credentials.clone(),
             payload,
-            compression: self.compression
+            compression: self.compression,
         }
     }
 }
@@ -163,21 +135,23 @@ where
         let request_builder = NewRelicRequestBuilder {
             encoding: self.encoding,
             compression: self.compression,
-            credentials: self.credentials.clone()
+            credentials: self.credentials.clone(),
         };
 
         let sink = input
             .batched(self.batcher_settings.into_byte_size_config())
             .request_builder(builder_limit, request_builder)
-            .filter_map(|request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build New Relic request: {:?}.", e);
-                        None
+            .filter_map(
+                |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
+                    match request {
+                        Err(e) => {
+                            error!("Failed to build New Relic request: {:?}.", e);
+                            None
+                        }
+                        Ok(req) => Some(req),
                     }
-                    Ok(req) => Some(req),
-                }
-            })
+                },
+            )
             .into_driver(self.service, self.acker);
 
         sink.run().await
