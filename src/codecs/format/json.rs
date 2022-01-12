@@ -117,14 +117,12 @@ impl Encoder<Event> for JsonSerializer {
     type Error = crate::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        let json = match event {
-            Event::Log(log) => serde_json::to_vec(&log),
-            Event::Metric(metric) => serde_json::to_vec(&metric),
-        }?;
-
-        buffer.put(json.as_slice());
-
-        Ok(())
+        let writer = buffer.writer();
+        match event {
+            Event::Log(log) => serde_json::to_writer(writer, &log),
+            Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+        }
+        .map_err(Into::into)
     }
 }
 
