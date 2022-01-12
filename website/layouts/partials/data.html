@@ -300,6 +300,25 @@
   </div>
   {{ end }}
 
+  {{/* Source/transform outputs */}}
+  {{ with .component_outputs }}
+    <div class="flex flex-col divide-y dark:divide-gray-700">
+      {{ range . }}
+      <div class="py-3 px-5">
+        <span class="flex justify-between items-center">
+          <span class="font-mono">
+            {{ partial "heading.html" (dict "text" .name "level" 3 "anchor" true "icon" false) }}
+          </span>
+        </span>
+
+        <div class="my-3 prose dark:prose-dark max-w-none">
+          {{ .description | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+      </div>
+  {{ end }}
+
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
   {{ $formats := slice "toml" "yaml" "json" }}
