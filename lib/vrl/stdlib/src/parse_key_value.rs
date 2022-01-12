@@ -129,7 +129,7 @@ impl Function for ParseKeyValue {
                         &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
                     )
                     .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
-                    .map_err(|e| vrl::function::Error::InvalidEnumVariant {
+                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
                         keyword: "whitespace",
                         value,
                         variants: Whitespace::all_value().to_vec(),

@@ -6,8 +6,6 @@ use crate::{
     Context, Expression, State, TypeDef, Value,
 };
 
-use super::Literal;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
     inner: BTreeMap<String, Expr>,
