@@ -383,13 +383,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
-.PHONY: test-integration-splunk-7
-test-integration-splunk-7: ## Runs Splunk v7.3 integration tests
-	SPLUNK_VERSION=7.3.9 make test-integration-splunk
-ifeq ($(AUTOSPAWN), true)
-	make test-integration-splunk-cleanup
-endif
-
 tests/data/dnstap/socket:
 	mkdir -p tests/data/dnstap/socket
 	chmod 777 tests/data/dnstap/socket
