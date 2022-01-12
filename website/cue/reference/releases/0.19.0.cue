@@ -41,6 +41,10 @@ releases: "0.19.0": {
 		changes in this release.
 		"""
 
+	known_issues: [
+		"A regression was introduced that changed the name of the data directory for sinks using a disk buffer. Fixed in v0.19.1.",
+	]
+
 	changelog: [
 		{
 			type: "enhancement"
