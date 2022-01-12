@@ -351,6 +351,20 @@ pub mod test_util {
         }
     }
 
+    pub(crate) fn address_v1(secure: bool) -> String {
+        if secure {
+            std::env::var("INFLUXDB_V1_HTTPS_ADDRESS")
+                .unwrap_or_else(|_| "http://localhost:8087".into())
+        } else {
+            std::env::var("INFLUXDB_V1_HTTP_ADDRESS")
+                .unwrap_or_else(|_| "http://localhost:8086".into())
+        }
+    }
+
+    pub(crate) fn address_v2() -> String {
+        std::env::var("INFLUXDB_V2_ADDRESS").unwrap_or_else(|_| "http://localhost:9999".into())
+    }
+
     // ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011
     //
     // =>
@@ -432,7 +446,7 @@ pub mod test_util {
         assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
     }
 
-    pub(crate) async fn onboarding_v2() {
+    pub(crate) async fn onboarding_v2(endpoint: &str) {
         let mut body = std::collections::HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
@@ -446,7 +460,7 @@ pub mod test_util {
             .unwrap();
 
         let res = client
-            .post("http://localhost:9999/api/v2/setup")
+            .post(format!("{}/api/v2/setup", endpoint))
             .json(&body)
             .header("accept", "application/json")
             .send()
@@ -818,16 +832,38 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             healthcheck,
-            test_util::{next_database, onboarding_v2, BUCKET, ORG, TOKEN},
+            test_util::{address_v1, address_v2, next_database, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb1Settings, InfluxDb2Settings,
         },
     };
 
     #[tokio::test]
     async fn influxdb2_healthchecks_ok() {
-        onboarding_v2().await;
+        let endpoint = address_v2();
+        onboarding_v2(&endpoint).await;
 
-        let endpoint = "http://localhost:9999".to_string();
+        let endpoint = address_v2();
+        let influxdb1_settings = None;
+        let influxdb2_settings = Some(InfluxDb2Settings {
+            org: ORG.to_string(),
+            bucket: BUCKET.to_string(),
+            token: TOKEN.to_string(),
+        });
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
+
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn influxdb2_healthchecks_fail() {
+        let endpoint = "http://127.0.0.1:9999".to_string();
+        onboarding_v2(&endpoint).await;
+
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
@@ -841,31 +877,12 @@ mod integration_tests {
             .unwrap()
             .await
             .unwrap();
-    }
-
-    #[tokio::test]
-    async fn influxdb2_healthchecks_fail() {
-        onboarding_v2().await;
-
-        let endpoint = "http://not_exist:9999".to_string();
-        let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDb2Settings {
-            org: ORG.to_string(),
-            bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
-        });
-        let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
-
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
-            .unwrap()
-            .await
-            .unwrap_err();
     }
 
     #[tokio::test]
     async fn influxdb1_healthchecks_ok() {
-        let endpoint = "http://localhost:8086".to_string();
+        let endpoint = address_v1(false);
+
         let influxdb1_settings = Some(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
@@ -884,8 +901,9 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[should_panic]
     async fn influxdb1_healthchecks_fail() {
-        let endpoint = "http://not_exist:8086".to_string();
+        let endpoint = "http://127.0.0.1:8086".to_string();
         let influxdb1_settings = Some(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
@@ -900,6 +918,6 @@ mod integration_tests {
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
             .await
-            .unwrap_err();
+            .unwrap();
     }
 }
