@@ -10,7 +10,9 @@ use crate::{
     config::{SinkConfig, SinkContext},
     event::{Metric, MetricKind},
     sinks::{
-        splunk_hec::common::integration_test_helpers::{get_token, splunk_hec_address, splunk_api_address},
+        splunk_hec::common::integration_test_helpers::{
+            get_token, splunk_api_address, splunk_hec_address,
+        },
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
@@ -199,11 +201,10 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
     let res = client
         .get(format!(
             "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
-            splunk_api_address(), metric_name
+            splunk_api_address(),
+            metric_name
         ))
-        .form(&vec![
-            ("filter", "index=*"),
-        ])
+        .form(&vec![("filter", "index=*")])
         .basic_auth(USERNAME, Some(PASSWORD))
         .send()
         .await

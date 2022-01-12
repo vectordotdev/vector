@@ -11,7 +11,7 @@ use crate::{
         splunk_hec::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
-                integration_test_helpers::{get_token, splunk_hec_address, splunk_api_address},
+                integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
             },
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
         },
@@ -40,7 +40,10 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
         None => "search index=*".into(),
     };
     let res = client
-        .post(format!("{}/services/search/jobs?output_mode=json", splunk_api_address()))
+        .post(format!(
+            "{}/services/search/jobs?output_mode=json",
+            splunk_api_address()
+        ))
         .form(&vec![
             ("search", &search_query[..]),
             ("exec_mode", "oneshot"),

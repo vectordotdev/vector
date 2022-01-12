@@ -1,4 +1,4 @@
-services: 
+services:
   splunk-hec:
     image: splunk/splunk:${SPLUNK_VERSION:-8.2.4}
     environment:
