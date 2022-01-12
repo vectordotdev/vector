@@ -360,18 +360,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh humio stop
 endif
 
-.PHONY: test-integration-kafka
-test-integration-kafka: ## Runs Kafka integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
-
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
 ifeq ($(AUTOSPAWN), true)
