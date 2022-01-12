@@ -323,11 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-datadog-metrics
-test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
-
-
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -351,17 +346,6 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh humio stop
-endif
-.PHONY: test-integration-influxdb
-test-integration-influxdb: ## Runs InfluxDB integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh influxdb start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
 endif
 
 .PHONY: test-integration-kafka
