@@ -293,14 +293,14 @@ mod integration_tests {
     use vector_core::config::proxy::ProxyConfig;
     use warp::Filter;
 
-    use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
+    use super::{build_healthcheck, create_client, integration_test_helpers::{get_token, splunk_hec_address}};
     use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
         let client = create_client(&None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(
-            "http://localhost:8088/".to_string(),
+            splunk_hec_address(),
             get_token().await,
             client,
         );
@@ -352,6 +352,14 @@ pub mod integration_test_helpers {
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
 
+    pub fn splunk_hec_address() -> String {
+        std::env::var("SPLUNK_HEC_ADDRESS").unwrap_or_else(|_| "http://localhost:8088".into())
+    }
+
+    pub fn splunk_api_address() -> String {
+        std::env::var("SPLUNK_API_ADDRESS").unwrap_or_else(|_| "https://localhost:8089".into())
+    }
+
     pub async fn get_token() -> String {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -361,7 +369,7 @@ pub mod integration_test_helpers {
         let res = retry_until(
             || {
                 client
-                    .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
+                    .get(format!("{}/services/data/inputs/http?output_mode=json", splunk_api_address()))
                     .basic_auth(USERNAME, Some(PASSWORD))
                     .send()
             },

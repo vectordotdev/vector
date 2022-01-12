@@ -32,6 +32,9 @@ services:
       - "--nocapture"
     depends_on:
       - splunk-hec
+    environment:
+      - SPLUNK_HEC_ADDRESS=http://splunk-hec:8088
+      - SPLUNK_API_ADDRESS=https://splunk-hec:8089
     volumes:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
