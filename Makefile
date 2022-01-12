@@ -323,18 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-eventstoredb_metrics
-test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-	@scripts/setup_integration_env.sh eventstoredb_metrics start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features eventstoredb_metrics-integration-tests --lib ::eventstoredb_metrics:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-endif
-
 .PHONY: test-integration-humio
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -406,15 +394,15 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
 endif
 
+tests/data/dnstap/socket:
+	mkdir -p tests/data/dnstap/socket
+	chmod 777 tests/data/dnstap/socket
+
 .PHONY: test-integration-dnstap
-test-integration-dnstap: ## Runs dnstap integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
-	@scripts/setup_integration_env.sh dnstap start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap::
+test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
+	make test-integration-dnstap-cleanup
 endif
 
 test-integration-%:
