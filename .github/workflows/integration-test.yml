@@ -58,7 +58,6 @@ jobs:
         include:
           - test: 'eventstoredb_metrics'
           - test: 'humio'
-          - test: 'influxdb'
           - test: 'kafka'
           - test: 'postgresql_metrics'
           - test: 'pulsar'
@@ -102,6 +101,7 @@ jobs:
           - test: 'elasticsearch'
           - test: 'fluent'
           - test: 'gcp'
+          - test: 'influxdb'
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongo'
