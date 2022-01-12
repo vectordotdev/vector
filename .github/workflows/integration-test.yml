@@ -63,7 +63,6 @@ jobs:
           - test: 'postgresql_metrics'
           - test: 'pulsar'
           - test: 'splunk'
-          - test: 'dnstap'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
@@ -98,6 +97,7 @@ jobs:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
+          - test: 'dnstap'
           - test: 'docker'
           - test: 'elasticsearch'
           - test: 'fluent'

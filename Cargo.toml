@@ -777,7 +777,7 @@ prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
-dnstap-integration-tests = ["sources-dnstap"]
+dnstap-integration-tests = ["sources-dnstap", "bollard"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]

@@ -419,15 +419,15 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
 endif
 
+tests/data/dnstap/socket:
+	mkdir -p tests/data/dnstap/socket
+	chmod 777 tests/data/dnstap/socket
+
 .PHONY: test-integration-dnstap
-test-integration-dnstap: ## Runs dnstap integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
-	@scripts/setup_integration_env.sh dnstap start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap::
+test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
+	make test-integration-dnstap-cleanup
 endif
 
 test-integration-%:
