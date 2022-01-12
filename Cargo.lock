@@ -1451,8 +1451,7 @@ dependencies = [
 [[package]]
 name = "console-api"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "033fddce299c93dd44ae21d5f5a6e749baa5d103784bcdde65701c07272a9fde"
+source = "git+https://github.com/tokio-rs/console?rev=fdc77e28d45da73595320fab8ce56f982c562bb6#fdc77e28d45da73595320fab8ce56f982c562bb6"
 dependencies = [
  "prost 0.9.0",
  "prost-types 0.9.0",
@@ -1464,10 +1463,10 @@ dependencies = [
 [[package]]
 name = "console-subscriber"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2380cc150266375aeda8f9aeadc5527395c1a8807ecf9fa97a46d1bb760ec5b"
+source = "git+https://github.com/tokio-rs/console?rev=fdc77e28d45da73595320fab8ce56f982c562bb6#fdc77e28d45da73595320fab8ce56f982c562bb6"
 dependencies = [
  "console-api",
+ "crossbeam-channel",
  "futures 0.3.19",
  "hdrhistogram",
  "humantime",
