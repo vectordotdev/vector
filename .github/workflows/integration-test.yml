@@ -56,17 +56,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'datadog-metrics'
-          - test: 'docker-logs'
           - test: 'eventstoredb_metrics'
-          - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
           - test: 'influxdb'
           - test: 'kafka'
-          - test: 'loki'
           - test: 'postgresql_metrics'
-          - test: 'prometheus'
           - test: 'pulsar'
           - test: 'splunk'
     steps:
@@ -102,11 +97,16 @@ jobs:
           - test: 'clickhouse'
           - test: 'datadog-agent'
           - test: 'datadog-logs'
+          - test: 'datadog-metrics'
           - test: 'dnstap'
+          - test: 'docker'
           - test: 'elasticsearch'
+          - test: 'fluent'
           - test: 'logstash'
+          - test: 'loki'
           - test: 'mongo'
           - test: 'nginx'
+          - test: 'prometheus'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0

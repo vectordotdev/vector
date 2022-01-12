@@ -323,14 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-datadog-metrics
-test-integration-datadog-metrics: ## Runs Datadog metrics integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features datadog-metrics-integration-tests --lib ::datadog::metrics::
-
-.PHONY: test-integration-docker-logs
-test-integration-docker-logs: ## Runs Docker Logs integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
-
 .PHONY: test-integration-eventstoredb_metrics
 test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -342,10 +334,6 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh eventstoredb_metrics stop
 endif
-
-.PHONY: test-integration-fluent
-test-integration-fluent: ## Runs Fluent integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
 
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
@@ -395,18 +383,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh kafka stop
 endif
 
-.PHONY: test-integration-loki
-test-integration-loki: ## Runs Loki integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-	@scripts/setup_integration_env.sh loki start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-endif
-
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -429,21 +405,6 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics stop
-endif
-
-.PHONY: test-integration-prometheus
-test-integration-prometheus: ## Runs Prometheus integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
-	@scripts/setup_integration_env.sh influxdb start
-	@scripts/setup_integration_env.sh prometheus start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
 endif
 
 .PHONY: test-integration-pulsar
@@ -769,6 +730,10 @@ clean: environment-clean ## Clean everything
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
+
+.PHONY: generate-kubernetes-manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
+	scripts/generate-manifests.sh
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

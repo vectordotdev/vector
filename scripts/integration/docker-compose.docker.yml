@@ -1,0 +1,30 @@
+services:
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "docker-logs-integration-tests"
+      - "--lib"
+      - "::docker_::"
+      - "--"
+      - "--nocapture"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

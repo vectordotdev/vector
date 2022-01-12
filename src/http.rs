@@ -25,7 +25,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-#[snafu(visibility = "pub(crate)")]
+#[snafu(visibility(pub(crate)))]
 pub enum HttpError {
     #[snafu(display("Failed to build TLS connector: {}", source))]
     BuildTlsConnector { source: TlsError },
@@ -68,8 +68,9 @@ where
         http.enforce_http(false);
 
         let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings).context(BuildTlsConnector)?;
-        let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnector)?;
+        let tls = tls_connector_builder(&settings).context(BuildTlsConnectorSnafu)?;
+        let mut https =
+            HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
 
         let settings = settings.tls().cloned();
         https.set_callback(move |c, _uri| {
@@ -83,7 +84,7 @@ where
         let mut proxy = ProxyConnector::new(https).unwrap();
         proxy_config
             .configure(&mut proxy)
-            .context(MakeProxyConnector)?;
+            .context(MakeProxyConnectorSnafu)?;
         let client = client_builder.build(proxy);
 
         let version = crate::get_version();
@@ -128,7 +129,7 @@ where
                     });
                     error
                 })
-                .context(CallRequest)?;
+                .context(CallRequestSnafu)?;
 
             // Emit the response into the internal events system.
             emit!(&http_client::GotHttpResponse {

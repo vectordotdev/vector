@@ -75,7 +75,7 @@ impl SourceConfig for ApacheMetricsConfig {
             .iter()
             .map(|endpoint| endpoint.parse::<http::Uri>())
             .collect::<Result<Vec<_>, _>>()
-            .context(super::UriParseError)?;
+            .context(super::UriParseSnafu)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 

@@ -133,12 +133,12 @@ pub mod service_control {
     fn start_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::START;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status().context(Service)?;
+        let service_status = service.query_status().context(ServiceSnafu)?;
 
         if service_status.current_state != ServiceState::StartPending
             || service_status.current_state != ServiceState::Running
         {
-            service.start(&[] as &[OsString]).context(Service)?;
+            service.start(&[] as &[OsString]).context(ServiceSnafu)?;
             emit!(&WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: false,
@@ -156,12 +156,12 @@ pub mod service_control {
     fn stop_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status().context(Service)?;
+        let service_status = service.query_status().context(ServiceSnafu)?;
 
         if service_status.current_state != ServiceState::StopPending
             || service_status.current_state != ServiceState::Stopped
         {
-            service.stop().context(Service)?;
+            service.stop().context(ServiceSnafu)?;
             emit!(&WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -183,7 +183,7 @@ pub mod service_control {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status().context(Service)?;
+        let service_status = service.query_status().context(ServiceSnafu)?;
 
         if service_status.current_state == ServiceState::StartPending
             || service_status.current_state == ServiceState::Running
@@ -199,7 +199,7 @@ pub mod service_control {
         )?;
         handle_service_exit_code(service_status.exit_code);
 
-        service.start(&[] as &[OsString]).context(Service)?;
+        service.start(&[] as &[OsString]).context(ServiceSnafu)?;
         emit!(&WindowsServiceRestart {
             name: &*service_def.name.to_string_lossy()
         });
@@ -209,7 +209,7 @@ pub mod service_control {
     fn install_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
         let service_manager =
-            ServiceManager::local_computer(None::<&str>, manager_access).context(Service)?;
+            ServiceManager::local_computer(None::<&str>, manager_access).context(ServiceSnafu)?;
 
         let service_info = ServiceInfo {
             name: service_def.name.clone(),
@@ -226,7 +226,7 @@ pub mod service_control {
 
         service_manager
             .create_service(&service_info, ServiceAccess::empty())
-            .context(Service)?;
+            .context(ServiceSnafu)?;
 
         emit!(&WindowsServiceInstall {
             name: &*service_def.name.to_string_lossy(),
@@ -245,9 +245,9 @@ pub mod service_control {
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(&service_def, service_access)?;
 
-        let service_status = service.query_status().context(Service)?;
+        let service_status = service.query_status().context(ServiceSnafu)?;
         if service_status.current_state != ServiceState::Stopped {
-            service.stop().context(Service)?;
+            service.stop().context(ServiceSnafu)?;
             emit!(&WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -262,7 +262,7 @@ pub mod service_control {
         )?;
         handle_service_exit_code(service_status.exit_code);
 
-        service.delete().context(Service)?;
+        service.delete().context(ServiceSnafu)?;
 
         emit!(&WindowsServiceUninstall {
             name: &*service_def.name.to_string_lossy(),
@@ -276,7 +276,7 @@ pub mod service_control {
     ) -> crate::Result<windows_service::service::Service> {
         let manager_access = ServiceManagerAccess::CONNECT;
         let service_manager =
-            ServiceManager::local_computer(None::<&str>, manager_access).context(Service)?;
+            ServiceManager::local_computer(None::<&str>, manager_access).context(ServiceSnafu)?;
 
         let service = service_manager
             .open_service(&service_def.name, access)
@@ -286,7 +286,7 @@ pub mod service_control {
                 });
                 e
             })
-            .context(Service)?;
+            .context(ServiceSnafu)?;
         Ok(service)
     }
 

@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+import seaborn as sns
+import numpy as np
+import pandas as pd
+import scipy.stats
+import argparse
+import common
+import matplotlib.pyplot as plt
+import os
+
+np.seterr(all='raise')
+
+parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
+parser.add_argument('--output-dir', type=str, help='the directory to search for capture files')
+parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
+parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
+args = parser.parse_args()
+
+bytes_written = pd.concat(common.compute_throughput(
+    common.open_captures(args.capture_dir,
+                         'bytes_written',
+                         unwanted_labels=['metric_name', 'metric_kind', 'target']),
+    cpus = args.vector_cpus))
+# Skip past warmup seconds samples, allowing for vector warmup to not factor
+# into judgement. Also, filter any zero samples as these are not interesting for
+# the purposes of analysis.
+bytes_written = bytes_written[bytes_written.fetch_index > args.warmup_seconds]
+
+bytes_written['bytes/second per core'] = bytes_written['throughput']
+bytes_written['runtime'] = bytes_written['fetch_index']
+
+for exp in bytes_written.experiment.unique():
+    print(exp)
+    sns.set_theme()
+    sns.lmplot(data=bytes_written[bytes_written.experiment == exp].sort_values(by=['variant']),
+               x="fetch_index", y="bytes/second per core",
+               hue="run_id", col="variant",
+               scatter=True)
+    plt.savefig(os.path.join(args.output_dir, "{}.png".format(exp)), dpi=200)
+    plt.close()

@@ -98,13 +98,13 @@ impl SinkConfig for PulsarSinkConfig {
         let producer = self
             .create_pulsar_producer()
             .await
-            .context(CreatePulsarSink)?;
+            .context(CreatePulsarSinkSnafu)?;
         let sink = PulsarSink::new(producer, self.encoding.clone(), cx.acker())?;
 
         let producer = self
             .create_pulsar_producer()
             .await
-            .context(CreatePulsarSink)?;
+            .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
