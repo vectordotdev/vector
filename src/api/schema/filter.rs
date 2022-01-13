@@ -45,7 +45,6 @@ impl StringFilter {
     }
 }
 
-
 #[derive(Default, InputObject)]
 pub struct SourceOutputTypeFilter {
     pub supports: Option<source::SourceOutputType>,
@@ -56,9 +55,9 @@ impl SourceOutputTypeFilter {
     pub fn filter_value(&self, value: source::SourceOutputType) -> bool {
         filter_check!(
             // Supports
-            self.supports.as_ref().map(|s| s.contains(value)),
+            self.supports.as_ref().map(|s| value.contains(*s)),
             // Not Supports
-            self.not_supports.as_ref().map(|s| !s.contains(value))
+            self.not_supports.as_ref().map(|s| !value.contains(*s))
         );
         true
     }
