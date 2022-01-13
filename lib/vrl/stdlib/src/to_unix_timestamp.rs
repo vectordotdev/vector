@@ -78,10 +78,10 @@ impl Function for ToUnixTimestamp {
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "unit" {
-            match expr.as_value() {
+        match (name, expr) {
+            ("unit", Some(expr)) => match expr.as_value() {
                 None => Ok(None),
                 Some(value) => {
                     let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
@@ -95,9 +95,8 @@ impl Function for ToUnixTimestamp {
                             })?,
                     ))
                 }
-            }
-        } else {
-            Ok(None)
+            },
+            _ => Ok(None),
         }
     }
 

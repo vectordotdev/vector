@@ -378,15 +378,16 @@ impl Expression for FunctionCall {
         };
 
         for (keyword, argument) in &args {
+            // TODO, this could be refactored.
+            let fun = vm.function(self.function_id).unwrap();
             match argument {
                 Some(argument) => {
                     // We can unwrap here because we have already returned with an Err if
                     // `function()` returns a `None`.
                     // We can't reuse the previous call to `function` since that lands us with a
                     // bunch of borrow errors.
-                    let fun = vm.function(self.function_id).unwrap();
                     match fun
-                        .compile_argument(&args, keyword, argument.inner())
+                        .compile_argument(&args, keyword, Some(argument.inner()))
                         .map_err(|err| err.to_string())?
                     {
                         Some(stat) => {
@@ -402,7 +403,20 @@ impl Expression for FunctionCall {
                     }
                 }
                 None => {
-                    vm.write_chunk(crate::vm::OpCode::EmptyParameter);
+                    match fun
+                        .compile_argument(&args, keyword, None)
+                        .map_err(|err| err.to_string())?
+                    {
+                        Some(stat) => {
+                            // The function has compiled this argument as a static
+                            let stat = vm.add_static(stat);
+                            vm.write_chunk(crate::vm::OpCode::MoveStatic);
+                            vm.write_primitive(stat);
+                        }
+                        None => {
+                            vm.write_chunk(crate::vm::OpCode::EmptyParameter);
+                        }
+                    }
                 }
             }
         }

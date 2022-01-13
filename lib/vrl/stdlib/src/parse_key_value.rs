@@ -119,10 +119,10 @@ impl Function for ParseKeyValue {
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "whitespace" {
-            match expr.as_value() {
+        match (name, expr) {
+            ("whitespace", Some(expr)) => match expr.as_value() {
                 None => Ok(None),
                 Some(value) => Ok(Some(
                     Whitespace::from_str(
@@ -135,9 +135,8 @@ impl Function for ParseKeyValue {
                         variants: Whitespace::all_value().to_vec(),
                     })?,
                 )),
-            }
-        } else {
-            Ok(None)
+            },
+            _ => Ok(None),
         }
     }
 

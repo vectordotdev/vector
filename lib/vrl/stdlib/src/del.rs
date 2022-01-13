@@ -95,23 +95,24 @@ impl Function for Del {
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "target" {
-            let query = match expr {
-                expression::Expr::Query(query) => query,
-                _ => {
-                    return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                        keyword: "field",
-                        expected: "query",
-                        expr: expr.clone(),
-                    }))
-                }
-            };
+        match (name, expr) {
+            ("target", Some(expr)) => {
+                let query = match expr {
+                    expression::Expr::Query(query) => query,
+                    _ => {
+                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                            keyword: "field",
+                            expected: "query",
+                            expr: expr.clone(),
+                        }))
+                    }
+                };
 
-            Ok(Some(Box::new(query.clone()) as _))
-        } else {
-            Ok(None)
+                Ok(Some(Box::new(query.clone()) as _))
+            }
+            _ => Ok(None),
         }
     }
 

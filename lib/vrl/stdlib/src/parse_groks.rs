@@ -106,32 +106,33 @@ impl Function for ParseGroks {
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "patterns" {
-            let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
-                if *name == "aliases" {
-                    arg.as_ref()
-                } else {
-                    None
-                }
-            });
+        match (name, expr) {
+            ("patterns", Some(expr)) => {
+                let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                    if *name == "aliases" {
+                        arg.as_ref()
+                    } else {
+                        None
+                    }
+                });
 
-            let patterns = expr.as_value().unwrap();
-            let patterns = patterns
-                .try_array()
-                .unwrap()
-                .into_iter()
-                .map(|value| {
-                    let pattern = value
-                        .try_bytes_utf8_lossy()
-                        .expect("grok pattern not bytes")
-                        .into_owned();
-                    Ok(pattern)
-                })
-                .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
+                let patterns = expr.as_value().unwrap();
+                let patterns = patterns
+                    .try_array()
+                    .unwrap()
+                    .into_iter()
+                    .map(|value| {
+                        let pattern = value
+                            .try_bytes_utf8_lossy()
+                            .expect("grok pattern not bytes")
+                            .into_owned();
+                        Ok(pattern)
+                    })
+                    .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
 
-            let aliases = aliases
+                let aliases = aliases
                 .map(|aliases| {
                     aliases
                         .to_value()
@@ -150,13 +151,15 @@ impl Function for ParseGroks {
                 })
                 .unwrap_or_default();
 
-            // we use a datadog library here because it is a superset of grok
-            let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
-                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?;
+                // we use a datadog library here because it is a superset of grok
+                let grok_rules =
+                    parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
+                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                    })?;
 
-            Ok(Some(Box::new(grok_rules) as _))
-        } else {
-            Ok(None)
+                Ok(Some(Box::new(grok_rules) as _))
+            }
+            _ => Ok(None),
         }
     }
 

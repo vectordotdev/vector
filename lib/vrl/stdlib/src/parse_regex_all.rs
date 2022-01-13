@@ -97,23 +97,24 @@ impl Function for ParseRegexAll {
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "pattern" {
-            let regex: regex::Regex = match expr {
-                expression::Expr::Literal(expression::Literal::Regex(regex)) => {
-                    Ok((**regex).clone())
-                }
-                expr => Err(Error::UnexpectedExpression {
-                    keyword: "pattern",
-                    expected: "regex",
-                    expr: expr.clone(),
-                }),
-            }?;
+        match (name, expr) {
+            ("pattern", Some(expr)) => {
+                let regex: regex::Regex = match expr {
+                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
+                        Ok((**regex).clone())
+                    }
+                    expr => Err(Error::UnexpectedExpression {
+                        keyword: "pattern",
+                        expected: "regex",
+                        expr: expr.clone(),
+                    }),
+                }?;
 
-            Ok(Some(Box::new(regex) as _))
-        } else {
-            Ok(None)
+                Ok(Some(Box::new(regex) as _))
+            }
+            _ => Ok(None),
         }
     }
 

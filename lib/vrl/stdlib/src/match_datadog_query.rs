@@ -75,53 +75,54 @@ impl Function for MatchDatadogQuery {
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
         name: &str,
-        expr: &expression::Expr,
+        expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
-        if name == "query" {
-            let query_value = match expr {
-                expression::Expr::Literal(literal) => literal.to_value(),
-                expression::Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
-                        expression::Expr::Literal(literal) => literal.to_value(),
-                        expr => {
-                            return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                                keyword: "query",
-                                expected: "literal",
-                                expr,
-                            }))
+        match (name, expr) {
+            ("query", Some(expr)) => {
+                let query_value = match expr {
+                    expression::Expr::Literal(literal) => literal.to_value(),
+                    expression::Expr::Variable(var) if var.value().is_some() => {
+                        match var.value().unwrap().clone().into_expr() {
+                            expression::Expr::Literal(literal) => literal.to_value(),
+                            expr => {
+                                return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                                    keyword: "query",
+                                    expected: "literal",
+                                    expr,
+                                }))
+                            }
                         }
                     }
-                }
-                expr => {
-                    return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                        keyword: "query",
-                        expected: "literal",
-                        expr: expr.clone(),
-                    }))
-                }
-            };
+                    expr => {
+                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                            keyword: "query",
+                            expected: "literal",
+                            expr: expr.clone(),
+                        }))
+                    }
+                };
 
-            let query = query_value
-                .try_bytes_utf8_lossy()
-                .expect("datadog search query should be a UTF8 string");
+                let query = query_value
+                    .try_bytes_utf8_lossy()
+                    .expect("datadog search query should be a UTF8 string");
 
-            // Compile the Datadog search query to AST.
-            let node = parse(&query)
-                .map_err(|e| {
-                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
-                })
-                .unwrap(); // TODO proper error handling...
+                // Compile the Datadog search query to AST.
+                let node = parse(&query)
+                    .map_err(|e| {
+                        Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+                    })
+                    .unwrap(); // TODO proper error handling...
 
-            // Build the matcher function that accepts a VRL event value. This will parse the `node`
-            // at boot-time and return a boxed func that contains just the logic required to match a
-            // VRL `Value` against the Datadog Search Syntax literal.
-            let filter = build_matcher(&node, &VrlFilter::default());
+                // Build the matcher function that accepts a VRL event value. This will parse the `node`
+                // at boot-time and return a boxed func that contains just the logic required to match a
+                // VRL `Value` against the Datadog Search Syntax literal.
+                let filter = build_matcher(&node, &VrlFilter::default());
 
-            Ok(Some(
-                Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>
-            ))
-        } else {
-            Ok(None)
+                Ok(Some(
+                    Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>
+                ))
+            }
+            _ => Ok(None),
         }
     }
 
