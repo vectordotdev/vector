@@ -323,18 +323,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
-.PHONY: test-integration-humio
-test-integration-humio: ## Runs Humio integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh humio stop
-	@scripts/setup_integration_env.sh humio start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh humio stop
-endif
-
 .PHONY: test-integration-kafka
 test-integration-kafka: ## Runs Kafka integration tests
 ifeq ($(AUTOSPAWN), true)
