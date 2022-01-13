@@ -66,7 +66,7 @@ impl fmt::Display for Value {
             Value::Timestamp(val) => {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
-            Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
+            Value::Regex(regex) => write!(f, "r'{}'", **regex),
             Value::Null => write!(f, "null"),
         }
     }
