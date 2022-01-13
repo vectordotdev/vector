@@ -81,7 +81,7 @@ impl SinkConfig for NatsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = NatsSink::new(self.clone(), cx.acker()).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
-        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -134,7 +134,7 @@ impl NatsSink {
 }
 
 #[async_trait]
-impl StreamSink for NatsSink {
+impl StreamSink<Event> for NatsSink {
     async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             let subject = match self.subject.render_string(&event) {

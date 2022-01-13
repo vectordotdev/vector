@@ -117,7 +117,10 @@ impl SinkConfig for SqsSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
+        Ok((
+            super::VectorSink::from_event_sink(sink),
+            healthcheck.boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {

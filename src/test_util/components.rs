@@ -184,11 +184,12 @@ where
 }
 
 /// Convenience wrapper for running sinks with a stream of events
-pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
+pub async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
+    let mut events = events.map(|result| result.map(|event| event.into()));
     match sink {
         VectorSink::Sink(mut sink) => {
             sink.send_all(&mut events)

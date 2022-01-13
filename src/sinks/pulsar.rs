@@ -107,7 +107,7 @@ impl SinkConfig for PulsarSinkConfig {
             .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
