@@ -11,15 +11,25 @@ use crate::ByteSizeOf;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
+#[allow(clippy::len_without_is_empty)]
 pub trait EventContainer: ByteSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
+
+    /// The number of events in this container.
+    fn len(&self) -> usize;
+
     /// Turn this container into an iterator of events.
     fn into_events(self) -> Self::IntoIter;
 }
 
 impl EventContainer for Event {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self)
     }
@@ -27,6 +37,11 @@ impl EventContainer for Event {
 
 impl EventContainer for LogEvent {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self.into())
     }
@@ -34,6 +49,11 @@ impl EventContainer for LogEvent {
 
 impl EventContainer for Metric {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self.into())
     }
@@ -44,6 +64,11 @@ pub type LogArray = Vec<LogEvent>;
 
 impl EventContainer for LogArray {
     type IntoIter = iter::Map<vec::IntoIter<LogEvent>, fn(LogEvent) -> Event>;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
     fn into_events(self) -> Self::IntoIter {
         self.into_iter().map(Into::into)
     }
@@ -54,6 +79,11 @@ pub type MetricArray = Vec<Metric>;
 
 impl EventContainer for MetricArray {
     type IntoIter = iter::Map<vec::IntoIter<Metric>, fn(Metric) -> Event>;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
     fn into_events(self) -> Self::IntoIter {
         self.into_iter().map(Into::into)
     }
@@ -76,6 +106,18 @@ impl From<Event> for EventArray {
     }
 }
 
+impl From<LogArray> for EventArray {
+    fn from(array: LogArray) -> Self {
+        Self::Logs(array)
+    }
+}
+
+impl From<MetricArray> for EventArray {
+    fn from(array: MetricArray) -> Self {
+        Self::Metrics(array)
+    }
+}
+
 impl ByteSizeOf for EventArray {
     fn allocated_bytes(&self) -> usize {
         match self {
@@ -87,6 +129,13 @@ impl ByteSizeOf for EventArray {
 
 impl EventContainer for EventArray {
     type IntoIter = EventArrayIntoIter;
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.len(),
+            Self::Metrics(a) => a.len(),
+        }
+    }
 
     fn into_events(self) -> Self::IntoIter {
         match self {
