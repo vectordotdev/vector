@@ -37,6 +37,7 @@ prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.79", default-features = false }
+smallvec = { version = "1", features = ["const_generics", "const_new", "union"] }
 snafu = { version = "0.7.0", default-features = false }
 substring = { version = "1.4", default-features = false }
 tokio = { version = "1.17.0", default-features = false }

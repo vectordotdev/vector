@@ -336,6 +336,7 @@ pub struct MockSinkConfig {
     data: Option<String>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 enum Mode {
     Normal(SourceSender),

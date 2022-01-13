@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 /// A related trait to `PartialEq`, `EventDataEq` tests if two events
 /// contain the same data, exclusive of the metadata. This is used to
 /// test for events having the same values but potentially different
@@ -52,6 +54,12 @@ impl<T: EventDataEq> EventDataEq for &[T] {
 }
 
 impl<T: EventDataEq> EventDataEq for Vec<T> {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.as_slice().event_data_eq(&other.as_slice())
+    }
+}
+
+impl<T: EventDataEq, const N: usize> EventDataEq for SmallVec<[T; N]> {
     fn event_data_eq(&self, other: &Self) -> bool {
         self.as_slice().event_data_eq(&other.as_slice())
     }

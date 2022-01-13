@@ -52,7 +52,7 @@ nom = { version = "7", optional = true }
 ordered-float = { version = "2.10.0", default-features = false }
 serde_json = { version = "1.0.79", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.136", optional = true, features = ["derive"] }
-smallvec = { version = "1", default-features = false }
+smallvec = { version = "1", default-features = false, features = ["const_generics", "union"] }
 snafu = { version = "0.7", optional = true }
 tracing = { version = "0.1.31", default-features = false }
 value = { path = "../value" }
