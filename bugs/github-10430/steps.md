@@ -19,6 +19,7 @@ in is still present after renaming the data directory, etc, we can use `netcat` 
 port and inspect the HTTP request made by the sink.
 
 ## Test Cases
+
 1. Ensure that the new-style directory stays untouched between 0.19.0 and the fix binary:
     - Run both the 0.19.0 binary and the fix binary with a clean data directory, and ensure they
       both generate the same data directory.

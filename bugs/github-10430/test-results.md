@@ -2,7 +2,7 @@
 
 ### Test 1
 
-```
+```shell
 toby@consigliere:~/src/vector/bugs/github-10430$ ./create-clean-data-directories.sh
 toby@consigliere:~/src/vector/bugs/github-10430$ ls -l /tmp/vector/github-10430/
 total 0
@@ -46,7 +46,7 @@ toby@consigliere:~/src/vector/bugs/github-10430$
 
 ### Test 2
 
-```
+```shell
 toby@consigliere:~/src/vector/bugs/github-10430$ ./create-clean-data-directories.sh
 toby@consigliere:~/src/vector/bugs/github-10430$ ls -l /tmp/vector/github-10430/
 total 0
@@ -103,7 +103,7 @@ toby@consigliere:~/src/vector/bugs/github-10430$
 
 ### Test 3
 
-```
+```shell
 toby@consigliere:~/src/vector/bugs/github-10430$ ./create-clean-data-directories.sh
 toby@consigliere:~/src/vector/bugs/github-10430$ ls -l /tmp/vector/github-10430/
 total 0
@@ -168,7 +168,7 @@ content-length: 615
 
 ### Test 4
 
-```
+```shell
 toby@consigliere:~/src/vector/bugs/github-10430$ ./create-clean-data-directories.sh
 toby@consigliere:~/src/vector/bugs/github-10430$ ls -l /tmp/vector/github-10430/
 total 0
@@ -232,7 +232,7 @@ toby@consigliere:~/src/vector/bugs/github-10430$
 
 ### Test 5
 
-```
+```shell
 toby@consigliere:~/src/vector/bugs/github-10430$ ./create-clean-data-directories.sh
 toby@consigliere:~/src/vector/bugs/github-10430$ ls -l /tmp/vector/github-10430/
 total 0
