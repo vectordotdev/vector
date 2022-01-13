@@ -39,7 +39,7 @@ services:
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
-      - "kafka-integration-tests,rdkafka-plain"
+      - "${FEATURES:-kafka-integration-tests,rdkafka-plain}"
       - "--lib"
       - "${FILTER:-::kafka::}"
       - "--"
