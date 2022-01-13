@@ -16,11 +16,14 @@ We can install Vector using an installation script or Docker:
 
 {{< tabs default="Script" >}}
 {{< tab title="Script" >}}
+
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
+
 {{< /tab >}}
 {{< tab title="Docker" >}}
+
 ```shell
 docker pull timberio/vector:{{< version >}}-distroless
 ```

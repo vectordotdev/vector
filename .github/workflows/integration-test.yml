@@ -59,7 +59,6 @@ jobs:
           - test: 'humio'
           - test: 'kafka'
           - test: 'postgresql_metrics'
-          - test: 'pulsar'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
@@ -106,6 +105,7 @@ jobs:
           - test: 'mongo'
           - test: 'nginx'
           - test: 'prometheus'
+          - test: 'pulsar'
           - test: 'redis'
           - test: 'splunk'
             env:
