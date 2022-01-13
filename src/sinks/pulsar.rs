@@ -402,6 +402,10 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
 
+    fn pulsar_address() -> String {
+        std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
+    }
+
     #[tokio::test]
     async fn pulsar_happy() {
         trace_init();
@@ -411,7 +415,7 @@ mod integration_tests {
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {
-            endpoint: "pulsar://127.0.0.1:6650".to_owned(),
+            endpoint: pulsar_address(),
             topic: topic.clone(),
             encoding: Encoding::Text.into(),
             auth: None,
