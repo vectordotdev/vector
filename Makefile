@@ -347,17 +347,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
 
-.PHONY: test-integration-splunk
-test-integration-splunk: ## Runs Splunk integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
-	@scripts/setup_integration_env.sh splunk start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
-endif
-
 tests/data/dnstap/socket:
 	mkdir -p tests/data/dnstap/socket
 	chmod 777 tests/data/dnstap/socket
