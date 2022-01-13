@@ -243,9 +243,10 @@ where
     /// to an out-of-order read.
     pub fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
         let record_id = token.into_id();
-        if record_id != self.current_record_id {
-            panic!("using expired read token");
-        }
+        assert!(
+            !(record_id != self.current_record_id),
+            "using expired read token"
+        );
 
         // SAFETY:
         // - `try_next_record` is the only method that can hand back a `ReadToken`
