@@ -158,7 +158,7 @@ impl GcsSinkConfig {
 
         let sink = GcsSink::new(cx, svc, request_settings, partitioner, batch_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {

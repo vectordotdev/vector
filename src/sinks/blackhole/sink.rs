@@ -44,7 +44,7 @@ impl BlackholeSink {
 }
 
 #[async_trait]
-impl StreamSink for BlackholeSink {
+impl StreamSink<Event> for BlackholeSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
         // that rate limiting support can be added more simply without having to interleave it with

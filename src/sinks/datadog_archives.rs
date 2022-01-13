@@ -274,7 +274,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_gcs_sink(
@@ -330,7 +330,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     fn build_azure_sink(
@@ -357,7 +357,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_partitioner() -> KeyPartitioner {

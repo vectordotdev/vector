@@ -54,7 +54,7 @@ where
         usage_handle.set_buffer_limits(Some(self.max_size), None);
 
         // Create the actual buffer subcomponents.
-        let buffer_path = self.data_dir.join(self.id);
+        let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
         let config = DiskBufferConfig::from_path(buffer_path)
             .max_buffer_size(self.max_size as u64)
             .build();

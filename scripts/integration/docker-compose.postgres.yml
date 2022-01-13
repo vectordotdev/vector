@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:13.1
+    command: /postgres-init.sh
+    environment:
+      - POSTGRES_USER=vector
+      - POSTGRES_PASSWORD=vector
+    volumes:
+      - socket:/var/run/postgresql
+      - ${PWD}/tests/data/postgres-init.sh:/postgres-init.sh:ro
+      - ${PWD}/tests/data:/certs:ro
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "postgresql_metrics-integration-tests"
+      - "--lib"
+      - "${FILTER:-::postgres}"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - postgres
+    environment:
+      - PG_SOCKET=/socket
+      - PG_HOST=postgres
+    volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - socket:/socket
+      - ${PWD}:/code
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+  socket: {}
+

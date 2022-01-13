@@ -137,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
-        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> config::DataType {

@@ -180,7 +180,7 @@ impl RedisSinkConfig {
             .with_flat_map(move |e| stream::iter(encode_event(e, &key, &encoding)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     async fn build_client(&self) -> RedisResult<ConnectionManager> {

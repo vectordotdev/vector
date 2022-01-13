@@ -134,7 +134,7 @@ impl AzureBlobSinkConfig {
             batcher_settings,
         );
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {

@@ -146,7 +146,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
