@@ -874,6 +874,28 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, tls, SourceSender};
+    use std::path::PathBuf;
+
+    fn pg_host() -> String {
+        std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
+    }
+
+    fn pg_socket() -> PathBuf {
+        std::env::var("PG_SOCKET")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                let current_dir = std::env::current_dir().unwrap();
+                current_dir
+                    .join("tests")
+                    .join("data")
+                    .join("postgresql-local-socket")
+            })
+    }
+
+    fn pg_url() -> String {
+        std::env::var("PG_URL")
+            .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
+    }
 
     async fn test_postgresql_metrics(
         endpoint: String,
@@ -960,22 +982,14 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_host() {
-        test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
-            None,
-            None,
-            None,
-        )
-        .await;
+        test_postgresql_metrics(pg_url(), None, None, None).await;
     }
 
     #[tokio::test]
     async fn test_local() {
-        let current_dir = std::env::current_dir().unwrap();
-        let socket = current_dir.join("tests/data/postgresql-local-socket");
         let endpoint = format!(
             "postgresql:///postgres?host={}&user=vector&password=vector",
-            socket.to_str().unwrap()
+            pg_socket().to_str().unwrap()
         );
         test_postgresql_metrics(endpoint, None, None, None).await;
     }
@@ -983,7 +997,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_ssl() {
         test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres?sslmode=require".to_owned(),
+            format!("{}?sslmode=require", pg_url()),
             Some(PostgresqlMetricsTlsConfig {
                 ca_file: tls::TEST_PEM_CA_PATH.into(),
             }),
@@ -996,7 +1010,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_include_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
             None,
@@ -1015,7 +1029,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_exclude_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             None,
             Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
@@ -1033,19 +1047,13 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_host_exclude_databases_empty() {
-        test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
-            None,
-            None,
-            Some(vec!["".to_owned()]),
-        )
-        .await;
+        test_postgresql_metrics(pg_url(), None, None, Some(vec!["".to_owned()])).await;
     }
 
     #[tokio::test]
     async fn test_host_include_databases_and_exclude_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             Some(vec!["template\\d+".to_owned()]),
             Some(vec!["template0".to_owned()]),
