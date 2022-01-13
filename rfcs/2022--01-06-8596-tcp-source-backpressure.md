@@ -72,7 +72,7 @@ Opt-in static connection limits have already been added to Vector. This option i
 ## Option 2 (dynamic connection limit)
 
 This removes both drawbacks from Option 1 by having Vector itself dynamically adjust the limit. The question now becomes,
-how do you select that value
+how do you select that value?
 
 The most similar thing already in Vector is ARC (Adaptive Request Concurrency). However, this same algorithm is not
 appropriate for TCP connections. ARC uses the "additive increase / multiplicative decrease" algorithm to frequently adjust
