@@ -124,7 +124,7 @@ impl SinkConfig for NewRelicConfig {
             batcher_settings,
         };
 
-        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

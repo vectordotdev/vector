@@ -159,7 +159,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for NewRelicSink<S>
+impl<S> StreamSink<Event> for NewRelicSink<S>
 where
     S: Service<NewRelicApiRequest> + Send + 'static,
     S::Future: Send + 'static,
