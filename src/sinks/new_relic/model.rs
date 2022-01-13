@@ -110,7 +110,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                     let message = message.to_string_lossy().replace("\\\"", "\"");
                     // If message contains a JSON string, parse it and insert all fields into self
                     if let serde_json::Result::Ok(json_map) =
-                    serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
+                        serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
                     {
                         for (k, v) in json_map {
                             match v {
