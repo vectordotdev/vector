@@ -58,7 +58,6 @@ jobs:
         include:
           - test: 'humio'
           - test: 'kafka'
-          - test: 'postgresql_metrics'
           - test: 'pulsar'
           - test: 'splunk'
     steps:
@@ -106,6 +105,7 @@ jobs:
           - test: 'loki'
           - test: 'mongo'
           - test: 'nginx'
+          - test: 'postgres'
           - test: 'prometheus'
           - test: 'redis'
     steps:

@@ -359,18 +359,6 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
 
-.PHONY: test-integration-postgresql_metrics
-test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh postgresql_metrics stop
-	@scripts/setup_integration_env.sh postgresql_metrics start
-	sleep 5 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh postgresql_metrics stop
-endif
-
 .PHONY: test-integration-pulsar
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
