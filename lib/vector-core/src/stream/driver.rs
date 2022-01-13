@@ -434,7 +434,10 @@ mod tests {
             Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            assert!(!self.permit.is_some(), "should not call poll_ready again after a successful call");
+            assert!(
+                !self.permit.is_some(),
+                "should not call poll_ready again after a successful call"
+            );
 
             match ready!(self.semaphore.poll_acquire(cx)) {
                 None => panic!("semaphore should not be closed!"),

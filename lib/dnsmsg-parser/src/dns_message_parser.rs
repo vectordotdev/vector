@@ -237,12 +237,7 @@ impl DnsMessageParser {
         };
         let domain_name = parse_domain_name(&mut decoder)?;
         Ok((
-            Some(format!(
-                "{} {} {}",
-                prefix,
-                ipv6_address,
-                domain_name
-            )),
+            Some(format!("{} {} {}", prefix, ipv6_address, domain_name)),
             None,
         ))
     }
@@ -330,10 +325,7 @@ impl DnsMessageParser {
             };
             apl_rdata.push_str(&format!(
                 "{}{}:{}/{}",
-                negation,
-                address_family,
-                address,
-                prefix
+                negation, address_family, address, prefix
             ));
             apl_rdata.push(' ');
         }
@@ -410,10 +402,7 @@ impl DnsMessageParser {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let rmailbx = parse_domain_name(&mut decoder)?;
                     let emailbx = parse_domain_name(&mut decoder)?;
-                    Ok((
-                        Some(format!("{} {}", rmailbx, emailbx)),
-                        None,
-                    ))
+                    Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty MINFO rdata"),
@@ -425,10 +414,7 @@ impl DnsMessageParser {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let mbox = parse_domain_name(&mut decoder)?;
                     let txt = parse_domain_name(&mut decoder)?;
-                    Ok((
-                        Some(format!("{} {}", mbox, txt)),
-                        None,
-                    ))
+                    Ok((Some(format!("{} {}", mbox, txt)), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty RP rdata"),
@@ -498,10 +484,7 @@ impl DnsMessageParser {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let preference = parse_u16(&mut decoder)?;
                     let intermediate_host = parse_domain_name(&mut decoder)?;
-                    Ok((
-                        Some(format!("{} {}", preference, intermediate_host)),
-                        None,
-                    ))
+                    Ok((Some(format!("{} {}", preference, intermediate_host)), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty RT rdata"),
@@ -527,15 +510,7 @@ impl DnsMessageParser {
                     let preference = parse_u16(&mut decoder)?;
                     let map822 = parse_domain_name(&mut decoder)?;
                     let mapx400 = parse_domain_name(&mut decoder)?;
-                    Ok((
-                        Some(format!(
-                            "{} {} {}",
-                            preference,
-                            map822,
-                            mapx400
-                        )),
-                        None,
-                    ))
+                    Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty PX rdata"),
@@ -554,10 +529,7 @@ impl DnsMessageParser {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let preference = parse_u16(&mut decoder)?;
                     let exchanger = parse_domain_name(&mut decoder)?;
-                    Ok((
-                        Some(format!("{} {}", preference, exchanger)),
-                        None,
-                    ))
+                    Ok((Some(format!("{} {}", preference, exchanger)), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty KX rdata"),
@@ -573,13 +545,7 @@ impl DnsMessageParser {
                     let crl_len = raw_rdata.len() as u16 - 5;
                     let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
                     Ok((
-                        Some(format!(
-                            "{} {} {} {}",
-                            cert_type,
-                            key_tag,
-                            algorithm,
-                            crl
-                        )),
+                        Some(format!("{} {} {} {}", cert_type, key_tag, algorithm, crl)),
                         None,
                     ))
                 }
