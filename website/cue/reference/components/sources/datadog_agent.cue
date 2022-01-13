@@ -77,6 +77,27 @@ components: sources: datadog_agent: {
 		}
 	}
 
+	outputs: [
+		{
+			name: components._default_output.name
+			description: """
+				Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks. Only active if [multiple_outputs](#multiple_outputs) is disabled.
+				"""
+		},
+		{
+			name: "logs"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "metrics"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
+				"""
+		},
+	]
+
 	output: {
 		logs: line: {
 			description: "An individual event from a batch of events received through an HTTP POST request sent by a Datadog Agent."

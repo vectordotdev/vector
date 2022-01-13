@@ -56,7 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'gcp'
           - test: 'humio'
           - test: 'kafka'
           - test: 'postgresql_metrics'
@@ -101,6 +100,7 @@ jobs:
           - test: 'elasticsearch'
           - test: 'eventstoredb'
           - test: 'fluent'
+          - test: 'gcp'
           - test: 'influxdb'
           - test: 'logstash'
           - test: 'loki'
