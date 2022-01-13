@@ -153,7 +153,7 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
         };
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 

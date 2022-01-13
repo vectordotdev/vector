@@ -129,7 +129,7 @@ impl SinkConfig for StatsdSinkConfig {
                     })
                 });
 
-                Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+                Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {

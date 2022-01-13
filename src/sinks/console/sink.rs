@@ -23,7 +23,7 @@ pub struct WriterSink<T> {
 }
 
 #[async_trait]
-impl<T> StreamSink for WriterSink<T>
+impl<T> StreamSink<Event> for WriterSink<T>
 where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {

@@ -168,7 +168,7 @@ impl InfluxDbSvc {
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 

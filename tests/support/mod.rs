@@ -380,7 +380,7 @@ impl SinkConfig for MockSinkConfig {
             future::err(HealthcheckError::Unhealthy.into())
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck.boxed()))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -402,7 +402,7 @@ struct MockSink {
 }
 
 #[async_trait]
-impl StreamSink for MockSink {
+impl StreamSink<Event> for MockSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         match self.sink {
             Mode::Normal(mut sink) => {

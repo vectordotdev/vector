@@ -103,7 +103,7 @@ impl SinkConfig for HumioMetricsConfig {
             transform,
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -121,7 +121,7 @@ pub struct HumioMetricsSink {
 }
 
 #[async_trait]
-impl StreamSink for HumioMetricsSink {
+impl StreamSink<Event> for HumioMetricsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut transform = self.transform;
         self.inner

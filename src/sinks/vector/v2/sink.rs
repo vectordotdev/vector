@@ -48,7 +48,7 @@ impl VectorSink {
 }
 
 #[async_trait]
-impl StreamSink for VectorSink {
+impl StreamSink<Event> for VectorSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

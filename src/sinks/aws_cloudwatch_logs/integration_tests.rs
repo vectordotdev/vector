@@ -291,7 +291,7 @@ async fn cloudwatch_insert_log_event_batched() {
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
     let stream = sink.into_stream(); //.send_all(&mut events).await.unwrap();
-    stream.run(events.boxed()).await.unwrap();
+    stream.run(events.map(Into::into).boxed()).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,
