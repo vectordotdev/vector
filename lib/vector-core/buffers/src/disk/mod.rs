@@ -11,10 +11,6 @@ use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
 
 pub mod leveldb_buffer;
 
-const OLD_AND_NEW_DATA_DIR_WARNING: &str = "detected an old-style disk buffer data directory while utilizing a new-style disk buffer data directory!
-
-this may indicate that you upgraded to 0.19.x prior to a regression being fixed which deals with disk buffer directory names.  see https://github.com/vectordotdev/vector/issues/10430 for more information about this situation.";
-
 #[derive(Debug, Snafu)]
 pub enum DataDirError {
     #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", data_dir))]
@@ -89,6 +85,9 @@ where
 
     if old_path_exists {
         if path_exists {
+            let sidelined_buffer_id = format!("{}_buffer_old", name);
+            let sidelined_path = data_dir.join(sidelined_buffer_id);
+
             // Both old style and new style paths exist.  We check if the old style path has any data,
             // and if it does, we emit a warning log because since the new style path exists, we don't
             // want to risk missing data on that side by trying to read the old data first and then
@@ -96,28 +95,40 @@ where
             //
             // If there's no data in the old style path, though, we just delete the directory and move
             // on: no need to emit anything because nothing is being lost.
-            let (existing_byte_size, existing_record_count) = db_initial_size(&old_path)?;
-            if existing_byte_size != 0 || existing_record_count != 0 {
+            let (old_buffer_size, old_buffer_record_count) = db_initial_size(&old_path)?;
+            if old_buffer_size != 0 || old_buffer_record_count != 0 {
                 // The old style path still has some data, so all we're going to do is warn the user
                 // that this is the case, since we don't want to risk reading older records that
                 // they've moved on from after switching to the new style path.
                 warn!(
-                    message = OLD_AND_NEW_DATA_DIR_WARNING,
-                    existing_record_count, existing_byte_size,
+                    old_buffer_record_count, old_buffer_size,
+                    "Found both old and new buffers with data for '{}' sink. This may indicate that you upgraded to 0.19.x prior to a regression being fixed which deals with disk buffer directory names. Using new buffers and ignoring old. See https://github.com/vectordotdev/vector/issues/10430 for more information.\n\nYou can suppress this message by renaming the old buffer data directory to something else.  Current path for old buffer data directory: {}, suggested path for renaming: {}",
+                    name, old_path.to_string_lossy(), sidelined_path.to_string_lossy()
                 );
             } else {
                 // The old style path has no more data.  Theoretically, we should be able to delete
                 // it, but that's a bit risky, so we just rename it instead.
-                let sidelined_buffer_id = format!("{}_buffer_old", name);
-                let sidelined_path = data_dir.join(sidelined_buffer_id);
-
                 std::fs::rename(&old_path, &sidelined_path)
                     .map_err(|e| map_io_error(e, &sidelined_path))?;
+
+                info!(
+                    "Archived old buffer data directory from '{}' to '{}' for '{}' sink.",
+                    old_path.to_string_lossy(),
+                    sidelined_path.to_string_lossy(),
+                    name
+                );
             }
         } else {
             // Old style path exists, but not the new style path.  Move the old style path to the
             // new style path and then use the new style path going forward.
             std::fs::rename(&old_path, &path).map_err(|e| map_io_error(e, &path))?;
+
+            info!(
+                "Migrated old buffer data directory from '{}' to '{}' for '{}' sink.",
+                old_path.to_string_lossy(),
+                path.to_string_lossy(),
+                name
+            );
         }
     }
 
