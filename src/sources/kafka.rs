@@ -374,9 +374,11 @@ impl ClientContext for CustomContext {
 }
 
 impl ConsumerContext for CustomContext {
-    fn post_rebalance(&self, _rebalance: &Rebalance) {
-        if let Some(finalizer) = self.finalizer.get() {
-            finalizer.flush();
+    fn post_rebalance(&self, rebalance: &Rebalance) {
+        if matches!(rebalance, Rebalance::Revoke(_)) {
+            if let Some(finalizer) = self.finalizer.get() {
+                finalizer.flush();
+            }
         }
     }
 }
