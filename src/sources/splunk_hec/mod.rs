@@ -1584,6 +1584,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn handles_non_utf8() {
+        let message = b" {\"event\": \"A non UTF8 character \xE4\"} ";
+        let (source, address) = source(None).await;
+
+        let b = reqwest::Client::new()
+            .post(&format!(
+                "http://{}/{}",
+                address, "services/collector/event"
+            ))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .body::<&[u8]>(message);
+
+        assert_eq!(200, b.send().await.unwrap().status().as_u16());
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            "A non UTF8 character �".into()
+        );
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
     async fn default() {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
         let (source, address) = source(None).await;
