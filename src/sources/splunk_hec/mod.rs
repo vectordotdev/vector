@@ -250,7 +250,7 @@ impl SplunkSource {
                         let body = if gzip {
                             MultiGzDecoder::new(body.reader())
                                 .read_to_end(&mut data)
-                                .unwrap();
+                                .map_err(|_| Rejection::from(ApiError::BadRequest))?;
                             String::from_utf8_lossy(data.as_slice())
                         } else {
                             String::from_utf8_lossy(body.as_ref())
