@@ -1,12 +1,16 @@
 use std::convert::TryInto;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use tokio_util::codec::Encoder;
 
 use crate::{
-    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
+    codecs::{
+        decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
+        encoding::{BoxedSerializer, SerializerConfig},
+    },
     config::log_schema,
     event::Event,
 };
@@ -80,13 +84,58 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
     }
 }
 
+/// Config used to build a `JsonSerializer`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct JsonSerializerConfig;
+
+impl JsonSerializerConfig {
+    /// Creates a new `JsonSerializerConfig`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+#[typetag::serde(name = "json")]
+impl SerializerConfig for JsonSerializerConfig {
+    fn build(&self) -> crate::Result<BoxedSerializer> {
+        Ok(Box::new(JsonSerializer))
+    }
+}
+
+/// Serializer that converts an `Event` to bytes using the JSON format.
+#[derive(Debug, Clone)]
+pub struct JsonSerializer;
+
+impl JsonSerializer {
+    /// Creates a new `JsonSerializer`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+impl Encoder<Event> for JsonSerializer {
+    type Error = crate::Error;
+
+    fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+        let writer = buffer.writer();
+        match event {
+            Event::Log(log) => serde_json::to_writer(writer, &log),
+            Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+        }
+        .map_err(Into::into)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::log_schema;
+    use crate::event::Value;
+    use bytes::BytesMut;
+    use shared::btreemap;
 
     #[test]
-    fn parse_json() {
+    fn deserialize_json() {
         let input = Bytes::from(r#"{ "foo": 123 }"#);
         let deserializer = JsonDeserializer::new();
 
@@ -104,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_json_array() {
+    fn deserialize_json_array() {
         let input = Bytes::from(r#"[{ "foo": 123 }, { "bar": 456 }]"#);
         let deserializer = JsonDeserializer::new();
 
@@ -126,6 +175,19 @@ mod tests {
         }
 
         assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn serialize_json() {
+        let event = Event::from(btreemap! {
+            "foo" => Value::from("bar")
+        });
+        let mut serializer = JsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(bytes.freeze(), r#"{"foo":"bar"}"#);
     }
 
     #[test]
