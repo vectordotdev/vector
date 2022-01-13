@@ -626,6 +626,7 @@ sinks-logs = [
   "sinks-loki",
   "sinks-nats",
   "sinks-new_relic_logs",
+  "sinks-new_relic",
   "sinks-papertrail",
   "sinks-pulsar",
   "sinks-redis",
@@ -676,6 +677,7 @@ sinks-logdna = []
 sinks-loki = []
 sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["sinks-http"]
+sinks-new_relic = []
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
 sinks-pulsar = ["avro-rs", "pulsar"]
