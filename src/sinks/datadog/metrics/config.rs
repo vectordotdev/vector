@@ -21,7 +21,7 @@ use crate::{
             batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
         },
-        Healthcheck, UriParseError, VectorSink,
+        Healthcheck, UriParseSnafu, VectorSink,
     },
 };
 
@@ -207,14 +207,14 @@ impl DatadogMetricsConfig {
 
         let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
     let result = format!("{}{}", host, endpoint)
         .parse::<Uri>()
-        .context(UriParseError)?;
+        .context(UriParseSnafu)?;
     Ok(result)
 }
 

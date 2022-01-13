@@ -10,7 +10,7 @@ use crate::{
     config::LogSchema,
     event::{Event, Value},
     sinks::{
-        aws_cloudwatch_logs::{CloudwatchKey, IoError},
+        aws_cloudwatch_logs::{CloudwatchKey, IoSnafu},
         util::encoding::{Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings},
     },
     template::Template,
@@ -84,7 +84,7 @@ impl CloudwatchRequestBuilder {
         let mut message_bytes = vec![];
         self.encoding
             .encode_input(event, &mut message_bytes)
-            .context(IoError)?;
+            .context(IoSnafu)?;
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
         if message.len() > MAX_MESSAGE_SIZE {

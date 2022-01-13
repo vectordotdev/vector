@@ -27,7 +27,7 @@ use snafu::ResultExt;
 pub use writer::Writer;
 
 use self::acknowledgements::create_disk_v1_acker;
-use super::{DataDirError, Open};
+use super::{DataDirError, OpenSnafu};
 use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
@@ -54,10 +54,10 @@ pub struct Buffer<T> {
 /// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &Path) -> Result<(u64, u64), DataDirError> {
+pub(super) fn db_initial_size(path: &Path) -> Result<(u64, u64), DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
-    let db: Database<Key> = Database::open(path, options).with_context(|| Open {
+    let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
         data_dir: path.parent().expect("always a parent"),
     })?;
     let mut item_size = 0;
@@ -97,7 +97,7 @@ where
         let mut options = Options::new();
         options.create_if_missing = true;
 
-        let db: Database<Key> = Database::open(path, options).with_context(|| Open {
+        let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
             data_dir: path.parent().expect("always a parent"),
         })?;
         let db = Arc::new(db);

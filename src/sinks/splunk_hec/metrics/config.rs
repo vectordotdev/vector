@@ -3,11 +3,11 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use vector_core::{sink::VectorSink, transform::DataType};
+use vector_core::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -143,6 +143,6 @@ impl HecMetricsSinkConfig {
             default_namespace: self.default_namespace.clone(),
         };
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }

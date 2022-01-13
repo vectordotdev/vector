@@ -25,7 +25,7 @@ use crate::{
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
         util::{sink::Response, Compression},
-        UriParseError,
+        UriParseSnafu,
     },
 };
 
@@ -200,7 +200,7 @@ impl HttpRequestBuilder {
         path: &str,
         passthrough_token: Option<Arc<str>>,
     ) -> Result<Request<Vec<u8>>, crate::Error> {
-        let uri = build_uri(self.endpoint.as_str(), path).context(UriParseError)?;
+        let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")

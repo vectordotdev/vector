@@ -1,20 +1,20 @@
 use std::{env, time::Instant};
 
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
         AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 
 mod parser;
@@ -107,8 +107,8 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -120,11 +120,9 @@ async fn aws_ecs_metrics(
     url: String,
     interval: u64,
     namespace: Option<String>,
-    out: Pipeline,
+    mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
     let interval = time::Duration::from_secs(interval);
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
@@ -153,8 +151,11 @@ async fn aws_ecs_metrics(
                                     count: metrics.len(),
                                 });
 
-                                let mut events = stream::iter(metrics).map(Event::Metric).map(Ok);
-                                out.send_all(&mut events).await?;
+                                let mut events = stream::iter(metrics).map(Event::Metric);
+                                if let Err(error) = out.send_all(&mut events).await {
+                                    error!(message = "Error sending metric.", %error);
+                                    return Err(());
+                                }
                             }
                             Err(error) => {
                                 emit!(&AwsEcsMetricsParseError {
@@ -510,7 +511,7 @@ mod test {
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{}", in_addr),
@@ -562,8 +563,16 @@ mod integration_tests {
     use super::*;
     use crate::test_util::collect_ready;
 
+    fn ecs_address() -> String {
+        std::env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
+    }
+
+    fn ecs_url(version: &str) -> String {
+        format!("{}/{}", ecs_address(), version)
+    }
+
     async fn scrape_metrics(endpoint: String, version: Version) {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
             endpoint,
@@ -585,18 +594,18 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scrapes_metrics_v2() {
-        scrape_metrics("http://localhost:9088/v2".into(), Version::V2).await;
+        scrape_metrics(ecs_url("v2"), Version::V2).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v3() {
-        scrape_metrics("http://localhost:9088/v3".into(), Version::V3).await;
+        scrape_metrics(ecs_url("v3"), Version::V3).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v4() {
         // mock uses same endpoint for v4 as v3
         // https://github.com/awslabs/amazon-ecs-local-container-endpoints/blob/mainline/docs/features.md#task-metadata-v4
-        scrape_metrics("http://localhost:9088/v3".into(), Version::V4).await;
+        scrape_metrics(ecs_url("v3"), Version::V4).await;
     }
 }

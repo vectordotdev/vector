@@ -164,7 +164,7 @@ where
         };
         let encoded_len = encode_result
             .map(|_| self.encode_buf.len())
-            .context(FailedToEncode)?;
+            .context(FailedToEncodeSnafu)?;
         if encoded_len >= self.max_record_size {
             return Err(WriterError::RecordTooLarge {
                 limit: self.max_record_size,
@@ -216,8 +216,11 @@ where
         let archive_len_buf = wire_archive_len.to_be_bytes();
         assert_eq!(archive_len_buf[..].len(), 8);
 
-        self.writer.write_all(&archive_len_buf).await.context(Io)?;
-        self.writer.write_all(archive_buf).await.context(Io)?;
+        self.writer
+            .write_all(&archive_len_buf)
+            .await
+            .context(IoSnafu)?;
+        self.writer.write_all(archive_buf).await.context(IoSnafu)?;
 
         // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
         // better/super low overhead way to capture "the bytes we wrote" rather than piecing
@@ -308,7 +311,7 @@ where
     #[instrument(skip(self), level = "trace")]
     pub(super) async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
         debug!("validating last write to the current writer data file");
-        self.ensure_ready_for_write().await.context(Io)?;
+        self.ensure_ready_for_write().await.context(IoSnafu)?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
@@ -326,11 +329,11 @@ where
             .get_ref()
             .try_clone()
             .await
-            .context(Io)?
+            .context(IoSnafu)?
             .into_std()
             .await;
 
-        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(Io)? };
+        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };
 
         // We have bytes, so we should have an archived record... hopefully!  Go through the motions
         // of verifying it.  If we hit any invalid states, then we should bump to the next data file
@@ -579,7 +582,7 @@ where
     /// the error.
     #[instrument(skip_all, level = "trace")]
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
-        self.ensure_ready_for_write().await.context(Io)?;
+        self.ensure_ready_for_write().await.context(IoSnafu)?;
 
         // Grab the next record ID and attempt to write the record.
         let id = self.ledger.state().get_next_writer_record_id();

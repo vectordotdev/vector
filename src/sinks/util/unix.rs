@@ -51,7 +51,7 @@ impl UnixSinkConfig {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -75,7 +75,7 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectError)
+        UnixStream::connect(&self.path).await.context(ConnectSnafu)
     }
 
     async fn connect_backoff(&self) -> UnixStream {
@@ -133,7 +133,7 @@ impl UnixSink {
 }
 
 #[async_trait]
-impl StreamSink for UnixSink {
+impl StreamSink<Event> for UnixSink {
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);

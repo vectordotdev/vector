@@ -13,8 +13,8 @@ use tokio_util::codec::Decoder;
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -74,8 +74,8 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -464,7 +464,7 @@ mod tests {
         config::{SourceConfig, SourceContext},
         event::EventStatus,
         test_util::{self, next_addr, trace_init, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     #[test]
@@ -798,7 +798,7 @@ mod tests {
     ) -> (Result<Result<usize, std::io::Error>, Elapsed>, Bytes) {
         trace_init();
 
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let source = FluentConfig {
             address: address.into(),
@@ -877,7 +877,7 @@ mod integration_tests {
         test_util::{
             collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
         },
-        Pipeline,
+        SourceSender,
     };
 
     const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
@@ -1042,7 +1042,7 @@ mod integration_tests {
     }
 
     async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {

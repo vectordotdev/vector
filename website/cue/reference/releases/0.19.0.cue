@@ -41,6 +41,10 @@ releases: "0.19.0": {
 		changes in this release.
 		"""
 
+	known_issues: [
+		"A regression was introduced that changed the name of the data directory for sinks using a disk buffer. This means, when upgrading from `v0.18.0`, if there was any data in existing disk buffers, it will not be sent. Vector's starting with clean or empty disk buffers are unaffected. Fixed in v0.19.1. See [#10430](https://github.com/vectordotdev/vector/issues/10430) for more details.",
+	]
+
 	changelog: [
 		{
 			type: "enhancement"

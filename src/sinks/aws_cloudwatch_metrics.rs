@@ -160,7 +160,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event).map(|mut metric| {
+                    normalizer.apply(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -173,7 +173,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
@@ -224,10 +224,11 @@ impl CloudWatchMetricsSvc {
     }
 }
 
+#[derive(Default)]
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
@@ -451,10 +452,14 @@ mod integration_tests {
         test_util::random_string,
     };
 
+    fn cloudwatch_address() -> String {
+        std::env::var("CLOUDWATCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
             ..Default::default()
         }
     }

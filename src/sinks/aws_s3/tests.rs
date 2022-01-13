@@ -29,6 +29,10 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
     };
 
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     #[tokio::test]
     async fn s3_insert_message_into_with_flat_key_prefix() {
         let cx = SinkContext::new_test();
@@ -295,7 +299,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         use rusoto_core::HttpClient;
@@ -319,7 +323,7 @@ mod integration_tests {
             filename_append_uuid: None,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
             batch,

@@ -119,7 +119,11 @@ components: {
 		if Kind != "sink" {
 			// `output` documents output of the component. This is very important
 			// as it communicate which events and fields are emitted.
-			output: #Output
+			output: #OutputData
+		}
+
+		if Kind != "sink" {
+			outputs: #Outputs
 		}
 
 		// `support` communicates the varying levels of support of the component.
@@ -439,10 +443,22 @@ components: {
 		default_namespace: string
 	}
 
-	#Output: {
+	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
 	}
+
+	#Output: {
+		name:        string
+		description: string
+	}
+
+	_default_output: #Output & {
+		name:        "<component_id>"
+		description: "Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks."
+	}
+
+	#Outputs: *[_default_output] | [#Output, ...#Output]
 
 	#IAM: {
 		#Policy: {
@@ -533,7 +549,7 @@ components: {
 		configuration: {
 			_acknowledgements: {
 				common:      true
-				description: "Controls how acknowledgements are handled by this source."
+				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings."
 				required:    false
 				type: object: options: {
 					enabled: {

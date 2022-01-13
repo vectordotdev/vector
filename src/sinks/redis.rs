@@ -130,7 +130,7 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-        let conn = self.build_client().await.context(RedisCreateFailed)?;
+        let conn = self.build_client().await.context(RedisCreateFailedSnafu)?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
         let sink = self.new(conn, cx)?;
         Ok((sink, healthcheck))
@@ -156,7 +156,7 @@ impl RedisSinkConfig {
             ..Default::default()
         });
 
-        let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
+        let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
         let encoding = self.encoding.clone();
 
         let method = self.list_option.map(|option| option.method);
@@ -180,7 +180,7 @@ impl RedisSinkConfig {
             .with_flat_map(move |e| stream::iter(encode_event(e, &key, &encoding)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
