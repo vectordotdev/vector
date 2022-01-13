@@ -30,7 +30,7 @@ tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false, features = ["attributes"] }
 
 [dev-dependencies]
-clap = "3.0.6"
+clap = "3.0.7"
 criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 pretty_assertions = "1.0.0"
