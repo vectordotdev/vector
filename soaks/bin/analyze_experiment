@@ -1,65 +1,11 @@
 #!/usr/bin/env python3
 import argparse
-import glob
-import math
 import numpy as np
-import os
 import pandas as pd
 import scipy.stats
-import json
-import gc
+import common
 
 np.seterr(all='raise')
-
-def human_bytes(b):
-    is_negative = False
-    if b < 0:
-        is_negative = True
-        b = -b
-    if b < 1 and b >= 0:
-        return "0B"
-    names = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
-    i = int(math.floor(math.log(b, 1024)))
-    p = math.pow(1024, i)
-    s = round(b / p, 2)
-    if is_negative:
-        s = -s
-    return "%s%s" % (s, names[i])
-
-# Use Tukey's method to detect values that sit 1.5 times outside the IQR.
-def total_outliers(df):
-    q1 = df['value'].quantile(0.25)
-    q3 = df['value'].quantile(0.75)
-    iqr = q3 - q1
-    scaled_iqr = 1.5 * iqr
-
-    outside_range = lambda b: (b < (q1 - scaled_iqr)) or (b > (q3 + scaled_iqr))
-    return df['value'].apply(outside_range).sum()
-
-def confidence(p):
-    c = (1.0 - p) * 100
-    return "{confidence:.{digits}f}%".format(confidence=c, digits=2)
-
-# Opens our capture files, filtering as needed
-#
-# The capture files generated in our experiments can be quite large, relative to
-# the CI machine memory we have available, and we need to do a fair bit here to
-# ensure everything will fit into memory. We primarily achieve this by garbage
-# collecting after each read, filtering out columns this program does not need
-# and reading small chunks of each capture file at a time.
-def open_captures(capture_dir, metric_name, unwanted_labels):
-    capture_paths = glob.glob(os.path.join(capture_dir, "**/*.captures"))
-    for f in capture_paths:
-        with pd.read_json(f, lines=True, chunksize=16384) as reader:
-            for chunk in reader:
-                # Drop unwanted labels from the capture file. The more data we
-                # can shed here the less we have to hold in memory overall.
-                chunk = chunk[chunk.metric_name == metric_name]
-                chunk = chunk.drop(labels=unwanted_labels, axis=1)
-                if chunk.empty:
-                    continue
-                yield chunk
-        gc.collect()
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
 parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
@@ -69,29 +15,20 @@ parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separ
 parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
 parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
+parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
 args = parser.parse_args()
 
 erratic_soaks = args.erratic_soaks.split(',')
 
-bytes_written = pd.concat(open_captures(args.capture_dir,
-                                        'bytes_written',
-                                        unwanted_labels=['metric_name', 'metric_kind',
-                                                         'metric_labels', 'target', 'fetch_index']))
-
-# Scale bytes_written down to our per-CPU unit, then compute and introduce
-# throughput into the table. We compute throughput by central finite difference,
-# using the time value recorded to understand step size between samples.
-bytes_written.value = bytes_written.value.div(args.vector_cpus)
-bytes_written.throughput = np.nan
-for exp in bytes_written.experiment.unique():
-    for v in ['baseline', 'comparison']:
-        selector = (bytes_written.experiment == exp) & (bytes_written.variant == v)
-        run_ids = bytes_written.loc[selector, 'run_id'].unique()
-        for ri in run_ids:
-            sub_selector = selector & (bytes_written.run_id == ri)
-            subtable = bytes_written.loc[sub_selector]
-            throughput = np.gradient(subtable['value'], subtable['time'].div(1000)) # bytes/second/cpu
-            bytes_written.loc[sub_selector, 'throughput'] = throughput
+bytes_written = pd.concat(common.compute_throughput(
+    common.open_captures(args.capture_dir,
+                         'bytes_written',
+                         unwanted_labels=['metric_name', 'metric_kind', 'target']),
+    cpus = args.vector_cpus))
+# Skip past warmup seconds samples, allowing for vector warmup to not factor
+# into judgement.
+bytes_written = bytes_written[(bytes_written.fetch_index > args.warmup_seconds) &
+                              (bytes_written.throughput > 0.0)]
 
 ttest_results = []
 for exp in bytes_written.experiment.unique():
@@ -105,8 +42,8 @@ for exp in bytes_written.experiment.unique():
     diff =  comparison_mean - baseline_mean
     percent_change = round(((comparison_mean - baseline_mean) / baseline_mean) * 100, 2)
 
-    baseline_outliers = total_outliers(baseline)
-    comparison_outliers = total_outliers(comparison)
+    baseline_outliers = common.total_outliers(baseline)
+    comparison_outliers = common.total_outliers(comparison)
 
     # The t-test here is calculating whether the expected mean of our two
     # distributions is equal, or, put another way, whether the samples we have
@@ -170,7 +107,7 @@ interesting changes are observed.
 
 p_value_violation = ttest_results['p-value'] < args.p_value
 changes = ttest_results[p_value_violation].copy(deep=True)
-changes['confidence'] = changes['p-value'].apply(confidence)
+changes['confidence'] = changes['p-value'].apply(common.confidence)
 changes = changes.drop(labels=['p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
                                'baseline outlier percentage',
@@ -178,22 +115,22 @@ changes = changes.drop(labels=['p-value', 'baseline mean',
                                'comparison stdev', 'erratic'], axis=1)
 changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
 changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
-changes['Δ mean'] = changes['Δ mean'].apply(human_bytes)
+changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
 if len(changes) > 0:
     print(changes.to_markdown(index=False, tablefmt='github'))
 else:
-    print("No statistically interesting changes with confidence {}.".format(confidence(args.p_value)))
+    print("No statistically interesting changes with confidence {}.".format(common.confidence(args.p_value)))
 
 print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
 ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
-ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(human_bytes)
-ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(human_bytes)
-ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(human_bytes)
-ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(human_bytes)
-ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(human_bytes)
+ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(common.human_bytes)
+ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(common.human_bytes)
+ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(common.human_bytes)
+ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(common.human_bytes)
+ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(common.human_bytes)
 print(ttest_results.to_markdown(index=False, tablefmt='github'))
 print("</details>")
 
@@ -204,14 +141,14 @@ describe = bytes_written.groupby(['experiment', 'variant', 'run_id']).throughput
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe = describe.sort_values('mean', ascending=False)
 describe['skewness'] = bytes_written.groupby(['experiment', 'variant', 'run_id']).throughput.skew()
-describe['mean'] = describe['mean'].apply(human_bytes)
-describe['std'] = describe['std'].apply(human_bytes)
-describe['min'] = describe['min'].apply(human_bytes)
-describe['average'] = describe['average'].apply(human_bytes)
-describe['p90'] = describe['p90'].apply(human_bytes)
-describe['p95'] = describe['p95'].apply(human_bytes)
-describe['p99'] = describe['p99'].apply(human_bytes)
-describe['max'] = describe['max'].apply(human_bytes)
+describe['mean'] = describe['mean'].apply(common.human_bytes)
+describe['std'] = describe['std'].apply(common.human_bytes)
+describe['min'] = describe['min'].apply(common.human_bytes)
+describe['average'] = describe['average'].apply(common.human_bytes)
+describe['p90'] = describe['p90'].apply(common.human_bytes)
+describe['p95'] = describe['p95'].apply(common.human_bytes)
+describe['p99'] = describe['p99'].apply(common.human_bytes)
+describe['max'] = describe['max'].apply(common.human_bytes)
 print(describe.to_markdown(index=True,
                            tablefmt='github',
                            headers=['(experiment, variant, run_id)', 'total samples',

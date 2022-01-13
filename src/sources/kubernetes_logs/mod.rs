@@ -19,7 +19,7 @@ use shared::TimeZone;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, ProxyConfig,
         SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
@@ -181,8 +181,8 @@ impl SourceConfig for Config {
         })))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

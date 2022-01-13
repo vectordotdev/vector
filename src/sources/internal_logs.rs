@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     shutdown::ShutdownSignal,
     trace, SourceSender,
@@ -38,8 +38,8 @@ impl SourceConfig for InternalLogsConfig {
         Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

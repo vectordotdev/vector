@@ -9,7 +9,9 @@ use tokio_util::{codec::FramedRead, io::StreamReader};
 
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     internal_events::StdinEventsReceived,
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
@@ -58,8 +60,8 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

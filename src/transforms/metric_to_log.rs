@@ -5,7 +5,7 @@ use shared::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
@@ -49,8 +49,8 @@ impl TransformConfig for MetricToLogConfig {
         DataType::Metric
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn enable_concurrency(&self) -> bool {

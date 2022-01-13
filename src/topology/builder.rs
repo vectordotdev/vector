@@ -32,7 +32,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
+        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        TransformContext,
     },
     event::Event,
     internal_events::EventsReceived,
@@ -146,9 +147,47 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (pipeline, mut rx) = SourceSender::new_with_buffer(SOURCE_SENDER_BUFFER_SIZE);
-
         let typetag = source.inner.source_type();
+        let source_outputs = source.inner.outputs();
+
+        let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
+        let mut pumps = Vec::new();
+        let mut controls = HashMap::new();
+        for output in source_outputs {
+            let mut rx = builder.add_output(output.clone());
+
+            let (mut fanout, control) = Fanout::new();
+            let pump = async move {
+                while let Some(event) = rx.next().await {
+                    fanout.feed(event).await?;
+                }
+                fanout.flush().await?;
+                Ok(TaskOutput::Source)
+            };
+
+            pumps.push(pump);
+            controls.insert(
+                OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                },
+                control,
+            );
+        }
+
+        let pump = async move {
+            let mut handles = Vec::new();
+            for pump in pumps {
+                handles.push(tokio::spawn(pump));
+            }
+            for handle in handles {
+                handle.await.expect("join error")?;
+            }
+            Ok(TaskOutput::Source)
+        };
+        let pump = Task::new(key.clone(), typetag, pump);
+
+        let pipeline = builder.build();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(key);
 
@@ -166,16 +205,6 @@ pub async fn build_pieces(
             }
             Ok(server) => server,
         };
-
-        let (mut output, control) = Fanout::new();
-        let pump = async move {
-            while let Some(event) = rx.next().await {
-                output.feed(event).await?;
-            }
-            output.flush().await?;
-            Ok(TaskOutput::Source)
-        };
-        let pump = Task::new(key.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -202,7 +231,7 @@ pub async fn build_pieces(
         };
         let server = Task::new(key.clone(), typetag, server);
 
-        outputs.insert(OutputId::from(key), control);
+        outputs.extend(controls);
         tasks.insert(key.clone(), pump);
         source_tasks.insert(key.clone(), server);
     }
@@ -224,7 +253,7 @@ pub async fn build_pieces(
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
             input_type: transform.inner.input_type(),
-            named_outputs: transform.inner.named_outputs(),
+            outputs: transform.inner.outputs(),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
 
@@ -432,7 +461,7 @@ struct TransformNode {
     typetag: &'static str,
     inputs: Vec<OutputId>,
     input_type: DataType,
-    named_outputs: Vec<String>,
+    outputs: Vec<Output>,
     enable_concurrency: bool,
 }
 
@@ -456,7 +485,7 @@ fn build_sync_transform(
     node: TransformNode,
     input_rx: BufferReceiver<Event>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.named_outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs);
 
     let runner = Runner::new(t, input_rx, node.input_type, outputs);
     let transform = if node.enable_concurrency {

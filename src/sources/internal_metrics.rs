@@ -4,7 +4,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -94,8 +94,8 @@ impl SourceConfig for InternalMetricsConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {

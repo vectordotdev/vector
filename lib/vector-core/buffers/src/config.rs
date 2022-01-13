@@ -367,7 +367,10 @@ impl BufferConfig {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 
-        builder.build(span).await.context(FailedToBuildTopology)
+        builder
+            .build(span)
+            .await
+            .context(FailedToBuildTopologySnafu)
     }
 }
 

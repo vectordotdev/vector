@@ -199,8 +199,8 @@ impl SourceConfig for ErrorSourceConfig {
         Ok(Box::pin(future::err(())))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn outputs(&self) -> Vec<config::Output> {
+        vec![config::Output::default(config::DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -260,8 +260,8 @@ impl SourceConfig for PanicSourceConfig {
         Ok(Box::pin(async { panic!() }))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn outputs(&self) -> Vec<config::Output> {
+        vec![config::Output::default(config::DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

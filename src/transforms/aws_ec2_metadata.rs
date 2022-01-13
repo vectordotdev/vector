@@ -16,7 +16,9 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
 
 use crate::{
-    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, Output, ProxyConfig, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -174,8 +176,8 @@ impl TransformConfig for Ec2Metadata {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -320,7 +322,7 @@ impl MetadataClient {
             .await?
             .map(|body| {
                 serde_json::from_slice(&body[..])
-                    .context(ParseIdentityDocument {})
+                    .context(ParseIdentityDocumentSnafu {})
                     .map_err(Into::into)
             })
             .transpose()
@@ -393,7 +395,7 @@ impl MetadataClient {
                             mac
                         );
 
-                        let subnet_path = subnet_path.parse().context(ParsePath {
+                        let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),
                         })?;
 
@@ -406,7 +408,7 @@ impl MetadataClient {
                         let vpc_path =
                             format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
 
-                        let vpc_path = vpc_path.parse().context(ParsePath {
+                        let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
                         })?;
 
@@ -441,7 +443,10 @@ impl MetadataClient {
     }
 
     async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await.with_context(|| FetchToken {})?;
+        let token = self
+            .get_token()
+            .await
+            .with_context(|_| FetchTokenSnafu {})?;
 
         let mut parts = self.host.clone().into_parts();
 

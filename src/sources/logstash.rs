@@ -14,8 +14,8 @@ use tokio_util::codec::Decoder;
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
     serde::bool_or_struct,
@@ -74,8 +74,8 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -468,7 +468,7 @@ impl Decoder for LogstashDecoder {
                     rest = right;
 
                     let fields_result: Result<BTreeMap<String, serde_json::Value>, _> =
-                        serde_json::from_slice(slice).context(JsonFrameFailedDecode {});
+                        serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {});
 
                     let remaining = rest.remaining();
                     let byte_size = src.remaining() - remaining;
@@ -514,7 +514,7 @@ impl Decoder for LogstashDecoder {
 
                         let res = ZlibDecoder::new(io::Cursor::new(slice))
                             .read_to_end(&mut buf)
-                            .context(DecompressionFailed)
+                            .context(DecompressionFailedSnafu)
                             .map(|_| BytesMut::from(&buf[..]));
 
                         let remaining = rest.remaining();

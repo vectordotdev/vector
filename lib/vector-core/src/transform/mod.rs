@@ -3,6 +3,7 @@ use std::{collections::HashMap, pin::Pin};
 use futures::{SinkExt, Stream};
 
 use crate::{
+    config::Output,
     event::Event,
     fanout::{self, Fanout},
     ByteSizeOf,
@@ -68,8 +69,8 @@ impl Transform {
     ///
     /// This is a broader trait than the simple [`FunctionTransform`] in that it allows transforms
     /// to write to multiple outputs. Those outputs must be known in advanced and returned via
-    /// `TransformConfig::named_outputs`. Attempting to send to any named output not registered in
-    /// advance is considered a bug and will cause a panic.
+    /// `TransformConfig::outputs`. Attempting to send to any output not registered in advance is
+    /// considered a bug and will cause a panic.
     pub fn synchronous(v: impl SyncTransform + 'static) -> Self {
         Transform::Synchronous(Box::new(v))
     }
@@ -146,8 +147,8 @@ pub trait TaskTransform: Send {
 
 /// Broader than the simple [`FunctionTransform`], this trait allows transforms to write to
 /// multiple outputs. Those outputs must be known in advanced and returned via
-/// `TransformConfig::named_outputs`. Attempting to send to any named output not registered in
-/// advance is considered a bug and will cause a panic.
+/// `TransformConfig::outputs`. Attempting to send to any output not registered in advance is
+/// considered a bug and will cause a panic.
 pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
 }
@@ -159,54 +160,73 @@ where
     T: FunctionTransform,
 {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        FunctionTransform::transform(self, &mut output.primary_buffer, event);
+        FunctionTransform::transform(
+            self,
+            output.primary_buffer.as_mut().expect("no default output"),
+            event,
+        );
     }
 }
 
 // TODO: this is a bit ugly when we already have the above impl
 impl SyncTransform for Box<dyn FunctionTransform> {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        FunctionTransform::transform(self.as_mut(), &mut output.primary_buffer, event);
+        FunctionTransform::transform(
+            self.as_mut(),
+            output.primary_buffer.as_mut().expect("no default output"),
+            event,
+        );
     }
 }
 
 pub struct TransformOutputs {
-    primary_output: Fanout,
+    outputs_spec: Vec<Output>,
+    primary_output: Option<Fanout>,
     named_outputs: HashMap<String, Fanout>,
 }
 
 impl TransformOutputs {
-    pub fn new(
-        named_outputs_in: Vec<String>,
-    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+    pub fn new(outputs_in: Vec<Output>) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+        let outputs_spec = outputs_in.clone();
+        let mut primary_output = None;
         let mut named_outputs = HashMap::new();
         let mut controls = HashMap::new();
 
-        for name in named_outputs_in {
+        for output in outputs_in {
             let (fanout, control) = Fanout::new();
-            named_outputs.insert(name.clone(), fanout);
-            controls.insert(Some(name.clone()), control);
+            match output.port {
+                None => {
+                    primary_output = Some(fanout);
+                    controls.insert(None, control);
+                }
+                Some(name) => {
+                    named_outputs.insert(name.clone(), fanout);
+                    controls.insert(Some(name.clone()), control);
+                }
+            }
         }
 
-        let (primary_output, control) = Fanout::new();
         let me = Self {
+            outputs_spec,
             primary_output,
             named_outputs,
         };
-        controls.insert(None, control);
 
         (me, controls)
     }
 
     pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
-        TransformOutputsBuf::new_with_capacity(
-            self.named_outputs.keys().cloned().collect(),
-            capacity,
-        )
+        TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
     }
 
     pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
-        send_inner(&mut buf.primary_buffer, &mut self.primary_output).await;
+        if let Some(primary) = self.primary_output.as_mut() {
+            send_inner(
+                buf.primary_buffer.as_mut().expect("mismatched outputs"),
+                primary,
+            )
+            .await;
+        }
         for (key, buf) in &mut buf.named_buffers {
             send_inner(
                 buf,
@@ -224,23 +244,37 @@ async fn send_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
 }
 
 pub struct TransformOutputsBuf {
-    primary_buffer: Vec<Event>,
+    primary_buffer: Option<Vec<Event>>,
     named_buffers: HashMap<String, Vec<Event>>,
 }
 
 impl TransformOutputsBuf {
-    pub fn new_with_capacity(named_outputs_in: Vec<String>, capacity: usize) -> Self {
+    pub fn new_with_capacity(outputs_in: Vec<Output>, capacity: usize) -> Self {
+        let mut primary_buffer = None;
+        let mut named_buffers = HashMap::new();
+
+        for output in outputs_in {
+            match output.port {
+                None => {
+                    primary_buffer = Some(Vec::with_capacity(capacity));
+                }
+                Some(name) => {
+                    named_buffers.insert(name.clone(), Vec::new());
+                }
+            }
+        }
+
         Self {
-            primary_buffer: Vec::with_capacity(capacity),
-            named_buffers: named_outputs_in
-                .into_iter()
-                .map(|k| (k, Vec::new()))
-                .collect(),
+            primary_buffer,
+            named_buffers,
         }
     }
 
     pub fn push(&mut self, event: Event) {
-        self.primary_buffer.push(event);
+        self.primary_buffer
+            .as_mut()
+            .expect("no default output")
+            .push(event);
     }
 
     pub fn push_named(&mut self, name: &str, event: Event) {
@@ -251,7 +285,10 @@ impl TransformOutputsBuf {
     }
 
     pub fn append(&mut self, slice: &mut Vec<Event>) {
-        self.primary_buffer.append(slice);
+        self.primary_buffer
+            .as_mut()
+            .expect("no default output")
+            .append(slice);
     }
 
     pub fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
@@ -262,7 +299,10 @@ impl TransformOutputsBuf {
     }
 
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
-        self.primary_buffer.drain(..)
+        self.primary_buffer
+            .as_mut()
+            .expect("no default output")
+            .drain(..)
     }
 
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
@@ -273,7 +313,7 @@ impl TransformOutputsBuf {
     }
 
     pub fn take_primary(&mut self) -> Vec<Event> {
-        std::mem::take(&mut self.primary_buffer)
+        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
     pub fn take_all_named(&mut self) -> HashMap<String, Vec<Event>> {
@@ -281,7 +321,7 @@ impl TransformOutputsBuf {
     }
 
     pub fn len(&self) -> usize {
-        self.primary_buffer.len()
+        self.primary_buffer.as_ref().map_or(0, Vec::len)
             + self
                 .named_buffers
                 .iter()

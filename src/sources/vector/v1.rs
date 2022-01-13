@@ -6,7 +6,7 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::{
     codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
-    config::{DataType, GenerateConfig, Resource, SourceContext},
+    config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
@@ -70,8 +70,8 @@ impl VectorConfig {
         )
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {

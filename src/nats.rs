@@ -32,7 +32,7 @@ impl NatsAuthConfig {
                 Ok(async_nats::Options::with_credentials(path))
             }
             NatsAuthConfig::NKey { nkey, seed } => {
-                let kp = nkeys::KeyPair::from_seed(seed).context(AuthConfigError)?;
+                let kp = nkeys::KeyPair::from_seed(seed).context(AuthConfigSnafu)?;
                 // The following unwrap is safe because the only way the sign method can fail is if
                 // keypair does not contain a seed. We are constructing the keypair from a seed in
                 // the preceding line.

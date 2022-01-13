@@ -24,9 +24,9 @@ enum BuildError {
     #[snafu(display("invalid subject template: {}", source))]
     SubjectTemplate { source: TemplateParseError },
     #[snafu(display("NATS Config Error: {}", source))]
-    ConfigError { source: NatsConfigError },
+    Config { source: NatsConfigError },
     #[snafu(display("NATS Connect Error: {}", source))]
-    ConnectError { source: std::io::Error },
+    Connect { source: std::io::Error },
 }
 
 /**
@@ -103,9 +103,9 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::Options {
 
 impl NatsSinkConfig {
     async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self.try_into().context(ConfigError)?;
+        let options: async_nats::Options = self.try_into().context(ConfigSnafu)?;
 
-        options.connect(&self.url).await.context(ConnectError)
+        options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
@@ -127,7 +127,7 @@ impl NatsSink {
         Ok(NatsSink {
             connection,
             encoding: config.encoding,
-            subject: Template::try_from(config.subject).context(SubjectTemplate)?,
+            subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
             acker,
         })
     }
@@ -342,8 +342,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConnectError { .. })),
-            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -392,8 +392,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConnectError { .. })),
-            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -444,8 +444,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConfigError { .. })),
-            "publish_and_check failed, expected BuildError::ConfigError, got: {:?}",
+            matches!(r, Err(BuildError::Config { .. })),
+            "publish_and_check failed, expected BuildError::Config, got: {:?}",
             r
         );
     }
@@ -496,8 +496,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConnectError { .. })),
-            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -556,8 +556,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConnectError { .. })),
-            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -618,8 +618,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::ConnectError { .. })),
-            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }

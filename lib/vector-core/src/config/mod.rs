@@ -26,6 +26,10 @@ pub struct Output {
 }
 
 impl Output {
+    /// Create a default `Output` of the given data type.
+    ///
+    /// A default output is one without a port identifier (i.e. not a named output) and the default
+    /// output consumers will receive if they declare the component itself as an input.
     pub fn default(ty: DataType) -> Self {
         Self { port: None, ty }
     }

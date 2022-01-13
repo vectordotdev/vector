@@ -17,7 +17,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
-    config::{self, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -146,8 +146,8 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -163,7 +163,7 @@ impl MongoDbMetrics {
 
         let mut client_options = ClientOptions::parse(endpoint)
             .await
-            .context(InvalidEndpoint)?;
+            .context(InvalidEndpointSnafu)?;
         client_options.direct_connection = Some(true);
 
         let endpoint = sanitize_endpoint(endpoint, &client_options);
@@ -171,7 +171,7 @@ impl MongoDbMetrics {
         tags.insert("host".into(), client_options.hosts[0].to_string());
 
         Ok(Self {
-            client: Client::with_options(client_options).context(InvalidClientOptions)?,
+            client: Client::with_options(client_options).context(InvalidClientOptionsSnafu)?,
             endpoint,
             namespace,
             tags,

@@ -11,7 +11,8 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
+        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
+        SourceDescription,
     },
     event::Event,
     internal_events::NatsEventsReceived,
@@ -27,10 +28,10 @@ use crate::{
 enum BuildError {
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
-    #[snafu(display("NATS Connection Error: {}", source))]
-    Connection { source: std::io::Error },
-    #[snafu(display("NATS Subscription Error: {}", source))]
-    Subscription { source: std::io::Error },
+    #[snafu(display("NATS Connect Error: {}", source))]
+    Connect { source: std::io::Error },
+    #[snafu(display("NATS Subscribe Error: {}", source))]
+    Subscribe { source: std::io::Error },
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -84,8 +85,8 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -95,8 +96,8 @@ impl SourceConfig for NatsSourceConfig {
 
 impl NatsSourceConfig {
     async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self.try_into().context(Config)?;
-        options.connect(&self.url).await.context(Connection)
+        let options: async_nats::Options = self.try_into().context(ConfigSnafu)?;
+        options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
@@ -174,7 +175,7 @@ async fn create_subscription(
         Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
     };
 
-    let subscription = subscription.context(Subscription)?;
+    let subscription = subscription.context(SubscribeSnafu)?;
 
     Ok((nc, subscription))
 }
@@ -288,8 +289,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Connection { .. })),
-            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -338,8 +339,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Connection { .. })),
-            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -442,8 +443,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Connection { .. })),
-            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -502,8 +503,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Connection { .. })),
-            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }
@@ -564,8 +565,8 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Connection { .. })),
-            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
             r
         );
     }

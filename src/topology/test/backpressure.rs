@@ -251,7 +251,7 @@ mod test_sink {
 }
 
 mod test_source {
-    use crate::config::{DataType, SourceConfig, SourceContext};
+    use crate::config::{DataType, Output, SourceConfig, SourceContext};
     use crate::event::Event;
     use crate::sources::Source;
     use async_trait::async_trait;
@@ -282,8 +282,8 @@ mod test_source {
             .boxed())
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
 
         fn source_type(&self) -> &'static str {

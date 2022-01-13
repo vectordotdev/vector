@@ -15,8 +15,8 @@ use crate::{
         NewlineDelimitedDecoderConfig,
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding, default_framing_stream_based},
@@ -191,8 +191,8 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

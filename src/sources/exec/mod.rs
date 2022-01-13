@@ -25,7 +25,7 @@ use crate::{
         self,
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
     serde::{default_decoding, default_framing_stream_based},
@@ -217,8 +217,8 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

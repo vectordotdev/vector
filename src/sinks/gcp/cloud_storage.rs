@@ -24,7 +24,7 @@ use crate::{
         gcs_common::{
             config::{
                 build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass,
-                KeyPrefixTemplate, BASE_URL,
+                KeyPrefixTemplateSnafu, BASE_URL,
             },
             service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
@@ -164,7 +164,7 @@ impl GcsSinkConfig {
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(KeyPrefixTemplate)?,
+                .context(KeyPrefixTemplateSnafu)?,
         ))
     }
 }

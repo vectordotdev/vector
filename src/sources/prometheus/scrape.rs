@@ -11,7 +11,9 @@ use tokio_stream::wrappers::IntervalStream;
 
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
     http::{Auth, HttpClient},
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
@@ -86,7 +88,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
+            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
@@ -103,8 +105,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -148,8 +150,8 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -576,7 +578,8 @@ mod test {
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
-                flush_period_secs: 1,
+                distributions_as_summaries: false,
+                flush_period_secs: Duration::from_secs(1),
             },
         );
 

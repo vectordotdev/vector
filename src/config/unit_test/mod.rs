@@ -30,7 +30,7 @@ use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
 
-use super::{compiler::expand_globs, graph::Graph};
+use super::{compiler::expand_globs, graph::Graph, OutputId};
 
 pub struct UnitTest {
     pub name: String,
@@ -122,7 +122,7 @@ pub struct UnitTestBuildMetadata {
     // with test input events to produces sources used in a particular test.
     template_sources: IndexMap<ComponentKey, UnitTestSourceConfig>,
     // A mapping from transform name to unit test sink name.
-    sink_ids: HashMap<ComponentKey, String>,
+    sink_ids: HashMap<OutputId, String>,
 }
 
 impl UnitTestBuildMetadata {
@@ -161,16 +161,14 @@ impl UnitTestBuildMetadata {
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
-                let mut extract_targets = vec![key.clone()];
-                extract_targets.extend(
-                    transform
-                        .inner
-                        .named_outputs()
-                        .iter()
-                        .map(|port| ComponentKey::from(format!("{}.{}", key, port)))
-                        .collect::<Vec<_>>(),
-                );
-                extract_targets
+                transform
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port,
+                    })
             })
             .collect::<HashSet<_>>();
 
@@ -232,7 +230,7 @@ impl UnitTestBuildMetadata {
         &self,
         test_name: &str,
         outputs: &[TestOutput],
-        no_outputs_from: &[ComponentKey],
+        no_outputs_from: &[OutputId],
     ) -> Result<
         (
             Vec<Receiver<UnitTestSinkResult>>,
@@ -303,24 +301,47 @@ fn get_relevant_test_components(
     graph: &Graph,
 ) -> Result<HashSet<String>, Vec<String>> {
     let _ = graph.check_for_cycles().map_err(|error| vec![error])?;
-    Ok(sources
-        .iter()
-        .flat_map(|source| {
-            let paths = graph.paths_to_sink_from(source);
-            let mut components = HashSet::new();
+    let mut errors = Vec::new();
+    let mut components = HashSet::new();
+    for source in sources {
+        let paths = graph.paths_to_sink_from(source);
+        if paths.is_empty() {
+            errors.push(format!(
+                "Unable to complete topology between input target '{}' and output target(s)",
+                source
+                    .to_string()
+                    .rsplit_once("-source-")
+                    .unwrap_or(("", ""))
+                    .0
+            ));
+        } else {
             for path in paths {
                 components.extend(path.into_iter().map(|key| key.to_string()));
             }
-            components
-        })
-        .collect())
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(components)
+    } else {
+        Err(errors)
+    }
 }
 
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
-    test: TestDefinition,
+    test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
+    let mut transform_only_config = config_builder.clone();
+    let _ = expand_macros(&mut transform_only_config);
+    let transform_only_graph = Graph::new_unchecked(
+        &transform_only_config.sources,
+        &transform_only_config.transforms,
+        &transform_only_config.sinks,
+    );
+    let test = test.resolve_outputs(&transform_only_graph);
+
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
         metadata.hydrate_into_sinks(&test.name, &test.outputs, &test.no_outputs_from)?;
@@ -339,14 +360,11 @@ async fn build_unit_test(
         &expanded_config.transforms,
         &expanded_config.sinks,
     );
-    let sources = config_builder.sources.keys().clone().collect::<Vec<_>>();
 
-    let mut valid_components = get_relevant_test_components(sources.as_ref(), &graph)?;
-    if valid_components.is_empty() {
-        return Err(vec![
-            "No path(s) found from inputs to outputs. Topology is disconnected.".to_string(),
-        ]);
-    }
+    let mut valid_components = get_relevant_test_components(
+        config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
+        &graph,
+    )?;
 
     // Preserve the original unexpanded transform(s) which are valid test insertion points
     let unexpanded_transforms = valid_components
@@ -367,11 +385,17 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
+    let graph = Graph::new_unchecked(
+        &config_builder.sources,
+        &config_builder.transforms,
+        &config_builder.sinks,
+    );
+    let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
-            .filter(|input| valid_components.contains(input))
+            .filter(|input| valid_inputs.contains_key(input))
             .collect::<Vec<_>>();
     }
 
@@ -428,8 +452,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs: IndexMap<ComponentKey, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
+) -> Result<IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
+    let mut outputs: IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
