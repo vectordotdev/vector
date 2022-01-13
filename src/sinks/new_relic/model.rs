@@ -53,36 +53,31 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
         let mut metric_array = vec![];
 
         for buf_event in buf_events {
-            match buf_event {
-                Event::Metric(metric) => {
-                    // Future improvement: put metric type. If type = count, NR metric model requiere an interval.ms field, that is not provided by the Vector Metric model.
-                    match metric.value() {
-                        MetricValue::Gauge { value } => {
-                            metric_array.push((
-                                Value::from(metric.name().to_owned()),
-                                Value::from(*value),
-                                Value::from(metric.timestamp()),
-                            ));
-                        }
-                        MetricValue::Counter { value } => {
-                            metric_array.push((
-                                Value::from(metric.name().to_owned()),
-                                Value::from(*value),
-                                Value::from(metric.timestamp()),
-                            ));
-                        }
-                        _ => {
-                            // Unrecognized metric type
-                        }
+            if let Event::Metric(metric) = buf_event {
+                // Future improvement: put metric type. If type = count, NR metric model requiere an interval.ms field, that is not provided by the Vector Metric model.
+                match metric.value() {
+                    MetricValue::Gauge { value } => {
+                        metric_array.push((
+                            Value::from(metric.name().to_owned()),
+                            Value::from(*value),
+                            Value::from(metric.timestamp()),
+                        ));
                     }
-                }
-                _ => {
-                    // Unrecognized event type
+                    MetricValue::Counter { value } => {
+                        metric_array.push((
+                            Value::from(metric.name().to_owned()),
+                            Value::from(*value),
+                            Value::from(metric.timestamp()),
+                        ));
+                    }
+                    _ => {
+                        // Unrecognized metric type
+                    }
                 }
             }
         }
 
-        if metric_array.len() > 0 {
+        if !metric_array.is_empty() {
             Ok(MetricsApiModel::new(metric_array))
         } else {
             Err(NewRelicSinkError::new("No valid metrics to generate"))
@@ -105,55 +100,50 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut events_array = vec![];
         for buf_event in buf_events {
-            match buf_event {
-                Event::Log(log) => {
-                    let mut event_model = KeyValData::new();
-                    for (k, v) in log.all_fields() {
-                        event_model.insert(k, v.clone());
-                    }
+            if let Event::Log(log) = buf_event {
+                let mut event_model = KeyValData::new();
+                for (k, v) in log.all_fields() {
+                    event_model.insert(k, v.clone());
+                }
 
-                    if let Some(message) = log.get("message") {
-                        let message = message.to_string_lossy().replace("\\\"", "\"");
-                        // If message contains a JSON string, parse it and insert all fields into self
-                        if let serde_json::Result::Ok(json_map) =
-                            serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
-                        {
-                            for (k, v) in json_map {
-                                match v {
-                                    serde_json::Value::String(s) => {
-                                        event_model.insert(k, Value::from(s));
-                                    }
-                                    serde_json::Value::Number(n) => {
-                                        if n.is_f64() {
-                                            event_model.insert(k, Value::from(n.as_f64()));
-                                        } else {
-                                            event_model.insert(k, Value::from(n.as_i64()));
-                                        }
-                                    }
-                                    serde_json::Value::Bool(b) => {
-                                        event_model.insert(k, Value::from(b));
-                                    }
-                                    _ => {}
+                if let Some(message) = log.get("message") {
+                    let message = message.to_string_lossy().replace("\\\"", "\"");
+                    // If message contains a JSON string, parse it and insert all fields into self
+                    if let serde_json::Result::Ok(json_map) =
+                    serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
+                    {
+                        for (k, v) in json_map {
+                            match v {
+                                serde_json::Value::String(s) => {
+                                    event_model.insert(k, Value::from(s));
                                 }
+                                serde_json::Value::Number(n) => {
+                                    if n.is_f64() {
+                                        event_model.insert(k, Value::from(n.as_f64()));
+                                    } else {
+                                        event_model.insert(k, Value::from(n.as_i64()));
+                                    }
+                                }
+                                serde_json::Value::Bool(b) => {
+                                    event_model.insert(k, Value::from(b));
+                                }
+                                _ => {}
                             }
-                            event_model.remove("message");
                         }
+                        event_model.remove("message");
                     }
-
-                    if let None = event_model.get("eventType") {
-                        event_model
-                            .insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
-                    }
-
-                    events_array.push(event_model);
                 }
-                _ => {
-                    // Unrecognized event type
+
+                if event_model.get("eventType").is_none() {
+                    event_model
+                        .insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
                 }
+
+                events_array.push(event_model);
             }
         }
 
-        if events_array.len() > 0 {
+        if !events_array.is_empty() {
             Ok(Self::new(events_array))
         } else {
             Err(NewRelicSinkError::new("No valid events to generate"))
@@ -178,27 +168,22 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut logs_array = vec![];
         for buf_event in buf_events {
-            match buf_event {
-                Event::Log(log) => {
-                    let mut log_model = KeyValData::new();
-                    for (k, v) in log.all_fields() {
-                        log_model.insert(k, v.clone());
-                    }
-                    if let None = log.get("message") {
-                        log_model.insert(
-                            "message".to_owned(),
-                            Value::from("log from vector".to_owned()),
-                        );
-                    }
-                    logs_array.push(log_model);
+            if let Event::Log(log) = buf_event {
+                let mut log_model = KeyValData::new();
+                for (k, v) in log.all_fields() {
+                    log_model.insert(k, v.clone());
                 }
-                _ => {
-                    // Unrecognized event type
+                if log.get("message").is_none() {
+                    log_model.insert(
+                        "message".to_owned(),
+                        Value::from("log from vector".to_owned()),
+                    );
                 }
+                logs_array.push(log_model);
             }
         }
 
-        if logs_array.len() > 0 {
+        if !logs_array.is_empty() {
             Ok(Self::new(logs_array))
         } else {
             Err(NewRelicSinkError::new("No valid logs to generate"))

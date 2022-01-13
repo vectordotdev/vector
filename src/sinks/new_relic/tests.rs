@@ -20,17 +20,17 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert_eq!(model.0[0].get("eventType").is_some(), true);
+    assert!(model.0[0].get("eventType").is_some());
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert_eq!(model.0[0].get("user").is_some(), true);
+    assert!(model.0[0].get("user").is_some());
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert_eq!(model.0[0].get("user_id").is_some(), true);
+    assert!(model.0[0].get("user_id").is_some());
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
 
     // With message field
@@ -47,19 +47,19 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert_eq!(model.0[0].get("eventType").is_some(), true);
+    assert!(model.0[0].get("eventType").is_some());
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert_eq!(model.0[0].get("user").is_some(), true);
+    assert!(model.0[0].get("user").is_some());
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert_eq!(model.0[0].get("user_id").is_some(), true);
+    assert!(model.0[0].get("user_id").is_some());
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert_eq!(model.0[0].get("message").is_some(), true);
+    assert!(model.0[0].get("message").is_some());
     assert_eq!(
         model.0[0].get("message").unwrap().to_string_lossy(),
         "This is a message".to_owned()
@@ -79,19 +79,19 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert_eq!(model.0[0].get("eventType").is_some(), true);
+    assert!(model.0[0].get("eventType").is_some());
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert_eq!(model.0[0].get("user").is_some(), true);
+    assert!(model.0[0].get("user").is_some());
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert_eq!(model.0[0].get("user_id").is_some(), true);
+    assert!(model.0[0].get("user_id").is_some());
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert_eq!(model.0[0].get("my_key").is_some(), true);
+    assert!(model.0[0].get("my_key").is_some());
     assert_eq!(
         model.0[0].get("my_key").unwrap().to_string_lossy(),
         "my_value".to_owned()
@@ -108,12 +108,12 @@ fn generate_log_api_model() {
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(logs.len(), 1);
-    assert_eq!(logs[0].get("tag_key").is_some(), true);
+    assert!(logs[0].get("tag_key").is_some());
     assert_eq!(
         logs[0].get("tag_key").unwrap().to_string_lossy(),
         "tag_value".to_owned()
     );
-    assert_eq!(logs[0].get("message").is_some(), true);
+    assert!(logs[0].get("message").is_some());
 
     // With message field
     let mut map = HashMap::<String, Value>::new();
@@ -127,12 +127,12 @@ fn generate_log_api_model() {
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(logs.len(), 1);
-    assert_eq!(logs[0].get("tag_key").is_some(), true);
+    assert!(logs[0].get("tag_key").is_some());
     assert_eq!(
         logs[0].get("tag_key").unwrap().to_string_lossy(),
         "tag_value".to_owned()
     );
-    assert_eq!(logs[0].get("message").is_some(), true);
+    assert!(logs[0].get("message").is_some());
     assert_eq!(
         logs[0].get("message").unwrap().to_string_lossy(),
         "This is a message".to_owned()
@@ -154,14 +154,14 @@ fn generate_metric_api_model() {
         .expect("Logs data store not present");
 
     assert_eq!(metrics.len(), 1);
-    assert_eq!(metrics[0].get("name").is_some(), true);
+    assert!(metrics[0].get("name").is_some());
     assert_eq!(
         metrics[0].get("name").unwrap().to_string_lossy(),
         "my_metric".to_owned()
     );
-    assert_eq!(metrics[0].get("value").is_some(), true);
+    assert!(metrics[0].get("value").is_some());
     assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
-    assert_eq!(metrics[0].get("timestamp").is_some(), true);
+    assert!(metrics[0].get("timestamp").is_some());
 
     // With timestamp
     let m = Metric::new(
@@ -178,12 +178,12 @@ fn generate_metric_api_model() {
         .expect("Logs data store not present");
 
     assert_eq!(metrics.len(), 1);
-    assert_eq!(metrics[0].get("name").is_some(), true);
+    assert!(metrics[0].get("name").is_some());
     assert_eq!(
         metrics[0].get("name").unwrap().to_string_lossy(),
         "my_metric".to_owned()
     );
-    assert_eq!(metrics[0].get("value").is_some(), true);
+    assert!(metrics[0].get("value").is_some());
     assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
-    assert_eq!(metrics[0].get("timestamp").is_some(), true);
+    assert!(metrics[0].get("timestamp").is_some());
 }

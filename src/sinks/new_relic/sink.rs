@@ -98,7 +98,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
                 NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();
-        let metadata = (self.credentials.clone(), events_len, finalizers);
+        let metadata = (Arc::clone(&self.credentials), events_len, finalizers);
         (metadata, api_model)
     }
 
@@ -107,7 +107,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         NewRelicApiRequest {
             batch_size: events_len,
             finalizers,
-            credentials: self.credentials.clone(),
+            credentials: Arc::clone(&self.credentials),
             payload,
             compression: self.compression,
         }
@@ -135,7 +135,7 @@ where
         let request_builder = NewRelicRequestBuilder {
             encoding: self.encoding,
             compression: self.compression,
-            credentials: self.credentials.clone(),
+            credentials: Arc::clone(&self.credentials),
         };
 
         let sink = input

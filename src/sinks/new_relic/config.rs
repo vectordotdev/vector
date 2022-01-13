@@ -109,7 +109,7 @@ impl SinkConfig for NewRelicConfig {
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
         let credentials = Arc::from(NewRelicCredentials::from(self));
 
-        let healthcheck = self.build_healthcheck(client.clone(), credentials.clone())?;
+        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(&credentials))?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, NewRelicApiRetry)
@@ -180,7 +180,7 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
         Self {
             license_key: config.license_key.clone(),
             account_id: config.account_id.clone(),
-            api: config.api.clone(),
+            api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
         }
     }
