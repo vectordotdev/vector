@@ -1,5 +1,5 @@
-use std::cmp;
 use bitmask_enum::bitmask;
+use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
@@ -26,9 +26,15 @@ pub enum SourceOutputType {
 impl From<DataType> for SourceOutputType {
     fn from(data_type: DataType) -> Self {
         let mut t = SourceOutputType::none();
-        data_type.contains(DataType::Metric).then(|| t = t & SourceOutputType::Metric);
-        data_type.contains(DataType::Log).then(|| t = t & SourceOutputType::Log);
-        data_type.contains(DataType::Trace).then(|| t = t & SourceOutputType::Trace);
+        data_type
+            .contains(DataType::Metric)
+            .then(|| t = t | SourceOutputType::Metric);
+        data_type
+            .contains(DataType::Log)
+            .then(|| t = t | SourceOutputType::Log);
+        data_type
+            .contains(DataType::Trace)
+            .then(|| t = t | SourceOutputType::Trace);
         t
     }
 }
