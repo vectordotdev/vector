@@ -59,7 +59,6 @@ jobs:
           - test: 'humio'
           - test: 'kafka'
           - test: 'postgresql_metrics'
-          - test: 'pulsar'
           - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
@@ -107,6 +106,7 @@ jobs:
           - test: 'mongo'
           - test: 'nginx'
           - test: 'prometheus'
+          - test: 'pulsar'
           - test: 'redis'
     steps:
       - uses: actions/checkout@v2.4.0
