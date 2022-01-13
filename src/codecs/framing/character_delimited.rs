@@ -17,6 +17,7 @@ pub struct CharacterDelimitedDecoderConfig {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
+    #[serde(with = "crate::serde::ascii_char")]
     delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
