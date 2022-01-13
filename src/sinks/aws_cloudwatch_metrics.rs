@@ -173,7 +173,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {

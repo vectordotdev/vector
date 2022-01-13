@@ -255,7 +255,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for LogSink<S>
+impl<S> StreamSink<Event> for LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,

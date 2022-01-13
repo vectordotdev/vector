@@ -207,7 +207,7 @@ impl DatadogMetricsConfig {
 
         let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 

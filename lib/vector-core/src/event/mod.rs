@@ -8,6 +8,11 @@ use std::{
 use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
+use prost::{DecodeError, EncodeError, Message};
+use shared::EventDataEq;
+
+use crate::ByteSizeOf;
+pub use array::{EventArray, EventContainer, LogArray, MetricArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -16,15 +21,12 @@ pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-use prost::{DecodeError, EncodeError, Message};
-use shared::EventDataEq;
 pub use util::log::{PathComponent, PathIter};
 pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
-use crate::ByteSizeOf;
-
+pub mod array;
 pub mod discriminant;
 pub mod error;
 mod finalization;
