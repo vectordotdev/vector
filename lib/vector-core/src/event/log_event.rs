@@ -809,10 +809,10 @@ mod test {
             log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
 
             log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
-            log.insert("merge_b", 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+            log.insert("merge_b", 123i64); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
 
             log.insert("a", true); // will remain as is since it's not selected for merge.
-            log.insert("b", 123); // will remain as is since it's not selected for merge.
+            log.insert("b", 123i64); // will remain as is since it's not selected for merge.
 
             // `c` is not present in the `current`, and not selected for merge,
             // so it won't be included in the final event.
@@ -826,12 +826,12 @@ mod test {
             log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
             log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
 
-            log.insert("merge_b", 456); // will be merged in as `456`.
+            log.insert("merge_b", 456i64); // will be merged in as `456`.
             log.insert("merge_c", false); // will be merged in as `false`.
 
             // `a` will remain as-is, since it's not marked for merge and
             // neither is it specified in the `incoming` event.
-            log.insert("b", 456); // `b` not marked for merge, will not change.
+            log.insert("b", 456i64); // `b` not marked for merge, will not change.
             log.insert("c", true); // `c` not marked for merge, will be ignored.
 
             log
@@ -845,9 +845,9 @@ mod test {
             log.insert("merge", "hello world");
             log.insert("do_not_merge", "my_first_value");
             log.insert("a", true);
-            log.insert("b", 123);
+            log.insert("b", 123i64);
             log.insert("merge_a", true);
-            log.insert("merge_b", 456);
+            log.insert("merge_b", 456i64);
             log.insert("merge_c", false);
             log
         };

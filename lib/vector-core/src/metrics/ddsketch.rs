@@ -1417,12 +1417,12 @@ mod tests {
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
-        if target < 0.0 || actual < 0.0 {
-            panic!(
-                "expected/actual values must be greater than 0.0; target={}, actual={}",
-                target, actual
-            );
-        }
+        assert!(
+            !(target < 0.0 || actual < 0.0),
+            "expected/actual values must be greater than 0.0; target={}, actual={}",
+            target,
+            actual
+        );
 
         if target == actual {
             0.0

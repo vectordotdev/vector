@@ -347,7 +347,7 @@ mod integration_tests {
     async fn s3_process_message_special_characters() {
         trace_init();
 
-        let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
+        let key = format!("special:{}", uuid::Uuid::new_v4());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
