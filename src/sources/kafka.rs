@@ -401,7 +401,7 @@ mod test {
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
-            commit_interval_ms: 5000,
+            commit_interval_ms: 1,
             key_field: "message_key".to_string(),
             topic_key: "topic".to_string(),
             partition_key: "partition".to_string(),
@@ -481,7 +481,7 @@ mod integration_test {
         let producer: FutureProducer = client_config(None);
 
         for i in 0..count {
-            let text = format!("{} {}", TEXT, i);
+            let text = format!("{} {:03}", TEXT, i);
             let key = format!("{} {}", KEY, i);
             let record = FutureRecord::to(&topic)
                 .payload(&text)
@@ -525,7 +525,7 @@ mod integration_test {
         for (i, event) in events.into_iter().enumerate() {
             assert_eq!(
                 event.as_log()[log_schema().message_key()],
-                format!("{} {}", TEXT, i).into()
+                format!("{} {:03}", TEXT, i).into()
             );
             assert_eq!(
                 event.as_log()["message_key"],
@@ -594,7 +594,7 @@ mod integration_test {
     }
 
     fn fetch_tpl_offset(group_id: &str, topic: &str, partition: i32) -> Offset {
-        let client: BaseConsumer = client_config(Some(&group_id));
+        let client: BaseConsumer = client_config(Some(group_id));
         client.subscribe(&[topic]).expect("Subscribing failed");
 
         let mut tpl = TopicPartitionList::new();
@@ -608,7 +608,7 @@ mod integration_test {
     }
 
     async fn create_topic(group_id: &str, topic: &str, partitions: i32) {
-        let client: AdminClient<DefaultClientContext> = client_config(Some(&group_id));
+        let client: AdminClient<DefaultClientContext> = client_config(Some(group_id));
         for result in client
             .create_topics(
                 [&NewTopic {
@@ -626,6 +626,16 @@ mod integration_test {
         }
     }
 
+    // Failure timeline:
+    // - Topic exists on multiple partitions
+    // - Consumer A connects to topic, is assigned both partitions
+    // - Consumer A receives some messages
+    // - Consumer B connects to topic
+    // - Consumer A has one partition revoked (rebalance)
+    // - Consumer B is assigned a partition
+    // - Consumer A stores an order on the revoked partition
+    // - Consumer B skips receiving messages?
+    #[ignore]
     #[tokio::test]
     async fn handles_rebalance() {
         // The test plan here is to:
@@ -634,15 +644,22 @@ mod integration_test {
         // - Wait further until all events will have been pulled down.
         // - Verify that all events are captured by the two sources, and that offsets are set right, etc.
 
-        const NEVENTS: usize = 100;
+        // However this test, as written, does not actually cause the
+        // conditions required to test this. We have had external
+        // validation that the sink behaves properly on rebalance
+        // events.  This test also requires the insertion of a small
+        // delay into the source to guarantee the timing, which is not
+        // suitable for production code.
+
+        const NEVENTS: usize = 200;
         const DELAY: u64 = 100;
 
         let (topic, group_id, config) = make_rand_config();
         create_topic(&group_id, &topic, 2).await;
 
-        let _now = send_events(topic.clone(), NEVENTS).await;
+        let _send_start = send_events(topic.clone(), NEVENTS).await;
 
-        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(DELAY), EventStatus::Delivered);
+        let (tx, rx1) = delay_pipeline(1, Duration::from_millis(200), EventStatus::Delivered);
         let (trigger_shutdown1, shutdown_done1) = spawn_kafka(tx, config.clone(), true);
         let events1 = tokio::spawn(collect_n(rx1, NEVENTS));
 
@@ -652,19 +669,55 @@ mod integration_test {
         let (trigger_shutdown2, shutdown_done2) = spawn_kafka(tx, config, true);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(5)).await;
 
         drop(trigger_shutdown1);
         let events1 = events1.await.unwrap();
         shutdown_done1.await;
-        dbg!(events1.len());
+
+        sleep(Duration::from_secs(5)).await;
 
         drop(trigger_shutdown2);
         let events2 = events2.await.unwrap();
         shutdown_done2.await;
-        dbg!(events2.len());
 
-        dbg!(fetch_tpl_offset(&group_id, &topic, 0));
-        dbg!(fetch_tpl_offset(&group_id, &topic, 1));
+        sleep(Duration::from_secs(1)).await;
+
+        assert!(!events1.is_empty());
+        assert!(!events2.is_empty());
+
+        match fetch_tpl_offset(&group_id, &topic, 0) {
+            Offset::Offset(offset) => {
+                assert!((offset as isize - events1.len() as isize).abs() <= 1)
+            }
+            o => panic!("Invalid offset for partition 0 {:?}", o),
+        }
+
+        match fetch_tpl_offset(&group_id, &topic, 1) {
+            Offset::Offset(offset) => {
+                assert!((offset as isize - events2.len() as isize).abs() <= 1)
+            }
+            o => panic!("Invalid offset for partition 0 {:?}", o),
+        }
+
+        let mut all_events = events1
+            .into_iter()
+            .chain(events2.into_iter())
+            .map(map_log)
+            .collect::<Vec<String>>();
+        all_events.sort();
+
+        // Assert they are all in sequential order and no dupes, TODO
+    }
+
+    fn map_log(event: Event) -> String {
+        let log = event.into_log();
+        format!(
+            "{} {} {} {}",
+            log["message"].to_string_lossy(),
+            log["topic"].to_string_lossy(),
+            log["partition"].to_string_lossy(),
+            log["offset"].to_string_lossy(),
+        )
     }
 }

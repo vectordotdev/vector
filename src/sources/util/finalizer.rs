@@ -86,7 +86,7 @@ async fn run_finalizer<T>(
     while let Some((_status, entry)) = status_receivers.next().await {
         apply_done(entry);
     }
-    drop(shutdown);
+    drop(shutdown); // redundant, just here for visibility
 }
 
 #[pin_project::pin_project]
