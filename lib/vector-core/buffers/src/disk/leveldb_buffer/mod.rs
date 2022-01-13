@@ -54,7 +54,7 @@ pub struct Buffer<T> {
 /// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &Path) -> Result<(u64, u64), DataDirError> {
+pub(super) fn db_initial_size(path: &Path) -> Result<(u64, u64), DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
     let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
