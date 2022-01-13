@@ -72,15 +72,15 @@ components: _nats: {
 			type: object: options: {
 				strategy: {
 					common:      false
-					description: "The strategy used to uniquely identify files. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certiificate Auth, use the TLS configuration."
+					description: "The strategy used to authenticate with the NATS server. See https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro. For TLS Client Certiificate Auth, use the TLS configuration."
 					required:    false
 					type: string: {
 						default: ""
 						enum: {
-							user_password:    "Username and password auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password"
-							token:            "Token auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens"
-							credentials_file: "Credentials file auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt"
-							nkey:             "Nkey auth: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth"
+							user_password:    "Username and password authentication: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password"
+							token:            "Token authentication: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens"
+							credentials_file: "Credentials file authentication: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt"
+							nkey:             "Nkey authentication: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth"
 						}
 					}
 				}

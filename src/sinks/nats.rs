@@ -40,7 +40,6 @@ pub struct NatsSinkConfig {
     connection_name: String,
     subject: String,
     url: String,
-    #[serde(default)]
     tls: Option<TlsConfig>,
     auth: Option<NatsAuthConfig>,
 }
@@ -104,13 +103,9 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::Options {
 
 impl NatsSinkConfig {
     async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self
-            .try_into()
-            .map_err(|e| BuildError::ConfigError { source: e })?;
-        options
-            .connect(&self.url)
-            .await
-            .map_err(|e| BuildError::ConnectError { source: e })
+        let options: async_nats::Options = self.try_into().context(ConfigError)?;
+
+        options.connect(&self.url).await.context(ConnectError)
     }
 }
 
@@ -225,7 +220,7 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::{matches, thread, time::Duration};
+    use std::{thread, time::Duration};
 
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
@@ -294,7 +289,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -316,7 +315,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -338,7 +341,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConnectError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConnectError { .. })),
+            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -359,7 +366,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -380,7 +391,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConnectError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConnectError { .. })),
+            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -402,7 +417,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -424,7 +443,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConfigError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConfigError { .. })),
+            "publish_and_check failed, expected BuildError::ConfigError, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -449,7 +472,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -468,7 +495,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConnectError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConnectError { .. })),
+            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -495,7 +526,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -520,7 +555,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConnectError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConnectError { .. })),
+            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -547,7 +586,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -574,6 +617,10 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::ConnectError { .. })));
+        assert!(
+            matches!(r, Err(BuildError::ConnectError { .. })),
+            "publish_and_check failed, expected BuildError::ConnectError, got: {:?}",
+            r
+        );
     }
 }

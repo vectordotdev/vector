@@ -2,7 +2,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 
 use crate::{
@@ -42,7 +42,6 @@ pub struct NatsSourceConfig {
     connection_name: String,
     subject: String,
     queue: Option<String>,
-    #[serde(default)]
     tls: Option<TlsConfig>,
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
@@ -96,13 +95,8 @@ impl SourceConfig for NatsSourceConfig {
 
 impl NatsSourceConfig {
     async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self
-            .try_into()
-            .map_err(|e| BuildError::Config { source: e })?;
-        options
-            .connect(&self.url)
-            .await
-            .map_err(|e| BuildError::Connection { source: e })
+        let options: async_nats::Options = self.try_into().context(Config)?;
+        options.connect(&self.url).await.context(Connection)
     }
 }
 
@@ -180,7 +174,7 @@ async fn create_subscription(
         Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
     };
 
-    let subscription = subscription.map_err(|e| BuildError::Subscription { source: e })?;
+    let subscription = subscription.context(Subscription)?;
 
     Ok((nc, subscription))
 }
@@ -205,7 +199,6 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{collect_n, random_string};
     use crate::tls::TlsOptions;
-    use std::matches;
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
         let subject = conf.subject.clone();
@@ -242,7 +235,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -264,7 +261,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -286,7 +287,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Connection { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Connection { .. })),
+            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -307,7 +312,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -328,7 +337,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Connection { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Connection { .. })),
+            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -350,7 +363,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -372,7 +389,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Config { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Config { .. })),
+            "publish_and_check failed, expected BuildError::Config, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -397,7 +418,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -416,7 +441,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Connection { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Connection { .. })),
+            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -443,7 +472,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -468,7 +501,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Connection { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Connection { .. })),
+            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -495,7 +532,11 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(r.is_ok());
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
     }
 
     #[tokio::test]
@@ -522,6 +563,10 @@ mod integration_tests {
         };
 
         let r = publish_and_check(conf).await;
-        assert!(matches!(r, Err(BuildError::Connection { .. })));
+        assert!(
+            matches!(r, Err(BuildError::Connection { .. })),
+            "publish_and_check failed, expected BuildError::Connection, got: {:?}",
+            r
+        );
     }
 }

@@ -1,7 +1,7 @@
 use crate::tls::TlsConfig;
 use nkeys::error::Error as NKeysError;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 pub enum NatsConfigError {
@@ -32,8 +32,7 @@ impl NatsAuthConfig {
                 Ok(async_nats::Options::with_credentials(path))
             }
             NatsAuthConfig::NKey { nkey, seed } => {
-                let kp = nkeys::KeyPair::from_seed(seed)
-                    .map_err(|e| NatsConfigError::AuthConfigError { source: e })?;
+                let kp = nkeys::KeyPair::from_seed(seed).context(AuthConfigError)?;
                 // The following unwrap is safe because the only way the sign method can fail is if
                 // keypair does not contain a seed. We are constructing the keypair from a seed in
                 // the preceding line.
