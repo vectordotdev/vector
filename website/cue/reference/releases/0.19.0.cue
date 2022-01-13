@@ -27,6 +27,10 @@ releases: "0.19.0": {
 		},
 	]
 
+	known_issues: [
+		"Using `framing.character_delimited.delimiter` in configs causes Vector to fail to start with `invalid type: string`."
+	]
+
 	description: """
 		The Vector team is pleased to announce version 0.19.0!
 
