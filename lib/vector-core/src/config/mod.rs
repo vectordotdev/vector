@@ -16,8 +16,8 @@ pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
 #[bitmask(u8)]
 pub enum DataType {
     Log,
-    Trace,
     Metric,
+    Trace,
 }
 
 #[derive(Debug, Clone, PartialEq)]
