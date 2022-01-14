@@ -209,10 +209,12 @@ impl FunctionCall {
 
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
+    /// The error path in this function should never really be hit as the compiler should
+    /// catch these whilst creating the AST.
     fn resolve_arguments(
         &self,
         function: &Box<dyn Function + Send + Sync>,
-    ) -> Vec<(&'static str, Option<FunctionArgument>)> {
+    ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
         let params = function.parameters().iter().collect::<Vec<_>>();
         let mut result = params
             .iter()
@@ -229,7 +231,7 @@ impl FunctionCall {
                     match params.iter().position(|param| param.keyword == keyword) {
                         None => {
                             // The parameter was not found in the list.
-                            todo!()
+                            return Err(format!("parameter {} not found.", keyword));
                         }
                         Some(pos) => {
                             result[pos].1 = Some(param.clone().take().1);
@@ -247,13 +249,13 @@ impl FunctionCall {
             }
 
             if pos > result.len() {
-                todo!("return proper errors")
+                return Err("Too many parameters".to_string());
             }
 
             result[pos].1 = Some(param);
         }
 
-        result
+        Ok(result)
     }
 
     pub fn noop() -> Self {
@@ -373,51 +375,33 @@ impl Expression for FunctionCall {
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let args = match vm.function(self.function_id) {
-            Some(fun) => self.resolve_arguments(fun),
+            Some(fun) => self.resolve_arguments(fun)?,
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
         for (keyword, argument) in &args {
-            // TODO, this could be refactored.
             let fun = vm.function(self.function_id).unwrap();
-            match argument {
-                Some(argument) => {
-                    // We can unwrap here because we have already returned with an Err if
-                    // `function()` returns a `None`.
-                    // We can't reuse the previous call to `function` since that lands us with a
-                    // bunch of borrow errors.
-                    match fun
-                        .compile_argument(&args, keyword, Some(argument.inner()))
-                        .map_err(|err| err.to_string())?
-                    {
-                        Some(stat) => {
-                            // The function has compiled this argument as a static
-                            let stat = vm.add_static(stat);
-                            vm.write_chunk(crate::vm::OpCode::MoveStatic);
-                            vm.write_primitive(stat);
-                        }
-                        None => {
-                            argument.inner().dump(vm)?;
-                            vm.write_chunk(crate::vm::OpCode::MoveParameter);
-                        }
-                    }
+            let argument = argument.as_ref().map(|argument| argument.inner());
+
+            match fun
+                .compile_argument(&args, keyword, argument)
+                .map_err(|err| err.to_string())?
+            {
+                Some(stat) => {
+                    // The function has compiled this argument as a static
+                    let stat = vm.add_static(stat);
+                    vm.write_chunk(crate::vm::OpCode::MoveStatic);
+                    vm.write_primitive(stat);
                 }
-                None => {
-                    match fun
-                        .compile_argument(&args, keyword, None)
-                        .map_err(|err| err.to_string())?
-                    {
-                        Some(stat) => {
-                            // The function has compiled this argument as a static
-                            let stat = vm.add_static(stat);
-                            vm.write_chunk(crate::vm::OpCode::MoveStatic);
-                            vm.write_primitive(stat);
-                        }
-                        None => {
-                            vm.write_chunk(crate::vm::OpCode::EmptyParameter);
-                        }
+                None => match argument {
+                    Some(argument) => {
+                        argument.dump(vm)?;
+                        vm.write_chunk(crate::vm::OpCode::MoveParameter);
                     }
-                }
+                    None => {
+                        vm.write_chunk(crate::vm::OpCode::EmptyParameter);
+                    }
+                },
             }
         }
 
@@ -854,7 +838,7 @@ mod tests {
     fn create_argument(ident: Option<&str>, value: i64) -> FunctionArgument {
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
-            Node::new(Span::new(0, 0), Expr::Literal(Literal::Integer(value))),
+            create_node(Expr::Literal(Literal::Integer(value))),
         )
     }
 
@@ -864,7 +848,7 @@ mod tests {
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
             arguments,
-            &vec![Box::new(TestFn) as _],
+            &[Box::new(TestFn) as _],
             &mut Default::default(),
         )
         .unwrap()
@@ -886,7 +870,7 @@ mod tests {
             ("three", Some(create_argument(None, 3))),
         ];
 
-        assert_eq!(expected, params);
+        assert_eq!(Ok(expected), params);
     }
 
     #[test]
@@ -905,7 +889,7 @@ mod tests {
             ("three", Some(create_argument(Some("three"), 3))),
         ];
 
-        assert_eq!(expected, params);
+        assert_eq!(Ok(expected), params);
     }
 
     #[test]
@@ -924,7 +908,7 @@ mod tests {
             ("three", Some(create_argument(Some("three"), 3))),
         ];
 
-        assert_eq!(expected, params);
+        assert_eq!(Ok(expected), params);
     }
 
     #[test]
@@ -943,7 +927,7 @@ mod tests {
             ("three", Some(create_argument(Some("three"), 3))),
         ];
 
-        assert_eq!(expected, params);
+        assert_eq!(Ok(expected), params);
     }
 
     #[test]
@@ -962,6 +946,6 @@ mod tests {
             ("three", Some(create_argument(Some("three"), 3))),
         ];
 
-        assert_eq!(expected, params);
+        assert_eq!(Ok(expected), params);
     }
 }
