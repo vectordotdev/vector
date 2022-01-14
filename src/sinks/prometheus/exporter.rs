@@ -125,7 +125,7 @@ impl SinkConfig for PrometheusExporterConfig {
         let sink = PrometheusExporter::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -418,7 +418,7 @@ impl PrometheusExporter {
 }
 
 #[async_trait]
-impl StreamSink for PrometheusExporter {
+impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed().await;
 

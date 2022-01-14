@@ -7,7 +7,7 @@ use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    event::EventArray,
     sinks::{
         elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
         util::{
@@ -106,30 +106,35 @@ impl SinkConfig for SematextLogsConfig {
 }
 
 struct MapTimestampStream {
-    inner: Box<dyn StreamSink + Send>,
+    inner: Box<dyn StreamSink<EventArray> + Send>,
 }
 
 #[async_trait]
-impl StreamSink for MapTimestampStream {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<EventArray> for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
         let mapped_input = input.map(map_timestamp).boxed();
         self.inner.run(mapped_input).await
     }
 }
 
 /// Used to map `timestamp` to `@timestamp`.
-fn map_timestamp(mut event: Event) -> Event {
-    let log = event.as_mut_log();
+fn map_timestamp(mut events: EventArray) -> EventArray {
+    match &mut events {
+        EventArray::Logs(logs) => {
+            for log in logs {
+                if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
+                    log.insert("@timestamp", ts);
+                }
 
-    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
-        log.insert("@timestamp", ts);
+                if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
+                    log.insert("os.host", host);
+                }
+            }
+        }
+        _ => unreachable!("This sink only accepts logs"),
     }
 
-    if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
-        log.insert("os.host", host);
-    }
-
-    event
+    events
 }
 
 #[cfg(test)]

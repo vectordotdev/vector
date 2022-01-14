@@ -119,7 +119,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for DatadogMetricsSink<S>
+impl<S> StreamSink<Event> for DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
     S::Error: fmt::Debug + Send + 'static,

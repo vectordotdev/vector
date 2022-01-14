@@ -88,7 +88,7 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
 }
 
 #[async_trait]
-impl StreamSink for DatadogEventsSink {
+impl StreamSink<Event> for DatadogEventsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run(input).await
     }

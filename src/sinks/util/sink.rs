@@ -50,7 +50,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
-// === StreamSink ===
+// === StreamSink<Event> ===
 pub use vector_core::sink::StreamSink;
 use vector_core::{buffers::Acker, internal_event::EventsSent};
 

@@ -81,7 +81,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             service: svc,
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

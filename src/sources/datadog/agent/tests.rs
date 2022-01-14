@@ -82,8 +82,20 @@ async fn source(
     status: EventStatus,
     acknowledgements: bool,
     store_api_key: bool,
-) -> (impl Stream<Item = Event>, SocketAddr) {
-    let (sender, recv) = SourceSender::new_test_finalize(status);
+    multiple_outputs: bool,
+) -> (
+    impl Stream<Item = Event>,
+    Option<impl Stream<Item = Event>>,
+    Option<impl Stream<Item = Event>>,
+    SocketAddr,
+) {
+    let (mut sender, recv) = SourceSender::new_test_finalize(status);
+    let mut logs_output = None;
+    let mut metrics_output = None;
+    if multiple_outputs {
+        logs_output = Some(sender.add_outputs(status, "logs".to_string()));
+        metrics_output = Some(sender.add_outputs(status, "metrics".to_string()));
+    }
     let address = next_addr();
     let context = SourceContext::new_test(sender);
     tokio::spawn(async move {
@@ -94,6 +106,7 @@ async fn source(
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             acknowledgements: acknowledgements.into(),
+            multiple_outputs,
         }
         .build(context)
         .await
@@ -102,7 +115,7 @@ async fn source(
         .unwrap();
     });
     wait_for_tcp(address).await;
-    (recv, address)
+    (recv, logs_output, metrics_output, address)
 }
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
@@ -120,7 +133,7 @@ async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, pat
 #[tokio::test]
 async fn full_payload_v1() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut events = spawn_collect_n(
         async move {
@@ -167,7 +180,7 @@ async fn full_payload_v1() {
 #[tokio::test]
 async fn full_payload_v2() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut events = spawn_collect_n(
         async move {
@@ -214,7 +227,7 @@ async fn full_payload_v2() {
 #[tokio::test]
 async fn no_api_key() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut events = spawn_collect_n(
         async move {
@@ -261,7 +274,7 @@ async fn no_api_key() {
 #[tokio::test]
 async fn api_key_in_url() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut events = spawn_collect_n(
         async move {
@@ -311,7 +324,7 @@ async fn api_key_in_url() {
 #[tokio::test]
 async fn api_key_in_query_params() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut events = spawn_collect_n(
         async move {
@@ -361,7 +374,7 @@ async fn api_key_in_query_params() {
 #[tokio::test]
 async fn api_key_in_header() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -417,7 +430,7 @@ async fn api_key_in_header() {
 #[tokio::test]
 async fn delivery_failure() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Rejected, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Rejected, true, true, false).await;
 
     spawn_collect_n(
         async move {
@@ -450,7 +463,7 @@ async fn delivery_failure() {
 #[tokio::test]
 async fn ignores_disabled_acknowledgements() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Rejected, false, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Rejected, false, true, false).await;
 
     let events = spawn_collect_n(
         async move {
@@ -485,7 +498,7 @@ async fn ignores_disabled_acknowledgements() {
 #[tokio::test]
 async fn ignores_api_key() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, false).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, false, false).await;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -538,7 +551,7 @@ async fn ignores_api_key() {
 #[tokio::test]
 async fn decode_series_endpoints() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -684,7 +697,7 @@ async fn decode_series_endpoints() {
 #[tokio::test]
 async fn decode_sketches() {
     trace_init();
-    let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -763,6 +776,119 @@ async fn decode_sketches() {
 
         assert_eq!(
             &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+            "12345678abcdefgh12345678abcdefgh"
+        );
+    }
+}
+
+#[tokio::test]
+async fn split_outputs() {
+    trace_init();
+    let (_, rx_logs, rx_metrics, addr) = source(EventStatus::Delivered, true, true, true).await;
+
+    let mut headers_for_log = HeaderMap::new();
+    headers_for_log.insert(
+        "dd-api-key",
+        "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+    );
+
+    let mut log_event = spawn_collect_n(
+        async move {
+            assert_eq!(
+                200,
+                send_with_path(
+                    addr,
+                    &serde_json::to_string(&[LogMsg {
+                        message: Bytes::from("baz"),
+                        timestamp: 789,
+                        hostname: Bytes::from("festeburg"),
+                        status: Bytes::from("notice"),
+                        service: Bytes::from("vector"),
+                        ddsource: Bytes::from("curl"),
+                        ddtags: Bytes::from("one,two,three"),
+                    }])
+                    .unwrap(),
+                    headers_for_log,
+                    "/v1/input/"
+                )
+                .await
+            );
+        },
+        rx_logs.unwrap(),
+        1,
+    )
+    .await;
+
+    let mut headers_for_metric = HeaderMap::new();
+    headers_for_metric.insert(
+        "dd-api-key",
+        "abcdefgh12345678abcdefgh12345678".parse().unwrap(),
+    );
+    let dd_metric_request = DatadogSeriesRequest {
+        series: vec![DatadogSeriesMetric {
+            metric: "dd_gauge".to_string(),
+            r#type: DatadogMetricType::Gauge,
+            interval: None,
+            points: vec![
+                DatadogPoint(1542182950, 3.14),
+                DatadogPoint(1542182951, 3.1415),
+            ],
+            tags: Some(vec!["foo:bar".to_string()]),
+            host: Some("random_host".to_string()),
+            source_type_name: None,
+            device: None,
+        }],
+    };
+    let mut metric_event = spawn_collect_n(
+        async move {
+            assert_eq!(
+                200,
+                send_with_path(
+                    addr,
+                    &serde_json::to_string(&dd_metric_request).unwrap(),
+                    headers_for_metric,
+                    "/api/v1/series"
+                )
+                .await
+            );
+        },
+        rx_metrics.unwrap(),
+        1,
+    )
+    .await;
+
+    {
+        let event = metric_event.remove(0);
+        let metric = event.as_metric();
+        assert_eq!(metric.name(), "dd_gauge");
+        assert_eq!(
+            metric.timestamp(),
+            Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+        );
+        assert_eq!(metric.kind(), MetricKind::Absolute);
+        assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+        assert_eq!(metric.tags().unwrap()["host"], "random_host".to_string());
+        assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+
+        assert_eq!(
+            &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+            "abcdefgh12345678abcdefgh12345678"
+        );
+    }
+
+    {
+        let event = log_event.remove(0);
+        let log = event.as_log();
+        assert_eq!(log["message"], "baz".into());
+        assert_eq!(log["timestamp"], 789.into());
+        assert_eq!(log["hostname"], "festeburg".into());
+        assert_eq!(log["status"], "notice".into());
+        assert_eq!(log["service"], "vector".into());
+        assert_eq!(log["ddsource"], "curl".into());
+        assert_eq!(log["ddtags"], "one,two,three".into());
+        assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+        assert_eq!(
+            &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
     }

@@ -337,7 +337,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(self)?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
-        let stream = VectorSink::Stream(Box::new(sink));
+        let stream = VectorSink::from_event_streamsink(sink);
         Ok((stream, healthcheck))
     }
 

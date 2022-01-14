@@ -57,30 +57,28 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+#[cfg(feature = "codecs")]
+mod adapter;
 mod codec;
-
-pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
-
 mod config;
-
-pub use config::EncodingConfig;
-
 mod fixed;
-
-pub use fixed::EncodingConfigFixed;
-
 mod with_default;
 
 use std::{fmt::Debug, io, sync::Arc};
 
-pub use codec::as_tracked_write;
 use serde::{Deserialize, Serialize};
-pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
     event::{Event, LogEvent, MaybeAsLogMut, PathComponent, PathIter, Value},
     Result,
 };
+
+#[cfg(feature = "codecs")]
+pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
+pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use config::EncodingConfig;
+pub use fixed::EncodingConfigFixed;
+pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
