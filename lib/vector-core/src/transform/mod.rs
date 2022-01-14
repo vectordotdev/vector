@@ -223,7 +223,7 @@ impl TransformOutputs {
     pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, Vec::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(0, |b| b.size_of());
+            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
             send_inner(
                 buf.primary_buffer.as_mut().expect("mismatched outputs"),
                 primary,
