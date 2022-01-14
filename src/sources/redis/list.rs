@@ -3,9 +3,8 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::redis::{create_event, Method},
     sources::Source,
-    Pipeline,
+    SourceSender,
 };
-use futures::SinkExt;
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 
 pub fn watch(
@@ -14,10 +13,8 @@ pub fn watch(
     redis_key: Option<String>,
     method: Method,
     mut shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> Source {
-    let mut out = out.sink_map_err(|error| error!(message="Error sending event.", %error));
-
     let fut = async move {
         trace!("Get redis connection manager.");
         let mut conn = client
@@ -38,7 +35,7 @@ pub fn watch(
                                 tokio::select! {
                                     result = out.send(event) => {match result {
                                         Ok(()) => { },
-                                        Err(()) => return Ok(()),
+                                        Err(err) => error!(message = "Error sending event.", error = %err),
                                     }}
                                     _ = &mut shutdown => return Ok(()),
                                 }
@@ -64,7 +61,7 @@ pub fn watch(
                                 tokio::select! {
                                     result = out.send(event) => {match result {
                                         Ok(()) => { },
-                                        Err(()) => return Ok(()),
+                                        Err(err) => error!(message = "Error sending event.", error = %err),
                                     }}
                                     _ = &mut shutdown => return Ok(()),
                                 }

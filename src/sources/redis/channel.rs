@@ -3,18 +3,17 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::redis::create_event,
     sources::Source,
-    Pipeline,
+    SourceSender,
 };
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 
 pub fn subscribe(
     client: redis::Client,
     key: String,
     redis_key: Option<String>,
     mut shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> Source {
-    let mut out = out.sink_map_err(|error| error!(message="Error sending event.", %error));
     let fut = async move {
         trace!("Get redis async connection.");
         let conn = client.get_async_connection().await.map_err(|_| ())?;
@@ -40,7 +39,7 @@ pub fn subscribe(
             tokio::select! {
                 result = out.send(event) => {match result {
                     Ok(()) => { },
-                    Err(()) => return Ok(()),
+                    Err(err) => error!(message = "Error sending event.", error = %err),
                 }}
                 _ = &mut shutdown => return Ok(()),
             }

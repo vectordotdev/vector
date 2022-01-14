@@ -1,10 +1,11 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
+        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
+        SourceDescription,
     },
     event::Event,
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 use bytes::Bytes;
 use redis::{Client, RedisResult};
@@ -75,8 +76,8 @@ impl SourceConfig for RedisSourceConfig {
         redis_source(self, cx.shutdown, cx.out)
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -87,7 +88,7 @@ impl SourceConfig for RedisSourceConfig {
 fn redis_source(
     config: &RedisSourceConfig,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> crate::Result<super::Source> {
     if config.key.is_empty() {
         return Err("`key` cannot be empty.".into());
@@ -140,7 +141,7 @@ fn create_event(line: &str, key: String, redis_key: &Option<String>) -> Event {
 #[cfg(test)]
 mod test {
     use super::{redis_source, DataTypeConfig, ListOption, Method, RedisSourceConfig};
-    use crate::{shutdown::ShutdownSignal, Pipeline};
+    use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -158,7 +159,7 @@ mod test {
             key: String::from("vector"),
             redis_key: None,
         };
-        assert!(redis_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
+        assert!(redis_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0).is_ok());
     }
 
     #[test]
@@ -170,7 +171,7 @@ mod test {
             key: String::from("vector"),
             redis_key: None,
         };
-        assert!(redis_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
+        assert!(redis_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0).is_ok());
     }
 }
 
@@ -182,7 +183,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
     use core::time;
     use redis::{AsyncCommands, RedisResult};
@@ -225,7 +226,7 @@ mod integration_test {
         send_event_by_list(key.clone(), "test message for list(brpop)").await;
 
         debug!("Receiving event.");
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = collect_n(rx, 1).await;
 
@@ -258,7 +259,7 @@ mod integration_test {
         send_event_by_list(key.clone(), "test message for list(blpop)").await;
 
         debug!("Receiving event.");
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = collect_n(rx, 1).await;
 
@@ -288,7 +289,7 @@ mod integration_test {
         };
 
         debug!("Receiving event.");
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = collect_n(rx, 10000).await;
 
