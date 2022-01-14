@@ -141,7 +141,7 @@ impl<T> Buffer<T>
 where
     T: Bufferable,
 {
-    #[cfg_attr(test, instrument(level = "trace"))]
+    #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
     pub(crate) async fn from_config_inner(
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,
@@ -181,7 +181,7 @@ where
     ///
     /// If an error occurred during the creation or loading of the disk buffer, an error variant
     /// will be returned describing the error.
-    #[cfg_attr(test, instrument(level = "trace"))]
+    #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
     pub async fn from_config(
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,
