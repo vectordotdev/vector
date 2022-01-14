@@ -195,7 +195,7 @@ pub enum SubCommand {
     #[cfg(feature = "api-client")]
     Top(top::Opts),
 
-    /// Observe log events from topology components
+    /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
     #[cfg(feature = "api-client")]
     Tap(tap::Opts),
 
