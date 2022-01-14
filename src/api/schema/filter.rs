@@ -1,4 +1,5 @@
 use async_graphql::{InputObject, InputType};
+use std::collections::BTreeSet;
 
 use super::components::{source, ComponentKind};
 
@@ -45,19 +46,32 @@ impl StringFilter {
     }
 }
 
-#[derive(Default, InputObject)]
-pub struct SourceOutputTypeFilter {
-    pub supports: Option<source::SourceOutputType>,
-    pub not_supports: Option<source::SourceOutputType>,
+#[derive(InputObject)]
+#[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
+// Filter for GraphQL lists
+pub struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
+    pub equals: Option<Vec<T>>,
+    pub not_equals: Option<Vec<T>>,
+    pub contains: Option<T>,
+    pub not_contains: Option<T>,
 }
 
-impl SourceOutputTypeFilter {
-    pub fn filter_value(&self, value: source::SourceOutputType) -> bool {
+impl<T: InputType + PartialEq + Eq + std::cmp::Ord> ListFilter<T> {
+    pub fn filter_value(&self, value: Vec<T>) -> bool {
+        let val = BTreeSet::from_iter(value.iter());
         filter_check!(
-            // Supports
-            self.supports.as_ref().map(|s| value.contains(*s)),
-            // Not Supports
-            self.not_supports.as_ref().map(|s| !value.contains(*s))
+            // Equals
+            self.equals
+                .as_ref()
+                .map(|s| BTreeSet::from_iter(s.iter()).eq(&val)),
+            // Not Equals
+            self.not_equals
+                .as_ref()
+                .map(|s| !BTreeSet::from_iter(s.iter()).eq(&val)),
+            // Contains
+            self.contains.as_ref().map(|s| val.contains(s)),
+            // Not Contains
+            self.not_contains.as_ref().map(|s| !val.contains(s))
         );
         true
     }

@@ -4244,12 +4244,6 @@
           "interfaces": null,
           "enumValues": [
             {
-              "name": "MULTIPLE",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "LOG",
               "description": null,
               "isDeprecated": false,
@@ -4277,7 +4271,43 @@
           "fields": null,
           "inputFields": [
             {
-              "name": "supports",
+              "name": "equals",
+              "description": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "not_equals",
+              "description": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "contains",
               "description": null,
               "type": {
                 "kind": "ENUM",
@@ -4287,7 +4317,7 @@
               "defaultValue": null
             },
             {
-              "name": "not_supports",
+              "name": "not_contains",
               "description": null,
               "type": {
                 "kind": "ENUM",

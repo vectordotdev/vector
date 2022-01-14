@@ -14,7 +14,6 @@ use crate::{
     filter_check,
 };
 
-// #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 #[derive(Enum, Ord, PartialOrd)]
 #[bitmask(u8)]
 pub enum SourceOutputType {
@@ -64,8 +63,21 @@ impl Source {
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
     }
-    pub fn get_output_type(&self) -> SourceOutputType {
-        self.0.output_type.into()
+    pub fn get_output_types(&self) -> Vec<SourceOutputType> {
+        let mut t = vec![];
+        self.0
+            .output_type
+            .contains(DataType::Log)
+            .then(|| t.push(SourceOutputType::Log));
+        self.0
+            .output_type
+            .contains(DataType::Metric)
+            .then(|| t.push(SourceOutputType::Metric));
+        self.0
+            .output_type
+            .contains(DataType::Trace)
+            .then(|| t.push(SourceOutputType::Trace));
+        t
     }
 }
 
@@ -99,8 +111,8 @@ impl Source {
     }
 
     /// Source output type
-    pub async fn output_type(&self) -> SourceOutputType {
-        self.get_output_type()
+    pub async fn output_type(&self) -> Vec<SourceOutputType> {
+        self.get_output_types()
     }
 
     /// Transform outputs
@@ -136,7 +148,7 @@ impl Source {
 pub struct SourcesFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_type: Option<Vec<filter::StringFilter>>,
-    output_type: Option<Vec<filter::SourceOutputTypeFilter>>,
+    output_type: Option<Vec<filter::ListFilter<SourceOutputType>>>,
     or: Option<Vec<Self>>,
 }
 
@@ -151,7 +163,7 @@ impl filter::CustomFilter<Source> for SourcesFilter {
                 .all(|f| f.filter_value(source.get_component_type()))),
             self.output_type
                 .as_ref()
-                .map(|f| f.iter().all(|f| f.filter_value(source.get_output_type())))
+                .map(|f| f.iter().all(|f| f.filter_value(source.get_output_types())))
         );
         true
     }
