@@ -121,7 +121,7 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
-        let mut runtime = Runtime::default();
+        let runtime = Runtime::default();
 
         #[cfg(feature = "vrl-vm")]
         let vm = Arc::new(runtime.compile(functions, &program)?);

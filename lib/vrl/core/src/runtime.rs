@@ -113,7 +113,7 @@ impl Runtime {
     }
 
     pub fn compile(
-        &mut self,
+        &self,
         fns: Vec<Box<dyn Function + Send + Sync>>,
         program: &Program,
     ) -> Result<Vm, String> {
