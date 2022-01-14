@@ -213,7 +213,7 @@ impl FunctionCall {
     /// catch these whilst creating the AST.
     fn resolve_arguments(
         &self,
-        function: &Box<dyn Function + Send + Sync>,
+        function: &(dyn Function + Send + Sync),
     ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
         let params = function.parameters().iter().collect::<Vec<_>>();
         let mut result = params
@@ -862,8 +862,7 @@ mod tests {
             create_node(create_argument(None, 3)),
         ]);
 
-        let fun = Box::new(TestFn) as _;
-        let params = call.resolve_arguments(&fun);
+        let params = call.resolve_arguments(&TestFn);
         let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
             ("one", Some(create_argument(None, 1))),
             ("two", Some(create_argument(None, 2))),
@@ -881,8 +880,7 @@ mod tests {
             create_node(create_argument(Some("three"), 3)),
         ]);
 
-        let fun = Box::new(TestFn) as _;
-        let params = call.resolve_arguments(&fun);
+        let params = call.resolve_arguments(&TestFn);
         let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
             ("one", Some(create_argument(Some("one"), 1))),
             ("two", Some(create_argument(Some("two"), 2))),
@@ -900,8 +898,7 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let fun = Box::new(TestFn) as _;
-        let params = call.resolve_arguments(&fun);
+        let params = call.resolve_arguments(&TestFn);
         let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
             ("one", Some(create_argument(Some("one"), 1))),
             ("two", Some(create_argument(Some("two"), 2))),
@@ -919,8 +916,7 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let fun = Box::new(TestFn) as _;
-        let params = call.resolve_arguments(&fun);
+        let params = call.resolve_arguments(&TestFn);
         let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
             ("one", Some(create_argument(Some("one"), 1))),
             ("two", Some(create_argument(None, 2))),
@@ -938,8 +934,7 @@ mod tests {
             create_node(create_argument(None, 2)),
         ]);
 
-        let fun = Box::new(TestFn) as _;
-        let params = call.resolve_arguments(&fun);
+        let params = call.resolve_arguments(&TestFn);
         let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
             ("one", Some(create_argument(None, 1))),
             ("two", Some(create_argument(None, 2))),

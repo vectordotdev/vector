@@ -200,7 +200,7 @@ impl Clone for Remap {
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
             #[cfg(feature = "vrl-vm")]
-            vm: self.vm.clone(),
+            vm: Arc::clone(&self.vm),
         }
     }
 }

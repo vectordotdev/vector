@@ -7,14 +7,14 @@ pub enum VmArgument<'a> {
 }
 
 impl<'a> VmArgument<'a> {
-    fn as_value(self) -> Value {
+    fn into_value(self) -> Value {
         match self {
             VmArgument::Value(value) => value,
             _ => panic!(),
         }
     }
 
-    fn as_any(self) -> &'a Box<dyn Any + Send + Sync> {
+    fn into_any(self) -> &'a Box<dyn Any + Send + Sync> {
         match self {
             VmArgument::Any(any) => any,
             _ => panic!(),
@@ -54,7 +54,7 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[pos].take().unwrap().as_value()
+        self.values[pos].take().unwrap().into_value()
     }
 
     /// Returns the parameter with the given name.
@@ -69,7 +69,7 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[pos].take().map(|v| v.as_value())
+        self.values[pos].take().map(|v| v.into_value())
     }
 
     /// Returns the parameter with the given name.
@@ -84,7 +84,7 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[pos].take().unwrap().as_any()
+        self.values[pos].take().unwrap().into_any()
     }
 
     /// Returns the parameter with the given name.
@@ -99,7 +99,7 @@ impl<'a> VmArgumentList<'a> {
             .expect("parameter doesn't exist");
 
         // Return the parameter found at this position.
-        self.values[pos].take().map(|v| v.as_any())
+        self.values[pos].take().map(|v| v.into_any())
     }
 
     /// Validates the arguments are correct.
