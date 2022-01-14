@@ -30,6 +30,6 @@ package = "vrl-stdlib"
 path = "../stdlib"
 
 [features]
-default = ["repl"]
+default = ["repl", "vrl-vm"]
 repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]
-
+vrl-vm = []

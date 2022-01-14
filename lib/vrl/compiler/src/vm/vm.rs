@@ -112,7 +112,7 @@ impl Vm {
     }
 
     /// For debugging purposes, returns a list of strings representing the instructions and primitives.
-    pub fn dissassemble(&self) -> Vec<String> {
+    pub fn disassemble(&self) -> Vec<String> {
         self.instructions
             .iter()
             .enumerate()

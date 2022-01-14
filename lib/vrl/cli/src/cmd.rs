@@ -109,13 +109,14 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
+        let functions = stdlib::all();
+        let program = vrl::compile(&source, &functions, None).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 
         for mut object in objects {
-            //for _ in 0..1000000 {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let functions = stdlib::all();
+            let result = execute(&mut object, &program, &tz, functions).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -129,7 +130,6 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
             }
-            //}
         }
 
         Ok(())
@@ -147,21 +147,33 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
+#[cfg(not(feature = "vrl-vm"))]
 fn execute(
-    _object: &mut impl Target,
+    object: &mut impl Target,
     program: &Program,
-    _timezone: &TimeZone,
+    timezone: &TimeZone,
+    _functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
 ) -> Result<Value, Error> {
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
+    runtime
+        .resolve(object, program, timezone)
+        .map_err(Error::Runtime)
+}
 
-    let vm = runtime.compile(Default::default(), program).unwrap();
-
-    println!("{:#?}", vm.dissassemble());
-    Ok(Value::Null)
-    // runtime
-    //    .resolve(object, program, timezone)
-    //   .map_err(Error::Runtime)
+#[cfg(feature = "vrl-vm")]
+fn execute(
+    object: &mut impl Target,
+    program: &Program,
+    timezone: &TimeZone,
+    functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
+) -> Result<Value, Error> {
+    let state = state::Runtime::default();
+    let mut runtime = Runtime::new(state);
+    let vm = runtime.compile(functions, program).unwrap();
+    runtime
+        .run_vm(&vm, object, timezone)
+        .map_err(Error::Runtime)
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {
