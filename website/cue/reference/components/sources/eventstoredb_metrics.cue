@@ -4,8 +4,9 @@ components: sources: eventstoredb_metrics: {
 	title: "EventStoreDB Metrics"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"

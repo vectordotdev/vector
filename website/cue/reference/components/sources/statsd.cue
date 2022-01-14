@@ -6,8 +6,9 @@ components: sources: statsd: {
 	title: "StatsD"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"

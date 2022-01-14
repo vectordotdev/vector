@@ -4,10 +4,11 @@ components: sinks: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
-		development:   "stable"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    true
+		delivery:         "at_least_once"
+		development:      "stable"
+		egress_method:    "batch"
 		service_providers: ["AWS"]
 		stateful: false
 	}

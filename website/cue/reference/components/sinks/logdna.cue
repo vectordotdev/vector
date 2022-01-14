@@ -4,10 +4,11 @@ components: sinks: logdna: {
 	title: "LogDNA"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "stable"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    false
+		delivery:         "at_least_once"
+		development:      "stable"
+		egress_method:    "batch"
 		service_providers: ["LogDNA"]
 		stateful: false
 	}

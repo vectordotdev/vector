@@ -6,8 +6,9 @@ components: sources: fluent: {
 	title: "Fluent"
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
+		acknowledgements: true
+		commonly_used:    true
+		delivery:         "best_effort"
 		deployment_roles: ["sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "stream"

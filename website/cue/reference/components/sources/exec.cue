@@ -4,8 +4,9 @@ components: sources: exec: {
 	title: "Exec"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "beta"
 		egress_method: "stream"

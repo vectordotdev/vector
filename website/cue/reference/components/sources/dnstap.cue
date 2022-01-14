@@ -4,8 +4,9 @@ components: sources: dnstap: {
 	title: "Dnstap"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "stream"

@@ -4,10 +4,11 @@ components: sinks: honeycomb: {
 	title: "Honeycomb"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "beta"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    false
+		delivery:         "at_least_once"
+		development:      "beta"
+		egress_method:    "batch"
 		service_providers: ["Honeycomb"]
 		stateful: false
 	}

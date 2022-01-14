@@ -11,19 +11,35 @@ Here you can find an overview of delivery guarantee types and their meaning as w
 the stability of our components. Next, you can head over to the [components] page and use filters to
 see which components support specific guarantees.
 
+## Acknowledgement guarantees
+
+Vector supports end-to-end acknowledgement for the majority of its
+sources and sinks. This is a system which tracks the delivery status of
+an event through the lifetime of that event is it travels from the
+originating source to any number of destination sinks.
+
+For a source that supports end-to-end acknowledgements and has the
+`acknowledgements` option enabled, this will cause it to wait for _all_
+connected sinks to either mark the event as delivered or to persist the
+events to a durable buffer before acknowledging receipt of the event. If
+the sink signals the event was rejected and the source can provide an
+error response (ie through an HTTP error code), then the source will
+provide an appropriate error to the sending agent.
+
+Sinks support end-to-end acknowledgements by providing an indicator of
+the final status of each event after delivery has completed. This
+includes waiting until all internal buffering and the retry process is
+complete. Sinks which have a durable buffer configured will mark events
+as delivered once they are persisted to that buffer, as an indicator
+that Vector will continue to retry the event even after restarts.
+
 ## Delivery guarantees
 
 ### At-least-once
 
-The **at-least-once** delivery guarantee ensures that an [event]
-received by a Vector component is ultimately delivered at least
-once. For a source, when the `acknowledgements` option is enabled, this
-indicates that it will wait for _all_ connected sinks to either mark the
-event as delivered or to persist the events to a durable buffer
-before acknowledging receipt of the event. For a sink, this indicates
-that it will attempt to retry the delivery until the events are either
-accepted or rejected and then signal the source with the results of that
-delivery.
+The **at-least-once** delivery guarantee ensures that an [event] received by a Vector component is
+ultimately delivered at least once. While rare, it is possible for an event to be delivered more
+than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
 
 While rare, it is possible for an event to be delivered more than
 once. See the [Does Vector support exactly-once

@@ -4,10 +4,11 @@ components: sinks: papertrail: {
 	title: "Papertrail"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "stable"
-		egress_method: "stream"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "at_least_once"
+		development:      "stable"
+		egress_method:    "stream"
 		service_providers: ["Papertrail"]
 		stateful: false
 	}

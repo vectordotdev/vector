@@ -3,9 +3,7 @@ package metadata
 components: sinks: datadog_logs: {
 	title: "Datadog Logs"
 
-	classes: sinks._datadog.classes & {
-		delivery: "at_least_once"
-	}
+	classes: sinks._datadog.classes
 
 	features: {
 		buffer: enabled:      true

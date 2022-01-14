@@ -10,10 +10,11 @@ components: sinks: vector: {
 		"""
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "beta"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    false
+		delivery:         "best_effort"
+		development:      "beta"
+		egress_method:    "batch"
 		service_providers: []
 		stateful: false
 	}

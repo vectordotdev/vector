@@ -12,7 +12,8 @@ components: {
 		commonly_used: bool
 
 		if Args.kind == "source" || Args.kind == "sink" {
-			delivery: #DeliveryStatus
+			acknowledgements: bool
+			delivery:         #DeliveryStatus
 		}
 
 		if Args.kind == "source" {

@@ -4,10 +4,11 @@ components: sinks: loki: {
 	title: "Loki"
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
-		development:   "beta"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    true
+		delivery:         "at_least_once"
+		development:      "beta"
+		egress_method:    "batch"
 		service_providers: ["Grafana"]
 		stateful: false
 	}

@@ -4,10 +4,11 @@ components: sinks: azure_blob: {
 	title: "Azure Blob Storage"
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
-		development:   "beta"
-		egress_method: "batch"
+		acknowledgements: false
+		commonly_used:    true
+		delivery:         "at_least_once"
+		development:      "beta"
+		egress_method:    "batch"
 		service_providers: ["Azure"]
 		stateful: false
 	}

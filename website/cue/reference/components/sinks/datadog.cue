@@ -2,9 +2,11 @@ package metadata
 
 components: sinks: _datadog: {
 	classes: {
-		commonly_used: false
-		development:   string | *"stable"
-		egress_method: "batch"
+		acknowledgements: true
+		commonly_used:    false
+		delivery:         "at_least_once"
+		development:      string | *"stable"
+		egress_method:    "batch"
 		service_providers: ["Datadog"]
 		stateful: false
 	}

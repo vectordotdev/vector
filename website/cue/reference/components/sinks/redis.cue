@@ -3,10 +3,11 @@ package metadata
 components: sinks: redis: {
 	title: "Redis"
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
-		development:   "beta"
-		egress_method: "batch"
+		acknowledgements: false
+		commonly_used:    false
+		delivery:         "best_effort"
+		development:      "beta"
+		egress_method:    "batch"
 		service_providers: []
 		stateful: false
 	}
