@@ -555,7 +555,7 @@ impl Runner {
         self.timer.start_wait();
         self.outputs.send(outputs_buf).await;
 
-        emit!(&EventsSent { count, byte_size });
+        emit!(&EventsSent { count, byte_size, output: None });
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
@@ -678,6 +678,7 @@ fn build_task_transform(
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
+                output: None,
             });
             Ok(event)
         }))
