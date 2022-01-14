@@ -52,6 +52,7 @@ where
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
+#[allow(clippy::non_send_fields_in_send_ty)]
 unsafe impl<T> Send for Writer<T> where T: Bufferable {}
 
 impl<T> Clone for Writer<T>
