@@ -321,19 +321,24 @@ mod tests {
     fn sort_output_type_asc() {
         let mut sources = vec![
             Source(Data {
+                component_key: ComponentKey::from("gen4"),
+                component_type: "demo_trace".to_string(),
+                output_type: DataType::Trace,
+            }),
+            Source(Data {
                 component_key: ComponentKey::from("gen1"),
-                component_type: "file".to_string(),
-                output_type: DataType::Log | DataType::Metric,
+                component_type: "demo_logs".to_string(),
+                output_type: DataType::Metric,
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "demo_logs".to_string(),
+                component_type: "file".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "docker_logs".to_string(),
-                output_type: DataType::Metric,
+                component_type: "mutliple_type".to_string(),
+                output_type: DataType::Log | DataType::Metric | DataType::Trace,
             }),
         ];
 
@@ -343,7 +348,7 @@ mod tests {
         }];
         sort::by_fields(&mut sources, &fields);
 
-        for (i, component_id) in ["gen1", "gen2", "gen3"].iter().enumerate() {
+        for (i, component_id) in ["gen2", "gen1", "gen4", "gen3"].iter().enumerate() {
             assert_eq!(sources[i].get_component_key().to_string(), *component_id);
         }
     }
