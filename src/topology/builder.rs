@@ -547,15 +547,8 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
-        // TODO: account for named outputs separately?
-        let count = outputs_buf.len();
-        // TODO: do we only want allocated_bytes for events themselves?
-        let byte_size = outputs_buf.size_of();
-
         self.timer.start_wait();
         self.outputs.send(outputs_buf).await;
-
-        emit!(&EventsSent { count, byte_size, output: None });
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
