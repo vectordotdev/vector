@@ -321,7 +321,7 @@ mod tests {
             args: func_args![value: format!("[{}] - - - -",
                                             Utc.ymd(2000, 10, 10).and_hms(20,55,36)
                                               .with_timezone(&Local)
-                                              .format("%a %b %d %H:%M:%S %Y").to_string()
+                                              .format("%a %b %d %H:%M:%S %Y")
                                             ),
                              timestamp_format: "%a %b %d %H:%M:%S %Y",
                              format: "error",
