@@ -157,9 +157,8 @@ impl From<MetricArray> for EventArray {
 impl ByteSizeOf for EventArray {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Self::Logs(a) => a.allocated_bytes(),
+            Self::Logs(a) | Self::Traces(a) => a.allocated_bytes(),
             Self::Metrics(a) => a.allocated_bytes(),
-            Self::Traces(a) => a.allocated_bytes(),
         }
     }
 }
@@ -199,9 +198,8 @@ impl Iterator for EventArrayIntoIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Logs(i) => i.next().map(Into::into),
+            Self::Logs(i) | Self::Traces(i) => i.next().map(Into::into),
             Self::Metrics(i) => i.next().map(Into::into),
-            Self::Traces(i) => i.next().map(Into::into),
         }
     }
 }

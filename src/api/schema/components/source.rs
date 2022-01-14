@@ -1,4 +1,3 @@
-use bitmask_enum::bitmask;
 use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
@@ -14,28 +13,12 @@ use crate::{
     filter_check,
 };
 
-#[derive(Enum, Ord, PartialOrd)]
-#[bitmask]
+
+#[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
     Log,
     Metric,
     Trace,
-}
-
-impl From<DataType> for SourceOutputType {
-    fn from(data_type: DataType) -> Self {
-        let mut t = SourceOutputType::none();
-        data_type
-            .contains(DataType::Metric)
-            .then(|| t |= SourceOutputType::Metric);
-        data_type
-            .contains(DataType::Log)
-            .then(|| t |= SourceOutputType::Log);
-        data_type
-            .contains(DataType::Trace)
-            .then(|| t |= SourceOutputType::Trace);
-        t
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -91,8 +74,8 @@ impl sort::SortableByField<SourcesSortFieldName> for Source {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
             }
             SourcesSortFieldName::OutputType => Ord::cmp(
-                &SourceOutputType::from(self.0.output_type).0,
-                &SourceOutputType::from(rhs.0.output_type).0,
+                &u8::from(self.0.output_type),
+                &u8::from(rhs.0.output_type),
             ),
         }
     }
