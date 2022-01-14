@@ -13,13 +13,17 @@ pub struct AwsEcsMetricsReceived {
 
 impl InternalEvent for AwsEcsMetricsReceived {
     fn emit_logs(&self) {
-        debug!(message = "Scraped events.", ?self.count);
+        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
+        counter!("events_in_total", self.count as u64); // deprecated
+        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
     }
 }
 
@@ -43,53 +47,91 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 #[derive(Debug)]
 pub struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,
-    pub url: &'a str,
+    pub endpoint: &'a str,
     pub body: Cow<'a, str>,
 }
 
 impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
     fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = %self.error);
+        error!(
+            message = "Parsing error.",
+            endpoint = %self.endpoint,
+            error = ?self.error,
+            stage = "processing",
+            error_type = "parse_failed",
+        );
         debug!(
             message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
-            url = %self.url,
+            endpoint = %self.endpoint,
             internal_log_rate_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "processing",
+            "error_type" => "parse_failed",
+            "endpoint" => self.endpoint.to_owned(),
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsErrorResponse<'a> {
+pub struct AwsEcsMetricsResponseError<'a> {
     pub code: hyper::StatusCode,
-    pub url: &'a str,
+    pub endpoint: &'a str,
 }
 
-impl InternalEvent for AwsEcsMetricsErrorResponse<'_> {
+impl InternalEvent for AwsEcsMetricsResponseError<'_> {
     fn emit_logs(&self) {
-        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
+        error!(
+            message = "HTTP error response.",
+            endpoint = %self.endpoint,
+            code = %self.code,
+            stage = "receiving",
+            error_type = "http_error",
+        );
     }
 
     fn emit_metrics(&self) {
         counter!("http_error_response_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "receiving",
+            "error_type" => "http_error",
+            "endpoint" => self.endpoint.to_owned(),
+            "code" => self.code.to_string(),
+        );
     }
 }
 
 #[derive(Debug)]
 pub struct AwsEcsMetricsHttpError<'a> {
     pub error: hyper::Error,
-    pub url: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl InternalEvent for AwsEcsMetricsHttpError<'_> {
     fn emit_logs(&self) {
-        error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
+        error!(
+            message = "HTTP request processing error.",
+            endpoint = %self.endpoint,
+            error = ?self.error,
+            stage = "receiving",
+            error_type = "http_error",
+        );
     }
 
     fn emit_metrics(&self) {
         counter!("http_request_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "receiving",
+            "error_type" => "http_error",
+            "endpoint" => self.endpoint.to_owned(),
+            "error" => self.error.to_string(),
+        );
     }
 }

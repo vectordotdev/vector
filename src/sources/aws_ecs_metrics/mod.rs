@@ -10,8 +10,8 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
+        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsReceived,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -160,25 +160,31 @@ async fn aws_ecs_metrics(
                             Err(error) => {
                                 emit!(&AwsEcsMetricsParseError {
                                     error,
-                                    url: &url,
+                                    endpoint: &url,
                                     body: String::from_utf8_lossy(&body),
                                 });
                             }
                         }
                     }
                     Err(error) => {
-                        emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                        emit!(&AwsEcsMetricsHttpError {
+                            error,
+                            endpoint: &url
+                        });
                     }
                 }
             }
             Ok(response) => {
-                emit!(&AwsEcsMetricsErrorResponse {
+                emit!(&AwsEcsMetricsResponseError {
                     code: response.status(),
-                    url: &url,
+                    endpoint: &url,
                 });
             }
             Err(error) => {
-                emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                emit!(&AwsEcsMetricsHttpError {
+                    error,
+                    endpoint: &url
+                });
             }
         }
     }
