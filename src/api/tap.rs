@@ -298,7 +298,6 @@ mod tests {
     use crate::api::schema::events::create_events_stream;
     use crate::config::Config;
     use futures::SinkExt;
-    use std::time::Duration;
     use tokio::sync::watch;
 
     use super::*;
