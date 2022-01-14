@@ -430,7 +430,7 @@ where
                     // the number of acknowledged records exceeds the difference between "last acked" and
                     // "highest record ID", which handles the wrapping-to-zero case.
                     self.last_acked_record_id >= pending.highest_record_id
-                        || (self.last_acked_record_id < pending.last_acked_record_id
+                        || (self.last_acked_record_id <= pending.last_acked_record_id
                             && pending.highest_record_id > pending.last_acked_record_id)
                 })
                 .count();

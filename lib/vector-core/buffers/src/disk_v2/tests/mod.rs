@@ -338,7 +338,16 @@ pub fn install_tracing_helpers() -> AssertionRegistry {
     // with a unique span that can be matched on specifically with
     // `AssertionBuilder::with_parent_name`.
     //
-    // At some point, we might be able to write a simple derive macro that does this for us, and
+    // TODO: We also need a better way of wrapping our test functions in their own parent spans, for
+    // the purpose of isolating their assertions.  Right now, we do it with a unique string that we
+    // have set to the test function name, but this is susceptible to being copypasta'd
+    // unintentionally, thus letting assertions bleed into other tests.
+    //
+    // Maybe we should add a helper method to `tracing-fluent-assertions` for generating a
+    // uniquely-named span that can be passed directly to the assertion builder methods, then it's a
+    // much tighter loop.
+    //
+    // TODO: At some point, we might be able to write a simple derive macro that does this for us, and
     // configures the other necessary bits, but for now.... by hand will get the job done.
     static ASSERTION_REGISTRY: Lazy<AssertionRegistry> = Lazy::new(|| {
         let assertion_registry = AssertionRegistry::default();

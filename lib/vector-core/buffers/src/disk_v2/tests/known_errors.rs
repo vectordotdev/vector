@@ -535,7 +535,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
             let marked_for_skip = assertion_registry
                 .build()
                 .with_name("mark_for_skip")
-                .with_parent_name("writer_detects_when_last_record_has_invalid_checksum")
+                .with_parent_name("writer_detects_when_last_record_wasnt_flushed")
                 .was_entered()
                 .finalize();
 
