@@ -173,11 +173,11 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Metric & DataType::Log
+        DataType::Metric | DataType::Log
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Metric & DataType::Log)]
+        vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

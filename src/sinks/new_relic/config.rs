@@ -128,7 +128,7 @@ impl SinkConfig for NewRelicConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log | DataType::Metric
     }
 
     fn sink_type(&self) -> &'static str {
