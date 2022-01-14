@@ -71,7 +71,7 @@ pub struct TapSink {
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
+    pub const fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
         Self { tap_tx, output_id }
     }
 }
