@@ -13,7 +13,6 @@ use crate::{
     filter_check,
 };
 
-
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
     Log,
@@ -73,10 +72,9 @@ impl sort::SortableByField<SourcesSortFieldName> for Source {
             SourcesSortFieldName::ComponentType => {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
             }
-            SourcesSortFieldName::OutputType => Ord::cmp(
-                &u8::from(self.0.output_type),
-                &u8::from(rhs.0.output_type),
-            ),
+            SourcesSortFieldName::OutputType => {
+                Ord::cmp(&u8::from(self.0.output_type), &u8::from(rhs.0.output_type))
+            }
         }
     }
 }
