@@ -269,7 +269,7 @@ mod test {
 
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [transforms.foo]
-            inputs = ["ignored"]
+            inputs = []
             type = "route"
             [transforms.foo.route.first]
                 type = "is_log"
