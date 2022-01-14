@@ -224,13 +224,21 @@ impl Inner {
                     byte_size += event_size;
                 }
                 Err(error) => {
-                    emit!(&EventsSent { count, byte_size, output: None });
+                    emit!(&EventsSent {
+                        count,
+                        byte_size,
+                        output: None
+                    });
                     return Err(error.into());
                 }
             }
         }
 
-        emit!(&EventsSent { count, byte_size, output: None });
+        emit!(&EventsSent {
+            count,
+            byte_size,
+            output: None
+        });
 
         Ok(())
     }
