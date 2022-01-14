@@ -41,7 +41,7 @@ impl Encoder<Event> for RawMessageSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
         let bytes = match event {
-            Event::Log(log) => log
+            Event::Log(log) | Event::Trace(log) => log
                 .get(log_schema().message_key())
                 .map(|value| value.as_bytes()),
             Event::Metric(_) => None,

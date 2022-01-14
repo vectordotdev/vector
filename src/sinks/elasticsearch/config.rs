@@ -342,7 +342,7 @@ impl SinkConfig for ElasticSearchConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Metric & DataType::Log
+        DataType::Metric | DataType::Log
     }
 
     fn sink_type(&self) -> &'static str {
