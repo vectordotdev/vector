@@ -3,7 +3,7 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - 2181:2181
-  
+
   kafka:
     image: wurstmeister/kafka:2.13-2.6.0
     depends_on:
