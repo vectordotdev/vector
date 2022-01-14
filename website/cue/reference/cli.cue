@@ -281,7 +281,7 @@ cli: {
 				}
 				"limit": {
 					_short:      "l"
-					description: "Number of log events to sample each interval"
+					description: "Maximum number of log events to sample each interval"
 					type:        "integer"
 					default:     100
 				}
