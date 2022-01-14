@@ -128,6 +128,7 @@ impl Runtime {
         Ok(vm)
     }
 
+    /// Given the provided [`Target`], runs the [`Vm`] to completion.
     pub fn run_vm(
         &mut self,
         vm: &Vm,

@@ -1,3 +1,19 @@
+use std::{
+    fs::File,
+    io::{self, Read},
+    path::PathBuf,
+};
+
+use serde::{Deserialize, Serialize};
+use shared::TimeZone;
+use snafu::{ResultExt, Snafu};
+use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+
+#[cfg(feature = "vrl-vm")]
+use std::sync::Arc;
+#[cfg(feature = "vrl-vm")]
+use vrl::Vm;
+
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
@@ -8,16 +24,6 @@ use crate::{
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use snafu::{ResultExt, Snafu};
-use std::{
-    fs::File,
-    io::{self, Read},
-    path::PathBuf,
-    sync::Arc,
-};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate, Vm};
 
 const DROPPED: &str = "dropped";
 
@@ -33,8 +39,6 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
-    #[serde(default = "crate::serde::default_true")]
-    pub use_vm: bool,
 }
 
 inventory::submit! {
@@ -80,7 +84,9 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
-    vm: Arc<Option<Vm>>,
+
+    #[cfg(feature = "vrl-vm")]
+    vm: Arc<Vm>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -116,23 +122,20 @@ impl Remap {
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         let mut runtime = Runtime::default();
-        let vm = if config.use_vm {
-            Some(runtime.compile(vrl_stdlib::all(), &program)?)
-        } else {
-            // Make sure it is using the vm..
-            Some(runtime.compile(vrl_stdlib::all(), &program)?)
-            //None
-        };
+
+        #[cfg(feature = "vrl-vm")]
+        let vm = Arc::new(runtime.compile(functions, &program)?);
 
         Ok(Remap {
             component_key: context.key.clone(),
             program,
             runtime,
-            vm: Arc::new(vm),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm,
         })
     }
 
@@ -172,6 +175,18 @@ impl Remap {
             }
         }
     }
+
+    #[cfg(feature = "vrl-vm")]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        self.runtime.run_vm(&self.vm, target, &self.timezone)
+    }
+
+    #[cfg(not(feature = "vrl-vm"))]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        let result = self.runtime.resolve(target, &self.program, &self.timezone);
+        self.runtime.clear();
+        result
+    }
 }
 
 impl Clone for Remap {
@@ -181,10 +196,11 @@ impl Clone for Remap {
             program: self.program.clone(),
             runtime: Runtime::default(),
             timezone: self.timezone,
-            vm: self.vm.clone(),
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm: self.vm.clone(),
         }
     }
 }
@@ -212,30 +228,40 @@ impl SyncTransform for Remap {
         };
 
         let mut target: VrlTarget = event.into();
+        let result = self.run_vrl(&mut target);
 
-        match &*self.vm {
-            Some(ref vm) => {
-                let result = self.runtime.run_vm(vm, &mut target, &self.timezone);
-
-                match result {
-                    Ok(_) => {
-                        for event in target.into_events() {
-                            output.push(event)
-                        }
-                    }
-                    Err(_) => {
-                        emit!(&RemapMappingAbort {
-                            event_dropped: self.drop_on_abort,
-                        });
-
-                        if !self.drop_on_abort {
-                            output.push(original_event.expect("event will be set"))
-                        }
-                    }
+        match result {
+            Ok(_) => {
+                for event in target.into_events() {
+                    output.push(event)
                 }
             }
-            None => {
-                unimplemented!()
+            Err(Terminate::Abort(error)) => {
+                emit!(&RemapMappingAbort {
+                    event_dropped: self.drop_on_abort,
+                });
+
+                if !self.drop_on_abort {
+                    output.push(original_event.expect("event will be set"))
+                } else if self.reroute_dropped {
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "abort", error);
+                    output.push_named(DROPPED, event)
+                }
+            }
+            Err(Terminate::Error(error)) => {
+                emit!(&RemapMappingError {
+                    error: error.to_string(),
+                    event_dropped: self.drop_on_error,
+                });
+
+                if !self.drop_on_error {
+                    output.push(original_event.expect("event will be set"))
+                } else if self.reroute_dropped {
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "error", error);
+                    output.push_named(DROPPED, event)
+                }
             }
         }
     }
