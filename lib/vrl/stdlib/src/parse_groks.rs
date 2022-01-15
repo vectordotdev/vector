@@ -182,7 +182,7 @@ impl Function for ParseGroks {
             .unwrap();
 
         let v = parse_grok::parse_grok(bytes.as_ref(), grok_rules, remove_empty)
-            .map_err(|e| format!("unable to parse grok: {}", e.to_string()))?;
+            .map_err(|e| format!("unable to parse grok: {}", e))?;
 
         Ok(v)
     }
