@@ -13,7 +13,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

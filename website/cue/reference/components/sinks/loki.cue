@@ -13,7 +13,6 @@ components: sinks: loki: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {
