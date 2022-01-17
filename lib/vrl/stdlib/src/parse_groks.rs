@@ -135,7 +135,7 @@ impl Function for ParseGroks {
                 let aliases = aliases
                 .map(|aliases| {
                     aliases
-                        .to_value()
+                        .as_value()
                         .unwrap()
                         .try_object()
                         .unwrap()
