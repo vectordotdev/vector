@@ -44,22 +44,15 @@ services:
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
-      - "kafka-integration-tests,rdkafka-plain"
-      - "--lib"
-      - "${FILTER:-::kafka::}"
+      - shutdown-tests
       - "--"
+      - "--test-threads"
+      - "4"
       - "--nocapture"
     depends_on:
       - kafka
     environment:
       - KAFKA_HOST=kafka
     volumes:
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
       - ${PWD}:/code
-
-# this is made to improve the build when running locally
-volumes:
-  cargogit: {}
-  cargoregistry: {}
 

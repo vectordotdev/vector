@@ -361,7 +361,7 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
-	FEATURES=shutdown-tests make test-integration-kafka
+	make test-integration-shutdown
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
