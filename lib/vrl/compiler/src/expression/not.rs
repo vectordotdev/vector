@@ -52,7 +52,7 @@ impl Expression for Not {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
         self.inner.compile_to_vm(vm)?;
-        vm.write_chunk(crate::vm::OpCode::Not);
+        vm.write_opcode(crate::vm::OpCode::Not);
 
         Ok(())
     }

@@ -60,13 +60,13 @@ impl Expression for Object {
         for (key, value) in &self.inner {
             let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
 
-            vm.write_chunk(OpCode::Constant);
+            vm.write_opcode(OpCode::Constant);
             vm.write_primitive(keyidx);
 
             value.compile_to_vm(vm)?;
         }
 
-        vm.write_chunk(OpCode::CreateObject);
+        vm.write_opcode(OpCode::CreateObject);
         vm.write_primitive(self.inner.len());
 
         Ok(())

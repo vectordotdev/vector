@@ -247,72 +247,72 @@ impl Expression for Op {
         match self.opcode {
             ast::Opcode::Mul => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Multiply);
+                vm.write_opcode(OpCode::Multiply);
             }
             ast::Opcode::Div => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Divide);
+                vm.write_opcode(OpCode::Divide);
             }
             ast::Opcode::Add => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Add);
+                vm.write_opcode(OpCode::Add);
             }
             ast::Opcode::Sub => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Subtract);
+                vm.write_opcode(OpCode::Subtract);
             }
             ast::Opcode::Rem => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Rem);
+                vm.write_opcode(OpCode::Rem);
             }
             ast::Opcode::Or => {
                 // Or is rewritten as an if statement to allow short circuiting.
                 let if_jump = vm.emit_jump(OpCode::JumpIfTrue);
-                vm.write_chunk(OpCode::Pop);
+                vm.write_opcode(OpCode::Pop);
                 self.rhs.compile_to_vm(vm)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::And => {
                 // And is rewritten as an if statement to allow short circuiting
                 let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-                vm.write_chunk(OpCode::Pop);
+                vm.write_opcode(OpCode::Pop);
                 self.rhs.compile_to_vm(vm)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Err => {
                 // Err is rewritten as an if statement to allow short circuiting
                 let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
-                vm.write_chunk(OpCode::ClearError);
+                vm.write_opcode(OpCode::ClearError);
                 self.rhs.compile_to_vm(vm)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Ne => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::NotEqual);
+                vm.write_opcode(OpCode::NotEqual);
             }
             ast::Opcode::Eq => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Equal);
+                vm.write_opcode(OpCode::Equal);
             }
             ast::Opcode::Ge => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::GreaterEqual);
+                vm.write_opcode(OpCode::GreaterEqual);
             }
             ast::Opcode::Gt => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Greater);
+                vm.write_opcode(OpCode::Greater);
             }
             ast::Opcode::Le => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::LessEqual);
+                vm.write_opcode(OpCode::LessEqual);
             }
             ast::Opcode::Lt => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Less);
+                vm.write_opcode(OpCode::Less);
             }
             ast::Opcode::Merge => {
                 self.rhs.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::Merge);
+                vm.write_opcode(OpCode::Merge);
             }
         };
         Ok(())

@@ -406,7 +406,7 @@ where
         match self {
             Variant::Single { target, expr } => {
                 expr.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::SetPath);
+                vm.write_opcode(OpCode::SetPath);
 
                 let target = vm.get_target(&target.into());
                 vm.write_primitive(target);
@@ -419,7 +419,7 @@ where
             } => {
                 // This isn't handling the error case yet.
                 expr.compile_to_vm(vm)?;
-                vm.write_chunk(OpCode::SetPathInfallible);
+                vm.write_opcode(OpCode::SetPathInfallible);
 
                 let target = vm.get_target(&ok.into());
                 vm.write_primitive(target);

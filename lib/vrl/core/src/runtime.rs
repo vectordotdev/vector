@@ -123,7 +123,7 @@ impl Runtime {
             expr.compile_to_vm(&mut vm)?;
         }
 
-        vm.write_chunk(OpCode::Return);
+        vm.write_opcode(OpCode::Return);
 
         Ok(vm)
     }

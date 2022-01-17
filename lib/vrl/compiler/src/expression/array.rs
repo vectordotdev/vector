@@ -61,7 +61,7 @@ impl Expression for Array {
             value.compile_to_vm(vm)?;
         }
 
-        vm.write_chunk(OpCode::CreateArray);
+        vm.write_opcode(OpCode::CreateArray);
         vm.write_primitive(self.inner.len());
 
         Ok(())

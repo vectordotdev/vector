@@ -67,12 +67,8 @@ impl Vm {
         self.values.len() - 1
     }
 
-    pub fn write_chunk(&mut self, code: OpCode) {
+    pub fn write_opcode(&mut self, code: OpCode) {
         self.instructions.push(Instruction::OpCode(code));
-    }
-
-    pub fn write_chunk_at(&mut self, pos: usize, code: OpCode) {
-        self.instructions[pos] = Instruction::OpCode(code);
     }
 
     pub fn instructions(&self) -> &Vec<Instruction> {
@@ -121,7 +117,7 @@ impl Vm {
     }
 
     pub fn emit_jump(&mut self, instruction: OpCode) -> usize {
-        self.write_chunk(instruction);
+        self.write_opcode(instruction);
 
         // Insert placeholder
         self.write_primitive(usize::MAX);

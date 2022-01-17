@@ -56,12 +56,12 @@ impl Expression for IfStatement {
 
         self.predicate.compile_to_vm(vm)?;
         let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-        vm.write_chunk(OpCode::Pop);
+        vm.write_opcode(OpCode::Pop);
         self.consequent.compile_to_vm(vm)?;
 
         let else_jump = vm.emit_jump(OpCode::Jump);
         vm.patch_jump(if_jump);
-        vm.write_chunk(OpCode::Pop);
+        vm.write_opcode(OpCode::Pop);
 
         if let Some(alternative) = &self.alternative {
             alternative.compile_to_vm(vm)?;

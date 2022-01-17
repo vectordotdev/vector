@@ -390,22 +390,22 @@ impl Expression for FunctionCall {
                 Some(stat) => {
                     // The function has compiled this argument as a static
                     let stat = vm.add_static(stat);
-                    vm.write_chunk(crate::vm::OpCode::MoveStatic);
+                    vm.write_opcode(crate::vm::OpCode::MoveStatic);
                     vm.write_primitive(stat);
                 }
                 None => match argument {
                     Some(argument) => {
                         argument.compile_to_vm(vm)?;
-                        vm.write_chunk(crate::vm::OpCode::MoveParameter);
+                        vm.write_opcode(crate::vm::OpCode::MoveParameter);
                     }
                     None => {
-                        vm.write_chunk(crate::vm::OpCode::EmptyParameter);
+                        vm.write_opcode(crate::vm::OpCode::EmptyParameter);
                     }
                 },
             }
         }
 
-        vm.write_chunk(crate::vm::OpCode::Call);
+        vm.write_opcode(crate::vm::OpCode::Call);
         vm.write_primitive(self.function_id);
 
         // We need to write the spans for error reporting.

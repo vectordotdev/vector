@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     expression::{ExpressionError, Resolved},
+    vm::OpCode,
     Context, Expression, Span, State, TypeDef,
 };
 
@@ -26,8 +27,8 @@ impl Expression for Abort {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        use crate::vm::OpCode;
-        vm.write_chunk(OpCode::Abort);
+        vm.write_opcode(OpCode::Abort);
+
         vm.write_primitive(self.span.start());
         vm.write_primitive(self.span.end());
         Ok(())

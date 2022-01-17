@@ -89,7 +89,7 @@ impl Expression for Literal {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let constant = vm.add_constant(self.to_value());
-        vm.write_chunk(OpCode::Constant);
+        vm.write_opcode(OpCode::Constant);
         vm.write_primitive(constant);
         Ok(())
     }

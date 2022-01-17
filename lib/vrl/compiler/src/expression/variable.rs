@@ -62,7 +62,7 @@ impl Expression for Variable {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        vm.write_chunk(crate::vm::OpCode::GetPath);
+        vm.write_opcode(crate::vm::OpCode::GetPath);
         let variable = crate::vm::Variable::Internal(self.ident().clone(), None);
         let target = vm.get_target(&variable);
         vm.write_primitive(target);
