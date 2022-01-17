@@ -151,8 +151,8 @@ impl Expression for Assignment {
         self.variant.type_def(state)
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        self.variant.dump(vm)
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.variant.compile_to_vm(vm)
     }
 }
 
@@ -402,10 +402,10 @@ where
         }
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         match self {
             Variant::Single { target, expr } => {
-                expr.dump(vm)?;
+                expr.compile_to_vm(vm)?;
                 vm.write_chunk(OpCode::SetPath);
 
                 let target = vm.get_target(&target.into());
@@ -418,7 +418,7 @@ where
                 default,
             } => {
                 // This isn't handling the error case yet.
-                expr.dump(vm)?;
+                expr.compile_to_vm(vm)?;
                 vm.write_chunk(OpCode::SetPathInfallible);
 
                 let target = vm.get_target(&ok.into());

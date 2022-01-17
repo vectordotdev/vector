@@ -55,7 +55,8 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
-    fn dump(&self, _vm: &mut vm::Vm) -> Result<(), String> {
+    /// Compile the expression to bytecode that can be interpreted by the VM.
+    fn compile_to_vm(&self, _vm: &mut vm::Vm) -> Result<(), String> {
         Ok(())
     }
 
@@ -199,21 +200,21 @@ impl Expression for Expr {
         }
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use Expr::*;
 
         match self {
-            Literal(v) => v.dump(vm),
-            Container(v) => v.dump(vm),
-            IfStatement(v) => v.dump(vm),
-            Op(v) => v.dump(vm),
-            Assignment(v) => v.dump(vm),
-            Query(v) => v.dump(vm),
-            FunctionCall(v) => v.dump(vm),
-            Variable(v) => v.dump(vm),
-            Noop(v) => v.dump(vm),
-            Unary(v) => v.dump(vm),
-            Abort(v) => v.dump(vm),
+            Literal(v) => v.compile_to_vm(vm),
+            Container(v) => v.compile_to_vm(vm),
+            IfStatement(v) => v.compile_to_vm(vm),
+            Op(v) => v.compile_to_vm(vm),
+            Assignment(v) => v.compile_to_vm(vm),
+            Query(v) => v.compile_to_vm(vm),
+            FunctionCall(v) => v.compile_to_vm(vm),
+            Variable(v) => v.compile_to_vm(vm),
+            Noop(v) => v.compile_to_vm(vm),
+            Unary(v) => v.compile_to_vm(vm),
+            Abort(v) => v.compile_to_vm(vm),
         }
     }
 }

@@ -62,6 +62,8 @@ pub trait Function: Sync + fmt::Debug {
         &[]
     }
 
+    /// Implement this function if you need to manipulate and store any function parameters
+    /// at compile time.
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
@@ -71,6 +73,7 @@ pub trait Function: Sync + fmt::Debug {
         Ok(None)
     }
 
+    /// This function is called by the VM.
     fn call(
         &self,
         _ctx: &mut Context,

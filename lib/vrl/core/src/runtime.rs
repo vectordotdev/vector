@@ -120,7 +120,7 @@ impl Runtime {
         let mut vm = Vm::new(fns);
 
         for expr in program.iter() {
-            expr.dump(&mut vm)?;
+            expr.compile_to_vm(&mut vm)?;
         }
 
         vm.write_chunk(OpCode::Return);

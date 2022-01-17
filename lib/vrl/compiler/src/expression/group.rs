@@ -27,8 +27,8 @@ impl Expression for Group {
         self.inner.type_def(state)
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        self.inner.dump(vm)
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.inner.compile_to_vm(vm)
     }
 }
 

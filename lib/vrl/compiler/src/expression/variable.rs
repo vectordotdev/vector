@@ -61,7 +61,7 @@ impl Expression for Variable {
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         vm.write_chunk(crate::vm::OpCode::GetPath);
         let variable = crate::vm::Variable::Internal(self.ident().clone(), None);
         let target = vm.get_target(&variable);

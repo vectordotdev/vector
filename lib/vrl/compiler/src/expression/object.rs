@@ -56,14 +56,14 @@ impl Expression for Object {
         TypeDef::new().object(type_defs).with_fallibility(fallible)
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         for (key, value) in &self.inner {
             let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
 
             vm.write_chunk(OpCode::Constant);
             vm.write_primitive(keyidx);
 
-            value.dump(vm)?;
+            value.compile_to_vm(vm)?;
         }
 
         vm.write_chunk(OpCode::CreateObject);

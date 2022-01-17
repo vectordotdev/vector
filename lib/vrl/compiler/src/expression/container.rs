@@ -58,14 +58,14 @@ impl Expression for Container {
         }
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use Variant::*;
 
         match &self.variant {
-            Group(v) => v.dump(vm),
-            Block(v) => v.dump(vm),
-            Array(v) => v.dump(vm),
-            Object(v) => v.dump(vm),
+            Group(v) => v.compile_to_vm(vm),
+            Block(v) => v.compile_to_vm(vm),
+            Array(v) => v.compile_to_vm(vm),
+            Object(v) => v.compile_to_vm(vm),
         }
     }
 }

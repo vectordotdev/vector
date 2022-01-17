@@ -51,20 +51,20 @@ impl Expression for IfStatement {
         }
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use crate::vm::OpCode;
 
-        self.predicate.dump(vm)?;
+        self.predicate.compile_to_vm(vm)?;
         let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
         vm.write_chunk(OpCode::Pop);
-        self.consequent.dump(vm)?;
+        self.consequent.compile_to_vm(vm)?;
 
         let else_jump = vm.emit_jump(OpCode::Jump);
         vm.patch_jump(if_jump);
         vm.write_chunk(OpCode::Pop);
 
         if let Some(alternative) = &self.alternative {
-            alternative.dump(vm)?;
+            alternative.compile_to_vm(vm)?;
         }
 
         vm.patch_jump(else_jump);

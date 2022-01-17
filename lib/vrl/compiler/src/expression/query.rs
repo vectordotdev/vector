@@ -121,7 +121,7 @@ impl Expression for Query {
         }
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         vm.write_chunk(crate::vm::OpCode::GetPath);
         let variable = match &self.target {
             Target::External => crate::vm::Variable::External(self.path.clone()),
@@ -129,11 +129,11 @@ impl Expression for Query {
                 crate::vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
             }
             Target::FunctionCall(call) => {
-                call.dump(vm)?;
+                call.compile_to_vm(vm)?;
                 crate::vm::Variable::Stack(self.path.clone())
             }
             Target::Container(container) => {
-                container.dump(vm)?;
+                container.compile_to_vm(vm)?;
                 crate::vm::Variable::Stack(self.path.clone())
             }
         };

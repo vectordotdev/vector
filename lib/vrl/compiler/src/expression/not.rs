@@ -50,8 +50,8 @@ impl Expression for Not {
         self.inner.type_def(state).boolean()
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
-        self.inner.dump(vm)?;
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
+        self.inner.compile_to_vm(vm)?;
         vm.write_chunk(crate::vm::OpCode::Not);
 
         Ok(())

@@ -25,7 +25,7 @@ impl Expression for Abort {
         TypeDef::new().infallible().null()
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use crate::vm::OpCode;
         vm.write_chunk(OpCode::Abort);
         vm.write_primitive(self.span.start());

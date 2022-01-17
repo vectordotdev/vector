@@ -373,7 +373,7 @@ impl Expression for FunctionCall {
         type_def
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let args = match vm.function(self.function_id) {
             Some(fun) => self.resolve_arguments(fun)?,
             None => return Err(format!("Function {} not found.", self.function_id)),
@@ -395,7 +395,7 @@ impl Expression for FunctionCall {
                 }
                 None => match argument {
                     Some(argument) => {
-                        argument.dump(vm)?;
+                        argument.compile_to_vm(vm)?;
                         vm.write_chunk(crate::vm::OpCode::MoveParameter);
                     }
                     None => {

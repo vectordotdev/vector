@@ -56,9 +56,9 @@ impl Expression for Array {
         TypeDef::new().array(type_defs).with_fallibility(fallible)
     }
 
-    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         for value in &self.inner {
-            value.dump(vm)?;
+            value.compile_to_vm(vm)?;
         }
 
         vm.write_chunk(OpCode::CreateArray);
