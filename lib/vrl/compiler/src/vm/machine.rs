@@ -7,8 +7,6 @@ use std::{collections::BTreeMap, ops::Deref};
 pub enum OpCode {
     Abort,
     Return,
-    GetLocal,
-    SetLocal,
     Constant,
     Negate,
     Add,
@@ -30,7 +28,6 @@ pub enum OpCode {
     JumpIfTrue,
     JumpIfNotErr,
     Jump,
-    Loop,
     SetPathInfallible,
     SetPath,
     GetPath,
@@ -132,12 +129,22 @@ impl Vm {
         self.instructions().len() - 1
     }
 
+    /// When compiling an `if` statement we don't know initially where we want to jump to if the predicate is
+    /// false.
+    /// To work this, we initially jump to an arbitrary position. Then compile the ensuing block which will allow
+    /// us to work out where we need to jump. We can then return to the initial jump and update it with the offset.
     pub fn patch_jump(&mut self, offset: usize) {
         let jump = self.instructions.len() - offset - 1;
         self.write_primitive_at(offset, jump);
     }
 
+    /// Interpret the VM.
+    /// Interpreting is essentially a process of looping through a list of intstructions and interpreting
+    /// each one.
+    /// The VM is stack based. When the `Return` OpCode is encountered the top item on the stack is popped and returned.
+    /// It is expected that the final instruction is a `Return`.
     pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, ExpressionError> {
+        // Any mutable state during the run is stored here.
         let mut state: VmState = VmState::new(self);
 
         loop {
@@ -145,6 +152,7 @@ impl Vm {
 
             match next {
                 OpCode::Abort => {
+                    // Aborts the process.
                     let start = state.next_primitive()?;
                     let end = state.next_primitive()?;
                     return Err(ExpressionError::Abort {
@@ -152,6 +160,7 @@ impl Vm {
                     });
                 }
                 OpCode::Return => {
+                    // Ends the process and returns the top item from the stack - or Null if the stack is empty.
                     return Ok(state.stack.pop().unwrap_or(Value::Null));
                 }
                 OpCode::Constant => {
@@ -189,46 +198,44 @@ impl Vm {
                     state.stack.push(lhs.eq_lossy(&rhs).into());
                 }
                 OpCode::Pop => {
+                    // Removes the top item from the stack
                     let _ = state.stack.pop();
                 }
                 OpCode::ClearError => {
+                    // Resets the state of the error.
                     state.error = None;
                 }
-                OpCode::GetLocal => {
-                    let slot = state.next_primitive()?;
-                    state.stack.push(state.stack[slot].clone());
-                }
-                OpCode::SetLocal => {
-                    let slot = state.next_primitive()?;
-                    state.stack[slot] = state.peek_stack()?.clone();
-                }
                 OpCode::JumpIfFalse => {
+                    // If the value at the top of the stack is false, jump by the given amount
                     let jump = state.next_primitive()?;
                     if !is_true(state.peek_stack()?) {
-                        state.ip += jump;
+                        state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
+                    // If the value at the top of the stack is true, jump by the given amount
                     let jump = state.next_primitive()?;
                     if is_true(state.peek_stack()?) {
-                        state.ip += jump;
+                        state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpIfNotErr => {
+                    // If the current state is not in error, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if state.error.is_none() {
-                        state.ip += jump;
+                        state.instruction_pointer += jump;
                     }
                 }
                 OpCode::Jump => {
+                    // Moves the instruction pointer by the amount specified
                     let jump = state.next_primitive()?;
-                    state.ip += jump;
-                }
-                OpCode::Loop => {
-                    let jump = state.next_primitive()?;
-                    state.ip -= jump;
+                    state.instruction_pointer += jump;
                 }
                 OpCode::SetPath => {
+                    // Sets the path specified by the target to the value at the top of the stack.
+                    // The value is then pushed back onto the stack since the assignment expression
+                    // also returns this value.
+                    // (Allows statements such as `a = b = 32`.
                     let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
                     let value = state.pop_stack()?;
@@ -237,6 +244,8 @@ impl Vm {
                     state.push_stack(value);
                 }
                 OpCode::SetPathInfallible => {
+                    // Sets the path for an infallible assignment statement ie.
+                    // thing, err = fallible_call()
                     let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
 
@@ -266,6 +275,7 @@ impl Vm {
                     }
                 }
                 OpCode::GetPath => {
+                    // Retrieves a value using the given path and pushes this onto the stack.
                     let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
 
@@ -295,7 +305,39 @@ impl Vm {
                         }
                     }
                 }
+                OpCode::CreateArray => {
+                    // Creates an array from the values on the stack.
+                    // The next primitive on the stack is the number of fields in the array
+                    // followed by the values to be added to the array.
+                    let count = state.next_primitive()?;
+                    let mut arr = Vec::new();
+
+                    for _ in 0..count {
+                        arr.push(state.pop_stack()?);
+                    }
+                    arr.reverse();
+
+                    state.stack.push(Value::Array(arr));
+                }
+                OpCode::CreateObject => {
+                    // Creates on object from the values on the stack.
+                    // The next primitive on the stack is the number of fields in the object
+                    // followed by key, value pairs.
+                    let count = state.next_primitive()?;
+                    let mut object = BTreeMap::new();
+
+                    for _ in 0..count {
+                        let value = state.pop_stack()?;
+                        let key = state.pop_stack()?;
+                        let key = String::from_utf8_lossy(&key.try_bytes().unwrap()).to_string();
+
+                        object.insert(key, value);
+                    }
+
+                    state.stack.push(Value::Object(object));
+                }
                 OpCode::Call => {
+                    // Calls a function in the stdlib.
                     let function_id = state.next_primitive()?;
                     let span_start = state.next_primitive()?;
                     let span_end = state.next_primitive()?;
@@ -341,36 +383,20 @@ impl Vm {
                         },
                     }
                 }
-                OpCode::CreateArray => {
-                    let count = state.next_primitive()?;
-                    let mut arr = Vec::new();
-
-                    for _ in 0..count {
-                        arr.push(state.pop_stack()?);
-                    }
-                    arr.reverse();
-
-                    state.stack.push(Value::Array(arr));
+                OpCode::EmptyParameter => {
+                    // Moves an empty, optional parameter onto the parameter stack.
+                    state.parameter_stack.push(None)
                 }
-                OpCode::CreateObject => {
-                    let count = state.next_primitive()?;
-                    let mut object = BTreeMap::new();
-
-                    for _ in 0..count {
-                        let value = state.pop_stack()?;
-                        let key = state.pop_stack()?;
-                        let key = String::from_utf8_lossy(&key.try_bytes().unwrap()).to_string();
-
-                        object.insert(key, value);
-                    }
-
-                    state.stack.push(Value::Object(object));
+                OpCode::MoveParameter => {
+                    // Moves the top value from the stack onto the parameter stack.
+                    state
+                        .parameter_stack
+                        .push(state.stack.pop().map(VmArgument::Value))
                 }
-                OpCode::EmptyParameter => state.parameter_stack.push(None),
-                OpCode::MoveParameter => state
-                    .parameter_stack
-                    .push(state.stack.pop().map(VmArgument::Value)),
                 OpCode::MoveStatic => {
+                    // Moves a static parameter onto the parameter stack.
+                    // A static parameter will have been created by the functions `compile_argument` method
+                    // during compile time.
                     let idx = state.next_primitive()?;
                     state
                         .parameter_stack
@@ -381,6 +407,7 @@ impl Vm {
     }
 }
 
+/// Op that applies a function to the top two elements on the stack.
 fn binary_op<F, E>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
 where
     E: Into<ExpressionError>,
