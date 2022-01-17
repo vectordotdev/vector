@@ -7,7 +7,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseError},
+    internal_events::{DnstapBytesReceived, DnstapEventReceived, DnstapParseError},
     Result,
 };
 
@@ -172,6 +172,9 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        emit!(&DnstapBytesReceived {
+            byte_size: frame.len()
+        });
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();

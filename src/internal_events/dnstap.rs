@@ -4,6 +4,25 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct DnstapBytesReceived {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for DnstapBytesReceived {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = "file",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_received_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
 pub struct DnstapEventReceived {
     pub byte_size: usize,
 }
@@ -15,7 +34,10 @@ impl InternalEvent for DnstapEventReceived {
 
     fn emit_metrics(&self) {
         counter!("component_received_events_total", 1);
-        counter!("component_received_event_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
         // deprecated
         counter!("processed_events_total", 1);
         counter!("events_in_total", 1);
@@ -42,6 +64,11 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
+            "stage" => "processing",
+            "error_type" => "parse_failed",
+        );
+        counter!(
+            "component_discarded_events_total", 1,
             "stage" => "processing",
             "error_type" => "parse_failed",
         );
