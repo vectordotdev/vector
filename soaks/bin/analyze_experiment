@@ -114,7 +114,7 @@ changes = changes.drop(labels=['p-value', 'baseline mean',
                                'comparison outlier percentage',
                                'comparison stdev', 'erratic'], axis=1)
 changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
-changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
+changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
 if len(changes) > 0:
     print(changes.to_markdown(index=False, tablefmt='github'))
@@ -125,7 +125,7 @@ print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
-ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
+ttest_results = ttest_results.sort_values('Δ mean %', ascending=False)
 ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(common.human_bytes)
 ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(common.human_bytes)
 ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(common.human_bytes)
