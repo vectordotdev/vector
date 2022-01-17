@@ -47,4 +47,8 @@ ignore = [
     # We resolved this by patching chrono to use a version that doesn't depend on `time` v0.1
     # https://github.com/vectordotdev/vector/issues/9679
     "RUSTSEC-2020-0159",
+
+    # Unsoundness in dashmap references
+    # https://github.com/vectordotdev/vector/issues/10862
+    "RUSTSEC-2022-0002"
 ]
