@@ -362,7 +362,6 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
 	FEATURES=shutdown-tests make test-integration-kafka
-	## ${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
