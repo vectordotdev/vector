@@ -109,14 +109,12 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let functions = stdlib::all();
-        let program = vrl::compile(&source, &functions, None).map_err(|diagnostics| {
+        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 
         for mut object in objects {
-            let functions = stdlib::all();
-            let result = execute(&mut object, &program, &tz, functions).map(|v| {
+            let result = execute(&mut object, &program, &tz, stdlib::all()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
