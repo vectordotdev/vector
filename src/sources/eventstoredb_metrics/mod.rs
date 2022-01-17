@@ -112,7 +112,7 @@ fn eventstoredb(
                                 let metrics = stats.metrics(namespace.clone());
 
                                 emit!(&EventStoreDbMetricsReceived {
-                                    events: metrics.len(),
+                                    count: metrics.len(),
                                     byte_size: bytes.len(),
                                 });
 
