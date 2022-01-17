@@ -6,12 +6,38 @@ use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsReceived {
+pub struct AwsEcsMetricsBytesReceived<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub http_path: &'a str,
+}
+
+impl<'a> InternalEvent for AwsEcsMetricsBytesReceived<'a> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            http_path = %self.http_path,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_string(),
+            "http_path" => self.http_path.to_string(),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct AwsEcsMetricsEventsReceived {
     pub byte_size: usize,
     pub count: usize,
 }
 
-impl InternalEvent for AwsEcsMetricsReceived {
+impl InternalEvent for AwsEcsMetricsEventsReceived {
     fn emit_logs(&self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
     }

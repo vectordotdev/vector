@@ -10,8 +10,8 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsReceived,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError,
+        AwsEcsMetricsBytesReceived, AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError,
+        AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -131,6 +131,7 @@ async fn aws_ecs_metrics(
         let request = Request::get(&url)
             .body(Body::empty())
             .expect("error creating request");
+        let uri = request.uri().clone();
 
         let start = Instant::now();
         match client.request(request).await {
@@ -143,10 +144,15 @@ async fn aws_ecs_metrics(
                         });
 
                         let byte_size = body.len();
+                        emit!(&AwsEcsMetricsBytesReceived {
+                            byte_size: byte_size.clone(),
+                            protocol: uri.scheme_str().unwrap_or("http"),
+                            http_path: uri.path(),
+                        });
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
-                                emit!(&AwsEcsMetricsReceived {
+                                emit!(&AwsEcsMetricsEventsReceived {
                                     byte_size,
                                     count: metrics.len(),
                                 });
