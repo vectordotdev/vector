@@ -179,7 +179,7 @@ mod test {
 
         let trace = Lua::new().load(lua_trace).eval::<Event>().unwrap();
         let log = trace.as_log();
-        assert_eq!(log["trace_id"], Value::Bytes("example".into()));
+        assert_eq!(log["trace_id"], Value::Integer(13_245_789));
         assert_eq!(log["tags.foo"], Value::Bytes("bar".into()));
     }
 
