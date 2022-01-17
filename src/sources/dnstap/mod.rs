@@ -7,7 +7,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseDataError},
+    internal_events::{DnstapEventReceived, DnstapParseError},
     Result,
 };
 
@@ -194,7 +194,7 @@ impl FrameHandler for DnstapFrameHandler {
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseDataError {
+                    emit!(&DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
