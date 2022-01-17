@@ -32,18 +32,6 @@ impl Expression for Abort {
         vm.write_primitive(self.span.end());
         Ok(())
     }
-
-    fn as_value(&self) -> Option<crate::Value> {
-        None
-    }
-
-    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
-        Ok(())
-    }
-
-    fn format(&self) -> Option<String> {
-        None
-    }
 }
 
 impl fmt::Display for Abort {
