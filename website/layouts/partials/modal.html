@@ -1,0 +1,36 @@
+{{ $formID := .form_id }}
+{{ $title := .form_title | default "" }}
+
+<div id={{ .form_id }} class="hidden bg-black bg-opacity-50 z-50 fixed top-0 left-0 w-full h-full overflow-auto">
+    <div class="max-w-full md:max-w-2xl w-auto mx-auto my-6 px-2.5 py-2">
+        <div id="modal-container" class="bg-white rounded flex flex-col">
+            <div class="relative text-center p-4 pb-3 flex items-start justify-between">
+                <p class="w-4/5 m-auto text-dark text-lg">
+                    {{ $title }}
+                </p>
+                <button id="modal-close" type="button" data-dismiss="modal"
+                    class="close absolute right-4 p-4 pt-3 -m-4 ml-auto font-semibold opacity-50">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="relative flex flex-auto px-2">
+                iframe loads here
+            </div>
+        </div>
+    </div>
+</div>
+
+{{/*  If User clicks outside modal or on "X", hide modal  */}}
+<script>
+    const modal = document.getElementById({{ $formID }});
+    const modalVisible = document.getElementById("modal-container");
+    const buttonExit = document.getElementById("modal-close");
+
+    const handleModalClick = () => {
+        if (!modalVisible.contains(event.target) || buttonExit.contains(event.target)) {
+            modal.classList.toggle("hidden");
+        }
+    }
+
+    modal.addEventListener("click", handleModalClick);
+</script>

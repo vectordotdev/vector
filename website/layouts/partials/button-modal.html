@@ -1,0 +1,33 @@
+{{ $link := .link | default "#" }}
+{{ $js_trigger := .js_trigger | default "" }}
+{{ $color := .color | default "primary" }}
+{{ $color_hover := .color_hover | default "secondary" }}
+{{ $text := .text | default "default" }}
+{{ $padding := .padding | default "py-3 md:py-4 md:px-8" }}
+{{ $typography := .typography | default "text-sm font-semibold uppercase" }}
+{{ $additional_classes := .additional_classes | default "" }}
+{{ $query_selector := print "." $js_trigger }}
+{{ $formID := .form_id | default "" }}
+{{ $formTitle := .form_title | default "" }}
+
+<a href="{{ $link }}" class="{{ $js_trigger }}">
+    <button
+        class="{{ $padding }} text-{{ $color }} inline-flex justify-center items-center w-full border border-{{ $color }} hover:border-{{ $color_hover }} hover:bg-{{ $color_hover }} rounded md:w-max md:m-auto select-none {{ $additional_classes }}">
+        <span class="{{ $typography }}">
+            {{ $text }}
+        </span>
+    </button>
+</a>
+
+{{/*  Listen for click on $query_selector, then toggle modal based on $formID  */}}
+{{ with $formID }}
+{{ partial "modal.html" (dict "form_id" $formID "form_title" $formTitle) }}
+<script>
+    const toggleModal = () => {
+        event.preventDefault();
+        document.getElementById({{ . }}).classList.toggle("hidden");
+    }
+
+    document.querySelector({{ $query_selector }}).addEventListener("click", toggleModal);
+</script>
+{{ end }}
