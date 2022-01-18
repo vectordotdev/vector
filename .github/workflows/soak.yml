@@ -194,7 +194,7 @@ jobs:
           tags: type=raw, value=${{ matrix.variant.tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        uses: docker/build-push-action@v2.8.0
         with:
           context: ${{matrix.variant.name}}-vector/
           file: soaks/Dockerfile

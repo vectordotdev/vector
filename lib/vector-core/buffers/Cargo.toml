@@ -46,7 +46,7 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 # https://github.com/tobz/tracing-fluent-assertions/pull/1
 tracing-fluent-assertions = { git = "https://github.com/vectordotdev/tracing-fluent-assertions", branch = "bump-tracing-subscriber" }
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
+tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 human_bytes = "0.3.0"
 
 [[bench]]
