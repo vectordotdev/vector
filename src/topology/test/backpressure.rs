@@ -53,7 +53,7 @@ async fn serial_backpressure() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
-/// Connects a single source to two sinks test and makes sure that the source is only able
+/// Connects a single source to two sinks and makes sure that the source is only able
 /// to emit events that the slower sink accepts.
 #[tokio::test]
 async fn default_fan_out() {
