@@ -60,7 +60,7 @@ impl Expression for Variable {
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
 
-    fn compile_to_vm(&self, vm: &mut vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
         vm.write_opcode(OpCode::GetPath);
 
         // Store the required path in the targets list, write it's index to the vm.

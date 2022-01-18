@@ -20,12 +20,6 @@ pub struct FunctionCall {
     // TODO: have span store line/col details to further improve this.
     span: Span,
 
-    // Used for pretty-printing function call.
-    //
-    // This allows us to keep the arguments non-cloneable.
-    arguments_fmt: Vec<String>,
-    arguments_dbg: Vec<String>,
-
     // used for equality check
     ident: &'static str,
 
@@ -90,16 +84,6 @@ impl FunctionCall {
         let mut index = 0;
         let mut list = ArgumentList::default();
 
-        let arguments_fmt = arguments
-            .iter()
-            .map(|arg| arg.to_string())
-            .collect::<Vec<_>>();
-
-        let arguments_dbg = arguments
-            .iter()
-            .map(|arg| format!("{:?}", arg))
-            .collect::<Vec<_>>();
-
         let mut maybe_fallible_arguments = false;
         for node in &arguments {
             let (argument_span, argument) = node.clone().take();
@@ -139,7 +123,10 @@ impl FunctionCall {
                 return Err(Error::InvalidArgumentKind {
                     function_ident: function.identifier(),
                     abort_on_error,
-                    arguments_fmt,
+                    arguments_fmt: arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
                     parameter: *parameter,
                     got: expr_kind,
                     argument,
@@ -201,8 +188,6 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments,
             span: call_span,
-            arguments_fmt,
-            arguments_dbg,
             ident: function.identifier(),
             function_id,
             arguments: Arc::new(arguments),
@@ -268,12 +253,24 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments: false,
             span: Span::default(),
-            arguments_fmt: vec![],
-            arguments_dbg: vec![],
             ident: "noop",
             arguments: Arc::new(Vec::new()),
             function_id: 0,
         }
+    }
+
+    pub fn arguments_fmt(&self) -> Vec<String> {
+        self.arguments
+            .iter()
+            .map(|arg| arg.inner().to_string())
+            .collect::<Vec<_>>()
+    }
+
+    pub fn arguments_dbg(&self) -> Vec<String> {
+        self.arguments
+            .iter()
+            .map(|arg| format!("{:?}", arg.inner()))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -431,7 +428,8 @@ impl fmt::Display for FunctionCall {
         self.ident.fmt(f)?;
         f.write_str("(")?;
 
-        let mut iter = self.arguments_fmt.iter().peekable();
+        let arguments = self.arguments_fmt();
+        let mut iter = arguments.iter().peekable();
         while let Some(arg) = iter.next() {
             f.write_str(arg)?;
 
@@ -451,7 +449,8 @@ impl fmt::Debug for FunctionCall {
 
         f.write_str("(")?;
 
-        let mut iter = self.arguments_dbg.iter().peekable();
+        let arguments = self.arguments_dbg();
+        let mut iter = arguments.iter().peekable();
         while let Some(arg) = iter.next() {
             f.write_str(arg)?;
 
