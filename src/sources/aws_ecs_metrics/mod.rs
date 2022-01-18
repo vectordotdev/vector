@@ -143,9 +143,8 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        let byte_size = body.len();
                         emit!(&AwsEcsMetricsBytesReceived {
-                            byte_size: byte_size.clone(),
+                            byte_size: body.len(),
                             protocol: uri.scheme_str().unwrap_or("http"),
                             http_path: uri.path(),
                         });
@@ -153,7 +152,7 @@ async fn aws_ecs_metrics(
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 emit!(&AwsEcsMetricsEventsReceived {
-                                    byte_size,
+                                    byte_size: body.len(),
                                     count: metrics.len(),
                                 });
 
