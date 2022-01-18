@@ -5,37 +5,113 @@ use std::{collections::BTreeMap, ops::Deref};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
+    /// Aborts the process, returning `Err(ExpressionError::Abort)`
     Abort,
+
+    /// Ends the process, returning the top value from the stack.
     Return,
+
+    /// Reads the ensuing primitive and loads the constant at that index onto the stack.
     Constant,
-    Negate,
+
+    /// Adds the two values at the top of the stack, placing the result back on the stack.
     Add,
+
+    /// Subtracts the two values at the top of the stack, placing the result back on the stack.
     Subtract,
+
+    /// Multiplies the two values at the top of the stack, placing the result back on the stack.
     Multiply,
+
+    /// Divides the two values at the top of the stack, placing the result back on the stack.
     Divide,
+
+    /// Divides the two values at the top of the stack, placing the remainder back on the stack.
     Rem,
+
+    /// Merges the two objects at the top of the stack, placing the result back on the stack.
     Merge,
+
+    /// Pops the boolean at the top of the stack, nots it, placing the result back on the stack.
     Not,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the second element is greater than the first.
     Greater,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the second element is greater or equal than the first.
     GreaterEqual,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the second element is less than the first.
     Less,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the second element is less than or equal the first.
     LessEqual,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the two elements are not equal.
     NotEqual,
+
+    /// Pops the top two elements from the stack, pushes a boolean if the two elements are equal.
     Equal,
+
+    /// Pops the top element from the stack, discarding it.
     Pop,
+
+    /// Clears the error state from the VM.
     ClearError,
+
+    /// If the top element of the stack is false advances the instruction pointer by the amount
+    /// set by the ensuing primitive instruction.
     JumpIfFalse,
+
+    /// If the top element of the stack is true advances the instruction pointer by the amount
+    /// set by the ensuing primitive instruction.
     JumpIfTrue,
+
+    /// If the error field of the VM is not set advances the instruction pointer by the amount
+    /// set by the ensuing primitive instruction.
     JumpIfNotErr,
+
+    /// Unconditionally advances the instruction pointer by the amount set by the ensuing
+    /// primitive instruction.
     Jump,
-    SetPathInfallible,
+
+    /// Takes the path indicated by the ensuing primitive and sets this path with the value
+    /// at the top of the stack. The value is not removed from the stack so it can continue
+    /// to be used.
     SetPath,
+
+    /// Sets either a success or error path. The next primitive is the index to the target for
+    /// the success path, the one after is the error path. After that is a pointer to a
+    /// constant indicating the default value to set to the success path should there be an error.
+    SetPathInfallible,
+
+    /// Takes the ensuing primitive as a pointer to a path. Retrieves this value from the state
+    /// and pushes this onto the stack.
     GetPath,
+
+    /// Calls the function indicated by the ensuing primitive.
     Call,
+
+    /// Creates an array. The ensuing primitive indicates the number of elements in the array.
+    /// This amount of values are popped from the stack. The resulting array is then pushed back on
+    /// the stack.
     CreateArray,
+
+    /// Creates an object. The ensuing primitive indicatos the number of elements in the object.
+    /// This amount of keys (as string constants) and values are popped from the stack. The resulting object
+    /// is then pushed back on the stack.
     CreateObject,
+
+    /// Pushes an empty parameter onto the parameter stack. An empty parameter will be a missing optional parameter
+    /// that will be passed to the next function called.
     EmptyParameter,
+
+    /// Moves a value from the stack onto the parameter stack in preparation for calling a function.
     MoveParameter,
+
+    /// Moves a static parameter indicated by the ensuing primitive onto the parameter stack. A static parameter
+    /// will have been created by the `compile_argument` function of the `Function` that is about to be called
+    /// at compile time. (Used, for example, to precompile and store regexes at compile time.)
     MoveStaticParameter,
 }
 
@@ -163,11 +239,6 @@ impl Vm {
                     let value = state.read_constant()?;
                     state.stack.push(value);
                 }
-                OpCode::Negate => match state.stack.pop() {
-                    None => return Err("Negating nothing".into()),
-                    Some(Value::Float(value)) => state.stack.push(Value::Float(value * -1.0)),
-                    _ => return Err("Negating non number".into()),
-                },
                 OpCode::Not => match state.stack.pop() {
                     None => return Err("Notting nothing".into()),
                     Some(Value::Boolean(value)) => state.stack.push(Value::Boolean(!value)),
