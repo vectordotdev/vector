@@ -7,8 +7,11 @@ use std::{
 
 use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
 use itertools::Itertools;
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
+use tokio::sync::{
+    mpsc as tokio_mpsc,
+    mpsc::error::{SendError, TrySendError},
+    oneshot,
+};
 use uuid::Uuid;
 
 use super::{ShutdownRx, ShutdownTx};
