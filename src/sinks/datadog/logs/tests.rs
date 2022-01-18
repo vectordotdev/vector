@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
-    stream, StreamExt,
+    StreamExt,
 };
 use http::request::Parts;
 use hyper::StatusCode;
@@ -94,7 +94,7 @@ async fn start_test(
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.await, batch_status);
 
     (expected, rx)
@@ -220,7 +220,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    let () = sink.run_event_stream(events).await.unwrap();
     // The log API takes payloads in units of 1,000 and, as a result, we ship in
     // units of 1,000. There will only be a single response on the stream.
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
@@ -292,10 +292,10 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let events = vec![
         event_with_api_key("mow", "pkc"),
         event_with_api_key("pnh", "vvo"),
-        Event::from("no API key in metadata"),
+        Event::from("no API key in metadata").into(),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut keys = rx
         .take(3)
@@ -360,7 +360,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    let () = sink.run_event_stream(events).await.unwrap();
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
     let parts = output.0;
 
@@ -424,7 +424,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    let () = sink.run_event_stream(events).await.unwrap();
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
     let parts = output.0;
 

@@ -189,7 +189,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 

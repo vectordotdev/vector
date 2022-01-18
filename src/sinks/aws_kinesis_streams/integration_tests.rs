@@ -54,7 +54,7 @@ async fn kinesis_put_records() {
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
     components::init_test();
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     sleep(Duration::from_secs(1)).await;
     components::SINK_TESTS.assert(&["region"]);
 

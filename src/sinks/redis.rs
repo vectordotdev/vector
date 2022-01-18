@@ -469,8 +469,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -527,8 +526,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -593,7 +591,7 @@ mod integration_tests {
 
         let sink = cnf.new(conn, cx).unwrap();
         let (_input, events) = random_lines_with_stream(100, num_events, None);
-        sink.run(events).await.unwrap();
+        sink.run_event_stream(events).await.unwrap();
 
         // Receive events.
         let mut received_msg_num = 0;

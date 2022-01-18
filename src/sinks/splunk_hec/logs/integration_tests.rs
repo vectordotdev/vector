@@ -1,6 +1,5 @@
-use std::{convert::TryFrom, future::ready, num::NonZeroU8, sync::Arc};
+use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
 
-use futures::stream;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -155,7 +154,7 @@ async fn splunk_insert_broken_token() {
         .with_batch_notifier(&batch)
         .into();
     drop(batch);
-    sink.run(stream::once(ready(event))).await.unwrap();
+    sink.run_events(iter::once(event)).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 
@@ -223,7 +222,7 @@ async fn splunk_insert_many() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
 
     assert!(find_entries(messages.as_slice()).await);
 }
@@ -342,7 +341,7 @@ async fn splunk_indexer_acknowledgements() {
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
     let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
     drop(tx);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
 
     assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
     assert!(find_entries(messages.as_slice()).await);
@@ -358,7 +357,7 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
     let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
     drop(tx);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
 
     // With indexer acknowledgements disabled on the server, events are still
     // acknowledged based on 200 OK

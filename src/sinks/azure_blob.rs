@@ -462,7 +462,9 @@ mod integration_tests {
         let sink = config.to_sink();
         let (lines, input) = random_lines_with_stream(100, 10, None);
 
-        sink.run(input).await.expect("Failed to run sink");
+        sink.run_event_stream(input)
+            .await
+            .expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
@@ -484,7 +486,9 @@ mod integration_tests {
         let sink = config.to_sink();
         let (events, input) = random_events_with_stream(100, 10, None);
 
-        sink.run(input).await.expect("Failed to run sink");
+        sink.run_event_stream(input)
+            .await
+            .expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
@@ -513,7 +517,9 @@ mod integration_tests {
         let sink = config.to_sink();
         let (lines, events) = random_lines_with_stream(100, 10, None);
 
-        sink.run(events).await.expect("Failed to run sink");
+        sink.run_event_stream(events)
+            .await
+            .expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
@@ -542,7 +548,9 @@ mod integration_tests {
         let sink = config.to_sink();
         let (events, input) = random_events_with_stream(100, 10, None);
 
-        sink.run(input).await.expect("Failed to run sink");
+        sink.run_event_stream(input)
+            .await
+            .expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
@@ -577,7 +585,9 @@ mod integration_tests {
         };
 
         let sink = config.to_sink();
-        sink.run(input).await.expect("Failed to run sink");
+        sink.run_event_stream(input)
+            .await
+            .expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 3);

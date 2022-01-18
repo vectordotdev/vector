@@ -90,6 +90,7 @@ impl EventContainer for MetricArray {
 }
 
 /// An array of one of the `Event` variants exclusively.
+#[derive(Debug)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
@@ -146,6 +147,7 @@ impl EventContainer for EventArray {
 }
 
 /// The iterator type for `EventArray`.
+#[derive(Debug)]
 pub enum EventArrayIntoIter {
     /// An iterator over type `LogEvent`.
     Logs(vec::IntoIter<LogEvent>),

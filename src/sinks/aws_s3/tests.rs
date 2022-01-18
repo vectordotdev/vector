@@ -15,7 +15,7 @@ mod integration_tests {
     use tokio_stream::StreamExt;
     use vector_core::{
         config::proxy::ProxyConfig,
-        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
     };
 
     use crate::{
@@ -134,7 +134,7 @@ mod integration_tests {
             Event::from(e)
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -336,13 +336,15 @@ mod integration_tests {
     fn make_events_batch(
         len: usize,
         count: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
-        let (lines, events) = random_lines_with_stream(len, count, None);
-
+    ) -> (
+        Vec<String>,
+        impl Stream<Item = EventArray>,
+        BatchStatusReceiver,
+    ) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+        let (lines, events) = random_lines_with_stream(len, count, Some(batch));
 
-        (lines, events, receiver)
+        (lines, events.map(Into::into), receiver)
     }
 
     async fn create_bucket(bucket: &str, object_lock_enabled: bool) {

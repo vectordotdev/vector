@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
-use futures::stream;
 use shared::encode_logfmt;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
@@ -62,7 +61,7 @@ async fn text() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -80,7 +79,7 @@ async fn json() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -106,7 +105,7 @@ async fn json_nested_fields() {
         event
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -125,7 +124,7 @@ async fn logfmt() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -169,7 +168,7 @@ async fn many_streams() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -228,7 +227,7 @@ async fn interpolate_stream_key() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    let _ = sink.run_event_stream(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -280,14 +279,12 @@ async fn many_tenants() {
     for i in 0..10 {
         let event = events.get_mut(i).unwrap();
 
-        if i % 2 == 0 {
-            event.as_mut_log().insert("tenant_id", "tenant1");
-        } else {
-            event.as_mut_log().insert("tenant_id", "tenant2");
-        }
+        event
+            .as_mut_log()
+            .insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
     }
 
-    let _ = sink.run(&mut stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
@@ -427,7 +424,7 @@ async fn test_out_of_order_events(
     config.batch.max_bytes = Some(4_000_000);
 
     let (sink, _) = config.build(cx).await.unwrap();
-    sink.run(&mut stream::iter(events.clone())).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 

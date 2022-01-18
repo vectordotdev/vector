@@ -4,7 +4,7 @@
 use std::convert::TryFrom;
 
 use chrono::Duration;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use rusoto_core::Region;
 use rusoto_logs::{
@@ -53,7 +53,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    sink.run_event_stream(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,
@@ -114,7 +114,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         }
         doit = true;
 
-        event
+        event.into()
     });
     let _ = sink.run(events).await.unwrap();
 
@@ -191,7 +191,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     lines.push(add_event(Duration::days(-1)));
     lines.push(add_event(Duration::days(-13)));
 
-    sink.run(stream::iter(events)).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,
@@ -238,7 +238,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    sink.run_event_stream(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,
@@ -350,7 +350,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
             event
         })
         .collect::<Vec<_>>();
-    sink.run(stream::iter(events)).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: format!("{}-0", stream_name),

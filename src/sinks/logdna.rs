@@ -404,7 +404,7 @@ mod tests {
         }
         drop(batch);
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }
