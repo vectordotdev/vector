@@ -376,19 +376,19 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut event| {
+        sink.run(events.map(move |mut events| {
             if doit {
-                event.as_mut_log().insert("_type", 1);
+                events.for_each_log(|log| {
+                    log.insert("_type", 1);
+                });
             }
             doit = true;
-            event.into()
+            events
         }))
         .await
         .expect("Sending events failed");
     } else {
-        sink.run_event_stream(events)
-            .await
-            .expect("Sending events failed");
+        sink.run(events).await.expect("Sending events failed");
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));

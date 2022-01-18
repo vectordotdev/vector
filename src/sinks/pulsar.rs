@@ -400,6 +400,7 @@ mod integration_tests {
     use pulsar::SubType;
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
 
     fn pulsar_address() -> String {
@@ -442,7 +443,8 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
-        events.map(Ok).forward(sink).await.unwrap();
+        let sink = VectorSink::from_event_sink(sink);
+        sink.run(events).await.unwrap();
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),

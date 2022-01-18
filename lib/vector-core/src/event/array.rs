@@ -98,6 +98,22 @@ pub enum EventArray {
     Metrics(MetricArray),
 }
 
+impl EventArray {
+    /// Run the given update function over each `LogEvent` in this array.
+    pub fn for_each_log(&mut self, update: impl FnMut(&mut LogEvent)) {
+        if let Self::Logs(logs) = self {
+            logs.iter_mut().for_each(update);
+        }
+    }
+
+    /// Run the given update function over each `Metric` in this array.
+    pub fn for_each_metric(&mut self, update: impl FnMut(&mut Metric)) {
+        if let Self::Metrics(metrics) = self {
+            metrics.iter_mut().for_each(update);
+        }
+    }
+}
+
 impl From<Event> for EventArray {
     fn from(event: Event) -> Self {
         match event {

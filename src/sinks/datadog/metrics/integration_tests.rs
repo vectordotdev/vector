@@ -79,7 +79,7 @@ async fn start_test(
         .collect();
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
-    let _ = sink.run_event_stream(stream).await.unwrap();
+    let _ = sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, batch_status);
 
     (events, rx)
@@ -168,6 +168,6 @@ async fn real_endpoint() {
         .collect();
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
-    let _ = sink.run_event_stream(stream).await.unwrap();
+    let _ = sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
 }

@@ -591,7 +591,7 @@ mod integration_tests {
 
         let sink = cnf.new(conn, cx).unwrap();
         let (_input, events) = random_lines_with_stream(100, num_events, None);
-        sink.run_event_stream(events).await.unwrap();
+        sink.run(events).await.unwrap();
 
         // Receive events.
         let mut received_msg_num = 0;

@@ -279,7 +279,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;
@@ -306,9 +306,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
-        sink.run_event_stream(events)
-            .await
-            .expect("Sending events failed");
+        sink.run(events).await.expect("Sending events failed");
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 

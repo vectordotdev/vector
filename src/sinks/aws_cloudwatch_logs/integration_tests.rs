@@ -53,7 +53,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run_event_stream(events).await.unwrap();
+    sink.run(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,
@@ -104,17 +104,17 @@ async fn cloudwatch_insert_log_events_sorted() {
     // add a historical timestamp to all but the first event, to simulate
     // out-of-order timestamps.
     let mut doit = false;
-    let events = events.map(move |mut event| {
+    let events = events.map(move |mut events| {
         if doit {
             let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-            event
-                .as_mut_log()
-                .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+            events.for_each_log(|log| {
+                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+            });
         }
         doit = true;
 
-        event.into()
+        events
     });
     let _ = sink.run(events).await.unwrap();
 
@@ -238,7 +238,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run_event_stream(events).await.unwrap();
+    sink.run(events).await.unwrap();
 
     let request = GetLogEventsRequest {
         log_stream_name: stream_name,

@@ -222,7 +222,7 @@ async fn splunk_insert_many() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);
-    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
     assert!(find_entries(messages.as_slice()).await);
 }
@@ -341,7 +341,7 @@ async fn splunk_indexer_acknowledgements() {
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
     let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
     drop(tx);
-    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
     assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
     assert!(find_entries(messages.as_slice()).await);
@@ -357,7 +357,7 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
     let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
     drop(tx);
-    components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
     // With indexer acknowledgements disabled on the server, events are still
     // acknowledged based on 200 OK

@@ -61,7 +61,7 @@ async fn text() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -79,7 +79,7 @@ async fn json() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -105,7 +105,7 @@ async fn json_nested_fields() {
         event
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -124,7 +124,7 @@ async fn logfmt() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -168,7 +168,7 @@ async fn many_streams() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -227,7 +227,7 @@ async fn interpolate_stream_key() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run_event_stream(events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
