@@ -56,7 +56,7 @@ pub struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
     pub not_contains: Option<T>,
 }
 
-impl<T: InputType + PartialEq + Eq + std::cmp::Ord> ListFilter<T> {
+impl<T: InputType + PartialEq + Eq + Ord> ListFilter<T> {
     pub fn filter_value(&self, value: Vec<T>) -> bool {
         let val = BTreeSet::from_iter(value.iter());
         filter_check!(

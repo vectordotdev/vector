@@ -87,7 +87,7 @@ impl Event {
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log`.
+    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) | Event::Trace(log) => log,
@@ -99,7 +99,7 @@ impl Event {
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log`.
+    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) | Event::Trace(log) => log,
@@ -111,7 +111,7 @@ impl Event {
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log`.
+    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) | Event::Trace(log) => log,

@@ -49,14 +49,14 @@ impl VrlTarget {
     pub fn into_events(self) -> impl Iterator<Item = Event> {
         match self {
             VrlTarget::LogEvent(value, metadata) => {
-                Box::new(value_into_logevent(value, metadata).map(Event::Log))
+                Box::new(value_into_logevents(value, metadata).map(Event::Log))
                     as Box<dyn Iterator<Item = Event>>
             }
             VrlTarget::Metric(metric) => {
                 Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
             }
             VrlTarget::Trace(value, metadata) => {
-                Box::new(value_into_logevent(value, metadata).map(Event::Trace))
+                Box::new(value_into_logevents(value, metadata).map(Event::Trace))
                     as Box<dyn Iterator<Item = Event>>
             }
         }
@@ -331,7 +331,7 @@ impl From<Event> for VrlTarget {
 //   * If an element is an object, create an event using that as fields.
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
-fn value_into_logevent(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
+fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
     match value {
         Value::Map(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
             as Box<dyn Iterator<Item = LogEvent>>,
