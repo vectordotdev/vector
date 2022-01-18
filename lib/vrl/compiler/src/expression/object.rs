@@ -58,15 +58,19 @@ impl Expression for Object {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         for (key, value) in &self.inner {
+            // Write the key as a constant
             let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
-
             vm.write_opcode(OpCode::Constant);
             vm.write_primitive(keyidx);
 
+            // Write the value
             value.compile_to_vm(vm)?;
         }
 
         vm.write_opcode(OpCode::CreateObject);
+
+        // Write the number of key/value pairs in the object so the machine knows
+        // how many pairs to suck into the created object.
         vm.write_primitive(self.inner.len());
 
         Ok(())

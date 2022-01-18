@@ -48,6 +48,7 @@ impl Expression for Block {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         for expr in &self.inner {
+            // Write each of the inner expressions
             expr.compile_to_vm(vm)?;
         }
 

@@ -61,6 +61,7 @@ impl Expression for Container {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use Variant::*;
 
+        // Pass the call on to the contained expression.
         match &self.variant {
             Group(v) => v.compile_to_vm(vm),
             Block(v) => v.compile_to_vm(vm),

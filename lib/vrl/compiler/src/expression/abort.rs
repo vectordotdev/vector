@@ -29,6 +29,7 @@ impl Expression for Abort {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         vm.write_opcode(OpCode::Abort);
 
+        // The Abort OpCode needs the span of the expression to return in the abort error.
         vm.write_primitive(self.span.start());
         vm.write_primitive(self.span.end());
         Ok(())

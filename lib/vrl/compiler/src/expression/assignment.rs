@@ -405,9 +405,13 @@ where
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         match self {
             Variant::Single { target, expr } => {
+                // Compile the expression which will leave the result at the top of the stack.
                 expr.compile_to_vm(vm)?;
+
                 vm.write_opcode(OpCode::SetPath);
 
+                // Add the target to the list of targets, write it's index as a primitive for the
+                // SetPath opcode to retrieve.
                 let target = vm.get_target(&target.into());
                 vm.write_primitive(target);
             }
@@ -417,16 +421,19 @@ where
                 expr,
                 default,
             } => {
-                // This isn't handling the error case yet.
+                // Compile the expression which will leave the result at the top of the stack.
                 expr.compile_to_vm(vm)?;
                 vm.write_opcode(OpCode::SetPathInfallible);
 
+                // Write the target for the Ok path.
                 let target = vm.get_target(&ok.into());
                 vm.write_primitive(target);
 
+                // Write the target for the Error path.
                 let target = vm.get_target(&err.into());
                 vm.write_primitive(target);
 
+                // Add the default value (the value to set to the Ok target should we have an error).
                 let default = vm.add_constant(default.clone());
                 vm.write_primitive(default);
             }

@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     expression::{Block, Expr, Literal, Predicate, Resolved},
+    vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -52,21 +53,31 @@ impl Expression for IfStatement {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        use crate::vm::OpCode;
-
+        // Write the predicate which will leave the result on the stack.
         self.predicate.compile_to_vm(vm)?;
+
+        // If the value is false, we want to jump to the alternative block.
+        // We need to store this jump as it will need updating when we know where
+        // the alternative block actually starts.
         let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
         vm.write_opcode(OpCode::Pop);
+
+        // Write the consequent block.
         self.consequent.compile_to_vm(vm)?;
 
+        // After the consequent block we want to jump over the alternative.
         let else_jump = vm.emit_jump(OpCode::Jump);
+
+        // Update the initial if jump to jump to the current position.
         vm.patch_jump(if_jump);
         vm.write_opcode(OpCode::Pop);
 
         if let Some(alternative) = &self.alternative {
+            // Write the alternative block.
             alternative.compile_to_vm(vm)?;
         }
 
+        // Update the else jump to jump to the current position.
         vm.patch_jump(else_jump);
 
         Ok(())

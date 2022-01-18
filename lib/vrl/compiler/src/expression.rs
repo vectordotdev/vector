@@ -189,6 +189,7 @@ impl Expression for Expr {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         use Expr::*;
 
+        // Pass the call on to the contained expression.
         match self {
             Literal(v) => v.compile_to_vm(vm),
             Container(v) => v.compile_to_vm(vm),

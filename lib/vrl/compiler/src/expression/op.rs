@@ -5,7 +5,9 @@ use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
-    value, Context, Expression, State, TypeDef, Value,
+    value,
+    vm::OpCode,
+    Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Clone, PartialEq)]
@@ -241,8 +243,6 @@ impl Expression for Op {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        use crate::vm::OpCode;
-
         self.lhs.compile_to_vm(vm)?;
         match self.opcode {
             ast::Opcode::Mul => {

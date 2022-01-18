@@ -5,6 +5,7 @@ use lookup::LookupBuf;
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
     parser::ast::Ident,
+    vm::{self, OpCode},
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -122,23 +123,32 @@ impl Expression for Query {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        vm.write_opcode(crate::vm::OpCode::GetPath);
+        vm.write_opcode(OpCode::GetPath);
+
+        // Write the target depending on what target we are trying to retrieve.
         let variable = match &self.target {
-            Target::External => crate::vm::Variable::External(self.path.clone()),
+            Target::External => vm::Variable::External(self.path.clone()),
             Target::Internal(variable) => {
-                crate::vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
+                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
             }
             Target::FunctionCall(call) => {
+                // Write the code to call the function.
                 call.compile_to_vm(vm)?;
-                crate::vm::Variable::Stack(self.path.clone())
+
+                // Then retrieve the given path from the returned value that has been pushed on the stack
+                vm::Variable::Stack(self.path.clone())
             }
             Target::Container(container) => {
+                // Write the code to create the container onto the stack.
                 container.compile_to_vm(vm)?;
-                crate::vm::Variable::Stack(self.path.clone())
+
+                // Then retrieve the given path from the returned value that has been pushed on the stack
+                vm::Variable::Stack(self.path.clone())
             }
         };
         let target = vm.get_target(&variable);
         vm.write_primitive(target);
+
         Ok(())
     }
 }
