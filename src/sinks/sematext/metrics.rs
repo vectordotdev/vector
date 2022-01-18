@@ -278,7 +278,7 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::StreamExt;
     use indoc::indoc;
 
     use super::*;

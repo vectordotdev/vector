@@ -291,7 +291,7 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{channel::mpsc, StreamExt};
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
