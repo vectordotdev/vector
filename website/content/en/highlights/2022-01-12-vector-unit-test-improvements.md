@@ -42,9 +42,7 @@ now test `remap` transform's `dropped` output like so,
 Under-the-hood, we've reworked the unit testing implementation to more closely
 align with how a configuration actually runs, making it easier to support
 testing new features. However, as a result, some unit testing debug UX has also
-changed.
-
-- Previously, on a test condition error, debug output included `input` event
+changed: previously, on a test condition error, debug output included `input` event
   information representing the event(s) prior to being transformed. `input`
   event information is no longer available. The original `input` event(s) for a
   test can be determined from your configuration.
