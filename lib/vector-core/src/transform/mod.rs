@@ -239,8 +239,9 @@ impl TransformOutputs {
 
 async fn send_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
     for event in buf.drain(..) {
-        output.send(event).await.expect("unit error");
+        output.feed(event).await.expect("unit error");
     }
+    output.flush().await.expect("unit error");
 }
 
 pub struct TransformOutputsBuf {
