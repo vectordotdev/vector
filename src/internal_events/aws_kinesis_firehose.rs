@@ -6,6 +6,28 @@ use vector_core::internal_event::InternalEvent;
 use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug)]
+pub struct AwsKinesisFirehoseBytesReceived {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AwsKinesisFirehoseBytesReceived {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = "http",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "http",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct AwsKinesisFirehoseEventsReceived {
     pub count: usize,
     pub byte_size: usize,
@@ -22,8 +44,9 @@ impl InternalEvent for AwsKinesisFirehoseEventsReceived {
             "component_received_event_bytes_total",
             self.byte_size as u64
         );
-        counter!("events_in_total", self.count as u64); // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
+        // deprecated
+        counter!("events_in_total", self.count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -68,13 +91,14 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_read_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => "receiving",
             "error_type" => "http_error",
             "code" => self.code.to_string(),
-        )
+        );
+        // deprecated
+        counter!("request_read_errors_total", 1);
     }
 }
 
@@ -96,11 +120,12 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_automatic_decode_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => "processing",
             "error_type" => "decoding_error",
-        )
+        );
+        // deprecated
+        counter!("request_automatic_decode_errors_total", 1);
     }
 }
