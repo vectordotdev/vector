@@ -3948,16 +3948,24 @@
               "deprecationReason": null
             },
             {
-              "name": "outputType",
+              "name": "outputTypes",
               "description": "Source output type",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "ENUM",
-                  "name": "SourceOutputType",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "SourceOutputType",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -4289,7 +4297,7 @@
               "defaultValue": null
             },
             {
-              "name": "not_equals",
+              "name": "notEquals",
               "description": null,
               "type": {
                 "kind": "LIST",
@@ -4317,7 +4325,7 @@
               "defaultValue": null
             },
             {
-              "name": "not_contains",
+              "name": "notContains",
               "description": null,
               "type": {
                 "kind": "ENUM",
