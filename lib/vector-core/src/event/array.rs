@@ -11,13 +11,17 @@ use crate::ByteSizeOf;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
-#[allow(clippy::len_without_is_empty)]
 pub trait EventContainer: ByteSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
 
     /// The number of events in this container.
     fn len(&self) -> usize;
+
+    /// Is this container empty?
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     /// Turn this container into an iterator of events.
     fn into_events(self) -> Self::IntoIter;
@@ -28,6 +32,10 @@ impl EventContainer for Event {
 
     fn len(&self) -> usize {
         1
+    }
+
+    fn is_empty(&self) -> bool {
+        false
     }
 
     fn into_events(self) -> Self::IntoIter {
@@ -42,6 +50,10 @@ impl EventContainer for LogEvent {
         1
     }
 
+    fn is_empty(&self) -> bool {
+        false
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self.into())
     }
@@ -52,6 +64,10 @@ impl EventContainer for Metric {
 
     fn len(&self) -> usize {
         1
+    }
+
+    fn is_empty(&self) -> bool {
+        false
     }
 
     fn into_events(self) -> Self::IntoIter {
