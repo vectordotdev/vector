@@ -3703,9 +3703,9 @@ dependencies = [
 
 [[package]]
 name = "listenfd"
-version = "0.3.5"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809e514e2cb8a9624701346ea3e694c1766d76778e343e537d873c1c366e79a7"
+checksum = "fe05ca4da1db151e4cfed8dfd45438047aee112e43656c0963b6579e443bf22a"
 dependencies = [
  "libc",
  "uuid",
