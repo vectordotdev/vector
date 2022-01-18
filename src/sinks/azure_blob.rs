@@ -697,7 +697,7 @@ mod integration_tests {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },
-                    _ => Err(format!("Unexpected error {}", reason.to_string())),
+                    _ => Err(format!("Unexpected error {}", reason)),
                 },
             };
 

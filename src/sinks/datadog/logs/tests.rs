@@ -293,7 +293,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let events = vec![
         event_with_api_key("mow", "pkc"),
         event_with_api_key("pnh", "vvo"),
-        Event::from("no API key in metadata").into(),
+        Event::from("no API key in metadata"),
     ];
 
     let _ = sink.run_events(events).await.unwrap();
