@@ -704,6 +704,7 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "aws-integration-tests",
+  "azure-integration-tests",
   "clickhouse-integration-tests",
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",

@@ -28,21 +28,12 @@ impl VectorSink {
     /// # Errors
     ///
     /// See `VectorSink::run` for errors.
-    pub async fn run_event_stream(self, input: impl Stream<Item = Event> + Send) -> Result<(), ()> {
-        self.run(input.map(Into::into)).await
-    }
-
-    /// Run the `VectorSink` with a one-time `Vec` of `Event`s, for use in tests
-    ///
-    /// # Errors
-    ///
-    /// See `VectorSink::run` for errors.
     pub async fn run_events<I>(self, input: I) -> Result<(), ()>
     where
         I: IntoIterator<Item = Event> + Send,
         I::IntoIter: Send,
     {
-        self.run_event_stream(stream::iter(input)).await
+        self.run(stream::iter(input).map(Into::into)).await
     }
 
     /// Converts `VectorSink` into a `futures::Sink`
