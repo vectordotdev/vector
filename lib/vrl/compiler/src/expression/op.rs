@@ -244,6 +244,9 @@ impl Expression for Op {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         self.lhs.compile_to_vm(vm)?;
+
+        // Note, not all opcodes want the RHS evaluated straight away, so we
+        // only compile the rhs in each branch as necessary.
         match self.opcode {
             ast::Opcode::Mul => {
                 self.rhs.compile_to_vm(vm)?;

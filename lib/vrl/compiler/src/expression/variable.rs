@@ -1,12 +1,11 @@
-use std::fmt;
-
-use diagnostic::{DiagnosticError, Label};
-
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
+    vm::{self, OpCode, Vm},
     Context, Expression, Span, State, TypeDef, Value,
 };
+use diagnostic::{DiagnosticError, Label};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
@@ -61,9 +60,11 @@ impl Expression for Variable {
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        vm.write_opcode(crate::vm::OpCode::GetPath);
-        let variable = crate::vm::Variable::Internal(self.ident().clone(), None);
+    fn compile_to_vm(&self, vm: &mut vm::Vm) -> Result<(), String> {
+        vm.write_opcode(OpCode::GetPath);
+
+        // Store the required path in the targets list, write it's index to the vm.
+        let variable = vm::Variable::Internal(self.ident().clone(), None);
         let target = vm.get_target(&variable);
         vm.write_primitive(target);
 

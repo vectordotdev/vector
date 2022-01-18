@@ -3,11 +3,11 @@ use crate::{
     function::{ArgumentList, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
     value::Kind,
+    vm::OpCode,
     Context, Expression, Function, Resolved, Span, State, TypeDef,
 };
 use diagnostic::{DiagnosticError, Label, Note, Urls};
-use std::fmt;
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -29,6 +29,8 @@ pub struct FunctionCall {
     // used for equality check
     ident: &'static str,
 
+    // The index of the function in the list of stdlib functions.
+    // Used by the VM to identify this function when called.
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
@@ -374,6 +376,7 @@ impl Expression for FunctionCall {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Resolve the arguments so they are in the order defined in the function.
         let args = match vm.function(self.function_id) {
             Some(fun) => self.resolve_arguments(fun)?,
             None => return Err(format!("Function {} not found.", self.function_id)),
@@ -383,6 +386,8 @@ impl Expression for FunctionCall {
             let fun = vm.function(self.function_id).unwrap();
             let argument = argument.as_ref().map(|argument| argument.inner());
 
+            // Call `compile_argument` for functions that need to perform any compile time processing
+            // on the argument.
             match fun
                 .compile_argument(&args, keyword, argument)
                 .map_err(|err| err.to_string())?
@@ -390,22 +395,27 @@ impl Expression for FunctionCall {
                 Some(stat) => {
                     // The function has compiled this argument as a static
                     let stat = vm.add_static(stat);
-                    vm.write_opcode(crate::vm::OpCode::MoveStatic);
+                    vm.write_opcode(OpCode::MoveStatic);
                     vm.write_primitive(stat);
                 }
                 None => match argument {
                     Some(argument) => {
+                        // Compile the argument, MoveParameter will move the result of the expression onto the
+                        // parameter stack to be passed into the function.
                         argument.compile_to_vm(vm)?;
-                        vm.write_opcode(crate::vm::OpCode::MoveParameter);
+                        vm.write_opcode(OpCode::MoveParameter);
                     }
                     None => {
-                        vm.write_opcode(crate::vm::OpCode::EmptyParameter);
+                        // The parameter hasn't been specified, so just move an empty parameter onto the
+                        // parameter stack.
+                        vm.write_opcode(OpCode::EmptyParameter);
                     }
                 },
             }
         }
 
-        vm.write_opcode(crate::vm::OpCode::Call);
+        // Call the function with the given id.
+        vm.write_opcode(OpCode::Call);
         vm.write_primitive(self.function_id);
 
         // We need to write the spans for error reporting.
