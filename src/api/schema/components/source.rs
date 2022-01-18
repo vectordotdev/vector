@@ -1,6 +1,8 @@
 use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use super::{sink, state, transform, Component};
 use crate::{
@@ -13,7 +15,7 @@ use crate::{
     filter_check,
 };
 
-#[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
+#[derive(Debug, Enum, EnumIter, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
     Log,
     Metric,
@@ -46,20 +48,20 @@ impl Source {
         self.0.component_type.as_str()
     }
     pub fn get_output_types(&self) -> Vec<SourceOutputType> {
-        let mut t = vec![];
-        self.0
-            .output_type
-            .contains(DataType::Log)
-            .then(|| t.push(SourceOutputType::Log));
-        self.0
-            .output_type
-            .contains(DataType::Metric)
-            .then(|| t.push(SourceOutputType::Metric));
-        self.0
-            .output_type
-            .contains(DataType::Trace)
-            .then(|| t.push(SourceOutputType::Trace));
-        t
+        SourceOutputType::iter()
+            .filter(|s| self.0.output_type.contains(s.into()))
+            .map(Into::into)
+            .collect()
+    }
+}
+
+impl From<&SourceOutputType> for DataType {
+    fn from(s: &SourceOutputType) -> Self {
+        match s {
+            SourceOutputType::Log => DataType::Log,
+            SourceOutputType::Metric => DataType::Metric,
+            SourceOutputType::Trace => DataType::Trace,
+        }
     }
 }
 
@@ -92,7 +94,7 @@ impl Source {
     }
 
     /// Source output type
-    pub async fn output_type(&self) -> Vec<SourceOutputType> {
+    pub async fn output_types(&self) -> Vec<SourceOutputType> {
         self.get_output_types()
     }
 

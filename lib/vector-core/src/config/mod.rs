@@ -13,6 +13,8 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
     vector_buffers::config::memory_buffer_default_max_events();
 
+// This enum should be kept alphabetically sorted as the bitmask value is used when
+// sorting sources by data type in the GraphQL API.
 #[bitmask(u8)]
 pub enum DataType {
     Log,
