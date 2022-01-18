@@ -55,19 +55,43 @@ impl InternalEvent for EventStoreDbStatsParsingError {
     }
 }
 
-pub struct EventStoreDbMetricsReceived {
+pub struct EventStoreDbMetricsBytesReceived {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for EventStoreDbMetricsBytesReceived {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = "http",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "http",
+        );
+    }
+}
+
+pub struct EventStoreDbMetricsEventsReceived {
     pub count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for EventStoreDbMetricsReceived {
+impl InternalEvent for EventStoreDbMetricsEventsReceived {
     fn emit_logs(&self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
-        counter!("component_received_event_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
         // deprecated
         counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);

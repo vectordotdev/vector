@@ -12,7 +12,8 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{
-        EventStoreDbMetricsHttpError, EventStoreDbMetricsReceived, EventStoreDbStatsParsingError,
+        EventStoreDbMetricsBytesReceived, EventStoreDbMetricsEventsReceived,
+        EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
     },
     tls::TlsSettings,
 };
@@ -101,6 +102,9 @@ fn eventstoredb(
                                 continue;
                             }
                         };
+                        emit!(&EventStoreDbMetricsBytesReceived {
+                            byte_size: bytes.len()
+                        });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
@@ -111,7 +115,7 @@ fn eventstoredb(
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
 
-                                emit!(&EventStoreDbMetricsReceived {
+                                emit!(&EventStoreDbMetricsEventsReceived {
                                     count: metrics.len(),
                                     byte_size: bytes.len(),
                                 });
