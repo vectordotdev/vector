@@ -36,7 +36,7 @@ pub enum OpCode {
     CreateObject,
     EmptyParameter,
     MoveParameter,
-    MoveStatic,
+    MoveStaticParameter,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -389,7 +389,7 @@ impl Vm {
                         .parameter_stack
                         .push(state.stack.pop().map(VmArgument::Value))
                 }
-                OpCode::MoveStatic => {
+                OpCode::MoveStaticParameter => {
                     // Moves a static parameter onto the parameter stack.
                     // A static parameter will have been created by the functions `compile_argument` method
                     // during compile time.

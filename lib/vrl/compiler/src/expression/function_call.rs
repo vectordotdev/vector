@@ -392,7 +392,7 @@ impl Expression for FunctionCall {
                 Some(stat) => {
                     // The function has compiled this argument as a static
                     let stat = vm.add_static(stat);
-                    vm.write_opcode(OpCode::MoveStatic);
+                    vm.write_opcode(OpCode::MoveStaticParameter);
                     vm.write_primitive(stat);
                 }
                 None => match argument {
