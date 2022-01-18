@@ -30,6 +30,12 @@ struct DeletionMarker {
     bytes_read: u64,
 }
 
+#[derive(Debug)]
+struct DelayedAck {
+    record_id_threshold: u64,
+    amount: u64,
+}
+
 pub(super) struct ReadToken(usize, u64);
 
 impl ReadToken {
@@ -68,7 +74,7 @@ where
     /// records in a way that is not easily detectable and could lead to records which
     /// deserialize/decode but contain invalid data.
     #[snafu(display("failed to deserialize encoded record from buffer: {}", reason))]
-    FailedToDeserialize { reason: String },
+    Deserialization { reason: String },
 
     /// The record's checksum did not match.
     ///
@@ -82,16 +88,25 @@ where
         calculated,
         actual
     ))]
-    InvalidChecksum { calculated: u32, actual: u32 },
+    Checksum { calculated: u32, actual: u32 },
 
     /// The decoder encountered an issue during decoding.
     ///
     /// At this stage, the record can be assumed to have been written correctly, and read correctly
     /// from disk, as the checksum was also validated.
     #[snafu(display("failed to decoded record: {:?}", source))]
-    FailedToDecode {
+    Decode {
         source: <T as DecodeBytes<T>>::Error,
     },
+
+    /// The reader detected that a data file contains a partially-written record.
+    ///
+    /// Records should never be partially written to a data file (we don't split records across data
+    /// files) so this would be indicative of a write that was never properly written/flushed, or
+    /// some issue with the write where it was acknowledged but the data/file was corrupted in same way.
+    ///
+    /// This is effectively the same class of error as an invalid checksum/failed deserialization.
+    PartialWrite,
 }
 
 impl<T> ReaderError<T>
@@ -101,7 +116,9 @@ where
     fn is_bad_read(&self) -> bool {
         matches!(
             self,
-            ReaderError::InvalidChecksum { .. } | ReaderError::FailedToDeserialize { .. }
+            ReaderError::Checksum { .. }
+                | ReaderError::Deserialization { .. }
+                | ReaderError::PartialWrite
         )
     }
 }
@@ -136,9 +153,13 @@ where
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    async fn read_length_delimiter(&mut self) -> Result<Option<usize>, ReaderError<T>> {
+    async fn read_length_delimiter(
+        &mut self,
+        is_finalized: bool,
+    ) -> Result<Option<usize>, ReaderError<T>> {
         loop {
-            if self.reader.buffer().len() >= 8 {
+            let available = self.reader.buffer().len();
+            if available >= 8 {
                 let length_buf = &self.reader.buffer()[..8];
                 let length = length_buf
                     .try_into()
@@ -160,22 +181,32 @@ where
                 return Ok(Some(record_len));
             }
 
+            // We don't have enough bytes, so we need to fill our buffer again.
             let buf = self.reader.fill_buf().await.context(IoSnafu)?;
             if buf.is_empty() {
                 return Ok(None);
+            }
+
+            // If we tried to read more bytes, and we still don't have enough for the record
+            // delimiter, and the data file has been finalized already: we've got a partial
+            // write situation on our hands.
+            if buf.len() < 8 && is_finalized {
+                return Err(ReaderError::PartialWrite);
             }
         }
     }
 
     /// Attempts to read a record.
     ///
-    /// In order to facilitate driving other logic within the reader when there is no data to
-    /// currently read, this method returns early when there is no available data at all, rather
-    /// than waiting for enough data to start readiong a normal record.  In cases where there is not
-    /// enough data to begin reading a record, `None` is returned.
+    /// Records are prececded by a length delimiter, a fixed-size integer (currently 8 bytes) that
+    /// tells the reader how many more bytes to read in order to completely read the next record.
     ///
-    /// If there is any available data, even if it's not _enough_ data, then this method will
-    /// continue awaiting until it can read an entire record.
+    /// If there are no more bytes to read, we return early in order to allow the caller to wait
+    /// until such a time where there should be more data, as no wake-ups can be generated when
+    /// reading a file after reaching EOF.
+    ///
+    /// If there is any data available, we attempt to continue reading until both a length
+    /// delimiter, and the accompanying record, can be read in their entirety.
     ///
     /// If a record is able to be read in its entirety, a token is returned to caller that can be
     /// used with [`read_record`] in order to get an owned `T`.  This is due to a quirk with the
@@ -183,13 +214,30 @@ where
     /// which is handled by splitting the "do we have a valid record in our buffer?" logic from the
     /// "read that record and decode it" logic.
     ///
+    /// # Finalized reads
+    ///
+    /// All of the above logic applies when `is_finalized` is `false`, which signals that a data
+    /// file is still currently being written to.  If `is_finalized` is `true`, most of the above
+    /// logic applies but in cases where we detect a partial write, we explicitly return an error
+    /// for a partial read.
+    ///
+    /// In practice, what this means is that when we believe a file should be "finalized" -- the
+    /// writer flushed the file to disk, the ledger has been flushed, etc -- then we also expect to
+    /// be able to read all bytes with no leftover.  A partially-written length delimiter, or
+    /// record, would be indicative of a bug with the writer or OS/disks, essentially telling us
+    /// that the current data file is not valid for reads anymore.  We don't know _why_ it's in this
+    /// state, only that something is not right and that we must skip the file.
+    ///
     /// # Errors
     ///
     /// Errors can occur during the I/O or deserialization stage.  If an error occurs during any of
     /// these stages, an appropriate error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
-        let record_len = if let Some(len) = self.read_length_delimiter().await? {
+    pub async fn try_next_record(
+        &mut self,
+        is_finalized: bool,
+    ) -> Result<Option<ReadToken>, ReaderError<T>> {
+        let record_len = if let Some(len) = self.read_length_delimiter(is_finalized).await? {
             len
         } else {
             trace!("read_length_delimiter returned None");
@@ -197,7 +245,7 @@ where
         };
 
         if record_len == 0 {
-            return Err(ReaderError::FailedToDeserialize {
+            return Err(ReaderError::Deserialization {
                 reason: "record length was zero".to_string(),
             });
         }
@@ -207,6 +255,11 @@ where
         while self.aligned_buf.len() < record_len {
             let needed = record_len - self.aligned_buf.len();
             let buf = self.reader.fill_buf().await.context(IoSnafu)?;
+            if buf.is_empty() && is_finalized {
+                // If we needed more data, but there was none available, and we're finalized: we've
+                // got ourselves a partial write situation.
+                return Err(ReaderError::PartialWrite);
+            }
 
             let available = cmp::min(buf.len(), needed);
             self.aligned_buf.extend_from_slice(&buf[..available]);
@@ -216,11 +269,11 @@ where
         // Now see if we can deserialize our archived record from this.
         let buf = self.aligned_buf.as_slice();
         match try_as_record_archive(buf, &self.checksummer) {
-            RecordStatus::FailedDeserialization(de) => Err(ReaderError::FailedToDeserialize {
+            RecordStatus::FailedDeserialization(de) => Err(ReaderError::Deserialization {
                 reason: de.into_inner(),
             }),
             RecordStatus::Corrupted { calculated, actual } => {
-                Err(ReaderError::InvalidChecksum { calculated, actual })
+                Err(ReaderError::Checksum { calculated, actual })
             }
             RecordStatus::Valid(id) => {
                 self.current_record_id = id;
@@ -254,7 +307,7 @@ where
         // - `try_next_record` does all the archive checks, checksum validation, etc
         let archived_record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
 
-        T::decode(archived_record.payload()).context(FailedToDecodeSnafu)
+        T::decode(archived_record.payload()).context(DecodeSnafu)
     }
 }
 
@@ -269,6 +322,7 @@ pub struct Reader<T> {
     ready_to_read: bool,
     check_pending_deletions: bool,
     pending_deletions: Vec<DeletionMarker>,
+    delayed_acks: Vec<DelayedAck>,
     pending_read_sizes: Vec<u64>,
     _t: PhantomData<T>,
 }
@@ -288,6 +342,7 @@ where
             ready_to_read: false,
             check_pending_deletions: false,
             pending_deletions: Vec::new(),
+            delayed_acks: Vec::new(),
             pending_read_sizes: Vec::new(),
             _t: PhantomData,
         }
@@ -359,12 +414,18 @@ where
 
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn delete_completed_data_files(&mut self) -> io::Result<()> {
+        trace!(
+            message = "scanning for pending data files now eligible for deletion",
+            self.last_acked_record_id
+        );
+
         // Figure out if any of the pending deletions we have are now ready.
         let ready_deletions = {
             let ready_deletions_len = self
                 .pending_deletions
                 .iter()
                 .take_while(|pending| {
+                    trace!(message = "examining pending deletion", marker = ?pending);
                     // If we haven't wrapped around past zero, then we simply check if our new "last acked"
                     // value is highest than the highest record ID for the deletion, otherwise we check if
                     // the number of acknowledged records exceeds the difference between "last acked" and
@@ -389,12 +450,54 @@ where
 
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     async fn adjust_acknowledgement_state(&mut self, ack_offset: u64) -> io::Result<()> {
-        // Track our new highest acknowledged record ID, and handle any pending deletions that now qualify.
-        self.last_acked_record_id = self.last_acked_record_id.wrapping_add(ack_offset);
+        // Calculate our new `last_acked_record_id`, and then proactively drain any delayed
+        // acknowledgements that would become eligible by either adding `ack_offset`, or any
+        // knock-on acknowledgement changes from an eligible delayed acknowledgement.
+        //
+        // For example, if we had last_acked_record_id=2, and two delayed acknowledgements -- one
+        // with a threshold of 4 and one with a threshold of 6, both with an amount of 2, then our
+        // outstanding expected acknowledgement timeline would look like:
+        //
+        //                           [ delayed ack region 4/2 ][ delayed ack region 6/2 ]
+        // [record ID 3][record ID 4][record ID 5][record ID 6][record ID 7][record ID 8]
+        //
+        // This means that if we acknowledge record IDs 3 and 4 (ack_offset=2), we would make the
+        // first delayed acknowledgement eligible, because `last_acked_record_id` would now be 4.
+        // However, once we also incorporated the acknowledgements from the first delayed ack, then
+        // the _second_ delayed acknowledgement would become eligible, since `last_acked_record_id`
+        // would now be at 6.
+        //
+        // Thus, we track the estimated `last_acked_record_id` for every delayed acknowledgement
+        // that becomes eligible so that we can maximally consume them in this one call.
+        let mut new_last_acked_record_id = self.last_acked_record_id.wrapping_add(ack_offset);
+        while !self.delayed_acks.is_empty() {
+            let delayed_ack = self
+                .delayed_acks
+                .first()
+                .expect("delayed_acks cannot be empty");
+            if new_last_acked_record_id >= delayed_ack.record_id_threshold {
+                let delayed_ack = self.delayed_acks.remove(0);
+                new_last_acked_record_id =
+                    new_last_acked_record_id.wrapping_add(delayed_ack.amount);
+            }
+        }
+
+        // Now calculate the actual delta to apply to `last_acked_record_id` and make it so.
+        let last_acked_delta = new_last_acked_record_id.wrapping_sub(self.last_acked_record_id);
+        self.last_acked_record_id = self.last_acked_record_id.wrapping_add(last_acked_delta);
         self.ledger
             .state()
-            .increment_last_reader_record_id(ack_offset);
+            .increment_last_reader_record_id(last_acked_delta);
+
+        // Pending data file deletions may be eligible now, so check.
         self.delete_completed_data_files().await
+    }
+
+    fn add_delayed_ack_range(&mut self, record_id_threshold: u64, amount: u64) {
+        self.delayed_acks.push(DelayedAck {
+            record_id_threshold,
+            amount,
+        });
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
@@ -424,12 +527,17 @@ where
 
             self.ledger.track_reads(ack_count, total_bytes_read);
 
+            // Adjust our acknowledgement state, which may also trigger delayed acknowledgements
+            // to fire depending on how much acknowledgement progress we make from "real"
+            // acknowledgements.  We do this before notifying the writer because if we do end up
+            // allowing a delayed acknowledgement to proceed, we may free up even more bytes in the
+            // buffer.
+            self.adjust_acknowledgement_state(pending_acks as u64)
+                .await?;
+
             // Notify any waiting writers that we've consumed a bunch of records/bytes, since they
             // might be waiting for the total buffer size to go down below the configured limit.
             self.ledger.notify_reader_waiters();
-
-            self.adjust_acknowledgement_state(pending_acks as u64)
-                .await?;
         }
 
         // Due to the structure of `next`, we handle pending acknowledgements before we generate
@@ -517,6 +625,8 @@ where
                 },
             };
 
+            debug!("reader opened data file '{:?}'", data_file_path);
+
             self.reader = Some(RecordReader::new(data_file));
             return Ok(());
         }
@@ -566,18 +676,16 @@ where
                 count: corrupted_records,
             });
 
-            // We call this here, instead of incrementing `pending_acks` in the ledger
-            // directly, or waiting for the next call to `next`, for two reasons:
-            // - we can delete data files faster, potentially, by doing it right before
-            //   `next` successfully returns a record
-            // - since we're skipping records, there's no pending read sizes for the records
-            //   we're skipping, so we just need to update the acknowledgement state
-            //   directly, without going through the normal path
+            // Track the range of record IDs for the corrupted region, which ensures that we won't
+            // acknowledge them until all record IDs before the start of the range have also been
+            // acknowledged.  This avoids potentially acknowledging not-yet-acknowledged records
+            // which are part of a corrupted data file, since it could cause the data file to be
+            // deleted before those not-yet-acknowledged records were _actually_ acknowledged.
             //
-            // We maintain ledger consistency, even without going through
-            // `handle_pending_acknowledgements`, by updating the record count above, and
-            // the data file deletion logic handles fixing up the buffer size.
-            self.adjust_acknowledgement_state(corrupted_records).await?;
+            // Essentially, we need to wait until the last valid record ID that we read has been
+            // acknowledged, and then we can fast-forward acknowledge the record ID range for the
+            // corrupted records we just discovered.
+            self.add_delayed_ack_range(previous_id, corrupted_records);
         }
 
         Ok(())
@@ -671,8 +779,21 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            if self.ledger.is_writer_done() && self.ledger.get_total_buffer_size() == 0 {
-                return Ok(None);
+            //
+            // TODO: Validate this with a test that messes with a data file without having to reload
+            // the buffer, since reloading the buffer will recalculate our buffer size.
+            if self.ledger.is_writer_done() {
+                let total_buffer_size = self.ledger.get_total_buffer_size();
+                let total_records = self.ledger.get_total_records();
+                trace!(
+                    "writer done, buffer_size={}, total_records={}",
+                    total_buffer_size,
+                    total_records
+                );
+
+                if total_buffer_size == 0 || total_records == 0 {
+                    return Ok(None);
+                }
             }
 
             self.ensure_ready_for_read().await.context(IoSnafu)?;
@@ -684,10 +805,16 @@ where
 
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
+            // Essentially: is the writer still writing to this data file or not?
+            //
+            // A necessary invariant to have to understand if the record reader should actually keep
+            // waiting for data, or if a data file had a partial write/missing data and should be skipped.
+            let is_finalized = reader_file_id != writer_file_id;
+
             // Try reading a record, which if successful, gives us a token to actually read/get a
             // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not
             // yet fully understanding mutable borrows when conditional control flow is involved.
-            match reader.try_next_record().await {
+            match reader.try_next_record(is_finalized).await {
                 // Not even enough data to read a length delimiter, so we need to wait for the
                 // writer to signal us that there's some actual data to read.
                 Ok(None) => {}
@@ -752,13 +879,6 @@ where
             // loop, because otherwise we could get stuck waiting for the writer after an empty
             // `try_read_record` attempt when the writer is done and we're at the end of the file,
             // etc.
-            //
-            // TODO: We may want to explore adding logic to the reader that returns a sentinel value
-            // when we're trying to read a length delimiter from a position that is past the maximum
-            // file size, since that is theoretically not possible.  We could _start_ a read that is
-            // below the limit, and continue it past the limit, but we should never be able to read
-            // a length delimiter past the limit, because we can't write a length delimiter that
-            // _starts_ past the limit.
             if self.ready_to_read {
                 self.ledger.wait_for_writer().await;
             } else {

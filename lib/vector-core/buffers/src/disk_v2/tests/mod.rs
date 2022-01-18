@@ -88,14 +88,18 @@ macro_rules! assert_reader_writer_file_positions {
     ($ledger:expr, $reader:expr, $writer:expr) => {{
         let (reader, writer) = $ledger.get_current_reader_writer_file_id();
         assert_eq!(
-            reader, $reader as u16,
+            reader,
+            ($reader) as u16,
             "expected reader file ID of {}, got {} instead",
-            $reader, reader
+            ($reader),
+            reader
         );
         assert_eq!(
-            writer, $writer as u16,
+            writer,
+            ($writer) as u16,
             "expected writer file ID of {}, got {} instead",
-            $writer, writer
+            ($writer),
+            writer
         );
     }};
 }
@@ -131,6 +135,41 @@ macro_rules! assert_file_exists_async {
             result.expect("is_ok() was true").is_file(),
             "path exists but is not file"
         );
+    }};
+}
+
+#[macro_export]
+macro_rules! await_timeout {
+    ($fut:expr, $secs:expr) => {{
+        tokio::time::timeout(std::time::Duration::from_secs($secs), $fut)
+            .await
+            .expect("future should not timeout")
+    }};
+}
+
+#[macro_export]
+macro_rules! set_data_file_length {
+    ($path:expr, $start_len:expr, $target_len:expr) => {{
+        let mut data_file = OpenOptions::new()
+            .write(true)
+            .open(&$path)
+            .await
+            .expect("open should not fail");
+
+        // Just to make sure the data file matches our expected state before futzing with it.
+        let metadata = data_file
+            .metadata()
+            .await
+            .expect("metadata should not fail");
+        assert_eq!(($start_len) as u64, metadata.len());
+
+        data_file
+            .set_len(($target_len) as u64)
+            .await
+            .expect("truncate should not fail");
+        data_file.flush().await.expect("flush should not fail");
+        data_file.sync_all().await.expect("sync should not fail");
+        drop(data_file);
     }};
 }
 
@@ -299,7 +338,16 @@ pub fn install_tracing_helpers() -> AssertionRegistry {
     // with a unique span that can be matched on specifically with
     // `AssertionBuilder::with_parent_name`.
     //
-    // At some point, we might be able to write a simple derive macro that does this for us, and
+    // TODO: We also need a better way of wrapping our test functions in their own parent spans, for
+    // the purpose of isolating their assertions.  Right now, we do it with a unique string that we
+    // have set to the test function name, but this is susceptible to being copypasta'd
+    // unintentionally, thus letting assertions bleed into other tests.
+    //
+    // Maybe we should add a helper method to `tracing-fluent-assertions` for generating a
+    // uniquely-named span that can be passed directly to the assertion builder methods, then it's a
+    // much tighter loop.
+    //
+    // TODO: At some point, we might be able to write a simple derive macro that does this for us, and
     // configures the other necessary bits, but for now.... by hand will get the job done.
     static ASSERTION_REGISTRY: Lazy<AssertionRegistry> = Lazy::new(|| {
         let assertion_registry = AssertionRegistry::default();
@@ -312,6 +360,7 @@ pub fn install_tracing_helpers() -> AssertionRegistry {
             .and_then(|s| LevelFilter::from_str(s.as_str()).map_err(|_| ()))
             .unwrap_or(LevelFilter::OFF);
         let fmt_layer = tracing_subscriber::fmt::layer()
+            .with_ansi(true)
             .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
             .with_test_writer()
             .with_filter(fmt_filter);
