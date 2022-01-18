@@ -79,39 +79,22 @@ impl Function for MatchDatadogQuery {
     ) -> CompiledArgument {
         match (name, expr) {
             ("query", Some(expr)) => {
-                let query_value = match expr {
-                    expression::Expr::Literal(literal) => literal.to_value(),
-                    expression::Expr::Variable(var) if var.value().is_some() => {
-                        match var.value().unwrap().clone().into_expr() {
-                            expression::Expr::Literal(literal) => literal.to_value(),
-                            expr => {
-                                return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                                    keyword: "query",
-                                    expected: "literal",
-                                    expr,
-                                }))
-                            }
-                        }
-                    }
-                    expr => {
-                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                let query_value =
+                    expr.as_value()
+                        .ok_or_else(|| vrl::function::Error::UnexpectedExpression {
                             keyword: "query",
                             expected: "literal",
                             expr: expr.clone(),
-                        }))
-                    }
-                };
+                        })?;
 
                 let query = query_value
                     .try_bytes_utf8_lossy()
                     .expect("datadog search query should be a UTF8 string");
 
                 // Compile the Datadog search query to AST.
-                let node = parse(&query)
-                    .map_err(|e| {
-                        Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
-                    })
-                    .unwrap(); // TODO proper error handling...
+                let node = parse(&query).map_err(|e| {
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+                })?;
 
                 // Build the matcher function that accepts a VRL event value. This will parse the `node`
                 // at boot-time and return a boxed func that contains just the logic required to match a
