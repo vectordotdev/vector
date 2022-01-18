@@ -4,6 +4,36 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct EventStoreDbMetricsSendingError {
+    pub count: usize,
+    pub error: String,
+}
+
+impl InternalEvent for EventStoreDbMetricsSendingError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Sending metric error.",
+            error = ?self.error,
+            error_type = "stream_error",
+            stage = "sending",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", self.count as u64,
+            "stage" => "sending",
+            "error_type" => "stream_error",
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "stage" => "sending",
+            "error_type" => "stream_error",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct EventStoreDbMetricsHttpError {
     pub error: crate::Error,
 }

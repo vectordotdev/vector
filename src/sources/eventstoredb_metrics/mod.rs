@@ -13,7 +13,8 @@ use crate::{
     http::HttpClient,
     internal_events::{
         EventStoreDbMetricsBytesReceived, EventStoreDbMetricsEventsReceived,
-        EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
+        EventStoreDbMetricsHttpError, EventStoreDbMetricsSendingError,
+        EventStoreDbStatsParsingError,
     },
     tls::TlsSettings,
 };
@@ -114,15 +115,19 @@ fn eventstoredb(
 
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
+                                let count = metrics.len();
 
                                 emit!(&EventStoreDbMetricsEventsReceived {
-                                    count: metrics.len(),
+                                    count: count.clone(),
                                     byte_size: bytes.len(),
                                 });
 
                                 let mut metrics = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = cx.out.send_all(&mut metrics).await {
-                                    error!(message = "Error sending metric.", %error);
+                                    emit!(&EventStoreDbMetricsSendingError {
+                                        count,
+                                        error: error.to_string(),
+                                    });
                                     break;
                                 }
                             }
