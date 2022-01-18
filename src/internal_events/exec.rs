@@ -18,6 +18,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
             message = "Received events.",
             count = self.count,
             command = %self.command,
+            byte_size = self.byte_size,
         );
     }
 
@@ -26,6 +27,11 @@ impl InternalEvent for ExecEventsReceived<'_> {
             "component_received_events_total", self.count as u64,
             "command" => self.command.to_owned(),
         );
+        counter!(
+            "component_received_event_bytes_total", self.byte_size as u64,
+            "command" => self.command.to_owned(),
+        );
+        // deprecated
         counter!(
             "events_in_total", self.count as u64,
             "command" => self.command.to_owned(),
@@ -38,50 +44,134 @@ impl InternalEvent for ExecEventsReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct ExecFailed<'a> {
+pub struct ExecFailedError<'a> {
     pub command: &'a str,
     pub error: std::io::Error,
 }
 
-impl InternalEvent for ExecFailed<'_> {
+impl InternalEvent for ExecFailedError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Unable to exec.",
             command = %self.command,
             error = ?self.error,
+            error_type = "failed",
+            stage = "receiving",
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
+            "component_errors_total", 1,
+            "command" => self.command.to_owned(),
+            "error" => self.error.to_string(),
+            "error_type" => "failed",
+            "stage" => "receiving",
+        );
+        // deprecated
+        counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
+            "error" => self.error.to_string(),
             "error_type" => "failed",
+            "stage" => "receiving",
         );
     }
 }
 
 #[derive(Debug)]
-pub struct ExecTimeout<'a> {
+pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
+    pub error: String,
 }
 
-impl InternalEvent for ExecTimeout<'_> {
+impl InternalEvent for ExecTimeoutError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Timeout during exec.",
             command = %self.command,
-            elapsed_seconds = %self.elapsed_seconds
+            elapsed_seconds = %self.elapsed_seconds,
+            error = %self.error,
+            error_type = "timed_out",
+            stage = "receiving",
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
+            "component_errors_total", 1,
+            "command" => self.command.to_owned(),
+            "error" => self.error.clone(),
+            "error_type" => "timed_out",
+            "stage" => "receiving",
+        );
+        // deprecated
+        counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
+            "error" => self.error.clone(),
             "error_type" => "timed_out",
+            "stage" => "receiving",
         );
+    }
+}
+
+#[derive(Debug)]
+pub struct ExecStreamError {
+    pub error: String,
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ExecStreamError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to forward event, downstream is closed.",
+            error = %self.error,
+            error_type = "stream_closed",
+            stage = "sending",
+            count = %self.count,
+            byte_size = %self.byte_size,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", self.count as u64,
+            "byte_size" => self.byte_size.to_string(),
+            "error" => self.error.clone(),
+            "error_type" => "stream_closed",
+            "stage" => "sending",
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "byte_size" => self.byte_size.to_string(),
+            "error" => self.error.clone(),
+            "error_type" => "stream_closed",
+            "stage" => "sending",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct ExecEventsSent {
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ExecEventsSent {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Events sent.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_sent_events_total", self.count as u64);
+        counter!("component_sent_event_bytes_total", self.byte_size as u64);
     }
 }
 

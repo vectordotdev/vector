@@ -18,6 +18,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
@@ -27,7 +28,10 @@ use crate::{
     },
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
+    internal_events::{
+        ExecCommandExecuted, ExecEventsReceived, ExecEventsSent, ExecFailedError, ExecStreamError,
+        ExecTimeoutError,
+    },
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -257,16 +261,17 @@ async fn run_scheduled(
         match timeout_result {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailed {
+                    emit!(&ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
-            Err(_) => {
-                emit!(&ExecTimeout {
+            Err(error) => {
+                emit!(&ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
+                    error: error.to_string(),
                 });
             }
         }
@@ -301,7 +306,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailed {
+                        emit!(&ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -323,7 +328,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailed {
+            emit!(&ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -385,7 +390,13 @@ async fn run_command(
             byte_size,
         });
 
+        let total_size: usize = events.iter().map(ByteSizeOf::size_of).sum();
+        let total_count = events.len();
+        let mut processed_size = 0;
+        let mut processed_count = 0;
+
         for mut event in events {
+            let event_size = event.size_of();
             handle_event(
                 &config,
                 &hostname,
@@ -394,11 +405,30 @@ async fn run_command(
                 &mut event,
             );
 
-            if out.send(event).await.is_err() {
-                error!(message = "Failed to forward event; downstream is closed.");
-                break 'send;
+            match out.send(event).await {
+                Ok(_) => {
+                    processed_size += event_size;
+                    processed_count += 1;
+                }
+                Err(error) => {
+                    // we need to emit the successfully sent events before breaking the while loop
+                    emit!(&ExecEventsSent {
+                        count: processed_count,
+                        byte_size: processed_size,
+                    });
+                    emit!(&ExecStreamError {
+                        count: total_count - processed_count,
+                        byte_size: total_size - processed_size,
+                        error: error.to_string(),
+                    });
+                    break 'send;
+                }
             }
         }
+        emit!(&ExecEventsSent {
+            count: processed_count,
+            byte_size: processed_size,
+        });
     }
 
     let elapsed = start.elapsed();
