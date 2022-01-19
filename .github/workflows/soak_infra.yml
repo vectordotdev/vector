@@ -5,6 +5,9 @@
 name: Soak Infra
 
 on:
+  pull_request:
+    paths:
+      - 'lib/soak'
   push:
     branches:
       - master
@@ -100,7 +103,7 @@ jobs:
         with:
           context: .
           file: soaks/Dockerfile.builder
-          push: true
+          push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
