@@ -5,7 +5,7 @@ use tokio_test::{assert_pending, assert_ready, task::spawn};
 use super::with_temp_dir;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    disk_v2::{acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfig},
+    disk_v2::{acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfigBuilder},
 };
 
 #[tokio::test]
@@ -16,7 +16,7 @@ async fn ack_updates_ledger_correctly() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop();
-            let config = DiskBufferConfig::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir).build();
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");
@@ -44,7 +44,7 @@ async fn ack_wakes_reader() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop();
-            let config = DiskBufferConfig::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir).build();
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");

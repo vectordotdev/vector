@@ -7,10 +7,9 @@ use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
 
-use super::Ledger;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
+    disk_v2::{io::TokioFilesystem, Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer},
     encoding::{DecodeBytes, EncodeBytes},
     Acker, Bufferable,
 };
@@ -256,12 +255,17 @@ impl DecodeBytes<UndecodableRecord> for UndecodableRecord {
 
 pub(crate) async fn create_default_buffer<P, R>(
     data_dir: P,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, TokioFilesystem>,
+    Reader<R, TokioFilesystem>,
+    Acker,
+    Arc<Ledger<TokioFilesystem>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir).build();
+    let config = DiskBufferConfigBuilder::from_path(data_dir).build();
     let usage_handle = BufferUsageHandle::noop();
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -271,14 +275,19 @@ where
 pub(crate) async fn create_buffer_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, TokioFilesystem>,
+    Reader<R, TokioFilesystem>,
+    Acker,
+    Arc<Ledger<TokioFilesystem>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
     // We override `max_buffer_size` directly because otherwise `build` has built-in logic that
     // ensures it is a minimum size related to the data file size limit, etc.
-    let mut config = DiskBufferConfig::from_path(data_dir).build();
+    let mut config = DiskBufferConfigBuilder::from_path(data_dir).build();
     config.max_buffer_size = max_buffer_size;
     let usage_handle = BufferUsageHandle::noop();
 
@@ -290,12 +299,17 @@ where
 pub(crate) async fn create_buffer_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, TokioFilesystem>,
+    Reader<R, TokioFilesystem>,
+    Acker,
+    Arc<Ledger<TokioFilesystem>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir)
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_record_size(max_record_size)
         .build();
     let usage_handle = BufferUsageHandle::noop();
@@ -308,12 +322,17 @@ where
 pub(crate) async fn create_buffer_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, TokioFilesystem>,
+    Reader<R, TokioFilesystem>,
+    Acker,
+    Arc<Ledger<TokioFilesystem>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir)
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
         .build();
     let usage_handle = BufferUsageHandle::noop();

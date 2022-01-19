@@ -6,6 +6,8 @@ use std::{
 
 use crc32fast::Hasher;
 
+use super::io::{Filesystem, TokioFilesystem};
+
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
 pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
@@ -25,7 +27,7 @@ pub(crate) fn create_crc32c_hasher() -> Hasher {
 
 /// Buffer configuration.
 #[derive(Clone, Debug)]
-pub struct DiskBufferConfig {
+pub struct DiskBufferConfig<FS> {
     /// Directory where this buffer will write its files.
     ///
     /// Must be unique from all other buffers, whether within the same process or other Vector
@@ -62,9 +64,29 @@ pub struct DiskBufferConfig {
     /// In the event that data had not yet been durably written to disk, and Vector crashed, the
     /// amount of data written since the last flush would be lost.
     pub(crate) flush_interval: Duration,
+
+    /// Filesystem implementation for opening data files.
+    ///
+    /// We allow parameterizing the filesystem implementation for ease of testing.  The "filesystem"
+    /// implementation essentially defines how we open and delete data files, as well as the type of
+    /// the data file objects we get when opening a data file.
+    pub(crate) filesystem: FS,
 }
 
-impl DiskBufferConfig {
+/// Builder for [`DiskBufferConfig`].
+pub struct DiskBufferConfigBuilder<FS = TokioFilesystem>
+where
+    FS: Filesystem,
+{
+    data_dir: PathBuf,
+    max_buffer_size: Option<u64>,
+    max_data_file_size: Option<u64>,
+    max_record_size: Option<usize>,
+    flush_interval: Option<Duration>,
+    filesystem: FS,
+}
+
+impl DiskBufferConfigBuilder {
     pub fn from_path<P>(data_dir: P) -> DiskBufferConfigBuilder
     where
         P: AsRef<Path>,
@@ -75,20 +97,15 @@ impl DiskBufferConfig {
             max_data_file_size: None,
             max_record_size: None,
             flush_interval: None,
+            filesystem: TokioFilesystem,
         }
     }
 }
 
-/// Builder for [`DiskBufferConfig`].
-pub struct DiskBufferConfigBuilder {
-    data_dir: PathBuf,
-    max_buffer_size: Option<u64>,
-    max_data_file_size: Option<u64>,
-    max_record_size: Option<usize>,
-    flush_interval: Option<Duration>,
-}
-
-impl DiskBufferConfigBuilder {
+impl<FS> DiskBufferConfigBuilder<FS>
+where
+    FS: Filesystem,
+{
     /// Sets the maximum size, in bytes, that the buffer can consume.
     ///
     /// The actual maximum on-disk buffer size is this amount rounded up to the next multiple of
@@ -148,8 +165,30 @@ impl DiskBufferConfigBuilder {
         self
     }
 
+    /// Filesystem implementation for opening data files.
+    ///
+    /// We allow parameterizing the filesystem implementation for ease of testing.  The "filesystem"
+    /// implementation essentially defines how we open and delete data files, as well as the type of
+    /// the data file objects we get when opening a data file.
+    ///
+    /// Defaults to a Tokio-backed implementation.
+    #[allow(dead_code)]
+    pub fn filesystem<FS2>(self, filesystem: FS2) -> DiskBufferConfigBuilder<FS2>
+    where
+        FS2: Filesystem,
+    {
+        DiskBufferConfigBuilder {
+            data_dir: self.data_dir,
+            max_buffer_size: self.max_buffer_size,
+            max_data_file_size: self.max_data_file_size,
+            max_record_size: self.max_record_size,
+            flush_interval: self.flush_interval,
+            filesystem,
+        }
+    }
+
     /// Consumes this builder and constructs a `DiskBufferConfig`.
-    pub fn build(self) -> DiskBufferConfig {
+    pub fn build(self) -> DiskBufferConfig<FS> {
         let max_data_file_size = self
             .max_data_file_size
             .unwrap_or(DEFAULT_MAX_DATA_FILE_SIZE);
@@ -157,6 +196,7 @@ impl DiskBufferConfigBuilder {
         let flush_interval = self
             .flush_interval
             .unwrap_or_else(|| Duration::from_millis(500));
+        let filesystem = self.filesystem;
 
         // The actual on-disk maximum buffer size will be the user-supplied `max_buffer_size`
         // rounded up to the next multiple of `DATA_FILE_TARGET_MAX_SIZE`.  Internally, we'll limit
@@ -176,6 +216,7 @@ impl DiskBufferConfigBuilder {
             max_data_file_size,
             max_record_size,
             flush_interval,
+            filesystem,
         }
     }
 }

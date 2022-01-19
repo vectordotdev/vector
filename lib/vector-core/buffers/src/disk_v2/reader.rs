@@ -313,8 +313,8 @@ where
 
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T> {
-    ledger: Arc<Ledger>,
+pub struct Reader<T, FS> {
+    ledger: Arc<Ledger<FS>>,
     reader: Option<RecordReader<File, T>>,
     bytes_read: u64,
     last_reader_record_id: u64,
@@ -327,12 +327,12 @@ pub struct Reader<T> {
     _t: PhantomData<T>,
 }
 
-impl<T> Reader<T>
+impl<T, FS> Reader<T, FS>
 where
     T: Bufferable,
 {
     /// Creates a new [`Reader`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         Reader {
             ledger,
             reader: None,

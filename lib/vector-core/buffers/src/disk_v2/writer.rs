@@ -24,10 +24,7 @@ use tokio::{
     io::{AsyncWrite, AsyncWriteExt, BufWriter},
 };
 
-use super::{
-    common::{create_crc32c_hasher, DiskBufferConfig},
-    record::try_as_record_archive,
-};
+use super::{common::create_crc32c_hasher, record::try_as_record_archive};
 use crate::{
     disk_v2::{
         ledger::Ledger,
@@ -259,25 +256,22 @@ impl<T> RecordWriter<File, T> {
 
 /// Writes records to the buffer.
 #[derive(Debug)]
-pub struct Writer<T> {
-    ledger: Arc<Ledger>,
-    config: DiskBufferConfig,
+pub struct Writer<T, FS> {
+    ledger: Arc<Ledger<FS>>,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
     skip_to_next: bool,
     _t: PhantomData<T>,
 }
 
-impl<T> Writer<T>
+impl<T, FS> Writer<T, FS>
 where
     T: Bufferable,
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
-        let config = ledger.config().clone();
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         Writer {
             ledger,
-            config,
             writer: None,
             data_file_size: 0,
             skip_to_next: false,
@@ -291,7 +285,7 @@ where
     }
 
     fn can_write(&mut self) -> bool {
-        self.data_file_size < self.config.max_data_file_size
+        self.data_file_size < self.ledger.config().max_data_file_size
     }
 
     #[instrument(skip(self), level = "trace")]
@@ -433,7 +427,7 @@ where
             // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
             // wait for the reader to signal that they've made some progress.
             let total_buffer_size = self.ledger.get_total_buffer_size();
-            let max_buffer_size = self.config.max_buffer_size;
+            let max_buffer_size = self.ledger.config().max_buffer_size;
             if total_buffer_size <= max_buffer_size {
                 break;
             }
@@ -556,7 +550,10 @@ where
                 // Make sure the file is flushed to disk, especially if we just created it.
                 data_file.sync_all().await?;
 
-                self.writer = Some(RecordWriter::new(data_file, self.config.max_record_size));
+                self.writer = Some(RecordWriter::new(
+                    data_file,
+                    self.ledger.config().max_record_size,
+                ));
                 self.data_file_size = data_file_size;
 
                 // If we opened the "next" data file, we need to increment the current writer
@@ -662,7 +659,7 @@ where
     }
 }
 
-impl<T> Writer<T> {
+impl<T, FS> Writer<T, FS> {
     /// Closes this [`Writer`], marking it as done.
     ///
     /// Closing the writer signals to the reader that that no more records will be written until the
@@ -681,7 +678,7 @@ impl<T> Writer<T> {
     }
 }
 
-impl<T> Drop for Writer<T> {
+impl<T, FS> Drop for Writer<T, FS> {
     fn drop(&mut self) {
         self.close();
     }

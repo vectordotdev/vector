@@ -200,9 +200,9 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger {
+pub struct Ledger<FS> {
     // Buffer configuration.
-    config: DiskBufferConfig,
+    config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
     ledger_lock: LockFile,
     // Ledger state.
@@ -225,9 +225,9 @@ pub struct Ledger {
     usage_handle: BufferUsageHandle,
 }
 
-impl Ledger {
+impl<FS> Ledger<FS> {
     /// Gets the configuration for the buffer that this ledger represents.
-    pub fn config(&self) -> &DiskBufferConfig {
+    pub fn config(&self) -> &DiskBufferConfig<FS> {
         &self.config
     }
 
@@ -522,9 +522,9 @@ impl Ledger {
     /// operations, an error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip_all, level = "trace"))]
     pub(super) async fn load_or_create(
-        config: DiskBufferConfig,
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<Ledger, LedgerLoadCreateError> {
+    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir)
             .await
@@ -662,7 +662,10 @@ impl Ledger {
     }
 }
 
-impl fmt::Debug for Ledger {
+impl<FS> fmt::Debug for Ledger<FS>
+where
+    FS: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
             .field("config", &self.config)

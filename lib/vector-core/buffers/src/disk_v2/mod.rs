@@ -105,7 +105,7 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
+use self::{acknowledgements::create_disk_v2_acker, io::Filesystem, ledger::Ledger};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     ledger::LedgerLoadCreateError,
@@ -143,10 +143,13 @@ where
     T: Bufferable,
 {
     #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
-    pub(crate) async fn from_config_inner(
-        config: DiskBufferConfig,
+    pub(crate) async fn from_config_inner<FS>(
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
+    where
+        FS: Filesystem + Send + Sync + 'static,
+    {
         let ledger = Ledger::load_or_create(config, usage_handle)
             .await
             .context(LedgerSnafu)?;
@@ -183,10 +186,13 @@ where
     /// If an error occurred during the creation or loading of the disk buffer, an error variant
     /// will be returned describing the error.
     #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
-    pub async fn from_config(
-        config: DiskBufferConfig,
+    pub async fn from_config<FS>(
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T>, Reader<T>, Acker), BufferError<T>> {
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
+    where
+        FS: Filesystem + Send + Sync + 'static,
+    {
         let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
 
         Ok((writer, reader, acker))
