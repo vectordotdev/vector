@@ -136,18 +136,16 @@ impl Remap {
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
             Event::Log(ref mut log) => {
-                let raw_message = error
+                let message = error
                     .labels()
                     .pop()
-                    .expect("at least one label from error")
-                    .message;
+                    .map_or(error.to_string(), |label| label.message);
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
                         "dropped": {
                             "reason": reason,
-                            "message": error.to_string(),
-                            "raw_message": raw_message,
+                            "message": message,
                             "component_id": self.component_key,
                             "component_type": "remap",
                             "component_kind": "transform",
@@ -687,7 +685,6 @@ mod tests {
                 "dropped": {
                     "reason": "abort",
                     "message": "aborted",
-                    "raw_message": "aborted",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -706,8 +703,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
-                    "raw_message": "expected \"string\", got \"integer\"",
+                    "message": "expected \"string\", got \"integer\"",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -805,8 +801,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"assert_eq\" at (0:44): custom message here",
-                    "raw_message": "custom message here",
+                    "message": "custom message here",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
