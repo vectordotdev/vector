@@ -35,7 +35,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_core::event::{BatchNotifier, Event, LogEvent};
+use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
 
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
@@ -195,23 +195,23 @@ pub fn temp_dir() -> PathBuf {
 pub fn map_event_batch_stream(
     stream: impl Stream<Item = Event>,
     batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |event| event.with_batch_notifier_option(&batch))
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch).into())
 }
 
 // TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |log| vec![log.with_batch_notifier_option(&batch)].into())
 }
 
 pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
     generator: Gen,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let lines = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
     (lines, stream)
@@ -221,7 +221,7 @@ pub fn random_lines_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let generator = move |_| random_string(len);
     generate_lines_with_stream(generator, count, batch)
 }
@@ -230,7 +230,7 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
     generator: Gen,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -243,7 +243,7 @@ pub fn random_events_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
         .map(|_| Event::from(random_string(len)))
         .collect::<Vec<_>>();
@@ -259,7 +259,7 @@ pub fn random_updated_events_with_stream<F>(
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
     update_fn: F,
-) -> (Vec<Event>, impl Stream<Item = Event>)
+) -> (Vec<Event>, impl Stream<Item = EventArray>)
 where
     F: Fn((usize, Event)) -> Event,
 {

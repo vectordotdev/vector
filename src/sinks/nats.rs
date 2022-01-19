@@ -245,6 +245,7 @@ mod integration_tests {
     use std::{thread, time::Duration};
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
 
     #[tokio::test]
@@ -271,11 +272,12 @@ mod integration_tests {
 
         // Publish events.
         let (acker, ack_counter) = Acker::basic();
-        let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
+        let sink = NatsSink::new(cnf.clone(), acker).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 
-        let _ = sink.run(Box::pin(events)).await.unwrap();
+        let _ = sink.run(events).await.unwrap();
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));

@@ -357,6 +357,7 @@ pub async fn build_pieces(
                             byte_size: event.size_of(),
                         })
                     })
+                    .map(Into::into) // Convert the `Event` into an `EventArray`
                     .take_until_if(tripwire),
             )
             .await

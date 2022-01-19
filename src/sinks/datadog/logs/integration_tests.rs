@@ -1,9 +1,10 @@
+use indoc::indoc;
+use vector_core::event::{BatchNotifier, BatchStatus};
+
 use crate::{
     config::SinkConfig, sinks::datadog::logs::DatadogLogsConfig, sinks::util::test::load_sink,
     test_util::generate_lines_with_stream,
 };
-use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus};
 
 #[tokio::test]
 async fn to_real_v2_endpoint() {
