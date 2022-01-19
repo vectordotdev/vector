@@ -397,6 +397,7 @@ mod integration_tests {
     use tokio::time::{sleep, Duration};
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string};
 
     fn sqs_address() -> String {
@@ -431,10 +432,11 @@ mod integration_tests {
 
         config.clone().healthcheck(client.clone()).await.unwrap();
 
-        let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = VectorSink::from_event_sink(sink);
 
         let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-        sink.send_all(&mut events.map(Ok)).await.unwrap();
+        sink.run(events).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;
 
