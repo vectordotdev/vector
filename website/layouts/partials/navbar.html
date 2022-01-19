@@ -23,10 +23,10 @@
           </a>
         </div>
         <div class="hidden lg:block lg:ml-6">
-          <div class="flex space-x-4 lg:space-x-3 xl:space-x-4">
+          <div class="flex space-x-4 lg:space-x-2.5 xl:space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal">
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm lg:text-sm xl:text-base font-normal">
               <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
