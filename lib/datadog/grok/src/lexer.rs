@@ -15,6 +15,7 @@ pub enum Token<S> {
     Colon,
     LParen,
     RParen,
+    LUnknown,
     Dot,
     Comma,
     Null,

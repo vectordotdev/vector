@@ -15,7 +15,7 @@ use nom::{
 use nom_regex::str::re_find;
 use ordered_float::NotNan;
 use regex::Regex;
-use vrl_compiler::Value;
+use vrl_compiler::{Target, Value};
 
 use crate::{
     ast::{Function, FunctionArgument},
@@ -23,6 +23,9 @@ use crate::{
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
+use lookup::{Lookup, LookupBuf};
+use std::collections::BTreeMap;
+use std::str::FromStr;
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     {
@@ -120,8 +123,9 @@ impl std::fmt::Display for KeyValueFilter {
 
 pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, GrokRuntimeError> {
     match value {
-        Value::Bytes(bytes) => Ok(Value::from_iter::<Vec<(String, Value)>>(
-            parse(
+        Value::Bytes(bytes) => {
+            let mut result = Value::Object(BTreeMap::default());
+            let p = parse(
                 String::from_utf8_lossy(bytes).as_ref(),
                 &filter.key_value_delimiter,
                 &filter
@@ -132,18 +136,22 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                 &filter.quotes,
                 &filter.value_re,
             )
-            .map_err(|_e| {
-                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-            })?
-            .iter()
-            .filter(|(k, v)| {
-                !(v.is_null()
-                    || matches!(v, Value::Bytes(b) if b.is_empty())
-                    || k.trim().is_empty())
-            })
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect(),
-        )),
+            .unwrap_or_default()
+            .into_iter()
+            .for_each(|(k, v)| {
+                if !(v.is_null()
+                    || matches!(&v, Value::Bytes(b) if b.is_empty())
+                    || k.to_owned().trim().is_empty())
+                {
+                    let lookup: LookupBuf = Lookup::from_str(&k).unwrap_or(Lookup::from(&k)).into();
+                    result.insert(&lookup, v.to_owned());
+                }
+            }); //TODO
+                // .map_err(|_e| {
+                //     GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                // })?
+            Ok(result)
+        }
         _ => Err(GrokRuntimeError::FailedToApplyFilter(
             filter.to_string(),
             value.to_string(),
@@ -153,11 +161,11 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
 
 type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
 
-fn parse<'a>(
-    input: &'a str,
-    key_value_delimiter: &'a str,
-    field_delimiters: &'a [&'a str],
-    quotes: &'a [(char, char)],
+fn parse(
+    input: &str,
+    key_value_delimiter: &str,
+    field_delimiters: &[&str],
+    quotes: &[(char, char)],
     value_re: &Regex,
 ) -> Result<Vec<(String, Value)>, String> {
     let (rest, result) = parse_line(
@@ -235,7 +243,7 @@ fn parse_key_value<'a>(
                         ),
                         preceded(space0, parse_key(field_delimiter, quotes, non_quoted_re)),
                     )),
-                    many_m_n(1, 1, tag(key_value_delimiter)),
+                    many_m_n(0, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter, quotes, non_quoted_re),
                 ))(input)
             },
@@ -329,11 +337,18 @@ fn parse_value<'a>(
                         parse_end_of_input(),
                     ))),
                 ),
-                |v: &'a str| Value::Integer(v.parse().expect("not an integer")),
+                |v| Value::Integer(v.parse().expect("not an integer")),
             ),
-            map(double, |value| {
-                Value::Float(NotNan::new(value).expect("not a float"))
-            }),
+            map(
+                terminated(
+                    double,
+                    peek(alt((
+                        parse_field_delimiter(field_delimiter),
+                        parse_end_of_input(),
+                    ))),
+                ),
+                |v| Value::Float(NotNan::new(v).expect("not a float")),
+            ),
             map(match_re_or_empty(re, field_delimiter), |value| {
                 Value::Bytes(Bytes::copy_from_slice(value.as_bytes()))
             }),

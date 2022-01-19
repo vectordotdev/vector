@@ -302,6 +302,13 @@ impl Filter<Value> for VrlFilter {
                             Comparison::Gt => *lhs > *rhs,
                             Comparison::Gte => *lhs >= *rhs,
                         },
+                        // Integers.
+                        (Value::Integer(lhs), ComparisonValue::Float(rhs)) => match comparator {
+                            Comparison::Lt => (*lhs as f64) < *rhs,
+                            Comparison::Lte => *lhs as f64 <= *rhs,
+                            Comparison::Gt => *lhs as f64 > *rhs,
+                            Comparison::Gte => *lhs as f64 >= *rhs,
+                        },
                         // Floats.
                         (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
                             let lhs = lhs.into_inner();
@@ -310,6 +317,16 @@ impl Filter<Value> for VrlFilter {
                                 Comparison::Lte => lhs <= *rhs,
                                 Comparison::Gt => lhs > *rhs,
                                 Comparison::Gte => lhs >= *rhs,
+                            }
+                        }
+                        // Floats.
+                        (Value::Float(lhs), ComparisonValue::Integer(rhs)) => {
+                            let lhs = lhs.into_inner();
+                            match comparator {
+                                Comparison::Lt => lhs < *rhs as f64,
+                                Comparison::Lte => lhs <= *rhs as f64,
+                                Comparison::Gt => lhs > *rhs as f64,
+                                Comparison::Gte => lhs >= *rhs as f64,
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.
@@ -1513,6 +1530,12 @@ mod test {
         negate_range_facet_lower_bound {
             args: func_args![value: value!({"custom": {"a": 5}}), query: "-@a:[4 TO *]"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_facet_lower_bound_match_a {
+            args: func_args![value: value!({"custom": {"level": 7.1}}), query: "@level:[7 TO 10]"],
+            want: Ok(true),
             tdef: type_def(),
         }
 

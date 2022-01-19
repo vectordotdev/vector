@@ -29,12 +29,13 @@ extern {
         "]" => Token::RBracket,
         "(" => Token::LParen,
         ")" => Token::RParen,
+        "?>" => Token::LUnknown,
     }
 }
 
 pub GrokFilter: GrokPattern = {
- "%{" <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp },
- "%{" <match_fn:FunctionOrRef> ":" "}" => GrokPattern{ match_fn, destination: None },
+ "%{" "?>"? <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp },
+ "%{" "?>"? <match_fn:FunctionOrRef> ":" "}" => GrokPattern{ match_fn, destination: None },
 }
 
 DestinationAndFilter: Destination = {

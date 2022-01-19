@@ -9,6 +9,7 @@ use crate::{
     grok_filter::apply_filter,
     parse_grok_rules::{GrokField, GrokRule},
 };
+use lookup::LookupBuf;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -47,6 +48,9 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
+            if (name.starts_with("ignore") || value.is_empty()) {
+                continue;
+            }
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
@@ -54,6 +58,9 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 filters,
             }) = grok_rule.fields.get(name)
             {
+                if name.starts_with("root") {
+                    let field = LookupBuf::root();
+                }
                 filters.iter().for_each(|filter| {
                     if let Some(ref v) = value {
                         match apply_filter(v, filter) {
@@ -69,7 +76,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 if let Some(value) = value {
                     match value {
                         // root-level maps must be merged
-                        Value::Object(map) if field.is_root() || field.segments[0].is_index() => {
+                        Value::Object(map) if field.is_root() => {
                             parsed.as_object_mut().expect("root is object").extend(map);
                         }
                         // anything else at the root leve must be ignored
@@ -77,11 +84,17 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         // ignore empty strings if necessary
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => {
-                            parsed.insert(field, value).unwrap_or_else(
-                                |error| warn!(message = "Error updating field value", field = %field, %error)
-                            );
-                        }
+                        _ => match parsed.get(field).expect("field does not exist") {
+                            Some(Value::Array(mut values)) => values.push(value),
+                            Some(v) => {
+                                parsed.insert(field, Value::Array(vec![v, value]));
+                            }
+                            None => {
+                                parsed.insert(field, value).unwrap_or_else(
+                                        |error| warn!(message = "Error updating field value", field = %field, %error)
+                                    );
+                            }
+                        },
                     };
                 }
             } else {
@@ -164,7 +177,7 @@ mod tests {
             parsed,
             Value::from(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000.0,
+                "duration" => 202000000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",
@@ -190,13 +203,9 @@ mod tests {
     fn supports_matchers() {
         test_grok_pattern(vec![
             ("%{number:field}", "-1.2", Ok(Value::from(-1.2_f64))),
-            ("%{number:field}", "-1", Ok(Value::from(-1_f64))),
-            (
-                "%{numberExt:field}",
-                "-1234e+3",
-                Ok(Value::from(-1234e+3_f64)),
-            ),
-            ("%{numberExt:field}", ".1e+3", Ok(Value::from(0.1e+3_f64))),
+            ("%{number:field}", "-1", Ok(Value::from(-1))),
+            ("%{numberExt:field}", "-1234e+3", Ok(Value::from(-1234000))),
+            ("%{numberExt:field}", ".1e+3", Ok(Value::from(100))),
             ("%{integer:field}", "-2", Ok(Value::from(-2))),
             ("%{integerExt:field}", "+2", Ok(Value::from(2))),
             ("%{integerExt:field}", "-2", Ok(Value::from(-2))),
@@ -208,7 +217,7 @@ mod tests {
     #[test]
     fn supports_filters() {
         test_grok_pattern(vec![
-            ("%{data:field:number}", "1.0", Ok(Value::from(1.0_f64))),
+            ("%{data:field:number}", "1.0", Ok(Value::from(1))),
             ("%{data:field:integer}", "1", Ok(Value::from(1))),
             (
                 "%{data:field:lowercase}",
@@ -220,8 +229,8 @@ mod tests {
                 "Abc",
                 Ok(Value::Bytes("ABC".into())),
             ),
-            ("%{integer:field:scale(10)}", "1", Ok(Value::from(10.0))),
-            ("%{number:field:scale(0.5)}", "10.0", Ok(Value::from(5.0))),
+            ("%{integer:field:scale(10)}", "1", Ok(Value::from(10))),
+            ("%{number:field:scale(0.5)}", "10.0", Ok(Value::from(5))),
         ]);
     }
 
@@ -520,6 +529,11 @@ mod tests {
                 "Thu Jun 16 08:29:03 2016",
                 Ok(Value::Integer(1466076543000)),
             ),
+            (
+                r#"%{date("MMM d yyyy HH:mm:ss z"):field}"#,
+                "Nov 16 2020 13:41:29 GMT",
+                Ok(Value::Integer(1605534089000)),
+            ),
         ]);
 
         // check error handling
@@ -581,7 +595,7 @@ mod tests {
             (
                 "%{data:field:array(number)}",
                 "[1,2]",
-                Ok(Value::Array(vec![1.0.into(), 2.0.into()])),
+                Ok(Value::Array(vec![1.into(), 2.into()])),
             ),
             (
                 "%{data:field:array(integer)}",
@@ -591,17 +605,17 @@ mod tests {
             (
                 "%{data:field:array(scale(10))}",
                 "[1,2.1]",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
             (
                 r#"%{data:field:array(";", scale(10))}"#,
                 "[1;2.1]",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
             (
                 r#"%{data:field:array("{}",";", scale(10))}"#,
                 "{1;2.1}",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
         ]);
 
@@ -619,6 +633,48 @@ mod tests {
                 Ok(Value::Object(btreemap! {})),
             ),
         ]);
+    }
+
+    #[test]
+    fn parses_alternative_with_the_same_field() {
+        test_full_grok(vec![
+            (
+                "(%{integer:field}|%{word:field})",
+                "123",
+                Ok(Value::from(btreemap! {
+                    "field" => Value::Integer(123)
+                })),
+            ),
+            (
+                "(%{number:field}|%{word:field})",
+                "abc",
+                Ok(Value::from(btreemap! {
+                    "field" => Value::Bytes("abc".into())
+                })),
+            ),
+        ]);
+        let rules = parse_grok_rules(
+            // patterns
+            &[r#"%{_prefix}"#.to_string()],
+            // aliases
+            btreemap! {
+            "_thread_name" => r#"%{notSpace:logger.thread_name}"#.to_string(),
+            "_thread_id" => r#"%{integer:logger.thread_id}"#.to_string(),
+                "_prefix" => r#"\[(%{_thread_name}:%{_thread_id}|%{_thread_name})\]"#.to_string(),
+                },
+        )
+        .expect("couldn't parse rules");
+        let parsed = parse_grok("[MemtableFlushWriter:20342]", &rules, false).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                 "logger" => btreemap! {
+                    "thread_id" => Value::Integer(20342),
+                    "thread_name" => Value::Bytes("MemtableFlushWriter".into()),
+                 }
+            })
+        );
     }
 
     #[test]
@@ -661,9 +717,16 @@ mod tests {
             ),
             (
                 r#"%{data::keyvalue(":")}"#,
-                r#"key:valueStr"#,
+                r#"kafka_cluster_status:8ca7b736f0aa43e5"#,
                 Ok(Value::from(btreemap! {
-                    "key" => "valueStr"
+                    "kafka_cluster_status" => "8ca7b736f0aa43e5"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue("=", "\\w.\\-_@:")}"#,
+                r#"IN=eth0 OUT= MAC"#,// no value
+                Ok(Value::from(btreemap! {
+                    "IN" => "eth0"
                 })),
             ),
             (
@@ -794,14 +857,79 @@ mod tests {
                 "key =valueStr",
                 Ok(Value::from(btreemap! {})),
             ),
+            (
+                "%{data::keyvalue}",
+                "db.name=my_db,db.operation=insert",
+                Ok(Value::from(btreemap! {
+                    "db" => btreemap! {
+                        "name" => "my_db",
+                        "operation" => "insert",
+                    }
+                })),
+            ),
         ]);
+    }
+
+    #[test]
+    fn test2() {
+        let rules = parse_grok_rules(
+                                                   &[
+                                                   r#"%{_core_date} %{_colorcode}?\\[%{_common_severity}\\]\\s+\\[%{_logger_name}\\]\\s+\\|\\s+%{_client_ip}\\s*\\|%{_colorcode}?\\s+%{_status_code}\\s+%{_colorcode}?\\s*\\|\\s+%{_duration}ms\\s*\\|\\s+%{notSpace}\\|%{_colorcode}?\\s+%{_http_method}\\s+%{_colorcode}\\s+%{_http_url}.*"#.to_string(),
+                                                   r#"%{_jobservice_date}\\s+\\[%{_common_severity}\\]\\s+\\[%{_logger_name}\\]:\\s+%{data}"#.to_string(),
+                                                   ],
+                                                    btreemap! {
+                                                       "core" => "%{_core_date} %{_colorcode}?\\[%{_common_severity}\\]\\s+\\[%{_logger_name}\\]\\s+\\|\\s+%{_client_ip}\\s*\\|%{_colorcode}?\\s+%{_status_code}\\s+%{_colorcode}?\\s*\\|\\s+%{_duration}ms\\s*\\|\\s+%{notSpace}\\|%{_colorcode}?\\s+%{_http_method}\\s+%{_colorcode}\\s+%{_http_url}.*".to_string(),
+                                                       "jobservice_or_simple_core"=>  "%{_jobservice_date}\\s+\\[%{_common_severity}\\]\\s+\\[%{_logger_name}\\]:\\s+%{data}".to_string(),
+                                                       "_core_date"=>  "%{date(\"yyyy/MM/dd HH:mm:ss\")}".to_string(),
+                                                       "_jobservice_date"=>  "%{date(\"yyyy-MM-dd'T'HH:mm:ssz\"):}".to_string(),
+                                                       "_colorcode"=>  "%{regex(\"(#033\\\\[((0|1);)?\\\\d+m)\")}".to_string(),
+                                                       "_common_severity"=>  "%{notSpace:severity}".to_string(),
+                                                       "_logger_name"=>  "%{regex(\"[^ :]*\"):logger.name}\\:\\d+".to_string(),
+                                                       "_client_ip"=>  "%{ipOrHost:network.client.ip}".to_string(),
+                                                       "_status_code"=>  "%{integer:http.status_code}".to_string(),
+                                                       "_duration"=>  "%{number:duration:scale(1000000)}".to_string(),
+                                                       "_http_method"=>  "%{word:http.method}".to_string(),
+                                                       "_http_url"=>  "%{notSpace:http.url}".to_string()
+                                                   }
+        ).expect("couldn't parse rules");
+    }
+
+    #[test]
+    fn test3() {
+        let rules = parse_grok_rules(
+            &[
+                r#"%{_date}\\s+%{_code}\\s+%{_log_message:msg}"#.to_string(),
+            ],
+            btreemap! {
+                                                      "log_rule" => r#"%{_date}\s+%{_code}\s+%{_log_message:msg}"#.to_string(),
+                                                      "_date" => r#"\[(%{date("yyyy-MM-dd HH:mm:ss.SSS"):timestamp}|%{date("EEE MMM dd HH:mm:ss yyyy"):timestamp}|%{date("EEE MMM  d HH:mm:ss yyyy"):timestamp})\]"#.to_string(),
+          "_code" => "%{notSpace:filename}:%{integer:lineno}",
+          "_log_message" => "(%{_init_message}|%{_listen_message}|%{_live_message}|%{_error_message}|%{_message})".to_string(),
+          "_init_message" => "init %{integer:twemproxy.pool.servers} servers in pool %{integer:twemproxy.pool.number} '%{notSpace:twemproxy.pool.name}'".to_string(),
+          "_listen_message" => "p %{integer:process.id} listening on %{_address} in %{_pool_info}".to_string(),
+          "_address" => r#"'%{ipOrHost:hostname}:%{port:port}'"#.to_string(),
+          "_pool_info" => r#"%{notSpace:twemproxy.pool.service} pool %{integer:twemproxy.pool.number} '%{notSpace:twemproxy.pool.name}' with %{integer:twemproxy.pool.servers} servers"#.to_string(),
+          "_live_message" => r#"%{integer:twemproxy.servers.live} of %{integer:twemproxy.servers.total} servers are live for pool %{integer:twemproxy.pool.number} '%{notSpace:twemproxy.pool.name}'"#.to_string(),
+          "_error_message" => r#"%{data:error.message} failed:\s+%{data:error.type}"#.to_string(),
+          "_message" => "%{data}".to_string(),
+                                                   },
+        ).expect("couldn't parse rules");
+
+        let parsed = parse_grok("[Tue Mar 30 15:51:03 2021] nc_proxy.c:206 p 5 listening on '0.0.0.0:6100' in redis pool 0 'situ' with 2 servers", &rules, false).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                 "field" =>  Value::Array(vec!["1".into(), 2.into()]),
+            })
+        );
     }
 
     #[test]
     fn alias_and_main_rule_extract_same_fields_to_array() {
         let rules = parse_grok_rules(
             // patterns
-            &[r#"%{notSpace:field:number} %{alias}"#.to_string()],
+            &[r#"%{numberStr:field} %{alias}"#.to_string()],
             // aliases
             btreemap! {
                 "alias" => r#"%{notSpace:field:integer}"#.to_string()
@@ -813,7 +941,7 @@ mod tests {
         assert_eq!(
             parsed,
             Value::from(btreemap! {
-                 "field" =>  Value::Array(vec![1.0.into(), 2.into()]),
+                 "field" =>  Value::Array(vec!["1".into(), 2.into()]),
             })
         );
     }
