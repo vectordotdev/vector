@@ -243,9 +243,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.21"
+version = "3.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c827154564efe63921d98aed34178283ddfc0111fa53530014967f74589cba48"
+checksum = "bf8133c82d84be4006797ae96b1e938564fa5f27a07f8ef852733d535d75e40f"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -274,9 +274,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "3.0.21"
+version = "3.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d55632b238b8a485d1f3b3d4894c00b1c6e4557c38f8e79b99bf115cf4ba0cc"
+checksum = "c7548a7cd7a946d85b6b2b9814b11f71bdda424143c755209a4f378849d75f45"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -290,9 +290,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "3.0.21"
+version = "3.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b285684a43f5286c593013233e7788c8c792c653aa1ad1eee97fe38e2dc702"
+checksum = "fa38c108e7b562fa9ccaa3d016827f61976375d79fa1e39ade9be005c0a8e2d4"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "3.0.21"
+version = "3.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b2ade1091b86cc83a4691fcbca1937f9a09cea42290fdd8a3b3181ca03a8e2"
+checksum = "34394798dfadb4cf2840ce2477a93c9e241b06c5703a0b31388b3a8837f0071e"
 dependencies = [
  "bytes 1.1.0",
  "indexmap",
@@ -2291,16 +2291,6 @@ name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
-
-[[package]]
-name = "fancy-regex"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae91abf6555234338687bb47913978d275539235fcb77ba9863b779090b42b14"
-dependencies = [
- "bit-set",
- "regex",
-]
 
 [[package]]
 name = "fast_chemail"
@@ -8032,12 +8022,13 @@ dependencies = [
 
 [[package]]
 name = "uaparser"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f36c3f6f1893391ac4db205cd54226c69957f0b78ecd61ce503e38d447e5de7"
+checksum = "787229e52a75439a1f640d67139897233ea33094292b3000de9b24e2b82ef205"
 dependencies = [
  "derive_more",
- "fancy-regex",
+ "lazy_static",
+ "regex",
  "serde",
  "serde_derive",
  "serde_yaml",
