@@ -23,11 +23,11 @@ impl InternalEvent for DnstapBytesReceived {
 }
 
 #[derive(Debug)]
-pub struct DnstapEventReceived {
+pub struct DnstapEventsReceived {
     pub byte_size: usize,
 }
 
-impl InternalEvent for DnstapEventReceived {
+impl InternalEvent for DnstapEventsReceived {
     fn emit_logs(&self) {
         trace!(message = "Events received.", count = 1, byte_size = %self.byte_size);
     }
