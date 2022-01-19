@@ -51,6 +51,23 @@ impl InternalEvent for AwsKinesisFirehoseEventsReceived {
 }
 
 #[derive(Debug)]
+pub struct AwsKinesisFirehoseEventsSent {
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AwsKinesisFirehoseEventsSent {
+    fn emit_logs(&self) {
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_sent_events_total", self.count as u64);
+        counter!("component_sent_event_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,
@@ -127,5 +144,42 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
         );
         // deprecated
         counter!("request_automatic_decode_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct AwsKinesisFirehoseStreamError {
+    pub error: String,
+    pub request_id: String,
+    pub count: usize,
+}
+
+impl InternalEvent for AwsKinesisFirehoseStreamError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to forward events, downstream is closed",
+            error = %self.error,
+            error_type = "stream",
+            stage = "sending",
+            request_id = %self.request_id,
+            count = self.count,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", self.count as u64,
+            "stage" => "sending",
+            "error" => self.error.clone(),
+            "errot_type" => "stream",
+            "request_id" => self.request_id.clone(),
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "stage" => "sending",
+            "error" => self.error.clone(),
+            "errot_type" => "stream",
+            "request_id" => self.request_id.clone(),
+        );
     }
 }

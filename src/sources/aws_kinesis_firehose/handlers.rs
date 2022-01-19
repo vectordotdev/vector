@@ -3,10 +3,10 @@ use std::{io::Read, sync::Arc};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::event::BatchNotifier;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
 use super::{
@@ -20,7 +20,8 @@ use crate::{
     event::{BatchStatus, Event},
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseBytesReceived,
-        AwsKinesisFirehoseEventsReceived,
+        AwsKinesisFirehoseEventsReceived, AwsKinesisFirehoseEventsSent,
+        AwsKinesisFirehoseStreamError,
     },
     sources::util::StreamDecodingError,
     SourceSender,
@@ -76,19 +77,25 @@ pub async fn firehose(
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
-                        out.send(event)
-                            .map_err(|error| {
-                                let error = RequestError::ShuttingDown {
-                                    request_id: request_id.clone(),
-                                    source: error,
-                                };
-                                // can only fail if receiving end disconnected, so we are shutting
-                                // down, probably not gracefully.
-                                error!(message = "Failed to forward events, downstream is closed.");
-                                error!(message = "Tried to send the following event.", %error);
-                                warp::reject::custom(error)
-                            })
-                            .await?;
+                        let byte_size = event.size_of();
+
+                        if let Err(error) = out.send(event).await {
+                            emit!(&AwsKinesisFirehoseStreamError {
+                                error: error.to_string(),
+                                request_id: request_id.clone(),
+                                count: 1,
+                            });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                                source: error,
+                            };
+                            warp::reject::custom(error);
+                        } else {
+                            emit!(&AwsKinesisFirehoseEventsSent {
+                                count: 1,
+                                byte_size,
+                            });
+                        }
                     }
 
                     drop(batch);
