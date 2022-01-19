@@ -95,6 +95,7 @@ use snafu::{ResultExt, Snafu};
 mod acknowledgements;
 mod backed_archive;
 mod common;
+mod io;
 mod ledger;
 mod reader;
 mod record;
