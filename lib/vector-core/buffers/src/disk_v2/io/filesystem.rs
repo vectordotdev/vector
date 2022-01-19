@@ -1,8 +1,10 @@
 use std::{path::PathBuf, io};
 
+use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// Generalized interface for opening and deleting files from a filesystem.
+#[async_trait]
 pub trait Filesystem {
 	type File: AsyncRead + AsyncWrite;
 
@@ -15,7 +17,7 @@ pub trait Filesystem {
 	/// 
 	/// If an I/O error occurred when attempting to open the file for writing, an error variant will
 	/// be returned describing the underlying error.
-	fn open_writable(&self, path: &PathBuf) -> io::Result<Self::File>;
+	async fn open_writable(&self, path: &PathBuf) -> io::Result<Self::File>;
 
 	/// Opens a file for writing, creating it if it does not already exist, but atomically.
 	///
@@ -27,7 +29,7 @@ pub trait Filesystem {
 	///
 	/// If a general I/O error occurred when attempting to open the file for writing, an error variant will
 	/// be returned describing the underlying error.
-	fn open_writable_atomic(&self, path: &PathBuf) -> io::Result<Self::File>;
+	async fn open_writable_atomic(&self, path: &PathBuf) -> io::Result<Self::File>;
 
 	/// Opens a file for readaing, creating it if it does not exist.
 	/// 
@@ -37,7 +39,7 @@ pub trait Filesystem {
 	/// 
 	/// If an I/O error occurred when attempting to open the file for reading, an error variant will
 	/// be returned describing the underlying error.	
-	fn open_readable(&self, path: &PathBuf) -> io::Result<Self::File>;
+	async fn open_readable(&self, path: &PathBuf) -> io::Result<Self::File>;
 
 	/// Deletes a file.
 	/// 
@@ -45,5 +47,5 @@ pub trait Filesystem {
 	/// 
 	/// If an I/O error occurred when attempting to delete the file, an error variant will be
 	/// returned describing the underlying error.     
-	fn delete(&self, path: &PathBuf) -> io::Result<()>;
+	async fn delete(&self, path: &PathBuf) -> io::Result<()>;
 }
