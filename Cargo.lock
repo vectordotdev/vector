@@ -1088,7 +1088,6 @@ dependencies = [
  "bytecheck",
  "bytes 1.1.0",
  "clap 3.0.10",
- "core_common",
  "crc32fast",
  "criterion",
  "crossbeam-utils",
@@ -1123,6 +1122,7 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-fluent-assertions",
  "tracing-subscriber",
+ "vector_common",
 ]
 
 [[package]]
@@ -1500,15 +1500,6 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
-
-[[package]]
-name = "core_common"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "serde_json",
- "tracing 0.1.29",
-]
 
 [[package]]
 name = "cpufeatures"
@@ -8427,6 +8418,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector_common"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "serde_json",
+ "tracing 0.1.29",
+]
+
+[[package]]
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
@@ -8436,7 +8436,6 @@ dependencies = [
  "buffers",
  "bytes 1.1.0",
  "chrono",
- "core_common",
  "criterion",
  "db-key",
  "derivative",
@@ -8491,6 +8490,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "vector_common",
  "vrl",
 ]
 

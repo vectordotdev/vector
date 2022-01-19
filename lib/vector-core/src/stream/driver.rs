@@ -328,7 +328,6 @@ mod tests {
     };
 
     use buffers::{Ackable, Acker};
-    use core_common::internal_event::EventsSent;
     use futures_util::{ready, stream};
     use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
@@ -339,6 +338,7 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
+    use vector_common::internal_event::EventsSent;
 
     use super::{Driver, DriverResponse};
     use crate::{

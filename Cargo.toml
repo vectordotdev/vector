@@ -68,6 +68,7 @@ depends = ""
 members = [
   ".",
   "lib/enrichment",
+  "lib/vector-common",
   "lib/vector-core",
   "lib/vector-core/buffers",
   "lib/dnsmsg-parser",
