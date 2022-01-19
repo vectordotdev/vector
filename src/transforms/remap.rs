@@ -7,7 +7,11 @@ use std::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+use vrl::{
+    diagnostic::Formatter,
+    prelude::{DiagnosticError, ExpressionError},
+    Program, Runtime, Terminate,
+};
 
 use crate::{
     config::{
@@ -132,12 +136,18 @@ impl Remap {
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
             Event::Log(ref mut log) => {
+                let raw_message = error
+                    .labels()
+                    .pop()
+                    .expect("at least one label from error")
+                    .message;
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
                         "dropped": {
                             "reason": reason,
                             "message": error.to_string(),
+                            "raw_message": raw_message,
                             "component_id": self.component_key,
                             "component_type": "remap",
                             "component_kind": "transform",
