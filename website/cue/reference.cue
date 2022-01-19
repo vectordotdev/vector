@@ -384,9 +384,9 @@ _values: {
 	}
 
 	#ConditionExample: {
-		title: !=""
-		name: "vrl" | "datadog_search"
-		example: !=""
+		title:    !=""
+		name:     "vrl" | "datadog_search"
+		example:  !=""
 		vrl_only: bool | *false
 	}
 
@@ -435,22 +435,22 @@ _values: {
 	}
 
 	condition_examples: [#ConditionExample, ...#ConditionExample] & [
-		{
-			title: "Standard VRL"
-			name: "vrl"
+				{
+			title:   "Standard VRL"
+			name:    "vrl"
 			example: ".status == 500"
 		},
 		{
-			title: "Datadog Search"
-			name: "datadog_search"
+			title:   "Datadog Search"
+			name:    "datadog_search"
 			example: "*stack"
 		},
 		{
-			title: "VRL shorthand"
-			name: "vrl"
-			example: ".status == 500"
+			title:    "VRL shorthand"
+			name:     "vrl"
+			example:  ".status == 500"
 			vrl_only: true
-		}
+		},
 	]
 }
 
