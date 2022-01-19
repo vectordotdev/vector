@@ -281,7 +281,7 @@ pub struct ReceiverStream<T> {
 }
 
 impl<T> ReceiverStream<T> {
-    fn new(inner: tokio_stream::wrappers::ReceiverStream<T>) -> Self {
+    const fn new(inner: tokio_stream::wrappers::ReceiverStream<T>) -> Self {
         Self { inner }
     }
 
