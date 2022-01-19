@@ -2,6 +2,8 @@ use metrics::counter;
 
 use crate::internal_event::InternalEvent;
 
+pub const DEFAULT_OUTPUT: &'static str = "_default";
+
 #[derive(Debug)]
 pub struct EventsSent<'a> {
     pub count: usize,

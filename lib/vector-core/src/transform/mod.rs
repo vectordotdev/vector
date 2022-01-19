@@ -1,6 +1,6 @@
 use std::{collections::HashMap, pin::Pin};
 
-use core_common::internal_event::{emit, EventsSent};
+use core_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use futures::{SinkExt, Stream};
 
 use crate::{
@@ -232,7 +232,7 @@ impl TransformOutputs {
             emit(&EventsSent {
                 count,
                 byte_size,
-                output: None,
+                output: Some(DEFAULT_OUTPUT),
             });
         }
         for (key, buf) in &mut buf.named_buffers {
