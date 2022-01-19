@@ -33,7 +33,7 @@ pub mod source;
 #[cfg(test)]
 mod test_util;
 pub mod transform;
-pub use buffers;
+pub use vector_buffers as buffers;
 pub mod partition;
 pub mod serde;
 pub mod stream;

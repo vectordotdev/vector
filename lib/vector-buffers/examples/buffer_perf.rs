@@ -8,14 +8,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use buffers::{
-    encoding::{DecodeBytes, EncodeBytes},
-    topology::{
-        builder::TopologyBuilder,
-        channel::{BufferReceiver, BufferSender},
-    },
-    Acker, BufferType, Bufferable, WhenFull,
-};
 use bytes::{Buf, BufMut};
 use clap::{App, Arg};
 use futures::{stream, SinkExt, StreamExt};
@@ -24,6 +16,14 @@ use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
 use tracing::{debug, info, Span};
 use tracing_subscriber::EnvFilter;
+use vector_buffers::{
+    encoding::{DecodeBytes, EncodeBytes},
+    topology::{
+        builder::TopologyBuilder,
+        channel::{BufferReceiver, BufferSender},
+    },
+    Acker, BufferType, Bufferable, WhenFull,
+};
 use vector_common::byte_size_of::ByteSizeOf;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

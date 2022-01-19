@@ -8,7 +8,7 @@ use crate::config::SinkOuter;
 use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
 
-use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 // Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.

@@ -12,7 +12,7 @@ inventory::submit! {
 #[cfg(test)]
 mod tests {
 
-    use vector_core::buffers::Acker;
+    use vector_buffers::Acker;
 
     use crate::{
         sinks::{
