@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use vector_core::internal_event::DEFAULT_OUTPUT;
+
 use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -136,6 +138,44 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
                 )
             })
             .collect())
+    }
+}
+
+/// To avoid collisions between `output` metric tags, check that a component
+/// does not have both a default output and a named output with the name
+/// `_default`
+pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    for (key, source) in config.sources.iter() {
+        let outputs = source.inner.outputs();
+        if outputs.iter().any(|output| output.is_default())
+            && outputs
+                .iter()
+                .map(|output| output.port.as_deref().unwrap_or_else(|| ""))
+                .collect::<Vec<_>>()
+                .contains(&DEFAULT_OUTPUT)
+        {
+            errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
+        }
+    }
+
+    for (key, transform) in config.transforms.iter() {
+        let outputs = transform.inner.outputs();
+        if outputs.iter().any(|output| output.is_default())
+            && outputs
+                .iter()
+                .map(|output| output.port.as_deref().unwrap_or_else(|| ""))
+                .collect::<Vec<_>>()
+                .contains(&DEFAULT_OUTPUT)
+        {
+            errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 

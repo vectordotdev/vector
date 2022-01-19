@@ -33,6 +33,11 @@ impl Output {
     pub fn default(ty: DataType) -> Self {
         Self { port: None, ty }
     }
+
+    /// Check if the `Output` is a default output
+    pub fn is_default(&self) -> bool {
+        self.port.is_none()
+    }
 }
 
 impl<T: Into<String>> From<(T, DataType)> for Output {
