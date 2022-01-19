@@ -159,7 +159,7 @@ pub async fn build_pieces(
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
                 while let Some(event) = rx.next().await {
-                    fanout.send(event).await?;
+                    fanout.feed(event).await?;
                 }
                 fanout.flush().await?;
                 Ok(TaskOutput::Source)
