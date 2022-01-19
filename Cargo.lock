@@ -1434,9 +1434,9 @@ dependencies = [
 
 [[package]]
 name = "console-api"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "033fddce299c93dd44ae21d5f5a6e749baa5d103784bcdde65701c07272a9fde"
+checksum = "14f67643a7d716307ad10b3e3aef02826382acbe349a3e7605ac57556148bc87"
 dependencies = [
  "prost 0.9.0",
  "prost-types 0.9.0",
@@ -1447,11 +1447,12 @@ dependencies = [
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2380cc150266375aeda8f9aeadc5527395c1a8807ecf9fa97a46d1bb760ec5b"
+checksum = "829835c211a0247cd11e65e13cec8696b879374879c35ce162ce8098b23c90d4"
 dependencies = [
  "console-api",
+ "crossbeam-channel",
  "futures 0.3.19",
  "hdrhistogram",
  "humantime",
