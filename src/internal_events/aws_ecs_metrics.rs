@@ -161,3 +161,57 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct AwsEcsMetricsEventsSent {
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AwsEcsMetricsEventsSent {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Events sent.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_sent_events_total", self.count as u64);
+        counter!("component_sent_event_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct AwsEcsMetricsStreamError {
+    pub error: String,
+    pub count: usize,
+}
+
+impl InternalEvent for AwsEcsMetricsStreamError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Error sending metrics downstream.",
+            count = %self.count,
+            error = %self.error,
+            error_type = "stream",
+            stage = "sending",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", self.count as u64,
+            "error" => self.error.clone(),
+            "error_type" => "stream",
+            "stage" => "sending",
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error" => self.error.clone(),
+            "error_type" => "stream",
+            "stage" => "sending",
+        );
+    }
+}

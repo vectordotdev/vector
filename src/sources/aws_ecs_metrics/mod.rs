@@ -10,8 +10,9 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsBytesReceived, AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError,
-        AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError,
+        AwsEcsMetricsBytesReceived, AwsEcsMetricsEventsReceived, AwsEcsMetricsEventsSent,
+        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted,
+        AwsEcsMetricsResponseError, AwsEcsMetricsStreamError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -151,15 +152,25 @@ async fn aws_ecs_metrics(
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
+                                let body_len = body.len();
+                                let count = metrics.len();
                                 emit!(&AwsEcsMetricsEventsReceived {
-                                    byte_size: body.len(),
-                                    count: metrics.len(),
+                                    byte_size: body_len.clone(),
+                                    count: count.clone(),
                                 });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
-                                    error!(message = "Error sending metric.", %error);
+                                    emit!(&AwsEcsMetricsStreamError {
+                                        error: error.to_string(),
+                                        count,
+                                    });
                                     return Err(());
+                                } else {
+                                    emit!(&AwsEcsMetricsEventsSent {
+                                        byte_size: body_len,
+                                        count,
+                                    });
                                 }
                             }
                             Err(error) => {
