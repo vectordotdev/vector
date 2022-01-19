@@ -963,10 +963,9 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
+    use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
@@ -1081,7 +1080,7 @@ mod tests {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run(stream::iter(messages).map(|x| x.into()))
+            sink.run_events(messages.into_iter().map(Into::into))
                 .await
                 .unwrap();
         });
@@ -1260,7 +1259,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()["greeting"], "hello".into());
@@ -1279,7 +1278,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());

@@ -264,6 +264,7 @@ pub struct Writer<T> {
     config: DiskBufferConfig,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
+    skip_to_next: bool,
     _t: PhantomData<T>,
 }
 
@@ -279,6 +280,7 @@ where
             config,
             writer: None,
             data_file_size: 0,
+            skip_to_next: false,
             _t: PhantomData,
         }
     }
@@ -296,6 +298,20 @@ where
     fn reset(&mut self) {
         self.writer = None;
         self.data_file_size = 0;
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    fn mark_for_skip(&mut self) {
+        self.skip_to_next = true;
+    }
+
+    fn should_skip(&mut self) -> bool {
+        let should_skip = self.skip_to_next;
+        if should_skip {
+            self.skip_to_next = false;
+        }
+
+        should_skip
     }
 
     /// Validates that the last write in the current writer data file matches the ledger.
@@ -396,13 +412,14 @@ where
             }
         };
 
-        // Reset our data file and increment the writer file ID so that the next call to
-        // `ensure_ready_to_write` opens the next file.  As with other corrupted data file
-        // conditions, we still depend on the reader to detect the corruption and delete the file.
+        // Reset our internal state, which closes the initial data file we opened, and mark
+        // ourselves as needing to skip to the next data file.  This is a little convoluted, but we
+        // need to ensure we follow the normal behavior of trying to open the next data file,
+        // waiting for the reader to delete it if it already exists and hasn't been fully read yet,
+        // etc.
         if should_skip_to_next_file {
             self.reset();
-            self.ledger.state().increment_writer_file_id();
-            self.ensure_ready_for_write().await?;
+            self.mark_for_skip();
         }
 
         Ok(())
@@ -432,9 +449,12 @@ where
             trace!("reader signalled progress");
         }
 
-        // If our data file is already open, and it has room left, then we're good here.  Otherwise,
-        // flush everything and reset ourselves so that we can open the next data file for writing.
-        let mut should_open_next = false;
+        // If we already have an open writer, and we have no more space in the data file to write,
+        // flush and close the file and mark ourselves as needing to open the _next_ data file.
+        //
+        // Likewise, if initialization detected an invalid record on the starting data file, and we
+        // need to skip to the next file, we honor that here.
+        let mut should_open_next = self.should_skip();
         if self.writer.is_some() {
             if self.can_write() {
                 return Ok(());
@@ -468,9 +488,8 @@ where
             // In order to handle this situation, we loop here, trying to create the file.  Readers
             // are responsible deleting a file once they have read it entirely, so our first loop
             // iteration is the happy path, trying to create the new file.  If we can't create it,
-            // we explicitly wait for the reader to signal that it has made writer-relevant
-            // progress: in other words, that it has fully read and deleted a data file, in case we
-            // were waiting for that to happen.
+            // this may be because it already exists and we're just picking up where we left off
+            // from last time, but it could also be a data file that a reader hasn't completed yet.
             let data_file_path = if should_open_next {
                 self.ledger.get_next_writer_data_file_path()
             } else {
@@ -490,17 +509,16 @@ where
                 // We got back an error trying to open the file: might be that it already exists,
                 // might be something else.
                 Err(e) => match e.kind() {
-                    // The file already exists, so it might have been a file we left off writing
-                    // to, or it might be full.  Figure out which.
                     ErrorKind::AlreadyExists => {
                         // We open the file again, without the atomic "create new" behavior.  If we
-                        // can do that successfully, we check its length.  Anything less than our
-                        // target max file size indicates that it's either a partially-filled data
-                        // file that we can pick back up, _or_ that the reader finished and deleted
-                        // the file between our initial open attempt and this one.
-                        //
-                        // If the file is indeed "full", though, then we hand back `None`, which
-                        // will force a wait on reader progress before trying again.
+                        // can do that successfully, we check its length.  There's three main
+                        // situations we encounter:
+                        // - the reader may have deleted the data file between the atomic create
+                        //   open and this one, and so we would expect the file length to be zero
+                        // - the file still exists, and it's full: the reader may still be reading
+                        //   it, or waiting for acknowledgements to be able to delete it
+                        // - it may not be full, which could be because it's the data file the
+                        //   writer left off on last time
                         let data_file = OpenOptions::new()
                             .append(true)
                             .read(true)
@@ -509,26 +527,18 @@ where
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
-                        if file_len >= self.config.max_data_file_size && should_open_next {
-                            // If we're opening up the buffer for a second (third, fourth, etc)
-                            // time, and the writer data file we open is full, we'll consider that
-                            // OK, and here's why:
-                            // - if the file is over the limit, there's no harm in validating it,
-                            //   it _should_ be finalized
-                            // - maybe there was a crash between discovering the file was over the
-                            //   limit and the writer needed to roll over, and the actual increment
-                            //   of the writer file ID, but this is also OK
-                            // - if the file was valid but we crashed before incrementing our file
-                            //   ID, then loading it here will just mean that we have to have at
-                            //   least one write be attempted before we hit this method again where
-                            //   we correctly detect the full data file and move to the next one
-                            // - if we _were_ running and hit the limit, then the logic would have
-                            //   kicked in that tries to load the "next" data file, and if that
-                            //   already existed, then yeah, we'd need to actually wait on the
-                            //   reader, but not here
-                            None
-                        } else {
+                        if file_len == 0 || !should_open_next {
+                            // The file is either empty, which means we created it and "own it" now,
+                            // or it's not empty but we're not skipping to the next file, which can
+                            // only mean that we're still initializing, and so this would be the
+                            // data file we left off writing to.
                             Some((data_file, file_len))
+                        } else {
+                            // The file isn't empty, and we're not in initialization anymore, which
+                            // means this data file is one that the reader still hasn't finished
+                            // reading through yet, and so we must wait for the reader to delete it
+                            // before we can proceed.
+                            None
                         }
                     }
                     // Legitimate I/O error with the operation, bubble this up.

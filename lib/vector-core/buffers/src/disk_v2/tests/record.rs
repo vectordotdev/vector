@@ -20,7 +20,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     record_writer.flush().await.expect("flush should not fail");
 
     let read_token = record_reader
-        .try_next_record()
+        .try_next_record(false)
         .await
         .expect("read should not fail");
     assert!(read_token.is_some());
@@ -41,7 +41,7 @@ async fn record_reader_always_returns_none_when_no_data() {
 
     let mut record_reader = RecordReader::<_, SizedRecord>::new(reader_io);
     let read_token = record_reader
-        .try_next_record()
+        .try_next_record(false)
         .await
         .expect("read should not fail");
     assert!(read_token.is_none());

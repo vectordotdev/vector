@@ -33,8 +33,9 @@ mod integration_test {
             },
             util::{
                 encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, NoDefaultsBatchSettings, StreamSink,
+                BatchConfig, NoDefaultsBatchSettings,
             },
+            VectorSink,
         },
         test_util::{components, random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
@@ -258,7 +259,8 @@ mod integration_test {
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
         let (acker, ack_counter) = Acker::basic();
-        let sink = Box::new(KafkaSink::new(config, acker).unwrap());
+        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -266,19 +268,20 @@ mod integration_test {
 
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        let input_events = events.map(|mut event| {
+        let input_events = events.map(move |mut events| {
+            let headers_key = headers_key.clone();
             let mut header_values = BTreeMap::new();
             header_values.insert(
                 header_1_key.to_string(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            event
-                .as_mut_log()
-                .insert(headers_key.clone(), header_values);
-            event
+            events.for_each_log(move |log| {
+                log.insert(headers_key.clone(), header_values.clone());
+            });
+            events
         });
         components::init_test();
-        sink.run(Box::pin(input_events)).await.unwrap();
+        sink.run(input_events).await.unwrap();
         components::SINK_TESTS.assert(&["protocol"]);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
