@@ -45,7 +45,7 @@
   display: none !important;
 }
 
-// Some rules that Tailwind can't really cover
+/* Some rules that Tailwind can't really cover */
 .jump + .jump,
 .admonition + .admonition {
   margin-top: 0.5rem;
@@ -56,7 +56,7 @@
   height: auto;
 }
 
-// Algolia search
+/* Algolia search */
 :root {
   --docsearch-key-shadow: inset 0 -2px 0 0 rgb(205, 205, 230),
     inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
@@ -69,6 +69,16 @@
 
 .aa-Form:focus-within {
   box-shadow: none;
+}
+
+@media screen and (max-width: 1279px) {
+  .aa-Autocomplete .aa-DetachedSearchButton {
+    @apply border-0;
+  }
+
+  .aa-Autocomplete .aa-DetachedSearchButtonPlaceholder {
+    @apply hidden;
+  }
 }
 
 .aa-DetachedSearchButton:hover .aa-DetachedSearchButtonIcon {
@@ -255,7 +265,7 @@
   border-color: transparent;
 }
 
-[data-autocomplete-source-id="queryResults"] .aa-Item[aria-selected=true] {
+[data-autocomplete-source-id="queryResults"] .aa-Item[aria-selected="true"] {
   background-color: rgba(var(--purple-v-rgb), 0.25);
 }
 
@@ -290,9 +300,9 @@
 }
 
 footer ion-icon[name="logo-github"]:hover {
-  @apply dark:text-gray-500
+  @apply dark:text-gray-500;
 }
 
-a[type='button'] {
+a[type="button"] {
   -webkit-appearance: unset;
 }
