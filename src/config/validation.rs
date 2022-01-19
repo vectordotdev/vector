@@ -151,9 +151,8 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         if outputs.iter().any(|output| output.is_default())
             && outputs
                 .iter()
-                .map(|output| output.port.as_deref().unwrap_or_else(|| ""))
-                .collect::<Vec<_>>()
-                .contains(&DEFAULT_OUTPUT)
+                .map(|output| output.port.as_deref().unwrap_or(""))
+                .any(|name| name == DEFAULT_OUTPUT)
         {
             errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
         }
@@ -164,9 +163,8 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         if outputs.iter().any(|output| output.is_default())
             && outputs
                 .iter()
-                .map(|output| output.port.as_deref().unwrap_or_else(|| ""))
-                .collect::<Vec<_>>()
-                .contains(&DEFAULT_OUTPUT)
+                .map(|output| output.port.as_deref().unwrap_or(""))
+                .any(|name| name == DEFAULT_OUTPUT)
         {
             errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
         }

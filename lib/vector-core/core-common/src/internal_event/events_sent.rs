@@ -2,7 +2,7 @@ use metrics::counter;
 
 use crate::internal_event::InternalEvent;
 
-pub const DEFAULT_OUTPUT: &'static str = "_default";
+pub const DEFAULT_OUTPUT: &str = "_default";
 
 #[derive(Debug)]
 pub struct EventsSent<'a> {
