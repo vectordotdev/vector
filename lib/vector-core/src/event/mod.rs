@@ -548,7 +548,7 @@ impl Encodable for Event {
             .map_err(|_| EncodeError::BufferTooSmall)
     }
 
-    fn decode<B>(_metadata: Self::Metadata, buffer: B) -> Result<Event, Self::DecodeError>
+    fn decode<B>(_metadata: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError>
     where
         B: Buf,
     {

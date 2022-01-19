@@ -4,7 +4,11 @@
 
 use std::{iter, vec};
 
-use super::{Event, LogEvent, Metric, TraceEvent};
+use bytes::{Buf, BufMut};
+use prost::{DecodeError, EncodeError, Message};
+use vector_buffers::encoding::FixedEncodable;
+
+use super::{proto, Event, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -212,5 +216,24 @@ impl Iterator for EventArrayIntoIter {
             Self::Metrics(i) => i.next().map(Into::into),
             Self::Traces(i) => i.next().map(Event::Trace),
         }
+    }
+}
+
+impl FixedEncodable for EventArray {
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
+
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
+    where
+        B: BufMut,
+    {
+        proto::EventArray::from(self).encode(buffer)
+    }
+
+    fn decode<B>(buffer: B) -> Result<Self, Self::DecodeError>
+    where
+        B: Buf,
+    {
+        proto::EventArray::decode(buffer).map(Into::into)
     }
 }
