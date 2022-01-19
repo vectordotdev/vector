@@ -404,7 +404,7 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-impl EncodeBytes<Event> for Event {
+impl EncodeBytes for Event {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -415,7 +415,7 @@ impl EncodeBytes<Event> for Event {
     }
 }
 
-impl DecodeBytes<Event> for Event {
+impl DecodeBytes for Event {
     type Error = DecodeError;
 
     fn decode<B>(buffer: B) -> Result<Event, Self::Error>

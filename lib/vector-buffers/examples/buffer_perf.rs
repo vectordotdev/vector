@@ -48,7 +48,7 @@ impl ByteSizeOf for VariableMessage {
     }
 }
 
-impl EncodeBytes<VariableMessage> for VariableMessage {
+impl EncodeBytes for VariableMessage {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -67,7 +67,7 @@ impl EncodeBytes<VariableMessage> for VariableMessage {
     }
 }
 
-impl DecodeBytes<VariableMessage> for VariableMessage {
+impl DecodeBytes for VariableMessage {
     type Error = DecodeError;
 
     fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>

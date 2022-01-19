@@ -59,7 +59,7 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
+impl<const N: usize> EncodeBytes for Message<N> {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -76,7 +76,7 @@ impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
     }
 }
 
-impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
+impl<const N: usize> DecodeBytes for Message<N> {
     type Error = DecodeError;
 
     fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>

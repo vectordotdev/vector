@@ -182,7 +182,7 @@ impl ByteSizeOf for SizedRecord {
     }
 }
 
-impl EncodeBytes<SizedRecord> for SizedRecord {
+impl EncodeBytes for SizedRecord {
     type Error = io::Error;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -202,7 +202,7 @@ impl EncodeBytes<SizedRecord> for SizedRecord {
     }
 }
 
-impl DecodeBytes<SizedRecord> for SizedRecord {
+impl DecodeBytes for SizedRecord {
     type Error = io::Error;
 
     fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::Error>
@@ -224,7 +224,7 @@ impl ByteSizeOf for UndecodableRecord {
     }
 }
 
-impl EncodeBytes<UndecodableRecord> for UndecodableRecord {
+impl EncodeBytes for UndecodableRecord {
     type Error = io::Error;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -243,7 +243,7 @@ impl EncodeBytes<UndecodableRecord> for UndecodableRecord {
     }
 }
 
-impl DecodeBytes<UndecodableRecord> for UndecodableRecord {
+impl DecodeBytes for UndecodableRecord {
     type Error = io::Error;
 
     fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::Error>
