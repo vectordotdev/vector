@@ -687,6 +687,7 @@ mod tests {
                 "dropped": {
                     "reason": "abort",
                     "message": "aborted",
+                    "raw_message": "aborted",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -706,6 +707,7 @@ mod tests {
                 "dropped": {
                     "reason": "error",
                     "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "raw_message": "expected \"string\", got \"integer\"",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -773,6 +775,45 @@ mod tests {
                     tags
                 }))
             )
+        );
+    }
+
+    #[test]
+    fn check_remap_branching_assert_with_message() {
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                assert_eq!(.hello, 0, "custom message here")
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"assert_eq\" at (0:44): custom message here",
+                    "raw_message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
         );
     }
 
