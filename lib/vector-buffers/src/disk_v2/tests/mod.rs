@@ -1,11 +1,11 @@
 use std::{future::Future, io, path::Path, str::FromStr, sync::Arc};
 
 use bytes::{Buf, BufMut};
-use core_common::byte_size_of::ByteSizeOf;
 use once_cell::sync::Lazy;
 use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
+use vector_common::byte_size_of::ByteSizeOf;
 
 use super::Ledger;
 use crate::{

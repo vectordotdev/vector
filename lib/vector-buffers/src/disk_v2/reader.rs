@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-use core_common::internal_event::emit;
 use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
@@ -14,6 +13,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncRead, BufReader},
 };
+use vector_common::internal_event::emit;
 
 use super::{
     common::create_crc32c_hasher,

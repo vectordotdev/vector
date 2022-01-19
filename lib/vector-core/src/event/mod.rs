@@ -5,11 +5,11 @@ use std::{
     sync::Arc,
 };
 
-use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
+use vector_buffers::encoding::{DecodeBytes, EncodeBytes};
 
 use crate::ByteSizeOf;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};

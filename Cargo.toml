@@ -68,8 +68,9 @@ depends = ""
 members = [
   ".",
   "lib/enrichment",
+  "lib/vector-buffers",
+  "lib/vector-common",
   "lib/vector-core",
-  "lib/vector-core/buffers",
   "lib/dnsmsg-parser",
   "lib/fakedata",
   "lib/file-source",
@@ -109,6 +110,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }

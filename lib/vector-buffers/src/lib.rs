@@ -34,10 +34,10 @@ pub(crate) mod variant;
 
 use std::fmt::Debug;
 
-use core_common::byte_size_of::ByteSizeOf;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::encoding::{DecodeBytes, EncodeBytes};
 

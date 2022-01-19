@@ -1081,51 +1081,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "buffers"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bytecheck",
- "bytes 1.1.0",
- "clap 3.0.10",
- "core_common",
- "crc32fast",
- "criterion",
- "crossbeam-utils",
- "db-key",
- "dyn-clone",
- "fslock",
- "futures 0.3.19",
- "hdrhistogram",
- "human_bytes",
- "leveldb",
- "memmap2",
- "metrics",
- "metrics-exporter-prometheus",
- "metrics-tracing-context",
- "metrics-util",
- "once_cell",
- "parking_lot",
- "pin-project 1.0.10",
- "pretty_assertions",
- "quickcheck",
- "rand 0.8.4",
- "rkyv",
- "serde",
- "serde_yaml",
- "snafu",
- "temp-dir",
- "tempdir",
- "tokio",
- "tokio-stream",
- "tokio-test",
- "tokio-util",
- "tracing 0.1.29",
- "tracing-fluent-assertions",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1500,15 +1455,6 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
-
-[[package]]
-name = "core_common"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "serde_json",
- "tracing 0.1.29",
-]
 
 [[package]]
 name = "cpufeatures"
@@ -8375,6 +8321,7 @@ dependencies = [
  "vector-api-client",
  "vector-datadog-filter",
  "vector-vrl-functions",
+ "vector_buffers",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8427,16 +8374,68 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector_buffers"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytecheck",
+ "bytes 1.1.0",
+ "clap 3.0.10",
+ "crc32fast",
+ "criterion",
+ "crossbeam-utils",
+ "db-key",
+ "dyn-clone",
+ "fslock",
+ "futures 0.3.19",
+ "hdrhistogram",
+ "human_bytes",
+ "leveldb",
+ "memmap2",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "metrics-tracing-context",
+ "metrics-util",
+ "once_cell",
+ "parking_lot",
+ "pin-project 1.0.10",
+ "pretty_assertions",
+ "quickcheck",
+ "rand 0.8.4",
+ "rkyv",
+ "serde",
+ "serde_yaml",
+ "snafu",
+ "temp-dir",
+ "tempdir",
+ "tokio",
+ "tokio-stream",
+ "tokio-test",
+ "tokio-util",
+ "tracing 0.1.29",
+ "tracing-fluent-assertions",
+ "tracing-subscriber",
+ "vector_common",
+]
+
+[[package]]
+name = "vector_common"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "serde_json",
+ "tracing 0.1.29",
+]
+
+[[package]]
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-trait",
  "atomig",
- "buffers",
  "bytes 1.1.0",
  "chrono",
- "core_common",
  "criterion",
  "db-key",
  "derivative",
@@ -8491,6 +8490,8 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "vector_buffers",
+ "vector_common",
  "vrl",
 ]
 

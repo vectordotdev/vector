@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
