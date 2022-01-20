@@ -282,6 +282,12 @@ pub fn update_config(config: &Config) {
                 component_key: component_key.clone(),
                 component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
+                outputs: transform
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| output.port.unwrap_or_else(|| "_default".to_string()))
+                    .collect(),
             })),
         );
     }
@@ -361,6 +367,7 @@ mod tests {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                outputs: vec!["_default".to_string()],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
@@ -500,6 +507,7 @@ mod tests {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
                 inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("e"),
