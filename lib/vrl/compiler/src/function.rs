@@ -1,8 +1,5 @@
 pub mod closure;
 
-use crate::expression::{
-    container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure, Literal,
-    Query,
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
@@ -13,7 +10,8 @@ use value::kind::Collection;
 
 use crate::{
     expression::{
-        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+        container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure,
+        Literal, Query,
     },
     parser::Node,
     value::{kind, Kind},
