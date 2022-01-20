@@ -142,31 +142,32 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 }
 
 /// To avoid collisions between `output` metric tags, check that a component
-/// does not have both a default output and a named output with the name
-/// `_default`
+/// does not have a named output with the name [`DEFAULT_OUTPUT`]
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
         let outputs = source.inner.outputs();
-        if outputs.iter().any(|output| output.is_default())
-            && outputs
-                .iter()
-                .map(|output| output.port.as_deref().unwrap_or(""))
-                .any(|name| name == DEFAULT_OUTPUT)
+        if outputs
+            .iter()
+            .map(|output| output.port.as_deref().unwrap_or(""))
+            .any(|name| name == DEFAULT_OUTPUT)
         {
-            errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
+            errors.push(format!(
+                "Source {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
         }
     }
 
     for (key, transform) in config.transforms.iter() {
         let outputs = transform.inner.outputs();
-        if outputs.iter().any(|output| output.is_default())
-            && outputs
-                .iter()
-                .map(|output| output.port.as_deref().unwrap_or(""))
-                .any(|name| name == DEFAULT_OUTPUT)
+        if outputs
+            .iter()
+            .map(|output| output.port.as_deref().unwrap_or(""))
+            .any(|name| name == DEFAULT_OUTPUT)
         {
-            errors.push(format!("Component {key} cannot have both a default output and named output with name: `{DEFAULT_OUTPUT}`"));
+            errors.push(format!(
+                "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
         }
     }
 
