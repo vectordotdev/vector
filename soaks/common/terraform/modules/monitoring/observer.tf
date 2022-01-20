@@ -1,12 +1,3 @@
-data "template_file" "soak-observer" {
-  template = file("${path.module}/observer.yaml.tpl")
-  vars = {
-    experiment_name    = var.experiment_name
-    experiment_variant = var.variant
-    vector_id          = var.vector_image
-  }
-}
-
 resource "kubernetes_config_map" "observer" {
   metadata {
     name      = "observer"
@@ -14,7 +5,11 @@ resource "kubernetes_config_map" "observer" {
   }
 
   data = {
-    "observer.yaml" = data.template_file.soak-observer.rendered
+    "observer.yaml" = templatefile("${path.module}/observer.yaml.tpl", {
+      experiment_name    = var.experiment_name
+      experiment_variant = var.variant
+      vector_id          = var.vector_image
+    })
   }
 }
 
