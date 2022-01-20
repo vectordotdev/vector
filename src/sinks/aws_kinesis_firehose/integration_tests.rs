@@ -1,7 +1,7 @@
 #![cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #![cfg(test)]
 
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt};
 use rusoto_core::Region;
 use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
 use rusoto_firehose::{
@@ -75,7 +75,7 @@ async fn firehose_put_records() {
     let (input, events) = random_events_with_stream(100, 100, None);
 
     components::init_test();
-    sink.0.run(events).await.unwrap();
+    sink.0.run(events.map(Into::into)).await.unwrap();
 
     sleep(Duration::from_secs(5)).await;
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);

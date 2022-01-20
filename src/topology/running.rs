@@ -9,7 +9,7 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_core::buffers::topology::channel::BufferSender;
+use vector_buffers::topology::channel::BufferSender;
 
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},

@@ -1,11 +1,11 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{
-    channel::mpsc,
     task::{Context, Poll},
-    SinkExt, Stream, StreamExt,
+    Stream, StreamExt,
 };
 use pin_project::pin_project;
+use tokio::sync::mpsc;
 #[cfg(test)]
 use vector_core::event::EventStatus;
 use vector_core::{config::Output, event::Event, internal_event::EventsSent, ByteSizeOf};
@@ -187,6 +187,7 @@ struct Inner {
 impl Inner {
     fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
         let (tx, rx) = mpsc::channel(n);
+        let rx = tokio_stream::wrappers::ReceiverStream::new(rx);
         (Self { inner: tx }, ReceiverStream::new(rx))
     }
 
@@ -276,11 +277,11 @@ impl Inner {
 #[derive(Debug)]
 pub struct ReceiverStream<T> {
     #[pin]
-    inner: mpsc::Receiver<T>,
+    inner: tokio_stream::wrappers::ReceiverStream<T>,
 }
 
 impl<T> ReceiverStream<T> {
-    fn new(inner: mpsc::Receiver<T>) -> Self {
+    const fn new(inner: tokio_stream::wrappers::ReceiverStream<T>) -> Self {
         Self { inner }
     }
 

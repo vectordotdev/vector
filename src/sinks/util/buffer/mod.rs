@@ -128,7 +128,7 @@ mod test {
 
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_core::buffers::Acker;
+    use vector_buffers::Acker;
 
     use super::{Buffer, Compression};
     use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};

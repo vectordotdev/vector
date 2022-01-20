@@ -1,6 +1,12 @@
 use std::{error, fmt, path::PathBuf};
 
-use buffers::{
+use bytes::{Buf, BufMut};
+use futures::{Sink, SinkExt, Stream, StreamExt};
+use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
+use metrics_util::{layers::Layer, DebuggingRecorder};
+use tracing::Span;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use vector_buffers::{
     encoding::{DecodeBytes, EncodeBytes},
     topology::{
         builder::TopologyBuilder,
@@ -8,13 +14,7 @@ use buffers::{
     },
     BufferType,
 };
-use bytes::{Buf, BufMut};
-use core_common::byte_size_of::ByteSizeOf;
-use futures::{Sink, SinkExt, Stream, StreamExt};
-use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::{layers::Layer, DebuggingRecorder};
-use tracing::Span;
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use vector_common::byte_size_of::ByteSizeOf;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
@@ -59,7 +59,7 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
+impl<const N: usize> EncodeBytes for Message<N> {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -76,7 +76,7 @@ impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
     }
 }
 
-impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
+impl<const N: usize> DecodeBytes for Message<N> {
     type Error = DecodeError;
 
     fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>

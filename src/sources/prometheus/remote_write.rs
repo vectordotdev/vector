@@ -125,7 +125,6 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use futures::stream;
     use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     use super::*;
@@ -183,7 +182,7 @@ mod test {
         let events_copy = events.clone();
         let mut output = test_util::spawn_collect_ready(
             async move {
-                sink.run(stream::iter(events_copy)).await.unwrap();
+                sink.run_events(events_copy).await.unwrap();
             },
             rx,
             1,

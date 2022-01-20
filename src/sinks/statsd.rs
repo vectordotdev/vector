@@ -467,7 +467,7 @@ mod test {
             }
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

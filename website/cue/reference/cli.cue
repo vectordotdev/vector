@@ -261,7 +261,8 @@ cli: {
 
 		"tap": {
 			description: """
-				Observe log events from topology components.
+				Observe output log events from source or transform components. Logs are sampled
+				at a specified interval.
 				"""
 
 			flags: _default_flags
@@ -269,7 +270,7 @@ cli: {
 			options: {
 				"interval": {
 					_short:      "i"
-					description: "Interval to sample metrics at, in milliseconds"
+					description: "Interval to sample logs at, in milliseconds"
 					type:        "integer"
 					default:     500
 				}
@@ -280,7 +281,7 @@ cli: {
 				}
 				"limit": {
 					_short:      "l"
-					description: "Sample log events to the provided limit"
+					description: "Maximum number of log events to sample each interval"
 					type:        "integer"
 					default:     100
 				}

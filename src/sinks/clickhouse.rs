@@ -285,7 +285,7 @@ mod integration_tests {
         },
     };
 
-    use futures::{future, stream};
+    use futures::future;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -548,13 +548,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
@@ -593,13 +590,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }

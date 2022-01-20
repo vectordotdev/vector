@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Cursor, panic, str::FromStr};
 
 use async_stream::stream;
 use aws_sdk_sqs::{
-    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName},
+    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
 use bytes::Bytes;
@@ -74,7 +74,9 @@ impl SqsSource {
             .queue_url(&self.queue_url)
             .max_number_of_messages(MAX_BATCH_SIZE)
             .wait_time_seconds(self.poll_secs as i32)
-            .attribute_names(MessageSystemAttributeName::SentTimestamp.as_str())
+            // I think this should be a known attribute
+            // https://github.com/awslabs/aws-sdk-rust/issues/411
+            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
             .send()
             .await;
 

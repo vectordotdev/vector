@@ -14,12 +14,30 @@ use crate::ByteSizeOf;
 pub trait EventContainer: ByteSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
+
+    /// The number of events in this container.
+    fn len(&self) -> usize;
+
+    /// Is this container empty?
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Turn this container into an iterator of events.
     fn into_events(self) -> Self::IntoIter;
 }
 
 impl EventContainer for Event {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self)
     }
@@ -27,6 +45,15 @@ impl EventContainer for Event {
 
 impl EventContainer for LogEvent {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self.into())
     }
@@ -34,6 +61,15 @@ impl EventContainer for LogEvent {
 
 impl EventContainer for Metric {
     type IntoIter = iter::Once<Event>;
+
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+
     fn into_events(self) -> Self::IntoIter {
         iter::once(self.into())
     }
@@ -44,6 +80,11 @@ pub type LogArray = Vec<LogEvent>;
 
 impl EventContainer for LogArray {
     type IntoIter = iter::Map<vec::IntoIter<LogEvent>, fn(LogEvent) -> Event>;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
     fn into_events(self) -> Self::IntoIter {
         self.into_iter().map(Into::into)
     }
@@ -54,17 +95,39 @@ pub type MetricArray = Vec<Metric>;
 
 impl EventContainer for MetricArray {
     type IntoIter = iter::Map<vec::IntoIter<Metric>, fn(Metric) -> Event>;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
     fn into_events(self) -> Self::IntoIter {
         self.into_iter().map(Into::into)
     }
 }
 
 /// An array of one of the `Event` variants exclusively.
+#[derive(Debug)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
     /// An array of type `Metric`
     Metrics(MetricArray),
+}
+
+impl EventArray {
+    /// Run the given update function over each `LogEvent` in this array.
+    pub fn for_each_log(&mut self, update: impl FnMut(&mut LogEvent)) {
+        if let Self::Logs(logs) = self {
+            logs.iter_mut().for_each(update);
+        }
+    }
+
+    /// Run the given update function over each `Metric` in this array.
+    pub fn for_each_metric(&mut self, update: impl FnMut(&mut Metric)) {
+        if let Self::Metrics(metrics) = self {
+            metrics.iter_mut().for_each(update);
+        }
+    }
 }
 
 impl From<Event> for EventArray {
@@ -73,6 +136,18 @@ impl From<Event> for EventArray {
             Event::Log(log) => Self::Logs(vec![log]),
             Event::Metric(metric) => Self::Metrics(vec![metric]),
         }
+    }
+}
+
+impl From<LogArray> for EventArray {
+    fn from(array: LogArray) -> Self {
+        Self::Logs(array)
+    }
+}
+
+impl From<MetricArray> for EventArray {
+    fn from(array: MetricArray) -> Self {
+        Self::Metrics(array)
     }
 }
 
@@ -88,6 +163,13 @@ impl ByteSizeOf for EventArray {
 impl EventContainer for EventArray {
     type IntoIter = EventArrayIntoIter;
 
+    fn len(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.len(),
+            Self::Metrics(a) => a.len(),
+        }
+    }
+
     fn into_events(self) -> Self::IntoIter {
         match self {
             Self::Logs(a) => EventArrayIntoIter::Logs(a.into_iter()),
@@ -97,6 +179,7 @@ impl EventContainer for EventArray {
 }
 
 /// The iterator type for `EventArray`.
+#[derive(Debug)]
 pub enum EventArrayIntoIter {
     /// An iterator over type `LogEvent`.
     Logs(vec::IntoIter<LogEvent>),

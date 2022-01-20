@@ -9,7 +9,7 @@ use tower::{
     util::BoxService,
     Service, ServiceBuilder,
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_none, Concurrency},
