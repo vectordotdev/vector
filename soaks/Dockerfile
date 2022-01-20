@@ -21,4 +21,5 @@ VOLUME /var/lib/vector/
 # Smoke test
 RUN ["vector", "--version"]
 
-ENTRYPOINT ["/usr/bin/vector"]
+# use setarch to disable ASLR to reduce noise
+ENTRYPOINT ["setarch", "uname", "--machine", "--addr-no-randomize", "/usr/bin/vector"]
