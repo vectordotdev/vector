@@ -1,7 +1,7 @@
 use std::{collections::HashMap, pin::Pin};
 
-use core_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use futures::{SinkExt, Stream};
+use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 
 use crate::{
     config::Output,
