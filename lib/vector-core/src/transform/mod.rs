@@ -1,11 +1,11 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::{SinkExt, Stream};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 
 use crate::{
     config::Output,
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     fanout::{self, Fanout},
     ByteSizeOf,
 };
@@ -23,7 +23,7 @@ mod config;
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
     Synchronous(Box<dyn SyncTransform>),
-    Task(Box<dyn TaskTransform>),
+    Task(Box<dyn TaskTransform<EventArray>>),
 }
 
 impl Transform {
@@ -83,8 +83,23 @@ impl Transform {
     ///
     /// **Note:** You should prefer to implement [`FunctionTransform`] over this
     /// where possible.
-    pub fn task(v: impl TaskTransform + 'static) -> Self {
+    pub fn task(v: impl TaskTransform<EventArray> + 'static) -> Self {
         Transform::Task(Box::new(v))
+    }
+
+    /// Create a new task transform over individual `Event`s.
+    ///
+    /// These tasks are coordinated, and map a stream of some `U` to some other
+    /// `T`.
+    ///
+    /// **Note:** You should prefer to implement [`FunctionTransform`] over this
+    /// where possible.
+    ///
+    /// # Panics
+    ///
+    /// TODO
+    pub fn event_task(v: impl TaskTransform<Event> + 'static) -> Self {
+        Transform::Task(Box::new(WrapEventTask(v)))
     }
 
     /// Mutably borrow the inner transform as a task transform.
@@ -92,7 +107,7 @@ impl Transform {
     /// # Panics
     ///
     /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform> {
+    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform<EventArray>> {
         match self {
             Transform::Task(t) => t,
             _ => {
@@ -106,7 +121,7 @@ impl Transform {
     /// # Panics
     ///
     /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn into_task(self) -> Box<dyn TaskTransform> {
+    pub fn into_task(self) -> Box<dyn TaskTransform<EventArray>> {
         match self {
             Transform::Task(t) => t,
             _ => {
@@ -137,13 +152,27 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 /// `TaskTransform` or vice versa.
-pub trait TaskTransform: Send {
+pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = T> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = T> + Send>>;
+
+    /// Wrap the transform task to process and emit individual
+    /// events. This is used to simplify testing task transforms.
+    fn transform_events(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
-        Self: 'static;
+        T: From<Event>,
+        T::IntoIter: Send,
+    {
+        self.transform(task.map(Into::into).boxed())
+            .map(EventContainer::into_events)
+            .flat_map(stream::iter)
+            .boxed()
+    }
 }
 
 /// Broader than the simple [`FunctionTransform`], this trait allows transforms to write to
@@ -358,5 +387,20 @@ impl ByteSizeOf for TransformOutputsBuf {
                 .iter()
                 .map(|(_, buf)| buf.size_of())
                 .sum::<usize>()
+    }
+}
+
+struct WrapEventTask<T>(T);
+
+impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for WrapEventTask<T> {
+    fn transform(
+        self: Box<Self>,
+        stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
+        // This is an aweful lot of boxes
+        let stream = stream
+            .flat_map(|events| stream::iter(events.into_events()))
+            .boxed();
+        Box::new(self.0).transform(stream).map(Into::into).boxed()
     }
 }

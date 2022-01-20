@@ -35,7 +35,7 @@ use crate::{
         ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
@@ -644,7 +644,7 @@ impl Runner {
 }
 
 fn build_task_transform(
-    t: Box<dyn TaskTransform>,
+    t: Box<dyn TaskTransform<EventArray>>,
     input_rx: BufferReceiver<Event>,
     input_type: DataType,
     typetag: &str,
@@ -655,15 +655,17 @@ fn build_task_transform(
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .inspect(|event| {
+        .filter(move |event: &Event| ready(filter_event_type(event, input_type)))
+        .inspect(|event: &Event| {
             emit!(&EventsReceived {
                 count: 1,
                 byte_size: event.size_of(),
             })
-        });
+        })
+        .map(EventArray::from);
     let transform = t
         .transform(Box::pin(filtered))
+        .flat_map(|events| futures::stream::iter(events.into_events()))
         .map(Ok)
         .forward(output.with(|event: Event| async {
             emit!(&EventsSent {
