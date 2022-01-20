@@ -46,7 +46,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (name, value) in matches.iter() {
+        for (name, value) in matches.iter().sorted() {
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
@@ -69,19 +69,27 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 if let Some(value) = value {
                     match value {
                         // root-level maps must be merged
-                        Value::Object(map) if field.is_root() || field.segments[0].is_index() => {
+                        Value::Object(map) if field.is_root() => {
                             parsed.as_object_mut().expect("root is object").extend(map);
                         }
                         // anything else at the root leve must be ignored
-                        _ if field.is_root() || field.segments[0].is_index() => {}
+                        _ if field.is_root() => {}
                         // ignore empty strings if necessary
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => {
-                            parsed.insert(field, value).unwrap_or_else(
-                                |error| warn!(message = "Error updating field value", field = %field, %error)
-                            );
-                        }
+                        _ => match parsed.get(field).expect("field does not exist") {
+                            Some(Value::Array(mut values)) => values.push(value),
+                            Some(v) => {
+                                parsed.insert(field, Value::Array(vec![v, value])).unwrap_or_else(
+                                    |error| warn!(message = "Error updating field value", field = %field, %error)
+                                );
+                            }
+                            None => {
+                                parsed.insert(field, value).unwrap_or_else(
+                                    |error| warn!(message = "Error updating field value", field = %field, %error)
+                                );
+                            }
+                        },
                     };
                 }
             } else {
@@ -399,7 +407,7 @@ mod tests {
             parsed,
             Value::from(btreemap! {
                 "nested" => btreemap! {
-                   "field" =>  Value::Array(vec![1.into(), "INFO".into(), Value::Null]),
+                   "field" =>  Value::Array(vec![1.into(), "INFO".into()]),
                 },
             })
         );
@@ -785,5 +793,49 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
         ]);
+    }
+
+    #[test]
+    fn alias_and_main_rule_extract_same_fields_to_array() {
+        let rules = parse_grok_rules(
+            // patterns
+            &[r#"%{notSpace:field:number} %{alias}"#.to_string()],
+            // aliases
+            btreemap! {
+                "alias" => r#"%{notSpace:field:integer}"#.to_string()
+            },
+        )
+        .expect("couldn't parse rules");
+        let parsed = parse_grok("1 2", &rules, false).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                 "field" =>  Value::Array(vec![1.0.into(), 2.into()]),
+            })
+        );
+    }
+
+    #[test]
+    fn alias_with_filter() {
+        let rules = parse_grok_rules(
+            // patterns
+            &[r#"%{alias:field:uppercase}"#.to_string()],
+            // aliases
+            btreemap! {
+                "alias" => r#"%{notSpace:subfield1} %{notSpace:subfield2:integer}"#.to_string()
+            },
+        )
+        .expect("couldn't parse rules");
+        let parsed = parse_grok("a 1", &rules, false).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                 "field" =>  Value::Bytes("A 1".into()),
+                 "subfield1" =>  Value::Bytes("a".into()),
+                 "subfield2" =>  Value::Integer(1)
+            })
+        );
     }
 }
