@@ -13,7 +13,22 @@ Support Services | {{ site.Title }}
     </h2>
 
     <div class="relative flex pb-16 mt-5">
-        <form id="mktoForm_12461"></form>
+        <form id="mktoForm_2917"></form>
     </div>
 </div>
+
+<script>
+    const formID = "2917";
+
+    const loadMarketoForm2 = () => {
+        MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', formID, (form) => {
+            const formOnPage = document.getElementById(`mktoForm_${formID}`);
+
+            formOnPage.removeAttribute("style");
+            formOnPage.setAttribute("class", "mktoForm flex flex-col");
+        });
+    };
+
+    window.addEventListener("load", loadMarketoForm2);
+</script>
 {{ end }}

@@ -8,7 +8,7 @@
     <div class="max-w-full md:max-w-2xl w-auto mx-auto my-6 px-2.5 py-2">
         <div id="modal-container--{{ $form.form_id }}" class="bg-white rounded flex flex-col">
             <div class="relative text-center p-4 flex items-start justify-between">
-                <p class="w-4/5 m-auto text-dark text-lg">
+                <p class="w-4/5 m-auto text-dark text-lg font-semibold">
                     {{ $form.form_title }}
                 </p>
                 <button id="modal-close--{{ $form.form_id }}" type="button" data-dismiss="modal"
@@ -31,7 +31,10 @@
     const loadMarketoForm = () => {
       formIDsArray.forEach(id => {
           MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', id, (form) => {
-          {{/*  const marketoForm = document.querySelector(`#mktoForm_${id}`);  */}}
+            const formOnPage = document.getElementById(`mktoForm_${id}`);
+
+            formOnPage.removeAttribute("style");
+            formOnPage.setAttribute("class", "mktoForm flex flex-col");
         });
       });
   
