@@ -7,7 +7,6 @@ use std::{
 
 use bytes::BufMut;
 use crc32fast::Hasher;
-use memmap2::Mmap;
 use rkyv::{
     ser::{
         serializers::{
@@ -19,14 +18,12 @@ use rkyv::{
     AlignedVec, Infallible,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncWrite, AsyncWriteExt, BufWriter},
-};
+use tokio::io::{AsyncWriteExt, BufWriter};
 
-use super::{common::create_crc32c_hasher, record::try_as_record_archive};
+use super::{common::create_crc32c_hasher, record::try_as_record_archive, Filesystem};
 use crate::{
     disk_v2::{
+        io::AsyncFile,
         ledger::Ledger,
         record::{Record, RecordStatus},
     },
@@ -102,7 +99,7 @@ pub(super) struct RecordWriter<W, T> {
 
 impl<W, T> RecordWriter<W, T>
 where
-    W: AsyncWrite + Unpin,
+    W: AsyncFile + Unpin,
     T: Bufferable,
 {
     /// Creates a new [`RecordWriter`] around the provided writer.
@@ -121,23 +118,18 @@ where
         }
     }
 
-    /// Gets a reference to the underlying writer.
-    pub fn get_ref(&self) -> &W {
-        self.writer.get_ref()
-    }
-
-    /// Writes a record.
+    /// Archives a record.
     ///
-    /// Returns the number of bytes written to serialize the record, including the framing. Writes
-    /// are not automatically flushed, so `flush` must be called after any record write if there is
-    /// a requirement for the record to immediately be written all the way to the underlying writer.
+    /// This encodes the record, as well as serializes it into its archival format that will be
+    /// stored on disk.  The total size of the archived record, including the length delimiter
+    /// inserted before the archived record, will be returned.
     ///
     /// # Errors
     ///
     /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
     #[instrument(skip(self, record), level = "trace")]
-    pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+    pub fn archive_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
         self.ser_buf.clear();
         self.ser_scratch.clear();
@@ -170,59 +162,80 @@ where
 
         let record = Record::with_checksum(id, &self.encode_buf, &self.checksummer);
 
+        // Push 8 dummy bytes where our length delimiter will sit.  We'll fix this up after
+        // serialization.  Notably, `AlignedSerializer` will report the serializer position as
+        // the length of its backing store, which now includes our 8 bytes, so we _subtract_
+        // those from the position when figuring out the actual value to write back after.
+        self.ser_buf
+            .extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
         // Now serialize the record, which puts it into its archived form.  This is what powers our
         // ability to do zero-copy deserialization from disk.
-        //
-        // NOTE: This operation is put into its own block scope because otherwise `serializer` lives
-        // untilk the end of the function, and it contains a mutable buffer pointer, which is
-        // `!Send` and thus can't move across await points.  Do not rearrange.
-        let archive_len = {
-            let mut serializer = CompositeSerializer::new(
-                AlignedSerializer::new(&mut self.ser_buf),
-                FallbackScratch::new(
-                    BufferScratch::new(&mut self.ser_scratch),
-                    AllocScratch::new(),
-                ),
-                Infallible,
-            );
+        let mut serializer = CompositeSerializer::new(
+            AlignedSerializer::new(&mut self.ser_buf),
+            FallbackScratch::new(
+                BufferScratch::new(&mut self.ser_scratch),
+                AllocScratch::new(),
+            ),
+            Infallible,
+        );
 
-            match serializer.serialize_value(&record) {
-                Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
-                Err(e) => match e {
-                    CompositeSerializerError::ScratchSpaceError(sse) => {
-                        return Err(WriterError::FailedToSerialize {
-                            reason: format!(
-                                "insufficient space to serialize encoded record: {}",
-                                sse
-                            ),
-                        })
-                    }
-                    // Only our scratch space strategy is fallible, so we should never get here.
-                    CompositeSerializerError::SerializerError(_)
-                    | CompositeSerializerError::SharedError(_) => unreachable!(),
-                },
-            }
+        let serializer_pos = match serializer.serialize_value(&record) {
+            Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
+            Err(e) => match e {
+                CompositeSerializerError::ScratchSpaceError(sse) => {
+                    return Err(WriterError::FailedToSerialize {
+                        reason: format!("insufficient space to serialize encoded record: {}", sse),
+                    })
+                }
+                // Only our scratch space strategy is fallible, so we should never get here.
+                CompositeSerializerError::SerializerError(_)
+                | CompositeSerializerError::SharedError(_) => unreachable!(),
+            },
         }?;
 
-        let archive_buf = self.ser_buf.as_slice();
-        assert_eq!(archive_buf.len(), archive_len);
+        // Sanity check before we do our length math.
+        if serializer_pos <= 8 || self.ser_buf.len() != serializer_pos {
+            return Err(WriterError::FailedToSerialize {
+                reason: format!(
+                    "serializer position invalid for context: pos={} len={}",
+                    serializer_pos,
+                    self.ser_buf.len(),
+                ),
+            });
+        }
 
+        // Fix up our length delimiter.1111111111111111
+        let archive_len = serializer_pos - 8;
         let wire_archive_len: u64 = archive_len
             .try_into()
             .expect("archive len should always fit into a u64");
         let archive_len_buf = wire_archive_len.to_be_bytes();
-        assert_eq!(archive_len_buf[..].len(), 8);
 
+        let length_delimiter_dst = &mut self.ser_buf.as_mut_slice()[0..8];
+        length_delimiter_dst.copy_from_slice(&archive_len_buf[..]);
+
+        Ok(archive_len)
+    }
+
+    /// Writes a record.
+    ///
+    /// Returns the total number of bytes written to disk for this record. Writes are not
+    /// automatically flushed, so `flush` must be called after any record write if there is a
+    /// requirement for the record to immediately be written all the way to the underlying writer.
+    ///
+    /// # Errors
+    ///
+    /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
+    /// during any of these stages, an appropriate error variant will be returned describing the error.
+    #[instrument(skip(self, record), level = "trace")]
+    pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+        let serialized_len = self.archive_record(id, record)?;
         self.writer
-            .write_all(&archive_len_buf)
+            .write_all(self.ser_buf.as_slice())
             .await
-            .context(IoSnafu)?;
-        self.writer.write_all(archive_buf).await.context(IoSnafu)?;
-
-        // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
-        // better/super low overhead way to capture "the bytes we wrote" rather than piecing
-        // together what we _believe_ we should have written.
-        Ok(8 + archive_len)
+            .context(IoSnafu)
+            .map(|_| serialized_len)
     }
 
     /// Flushes the writer.
@@ -237,9 +250,7 @@ where
     pub async fn flush(&mut self) -> io::Result<()> {
         self.writer.flush().await
     }
-}
 
-impl<T> RecordWriter<File, T> {
     /// Synchronizes the underlying file to disk.
     ///
     /// This tries to synchronize both data and metadata.
@@ -256,9 +267,13 @@ impl<T> RecordWriter<File, T> {
 
 /// Writes records to the buffer.
 #[derive(Debug)]
-pub struct Writer<T, FS> {
+pub struct Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     ledger: Arc<Ledger<FS>>,
-    writer: Option<RecordWriter<File, T>>,
+    writer: Option<RecordWriter<FS::File, T>>,
     data_file_size: u64,
     skip_to_next: bool,
     _t: PhantomData<T>,
@@ -267,6 +282,8 @@ pub struct Writer<T, FS> {
 impl<T, FS> Writer<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
@@ -332,7 +349,7 @@ where
         // current writer data file, which lets us treat it as one big buffer... which is useful for
         // asking `rkyv` to deserialize just the last record from the file, without having to seek
         // directly to the start of the record where the length delimiter is.
-        let data_file_handle = self
+        /*let data_file_handle = self
             .writer
             .as_ref()
             .expect("writer should exist after `ensure_ready_for_write`")
@@ -343,7 +360,14 @@ where
             .into_std()
             .await;
 
-        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };
+        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };*/
+        let data_file_path = self.ledger.get_current_writer_data_file_path();
+        let data_file_mmap = self
+            .ledger
+            .filesystem()
+            .open_mmap_readable(&data_file_path)
+            .await
+            .context(IoSnafu)?;
 
         // We have bytes, so we should have an archived record... hopefully!  Go through the motions
         // of verifying it.  If we hit any invalid states, then we should bump to the next data file
@@ -366,7 +390,7 @@ where
                         false
                     }
                     Ordering::Greater => {
-                        // Our last write is behind where the ledger thin ks we should be, so we
+                        // Our last write is behind where the ledger thinks we should be, so we
                         // likely missed flushing some records, or partially flushed the data file.
                         // Better roll over to be safe.
                         error!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
@@ -490,13 +514,11 @@ where
                 self.ledger.get_current_writer_data_file_path()
             };
 
-            let maybe_data_file = OpenOptions::new()
-                .append(true)
-                .read(true)
-                .create_new(true)
-                .open(&data_file_path)
+            let maybe_data_file = self
+                .ledger
+                .filesystem()
+                .open_file_writable_atomic(&data_file_path)
                 .await;
-
             let file = match maybe_data_file {
                 // We were able to create the file, so we're good to proceed.
                 Ok(data_file) => Some((data_file, 0)),
@@ -513,11 +535,10 @@ where
                         //   it, or waiting for acknowledgements to be able to delete it
                         // - it may not be full, which could be because it's the data file the
                         //   writer left off on last time
-                        let data_file = OpenOptions::new()
-                            .append(true)
-                            .read(true)
-                            .create(true)
-                            .open(&data_file_path)
+                        let data_file = self
+                            .ledger
+                            .filesystem()
+                            .open_file_writable(&data_file_path)
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
@@ -544,7 +565,7 @@ where
                 // We successfully opened the file and it can be written to.
                 debug!(
                     "opened data file '{:?}' (existing size: {} bytes)",
-                    data_file, data_file_size
+                    data_file_path, data_file_size
                 );
 
                 // Make sure the file is flushed to disk, especially if we just created it.
@@ -659,7 +680,11 @@ where
     }
 }
 
-impl<T, FS> Writer<T, FS> {
+impl<T, FS> Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     /// Closes this [`Writer`], marking it as done.
     ///
     /// Closing the writer signals to the reader that that no more records will be written until the
@@ -678,7 +703,11 @@ impl<T, FS> Writer<T, FS> {
     }
 }
 
-impl<T, FS> Drop for Writer<T, FS> {
+impl<T, FS> Drop for Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     fn drop(&mut self) {
         self.close();
     }

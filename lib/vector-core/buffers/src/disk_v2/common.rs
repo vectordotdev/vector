@@ -6,7 +6,7 @@ use std::{
 
 use crc32fast::Hasher;
 
-use super::io::{Filesystem, TokioFilesystem};
+use super::io::{Filesystem, ProductionFilesystem};
 
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
 pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
@@ -74,7 +74,7 @@ pub struct DiskBufferConfig<FS> {
 }
 
 /// Builder for [`DiskBufferConfig`].
-pub struct DiskBufferConfigBuilder<FS = TokioFilesystem>
+pub struct DiskBufferConfigBuilder<FS = ProductionFilesystem>
 where
     FS: Filesystem,
 {
@@ -97,7 +97,7 @@ impl DiskBufferConfigBuilder {
             max_data_file_size: None,
             max_record_size: None,
             flush_interval: None,
-            filesystem: TokioFilesystem,
+            filesystem: ProductionFilesystem,
         }
     }
 }

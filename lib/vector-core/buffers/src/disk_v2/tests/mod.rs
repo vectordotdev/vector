@@ -1,25 +1,66 @@
-use std::{future::Future, io, path::Path, str::FromStr, sync::Arc};
+use std::{
+    future::Future,
+    io::{self, Cursor},
+    path::Path,
+    str::FromStr,
+    sync::Arc,
+};
 
+use async_trait::async_trait;
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use once_cell::sync::Lazy;
 use temp_dir::TempDir;
+use tokio::io::DuplexStream;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    disk_v2::{io::TokioFilesystem, Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer},
+    disk_v2::{io::ProductionFilesystem, Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer},
     encoding::{DecodeBytes, EncodeBytes},
     Acker, Bufferable,
 };
+
+use super::io::{AsyncFile, Metadata, ReadableMemoryMap, WritableMemoryMap};
 
 mod acknowledgements;
 mod basic;
 mod invariants;
 mod known_errors;
+mod model;
 mod record;
 mod size_limits;
+
+#[async_trait]
+impl AsyncFile for DuplexStream {
+    async fn metadata(&self) -> io::Result<Metadata> {
+        Ok(Metadata { len: 0 })
+    }
+
+    async fn sync_all(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AsyncFile for Cursor<Vec<u8>> {
+    async fn metadata(&self) -> io::Result<Metadata> {
+        Ok(Metadata { len: 0 })
+    }
+
+    async fn sync_all(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl ReadableMemoryMap for Vec<u8> {}
+
+impl WritableMemoryMap for Vec<u8> {
+    fn flush(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 /*
     Helper code for getting tracing data from a test:
@@ -256,10 +297,10 @@ impl DecodeBytes<UndecodableRecord> for UndecodableRecord {
 pub(crate) async fn create_default_buffer<P, R>(
     data_dir: P,
 ) -> (
-    Writer<R, TokioFilesystem>,
-    Reader<R, TokioFilesystem>,
+    Writer<R, ProductionFilesystem>,
+    Reader<R, ProductionFilesystem>,
     Acker,
-    Arc<Ledger<TokioFilesystem>>,
+    Arc<Ledger<ProductionFilesystem>>,
 )
 where
     P: AsRef<Path>,
@@ -276,10 +317,10 @@ pub(crate) async fn create_buffer_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
 ) -> (
-    Writer<R, TokioFilesystem>,
-    Reader<R, TokioFilesystem>,
+    Writer<R, ProductionFilesystem>,
+    Reader<R, ProductionFilesystem>,
     Acker,
-    Arc<Ledger<TokioFilesystem>>,
+    Arc<Ledger<ProductionFilesystem>>,
 )
 where
     P: AsRef<Path>,
@@ -300,10 +341,10 @@ pub(crate) async fn create_buffer_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
 ) -> (
-    Writer<R, TokioFilesystem>,
-    Reader<R, TokioFilesystem>,
+    Writer<R, ProductionFilesystem>,
+    Reader<R, ProductionFilesystem>,
     Acker,
-    Arc<Ledger<TokioFilesystem>>,
+    Arc<Ledger<ProductionFilesystem>>,
 )
 where
     P: AsRef<Path>,
@@ -323,10 +364,10 @@ pub(crate) async fn create_buffer_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
 ) -> (
-    Writer<R, TokioFilesystem>,
-    Reader<R, TokioFilesystem>,
+    Writer<R, ProductionFilesystem>,
+    Reader<R, ProductionFilesystem>,
     Acker,
-    Arc<Ledger<TokioFilesystem>>,
+    Arc<Ledger<ProductionFilesystem>>,
 )
 where
     P: AsRef<Path>,

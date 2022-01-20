@@ -10,17 +10,17 @@ use core_common::internal_event::emit;
 use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{self, File},
-    io::{AsyncBufReadExt, AsyncRead, BufReader},
-};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use super::{
     common::create_crc32c_hasher,
+    io::Filesystem,
     ledger::Ledger,
     record::{try_as_record_archive, Record, RecordStatus},
 };
-use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
+use crate::{
+    disk_v2::io::AsyncFile, encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable,
+};
 
 #[derive(Debug)]
 struct DeletionMarker {
@@ -124,7 +124,6 @@ where
 }
 
 /// Buffered reader that handles deserialization, checksumming, and decoding of records.
-#[derive(Debug)]
 pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
@@ -135,7 +134,7 @@ pub(super) struct RecordReader<R, T> {
 
 impl<R, T> RecordReader<R, T>
 where
-    R: AsyncRead + Unpin + fmt::Debug,
+    R: AsyncFile + Unpin,
     T: Bufferable,
 {
     /// Creates a new [`RecordReader`] around the provided reader.
@@ -311,11 +310,29 @@ where
     }
 }
 
+impl<R, T> fmt::Debug for RecordReader<R, T>
+where
+    R: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecordReader")
+            .field("reader", &self.reader)
+            .field("aligned_buf", &self.aligned_buf)
+            .field("checksummer", &self.checksummer)
+            .field("current_record_id", &self.current_record_id)
+            .field("_t", &self._t)
+            .finish()
+    }
+}
+
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T, FS> {
+pub struct Reader<T, FS>
+where
+    FS: Filesystem,
+{
     ledger: Arc<Ledger<FS>>,
-    reader: Option<RecordReader<File, T>>,
+    reader: Option<RecordReader<FS::File, T>>,
     bytes_read: u64,
     last_reader_record_id: u64,
     last_acked_record_id: u64,
@@ -330,6 +347,8 @@ pub struct Reader<T, FS> {
 impl<T, FS> Reader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     /// Creates a new [`Reader`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
@@ -383,7 +402,11 @@ where
         // the rest of a corrupted file could lead to the total buffer size being unsynchronized.
         // We use the difference between the number of bytes read and the file size to figure out if
         // we need to make a manual adjustment.
-        let data_file = File::open(&marker.data_file_path).await?;
+        let data_file = self
+            .ledger
+            .filesystem()
+            .open_file_readable(&marker.data_file_path)
+            .await?;
         let metadata = data_file.metadata().await?;
 
         let size_delta = metadata.len() - marker.bytes_read;
@@ -399,7 +422,10 @@ where
         drop(data_file);
 
         // Delete the current data file, and increment our actual reader file ID.
-        fs::remove_file(&marker.data_file_path).await?;
+        self.ledger
+            .filesystem()
+            .delete_file(&marker.data_file_path)
+            .await?;
         self.ledger.increment_acked_reader_file_id();
         self.ledger.flush()?;
 
@@ -599,7 +625,12 @@ where
         loop {
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
             let data_file_path = self.ledger.get_current_reader_data_file_path();
-            let data_file = match File::open(&data_file_path).await {
+            let data_file = match self
+                .ledger
+                .filesystem()
+                .open_file_readable(&data_file_path)
+                .await
+            {
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {

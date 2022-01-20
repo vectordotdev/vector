@@ -9,19 +9,16 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
-use memmap2::{MmapMut, MmapOptions};
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{self, OpenOptions},
-    io::AsyncWriteExt,
-    sync::Notify,
-};
+use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 
 use super::{
     backed_archive::BackedArchive,
     common::{DiskBufferConfig, MAX_FILE_ID},
+    io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
+    Filesystem,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
 
@@ -200,13 +197,16 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger<FS> {
+pub struct Ledger<FS>
+where
+    FS: Filesystem,
+{
     // Buffer configuration.
     config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
     ledger_lock: LockFile,
     // Ledger state.
-    state: BackedArchive<MmapMut, LedgerState>,
+    state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
     total_buffer_size: AtomicU64,
     // Notifier for reader-related progress.
@@ -225,10 +225,18 @@ pub struct Ledger<FS> {
     usage_handle: BufferUsageHandle,
 }
 
-impl<FS> Ledger<FS> {
+impl<FS> Ledger<FS>
+where
+    FS: Filesystem,
+{
     /// Gets the configuration for the buffer that this ledger represents.
     pub fn config(&self) -> &DiskBufferConfig<FS> {
         &self.config
+    }
+
+    /// Gets the filesystem configured for this buffer.
+    pub fn filesystem(&self) -> &FS {
+        &self.config.filesystem
     }
 
     /// Gets the internal ledger state.
@@ -510,110 +518,6 @@ impl<FS> Ledger<FS> {
             );
     }
 
-    /// Loads or creates a ledger for the given [`DiskBufferConfig`].
-    ///
-    /// If the ledger file does not yet exist, a default ledger state will be created and persisted
-    /// to disk.  Otherwise, the ledger file on disk will be loaded and verified.
-    ///
-    /// # Errors
-    ///
-    /// If there is an error during either serialization of the new, default ledger state, or
-    /// deserializing existing data in the ledger file, or generally during the underlying I/O
-    /// operations, an error variant will be returned describing the error.
-    #[cfg_attr(test, instrument(skip_all, level = "trace"))]
-    pub(super) async fn load_or_create(
-        config: DiskBufferConfig<FS>,
-        usage_handle: BufferUsageHandle,
-    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
-        // Create our containing directory if it doesn't already exist.
-        fs::create_dir_all(&config.data_dir)
-            .await
-            .context(IoSnafu)?;
-
-        // Acquire an exclusive lock on our lock file, which prevents another Vector process from
-        // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
-        // another process from messing with our ledger files, or any of the data files, etc.
-        let ledger_lock_path = config.data_dir.join("buffer.lock");
-        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
-        if !ledger_lock.try_lock().context(IoSnafu)? {
-            return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
-        }
-
-        // Open the ledger file, which may involve creating it if it doesn't yet exist.
-        let ledger_path = config.data_dir.join("buffer.db");
-        let mut ledger_handle = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&ledger_path)
-            .await
-            .context(IoSnafu)?;
-
-        // If we just created the ledger file, then we need to create the default ledger state, and
-        // then serialize and write to the file, before trying to load it as a memory-mapped file.
-        let ledger_metadata = ledger_handle.metadata().await.context(IoSnafu)?;
-        let ledger_len = ledger_metadata.len();
-        if ledger_len == 0 {
-            debug!("ledger file is brand new, populating with default state");
-            let mut buf = BytesMut::new();
-            loop {
-                match BackedArchive::from_value(&mut buf, LedgerState::default()) {
-                    Ok(archive) => {
-                        ledger_handle
-                            .write_all(archive.get_backing_ref())
-                            .await
-                            .context(IoSnafu)?;
-                        break;
-                    }
-                    Err(SerializeError::FailedToSerialize(reason)) => {
-                        return Err(LedgerLoadCreateError::FailedToSerialize { reason })
-                    }
-                    // Our buffer wasn't big enough, but that's OK!  Resize it and try again.
-                    Err(SerializeError::BackingStoreTooSmall(_, min_len)) => buf.resize(min_len, 0),
-                }
-            }
-        }
-
-        // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
-        // ledger state back out of it.
-        let ledger_handle = ledger_handle.into_std().await;
-        let ledger_mmap = unsafe {
-            MmapOptions::new()
-                .map_mut(&ledger_handle)
-                .context(IoSnafu)?
-        };
-        let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
-            // Deserialized the ledger state without issue from an existing file.
-            Ok(backed) => backed,
-            // Either invalid data, or the buffer doesn't represent a valid ledger structure.
-            Err(e) => {
-                return Err(LedgerLoadCreateError::FailedToDeserialize {
-                    reason: e.into_inner(),
-                })
-            }
-        };
-
-        // Create the ledger object, and synchronize the buffer statistics with the buffer usage
-        // handle.  This handles making sure we account for the starting size of the buffer, and
-        // what not.
-        let mut ledger = Ledger {
-            config,
-            ledger_lock,
-            state: ledger_state,
-            total_buffer_size: AtomicU64::new(0),
-            reader_notify: Notify::new(),
-            writer_notify: Notify::new(),
-            writer_done: AtomicBool::new(false),
-            pending_acks: AtomicUsize::new(0),
-            unacked_reader_file_id_offset: AtomicU16::new(0),
-            last_flush: AtomicCell::new(Instant::now()),
-            usage_handle,
-        };
-        ledger.update_buffer_size().await?;
-
-        Ok(ledger)
-    }
-
     async fn update_buffer_size(&mut self) -> Result<(), LedgerLoadCreateError> {
         // Under normal operation, the reader and writer maintain a consistent state within the
         // ledger.  However, due to the nature of how we update the ledger, process crashes could
@@ -662,9 +566,129 @@ impl<FS> Ledger<FS> {
     }
 }
 
+impl<FS> Ledger<FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    /// Loads or creates a ledger for the given [`DiskBufferConfig`].
+    ///
+    /// If the ledger file does not yet exist, a default ledger state will be created and persisted
+    /// to disk.  Otherwise, the ledger file on disk will be loaded and verified.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error during either serialization of the new, default ledger state, or
+    /// deserializing existing data in the ledger file, or generally during the underlying I/O
+    /// operations, an error variant will be returned describing the error.
+    #[cfg_attr(test, instrument(skip_all, level = "trace"))]
+    pub(super) async fn load_or_create(
+        config: DiskBufferConfig<FS>,
+        usage_handle: BufferUsageHandle,
+    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
+        // Create our containing directory if it doesn't already exist.
+        fs::create_dir_all(&config.data_dir)
+            .await
+            .context(IoSnafu)?;
+
+        // Acquire an exclusive lock on our lock file, which prevents another Vector process from
+        // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
+        // another process from messing with our ledger files, or any of the data files, etc.
+        //
+        // TODO: It'd be nice to incorporate this within `Filesystem` to fully encapsulate _all_
+        // file I/O, but the code is so specific, including the drop guard for the lock file, that I
+        // don't know if it's worth it
+        let ledger_lock_path = config.data_dir.join("buffer.lock");
+        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
+        if !ledger_lock.try_lock().context(IoSnafu)? {
+            return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
+        }
+
+        // Open the ledger file, which may involve creating it if it doesn't yet exist.
+        let ledger_path = config.data_dir.join("buffer.db");
+        let mut ledger_handle = config
+            .filesystem
+            .open_file_writable(&ledger_path)
+            .await
+            .context(IoSnafu)?;
+
+        // If we just created the ledger file, then we need to create the default ledger state, and
+        // then serialize and write to the file, before trying to load it as a memory-mapped file.
+        let ledger_metadata = ledger_handle.metadata().await.context(IoSnafu)?;
+        let ledger_len = ledger_metadata.len();
+        if ledger_len == 0 {
+            debug!("ledger file is brand new, populating with default state");
+            let mut buf = BytesMut::new();
+            loop {
+                match BackedArchive::from_value(&mut buf, LedgerState::default()) {
+                    Ok(archive) => {
+                        ledger_handle
+                            .write_all(archive.get_backing_ref())
+                            .await
+                            .context(IoSnafu)?;
+                        break;
+                    }
+                    Err(SerializeError::FailedToSerialize(reason)) => {
+                        return Err(LedgerLoadCreateError::FailedToSerialize { reason })
+                    }
+                    // Our buffer wasn't big enough, but that's OK!  Resize it and try again.
+                    Err(SerializeError::BackingStoreTooSmall(_, min_len)) => buf.resize(min_len, 0),
+                }
+            }
+
+            // Now sync the file to ensure everything is on disk before proceeding.
+            ledger_handle.sync_all().await.context(IoSnafu)?;
+        }
+
+        // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
+        // ledger state back out of it.
+        /*let ledger_handle = ledger_handle.into_std().await;
+        let ledger_mmap = unsafe {
+            MmapOptions::new()
+                .map_mut(&ledger_handle)
+                .context(IoSnafu)?
+        };*/
+        let ledger_mmap = config
+            .filesystem
+            .open_mmap_writable(&ledger_path)
+            .await
+            .context(IoSnafu)?;
+        let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
+            // Deserialized the ledger state without issue from an existing file.
+            Ok(backed) => backed,
+            // Either invalid data, or the buffer doesn't represent a valid ledger structure.
+            Err(e) => {
+                return Err(LedgerLoadCreateError::FailedToDeserialize {
+                    reason: e.into_inner(),
+                })
+            }
+        };
+
+        // Create the ledger object, and synchronize the buffer statistics with the buffer usage
+        // handle.  This handles making sure we account for the starting size of the buffer, and
+        // what not.
+        let mut ledger = Ledger {
+            config,
+            ledger_lock,
+            state: ledger_state,
+            total_buffer_size: AtomicU64::new(0),
+            reader_notify: Notify::new(),
+            writer_notify: Notify::new(),
+            writer_done: AtomicBool::new(false),
+            pending_acks: AtomicUsize::new(0),
+            unacked_reader_file_id_offset: AtomicU16::new(0),
+            last_flush: AtomicCell::new(Instant::now()),
+            usage_handle,
+        };
+        ledger.update_buffer_size().await?;
+
+        Ok(ledger)
+    }
+}
+
 impl<FS> fmt::Debug for Ledger<FS>
 where
-    FS: fmt::Debug,
+    FS: Filesystem + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")

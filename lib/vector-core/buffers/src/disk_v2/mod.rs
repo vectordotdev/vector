@@ -105,9 +105,10 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use self::{acknowledgements::create_disk_v2_acker, io::Filesystem, ledger::Ledger};
+use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
+    io::Filesystem,
     ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
@@ -148,7 +149,8 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
     where
-        FS: Filesystem + Send + Sync + 'static,
+        FS: Filesystem + 'static,
+        FS::File: Unpin,
     {
         let ledger = Ledger::load_or_create(config, usage_handle)
             .await
@@ -191,7 +193,8 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
     where
-        FS: Filesystem + Send + Sync + 'static,
+        FS: Filesystem + 'static,
+        FS::File: Unpin,
     {
         let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
 

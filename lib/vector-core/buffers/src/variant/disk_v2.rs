@@ -13,7 +13,7 @@ use tokio_util::sync::ReusableBoxFuture;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    disk_v2::{Buffer, DiskBufferConfigBuilder, Reader, Writer},
+    disk_v2::{Buffer, DiskBufferConfigBuilder, Filesystem, Reader, Writer},
     topology::{
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
@@ -74,7 +74,10 @@ where
 }
 
 #[pin_project]
-struct WrappedReader<T, FS> {
+struct WrappedReader<T, FS>
+where
+    FS: Filesystem,
+{
     #[pin]
     reader: Option<Reader<T, FS>>,
     read_future: ReusableBoxFuture<(Reader<T, FS>, Option<T>)>,
@@ -83,7 +86,8 @@ struct WrappedReader<T, FS> {
 impl<T, FS> WrappedReader<T, FS>
 where
     T: Bufferable,
-    FS: Send + Sync + 'static,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
     pub fn new(reader: Reader<T, FS>) -> Self {
         Self {
@@ -96,7 +100,8 @@ where
 impl<T, FS> Stream for WrappedReader<T, FS>
 where
     T: Bufferable,
-    FS: Send + Sync + 'static,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
     type Item = T;
 
@@ -118,6 +123,8 @@ where
 async fn make_read_future<T, FS>(reader: Option<Reader<T, FS>>) -> (Reader<T, FS>, Option<T>)
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     match reader {
         None => unreachable!("future should not be called in this state"),
@@ -172,6 +179,8 @@ where
 async fn drive_disk_v2_writer<T, FS>(mut writer: Writer<T, FS>, mut input: Receiver<T>)
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     // TODO: use a control message struct so callers can send both items to write and flush
     // requests, facilitating the ability to allow for `send_all` at the frontend
