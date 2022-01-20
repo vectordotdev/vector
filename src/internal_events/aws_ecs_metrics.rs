@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::{borrow::Cow, time::Instant};
 
 use metrics::{counter, histogram};

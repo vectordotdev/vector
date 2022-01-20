@@ -152,12 +152,9 @@ async fn aws_ecs_metrics(
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
-                                let body_len = body.len();
+                                let byte_size = body.len();
                                 let count = metrics.len();
-                                emit!(&AwsEcsMetricsEventsReceived {
-                                    byte_size: body_len.clone(),
-                                    count: count.clone(),
-                                });
+                                emit!(&AwsEcsMetricsEventsReceived { byte_size, count });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
@@ -167,10 +164,7 @@ async fn aws_ecs_metrics(
                                     });
                                     return Err(());
                                 } else {
-                                    emit!(&AwsEcsMetricsEventsSent {
-                                        byte_size: body_len,
-                                        count,
-                                    });
+                                    emit!(&AwsEcsMetricsEventsSent { byte_size, count });
                                 }
                             }
                             Err(error) => {
