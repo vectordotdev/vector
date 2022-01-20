@@ -264,6 +264,12 @@ pub fn update_config(config: &Config) {
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.
                 output_type: source.inner.outputs().pop().unwrap().ty,
+                outputs: source
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| output.port.unwrap_or_else(|| "_default".to_string()))
+                    .collect(),
             })),
         );
     }
@@ -337,16 +343,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
@@ -496,21 +505,25 @@ mod tests {
                 component_key: ComponentKey::from("e"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("d"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("g"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("f"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec!["_default".to_string()],
             })),
         ];
 
