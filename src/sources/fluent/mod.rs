@@ -92,7 +92,7 @@ struct FluentSource;
 
 impl TcpSource for FluentSource {
     type Error = DecodeError;
-    type Item = FluentFrame;
+    type Item = FluentFrame2;
     type Decoder = FluentDecoder;
     type Acker = FluentAcker;
 
@@ -163,179 +163,171 @@ impl From<decode::Error> for DecodeError {
 
 #[derive(Debug)]
 struct FluentDecoder {
-    // unread frames from previous fluent message
-    unread_frames: VecDeque<(FluentFrame, usize)>,
+    // // unread frames from previous fluent message
+// unread_frames: VecDeque<(FluentFrame, usize)>,
 }
 
 impl FluentDecoder {
     fn new() -> Self {
         FluentDecoder {
-            unread_frames: VecDeque::new(),
+            // unread_frames: VecDeque::new(),
         }
     }
 
     fn handle_message(
         &mut self,
-        message: FluentMessage,
+        message: Result<FluentMessage, DecodeError>,
         byte_size: usize,
-    ) -> Result<(), DecodeError> {
-        match message {
+    ) -> Result<Option<(FluentFrame2, usize)>, DecodeError> {
+        match message? {
             FluentMessage::Message(tag, timestamp, record) => {
-                self.unread_frames.push_back((
-                    FluentFrame {
-                        tag,
-                        timestamp,
-                        record,
-                        chunk: None,
-                    },
-                    byte_size,
-                ));
-                Ok(())
+                let event = Event::from(FluentFrame {
+                    tag,
+                    timestamp,
+                    record,
+                });
+                let frame = FluentFrame2 {
+                    events: smallvec![event],
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
-                self.unread_frames.push_back((
-                    FluentFrame {
-                        tag,
-                        timestamp,
-                        record,
-                        chunk: options.chunk,
-                    },
-                    byte_size,
-                ));
-                Ok(())
+                let event = Event::from(FluentFrame {
+                    tag,
+                    timestamp,
+                    record,
+                });
+                let frame = FluentFrame2 {
+                    events: smallvec![event],
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::Forward(tag, entries) => {
-                self.unread_frames.extend(entries.into_iter().map(
-                    |FluentEntry(timestamp, record)| {
-                        (
-                            FluentFrame {
-                                tag: tag.clone(),
-                                timestamp,
-                                record,
-                                chunk: None,
-                            },
-                            byte_size,
-                        )
-                    },
-                ));
-                Ok(())
+                let events = entries
+                    .into_iter()
+                    .map(|FluentEntry(timestamp, record)| {
+                        Event::from(FluentFrame {
+                            tag: tag.clone(),
+                            timestamp,
+                            record,
+                        })
+                    })
+                    .collect();
+                let frame = FluentFrame2 {
+                    events,
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::ForwardWithOptions(tag, entries, options) => {
-                self.unread_frames.extend(entries.into_iter().map(
-                    |FluentEntry(timestamp, record)| {
-                        (
-                            FluentFrame {
-                                tag: tag.clone(),
-                                timestamp,
-                                record,
-                                chunk: options.chunk.clone(),
-                            },
-                            byte_size,
-                        )
-                    },
-                ));
-                Ok(())
+                let events = entries
+                    .into_iter()
+                    .map(|FluentEntry(timestamp, record)| {
+                        Event::from(FluentFrame {
+                            tag: tag.clone(),
+                            timestamp,
+                            record,
+                        })
+                    })
+                    .collect();
+                let frame = FluentFrame2 {
+                    events,
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::PackedForward(tag, bin) => {
                 let mut buf = BytesMut::from(&bin[..]);
 
-                let mut decoder = FluentEntryStreamDecoder;
-
-                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    self.unread_frames.push_back((
-                        FluentFrame {
-                            tag: tag.clone(),
-                            timestamp,
-                            record,
-                            chunk: None,
-                        },
-                        byte_size,
-                    ));
+                let mut events = smallvec![];
+                while let Some(FluentEntry(timestamp, record)) =
+                    FluentEntryStreamDecoder.decode(&mut buf)?
+                {
+                    events.push(Event::from(FluentFrame {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    }));
                 }
-                Ok(())
+                let frame = FluentFrame2 {
+                    events,
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
-                let buf = match options.compressed.as_deref() {
-                    Some("gzip") => {
-                        let mut buf = Vec::new();
-                        MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
-                            .read_to_end(&mut buf)
-                            .map(|_| buf)
-                            .map_err(Into::into)
-                    }
-                    Some("text") | None => Ok(bin.into_vec()),
-                    Some(s) => Err(DecodeError::UnknownCompression(s.to_owned())),
-                }?;
+                let mut buf = BytesMut::from(&bin[..]);
 
-                let mut buf = BytesMut::from(&buf[..]);
-
-                let mut decoder = FluentEntryStreamDecoder;
-
-                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    self.unread_frames.push_back((
-                        FluentFrame {
-                            tag: tag.clone(),
-                            timestamp,
-                            record,
-                            chunk: options.chunk.clone(),
-                        },
-                        byte_size,
-                    ));
+                let mut events = smallvec![];
+                while let Some(FluentEntry(timestamp, record)) =
+                    FluentEntryStreamDecoder.decode(&mut buf)?
+                {
+                    events.push(Event::from(FluentFrame {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    }));
                 }
-                Ok(())
+                let frame = FluentFrame2 {
+                    events,
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
-            FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(()),
+            FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(None),
             FluentMessage::Heartbeat(value) => Err(DecodeError::UnexpectedValue(value)),
         }
     }
 }
 
 impl Decoder for FluentDecoder {
-    type Item = (FluentFrame, usize);
+    type Item = (FluentFrame2, usize);
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if let Some(item) = self.unread_frames.pop_front() {
-            return Ok(Some(item));
-        }
-
-        if src.is_empty() {
-            return Ok(None);
-        }
-
-        let (byte_size, res) = {
-            let mut des = Deserializer::new(io::Cursor::new(&src[..]));
-
-            let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
-
-            // check for unexpected EOF to indicate that we need more data
-            if let Err(DecodeError::Decode(
-                decode::Error::InvalidDataRead(ref custom)
-                | decode::Error::InvalidMarkerRead(ref custom),
-            )) = res
-            {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                }
+        // if let Some(item) = self.unread_frames.pop_front() {
+        //     return Ok(Some(item));
+        // }
+        loop {
+            if src.is_empty() {
+                return Ok(None);
             }
 
-            (des.position() as usize, res)
-        };
+            let (byte_size, res) = {
+                let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
-        src.advance(byte_size);
+                let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
-        res.and_then(|message| {
-            self.handle_message(message, byte_size)
-                .map(|_| self.unread_frames.pop_front())
-        })
-        .map_err(|error| {
-            let base64_encoded_message = base64::encode(&src);
-            emit!(&FluentMessageDecodeError {
-                error: &error,
-                base64_encoded_message
-            });
-            error
-        })
+                // check for unexpected EOF to indicate that we need more data
+                if let Err(DecodeError::Decode(
+                    decode::Error::InvalidDataRead(ref custom)
+                    | decode::Error::InvalidMarkerRead(ref custom),
+                )) = res
+                {
+                    if custom.kind() == io::ErrorKind::UnexpectedEof {
+                        return Ok(None);
+                    }
+                }
+
+                (des.position() as usize, res)
+            };
+
+            src.advance(byte_size);
+
+            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
+                let base64_encoded_message = base64::encode(&src);
+                emit!(&FluentMessageDecodeError {
+                    error: &error,
+                    base64_encoded_message
+                });
+                error
+            })?;
+            if let Some(item) = maybe_item {
+                return Ok(Some(item));
+            }
+        }
     }
 }
 
@@ -381,7 +373,7 @@ struct FluentAcker {
 }
 
 impl FluentAcker {
-    fn new(frames: &[FluentFrame]) -> Self {
+    fn new(frames: &[FluentFrame2]) -> Self {
         Self {
             chunks: frames.iter().filter_map(|f| f.chunk.clone()).collect(),
         }
@@ -412,7 +404,7 @@ struct FluentFrame {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
-    chunk: Option<String>,
+    // chunk: Option<String>,
 }
 
 impl From<FluentFrame> for Event {
@@ -421,9 +413,20 @@ impl From<FluentFrame> for Event {
     }
 }
 
-impl From<FluentFrame> for SmallVec<[Event; 1]> {
-    fn from(frame: FluentFrame) -> Self {
-        smallvec![frame.into()]
+// impl From<FluentFrame> for SmallVec<[Event; 1]> {
+//     fn from(frame: FluentFrame) -> Self {
+//         smallvec![frame.into()]
+//     }
+// }
+
+struct FluentFrame2 {
+    events: SmallVec<[Event; 1]>,
+    chunk: Option<String>,
+}
+
+impl From<FluentFrame2> for SmallVec<[Event; 1]> {
+    fn from(frame: FluentFrame2) -> Self {
+        frame.events
     }
 }
 
@@ -433,7 +436,7 @@ impl From<FluentFrame> for LogEvent {
             tag,
             timestamp,
             record,
-            chunk: _,
+            // chunk: _,
         } = frame;
 
         let mut log = LogEvent::default();
