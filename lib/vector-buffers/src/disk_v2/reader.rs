@@ -95,9 +95,7 @@ where
     /// At this stage, the record can be assumed to have been written correctly, and read correctly
     /// from disk, as the checksum was also validated.
     #[snafu(display("failed to decoded record: {:?}", source))]
-    Decode {
-        source: <T as DecodeBytes<T>>::Error,
-    },
+    Decode { source: <T as DecodeBytes>::Error },
 
     /// The reader detected that a data file contains a partially-written record.
     ///

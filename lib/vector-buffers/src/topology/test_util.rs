@@ -10,7 +10,7 @@ use crate::{
 };
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
-impl EncodeBytes<u64> for u64 {
+impl EncodeBytes for u64 {
     type Error = BasicError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -23,7 +23,7 @@ impl EncodeBytes<u64> for u64 {
     }
 }
 
-impl DecodeBytes<u64> for u64 {
+impl DecodeBytes for u64 {
     type Error = BasicError;
 
     fn decode<B>(mut buffer: B) -> Result<u64, Self::Error>

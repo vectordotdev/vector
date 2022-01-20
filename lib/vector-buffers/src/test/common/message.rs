@@ -57,7 +57,7 @@ impl Arbitrary for Message {
     }
 }
 
-impl EncodeBytes<Message> for Message {
+impl EncodeBytes for Message {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -74,7 +74,7 @@ impl EncodeBytes<Message> for Message {
     }
 }
 
-impl DecodeBytes<Message> for Message {
+impl DecodeBytes for Message {
     type Error = DecodeError;
 
     fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>
