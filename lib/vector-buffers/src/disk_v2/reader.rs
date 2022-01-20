@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-use core_common::internal_event::emit;
 use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
@@ -14,6 +13,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncRead, BufReader},
 };
+use vector_common::internal_event::emit;
 
 use super::{
     common::create_crc32c_hasher,
@@ -95,9 +95,7 @@ where
     /// At this stage, the record can be assumed to have been written correctly, and read correctly
     /// from disk, as the checksum was also validated.
     #[snafu(display("failed to decoded record: {:?}", source))]
-    Decode {
-        source: <T as DecodeBytes<T>>::Error,
-    },
+    Decode { source: <T as DecodeBytes>::Error },
 
     /// The reader detected that a data file contains a partially-written record.
     ///

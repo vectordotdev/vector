@@ -12,42 +12,36 @@ use std::error;
 
 use bytes::{Buf, BufMut};
 
-/// Encode a `T` into a `bytes` buffer, possibly unsuccessfully
-pub trait EncodeBytes<T> {
+/// Encode a type into a `bytes` buffer, possibly unsuccessfully
+pub trait EncodeBytes: Sized {
     /// The type returned when `encode` fails
     type Error: error::Error + Send + Sync + 'static;
 
-    /// Attempt to encode a `T` into `B` buffer
+    /// Attempt to encode into `B` buffer
     ///
     /// # Errors
     ///
     /// Function will fail when encoding is not possible for the type instance.
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
-    where
-        B: BufMut,
-        Self: Sized;
+    fn encode<B: BufMut>(self, buffer: &mut B) -> Result<(), Self::Error>;
 
-    /// Return the encoded byte size of `T`
+    /// Return the encoded byte size
     ///
-    /// For some `T` it is not clear ahead of time how large the encoded size
+    /// For some types it is not clear ahead of time how large the encoded size
     /// will be. For such types the return will be `None`, otherwise `Some`.
     fn encoded_size(&self) -> Option<usize> {
         None
     }
 }
 
-/// Decode a `T` from a `bytes` buffer, possibly unsuccessfully
-pub trait DecodeBytes<T> {
+/// Decode a type from a `bytes` buffer, possibly unsuccessfully
+pub trait DecodeBytes: Sized {
     /// The type returned when `decode` fails
     type Error: error::Error + Send + Sync + 'static;
 
-    /// Attempt to decode a `T` from `B` buffer
+    /// Attempt to decode from `B` buffer
     ///
     /// # Errors
     ///
     /// Function will fail when decoding is not possible from the passed buffer.
-    fn decode<B>(buffer: B) -> Result<T, Self::Error>
-    where
-        T: Sized,
-        B: Buf;
+    fn decode<B: Buf>(buffer: B) -> Result<Self, Self::Error>;
 }

@@ -11,7 +11,7 @@ use pulsar::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},

@@ -246,10 +246,14 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let reader: Box<dyn Read + Send> = if gzip {
-                            Box::new(MultiGzDecoder::new(body.reader()))
+                        let mut data = Vec::new();
+                        let body = if gzip {
+                            MultiGzDecoder::new(body.reader())
+                                .read_to_end(&mut data)
+                                .map_err(|_| Rejection::from(ApiError::BadRequest))?;
+                            String::from_utf8_lossy(data.as_slice())
                         } else {
-                            Box::new(body.reader())
+                            String::from_utf8_lossy(body.as_ref())
                         };
 
                         let (batch, receiver) =
@@ -264,7 +268,7 @@ impl SplunkSource {
                             _ => None,
                         };
                         let mut events = stream::iter(EventIterator::new(
-                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
+                            Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
                             xff,
@@ -1575,6 +1579,33 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn handles_non_utf8() {
+        let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
+        let (source, address) = source(None).await;
+
+        let b = reqwest::Client::new()
+            .post(&format!(
+                "http://{}/{}",
+                address, "services/collector/event"
+            ))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .body::<&[u8]>(message);
+
+        assert_eq!(200, b.send().await.unwrap().status().as_u16());
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()["non"], "A non UTF8 character �".into());
+        assert_eq!(event.as_log()["number"], 2.into());
+        assert_eq!(event.as_log()["bool"], true.into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],

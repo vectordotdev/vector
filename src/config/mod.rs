@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use vector_core::buffers::{Acker, BufferConfig, BufferType};
+use vector_buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
     config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
