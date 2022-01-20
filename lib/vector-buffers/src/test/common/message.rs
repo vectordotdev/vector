@@ -1,8 +1,8 @@
 use std::{error, fmt, mem};
 
 use bytes::{Buf, BufMut};
-use core_common::byte_size_of::ByteSizeOf;
 use quickcheck::{Arbitrary, Gen};
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::encoding::{DecodeBytes, EncodeBytes};
 
@@ -57,7 +57,7 @@ impl Arbitrary for Message {
     }
 }
 
-impl EncodeBytes<Message> for Message {
+impl EncodeBytes for Message {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -74,7 +74,7 @@ impl EncodeBytes<Message> for Message {
     }
 }
 
-impl DecodeBytes<Message> for Message {
+impl DecodeBytes for Message {
     type Error = DecodeError;
 
     fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>

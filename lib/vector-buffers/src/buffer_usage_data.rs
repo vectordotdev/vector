@@ -6,9 +6,9 @@ use std::{
     time::Duration,
 };
 
-use core_common::internal_event::emit;
 use tokio::time::interval;
 use tracing::{Instrument, Span};
+use vector_common::internal_event::emit;
 
 use crate::{
     internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped},

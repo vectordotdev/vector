@@ -11,7 +11,7 @@ use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt}
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use super::SinkBuildError;
 use crate::{

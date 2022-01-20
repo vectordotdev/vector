@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::util::BoxService;
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
     config::log_schema,

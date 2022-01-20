@@ -8,12 +8,12 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Buf, BufMut};
-use core_common::byte_size_of::ByteSizeOf;
 use once_cell::sync::Lazy;
 use temp_dir::TempDir;
 use tokio::io::DuplexStream;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -222,7 +222,7 @@ impl ByteSizeOf for SizedRecord {
     }
 }
 
-impl EncodeBytes<SizedRecord> for SizedRecord {
+impl EncodeBytes for SizedRecord {
     type Error = io::Error;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -242,7 +242,7 @@ impl EncodeBytes<SizedRecord> for SizedRecord {
     }
 }
 
-impl DecodeBytes<SizedRecord> for SizedRecord {
+impl DecodeBytes for SizedRecord {
     type Error = io::Error;
 
     fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::Error>
@@ -264,7 +264,7 @@ impl ByteSizeOf for UndecodableRecord {
     }
 }
 
-impl EncodeBytes<UndecodableRecord> for UndecodableRecord {
+impl EncodeBytes for UndecodableRecord {
     type Error = io::Error;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -283,7 +283,7 @@ impl EncodeBytes<UndecodableRecord> for UndecodableRecord {
     }
 }
 
-impl DecodeBytes<UndecodableRecord> for UndecodableRecord {
+impl DecodeBytes for UndecodableRecord {
     type Error = io::Error;
 
     fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::Error>

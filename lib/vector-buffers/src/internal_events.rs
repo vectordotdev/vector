@@ -1,5 +1,5 @@
-use core_common::internal_event::InternalEvent;
 use metrics::{counter, decrement_gauge, gauge, increment_gauge};
+use vector_common::internal_event::InternalEvent;
 
 pub struct BufferEventsReceived {
     pub idx: usize,
