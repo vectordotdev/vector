@@ -5,11 +5,11 @@ use std::{
     sync::Arc,
 };
 
-use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
+use vector_buffers::encoding::{DecodeBytes, EncodeBytes};
 
 use crate::ByteSizeOf;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};
@@ -404,7 +404,7 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-impl EncodeBytes<Event> for Event {
+impl EncodeBytes for Event {
     type Error = EncodeError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
@@ -415,7 +415,7 @@ impl EncodeBytes<Event> for Event {
     }
 }
 
-impl DecodeBytes<Event> for Event {
+impl DecodeBytes for Event {
     type Error = DecodeError;
 
     fn decode<B>(buffer: B) -> Result<Event, Self::Error>
