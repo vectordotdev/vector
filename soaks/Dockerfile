@@ -17,8 +17,10 @@ FROM docker.io/debian:bullseye-slim@sha256:b0d53c872fd640c2af2608ba1e693cfc7dede
 RUN apt-get update && apt-get -y install zlib1g
 COPY --from=builder /vector/vector /usr/bin/vector
 VOLUME /var/lib/vector/
+COPY soaks/entrypoint.sh /entrypoint.sh
 
 # Smoke test
 RUN ["vector", "--version"]
 
-ENTRYPOINT ["/usr/bin/vector"]
+# use setarch to disable ASLR to reduce noise
+ENTRYPOINT ["/entrypoint.sh"]
