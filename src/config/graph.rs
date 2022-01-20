@@ -178,8 +178,8 @@ impl Graph {
 
             if !from_ty.intersects(to_ty) {
                 errors.push(format!(
-                    "Data type mismatch between {} and {}",
-                    edge.from, edge.to
+                    "Data type mismatch between {} ({}) and {} ({})",
+                    edge.from, from_ty, edge.to, to_ty
                 ));
             }
         }
@@ -474,7 +474,7 @@ mod test {
         graph.add_sink("out", DataType::Metric, vec!["in"]);
 
         assert_eq!(
-            Err(vec!["Data type mismatch between in and out".into()]),
+            Err(vec!["Data type mismatch between in (Log) and out (Metric)".into()]),
             graph.typecheck()
         );
     }
