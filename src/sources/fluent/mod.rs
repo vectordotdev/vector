@@ -258,7 +258,19 @@ impl FluentDecoder {
                 Ok(Some((frame, byte_size)))
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
-                let mut buf = BytesMut::from(&bin[..]);
+                let buf = match options.compressed.as_deref() {
+                    Some("gzip") => {
+                        let mut buf = Vec::new();
+                        MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
+                            .read_to_end(&mut buf)
+                            .map(|_| buf)
+                            .map_err(Into::into)
+                    }
+                    Some("text") | None => Ok(bin.into_vec()),
+                    Some(s) => Err(DecodeError::UnknownCompression(s.to_owned())),
+                }?;
+
+                let mut buf = BytesMut::from(&buf[..]);
 
                 let mut events = smallvec![];
                 while let Some(FluentEntry(timestamp, record)) =
