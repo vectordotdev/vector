@@ -342,7 +342,8 @@ form.mktoForm.flex.flex-col label.mktoLabel {
   display: block;
 }
 
-form.mktoForm.flex.flex-col input.mktoField {
+form.mktoForm.flex.flex-col input.mktoField,
+form.mktoForm.flex.flex-col select.mktoField {
   width: 100% !important;
   @apply border dark:border-gray-700 rounded-md h-9;
 }

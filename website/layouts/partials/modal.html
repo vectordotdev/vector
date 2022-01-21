@@ -27,38 +27,53 @@
 <script>
     const { MktoForms2 } = window;
     const formIDsArray = {{ $form_id_array }};
-  
-    const loadMarketoForm = () => {
-      formIDsArray.forEach(id => {
-          MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', id, (form) => {
-            const formOnPage = document.getElementById(`mktoForm_${id}`);
 
-            formOnPage.removeAttribute("style");
-            formOnPage.setAttribute("class", "mktoForm flex flex-col");
+    const loadMarketoForm = () => {
+        formIDsArray.forEach(id => {
+            MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', id, (form) => {
+                const formOnPage = document.getElementById(`mktoForm_${id}`);
+
+                formOnPage.removeAttribute("style");
+                formOnPage.setAttribute("class", "mktoForm flex flex-col");
+
+                function displayThankYouMessage(thankYouText) {
+                    const thankYouMsgContainer = document.createElement('div');
+                    thankYouMsgContainer.classList.add('w-full');
+                    thankYouMsgContainer.innerHTML = thankYouText;
+                    formOnPage.classList.add('hidden');
+                    // hide signup header upon form submission
+                    const signUpHeader = document.querySelector(`#modal-container--${id} > p`);
+                    signUpHeader.classList.add('hidden');
+
+                    formOnPage.parentNode.appendChild(thankYouMsgContainer);
+                }
+
+                form.onSuccess((values, followUpUrl) => {
+                    displayThankYouMessage("Thank you for joining our Updates Newsletter");
+                })
+            });
         });
-      });
-  
     };
-  
+
     /* If User clicks CTA button, show modal */
     const toggleModal = (id) => {
-      event.preventDefault();
-  
-      const modal = document.getElementById(id);
-      const modalVisible = document.getElementById(`modal-container--${id}`);
-      const buttonExit = document.getElementById(`modal-close--${id}`);
-  
+        event.preventDefault();
+
+        const modal = document.getElementById(id);
+        const modalVisible = document.getElementById(`modal-container--${id}`);
+        const buttonExit = document.getElementById(`modal-close--${id}`);
+
         /* If User clicks outside modal or on "X", hide modal & removeEventListener */
-      const handleModalClick = () => {
-        if (!modalVisible.contains(event.target) || buttonExit.contains(event.target)) {
-          modal.classList.toggle("hidden");
-          modal.removeEventListener("click", handleModalClick);
+        const handleModalClick = () => {
+            if (!modalVisible.contains(event.target) || buttonExit.contains(event.target)) {
+                modal.classList.toggle("hidden");
+                modal.removeEventListener("click", handleModalClick);
+            }
         }
-      }
-  
-      modal.classList.toggle("hidden");
-  
-      modal.addEventListener("click", handleModalClick);
+
+        modal.classList.toggle("hidden");
+
+        modal.addEventListener("click", handleModalClick);
     };
 
     window.addEventListener("load", loadMarketoForm);
