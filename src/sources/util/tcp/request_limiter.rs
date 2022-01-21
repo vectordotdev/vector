@@ -128,4 +128,43 @@ mod test {
         let data = limiter.data.lock().unwrap();
         assert_abs_diff_eq!(data.target_requests_in_flight(), 100 / 5, epsilon = 1);
     }
+
+    #[tokio::test]
+    async fn test_average_convergence() {
+        let limiter = RequestLimiter::new(100);
+
+        for _ in 0..100 {
+            let mut permit = limiter.acquire().await;
+            permit.decoding_finished(5);
+            drop(permit);
+        }
+        let data = limiter.data.lock().unwrap();
+        assert_abs_diff_eq!(data.target_requests_in_flight(), 100 / 5, epsilon = 1);
+    }
+
+    #[tokio::test]
+    async fn test_minimum_permits() {
+        let limiter = RequestLimiter::new(100);
+
+        for _ in 0..100 {
+            let mut permit = limiter.acquire().await;
+            permit.decoding_finished(500);
+            drop(permit);
+        }
+        let data = limiter.data.lock().unwrap();
+        assert_eq!(data.target_requests_in_flight(), MINIMUM_PERMITS);
+    }
+
+    #[tokio::test]
+    async fn test_maximum_permits() {
+        let limiter = RequestLimiter::new(100);
+
+        for _ in 0..100 {
+            let mut permit = limiter.acquire().await;
+            permit.decoding_finished(0);
+            drop(permit);
+        }
+        let data = limiter.data.lock().unwrap();
+        assert_eq!(data.target_requests_in_flight(), num_cpus::get());
+    }
 }
