@@ -36,13 +36,13 @@ for exp in bytes_written.experiment.unique():
     comparison = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'comparison')]
 
     baseline_mean = baseline.throughput.mean()
-    baseline_stddev = baseline.throughput.std()
+    baseline_stdev = baseline.throughput.std()
     comparison_mean = comparison.throughput.mean()
-    comparison_stddev = comparison.throughput.std()
+    comparison_stdev = comparison.throughput.std()
     mean_diff = comparison_mean - baseline_mean
-    stddev_diff = comparison_stddev - baseline_stddev
+    stdev_diff = comparison_stdev - baseline_stdev
     mean_percent_change = round(((comparison_mean - baseline_mean) / baseline_mean) * 100, 2)
-    stddev_percent_change = round(((comparison_stddev - baseline_stddev) / baseline_stddev) * 100, 2)
+    stdev_percent_change = round(((comparison_stdev - baseline_stdev) / baseline_stdev) * 100, 2)
 
     baseline_outliers = common.total_outliers(baseline)
     comparison_outliers = common.total_outliers(comparison)
@@ -58,27 +58,27 @@ for exp in bytes_written.experiment.unique():
     # and so there's some statistically interesting difference between the two
     # samples. For our purposes here that implies that performance has changed.
     mean_res = scipy.stats.ttest_ind_from_stats(baseline_mean,
-                                           baseline_stddev,
+                                           baseline_stdev,
                                            len(baseline),
                                            comparison_mean,
-                                           comparison_stddev,
+                                           comparison_stdev,
                                            len(comparison),
                                            equal_var=False)
 
-    stddev_res  = scipy.stats.bartlett(baseline.throughput.array, comparison.throughput.array)
+    stdev_res  = scipy.stats.bartlett(baseline.throughput.array, comparison.throughput.array)
 
     ttest_results.append({'experiment': exp,
                           'Δ mean': mean_diff.mean(),
                           'Δ mean %': mean_percent_change,
                           'ttest p-value': mean_res.pvalue,
-                          'Δ stddev': stddev_diff,
-                          'Δ stddev %': stddev_percent_change,
-                          'bartlett p-value': stddev_res.pvalue,
+                          'Δ stdev': stdev_diff,
+                          'Δ stdev %': stdev_percent_change,
+                          'bartlett p-value': stdev_res.pvalue,
                           'baseline mean': baseline_mean,
-                          'baseline stddev': baseline_stddev,
+                          'baseline stdev': baseline_stdev,
                           'baseline outlier percentage': (baseline_outliers / len(baseline)) * 100,
                           'comparison mean': comparison_mean,
-                          'comparison stddev': comparison_stddev,
+                          'comparison stdev': comparison_stdev,
                           'comparison outlier percentage': (comparison_outliers / len(comparison)) * 100,
                           'erratic': exp in erratic_soaks
                           })
@@ -117,10 +117,10 @@ p_value_violation = ttest_results['ttest p-value'] < args.p_value
 changes = ttest_results[p_value_violation].copy(deep=True)
 changes['confidence'] = changes['ttest p-value'].apply(common.confidence)
 changes = changes.drop(labels=['ttest p-value', 'baseline mean',
-                               'baseline stddev', 'comparison mean',
+                               'baseline stdev', 'comparison mean',
                                'baseline outlier percentage',
                                'comparison outlier percentage',
-                               'comparison stddev', 'erratic'], axis=1)
+                               'comparison stdev', 'erratic'], axis=1)
 changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
 changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
@@ -135,11 +135,11 @@ print("<summary>Fine details of change detection per experiment.</summary>")
 print()
 ttest_results = ttest_results.sort_values('Δ mean %', ascending=False)
 ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(common.human_bytes)
-ttest_results['Δ stddev'] = ttest_results['Δ stddev'].apply(common.human_bytes)
+ttest_results['Δ stdev'] = ttest_results['Δ stdev'].apply(common.human_bytes)
 ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(common.human_bytes)
-ttest_results['baseline stddev'] = ttest_results['baseline stddev'].apply(common.human_bytes)
+ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(common.human_bytes)
 ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(common.human_bytes)
-ttest_results['comparison stddev'] = ttest_results['comparison stddev'].apply(common.human_bytes)
+ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(common.human_bytes)
 print(ttest_results.to_markdown(index=False, tablefmt='github'))
 print("</details>")
 
