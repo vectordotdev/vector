@@ -42,7 +42,7 @@
                     thankYouMsgContainer.innerHTML = thankYouText;
                     formOnPage.classList.add('hidden');
                     // hide signup header upon form submission
-                    const signUpHeader = document.querySelector(`#modal-container--${id} > p`);
+                    const signUpHeader = document.querySelector(`#modal-container--${id} > div > p`);
                     signUpHeader.classList.add('hidden');
 
                     formOnPage.parentNode.appendChild(thankYouMsgContainer);
