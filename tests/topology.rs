@@ -601,6 +601,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
     config.add_source("in1", source1);
     config.add_transform("t1", &["in1"], transform1);
     let mut sink1_outer = SinkOuter::new(
+        // read from both the source and the transform
         vec![String::from("in1"), String::from("t1")],
         Box::new(sink1),
     );
@@ -616,6 +617,8 @@ async fn topology_disk_buffer_flushes_on_idle() {
 
     in1.send(event).await.unwrap();
 
+    // ensure that we get the first copy of the event within a reasonably short amount of time
+    // (either from the source or the transform)
     let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
         .await
         .expect("timeout 1")
@@ -623,6 +626,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
         .expect("no output");
     assert_eq!("foo", res);
 
+    // ensure that we get the second copy of the event
     let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
         .await
         .expect("timeout 2")
@@ -630,8 +634,11 @@ async fn topology_disk_buffer_flushes_on_idle() {
         .expect("no output");
     assert_eq!("foo", res);
 
+    // stop the topology only after we've received both copies of the event, to ensure it wasn't
+    // shutdown that flushed them
     topology.stop().await;
 
+    // make sure there are no unexpected stragglers
     let rest = out1.collect::<Vec<_>>().await;
     assert_eq!(rest, vec![]);
 }
