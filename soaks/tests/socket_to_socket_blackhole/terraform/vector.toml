@@ -24,5 +24,6 @@ address = "0.0.0.0:9090"
 [sinks.socket]
 type = "socket"
 inputs = ["socket"]
+mode = "tcp"
 address = "tcp-blackhole:8080"
 encoding = "json"
