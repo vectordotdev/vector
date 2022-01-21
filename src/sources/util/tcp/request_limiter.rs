@@ -2,26 +2,23 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 const EWMA_WEIGHT: f32 = 0.1;
-const INVERSE_EWMA_WEIGHT: f32 = 1.0 - EWMA_WEIGHT;
+// const INVERSE_EWMA_WEIGHT: f32 = 1.0 - EWMA_WEIGHT;
+
+const MINIMUM_PERMITS: usize = 2;
 
 pub struct RequestLimiterPermit {
     semaphore_permit: Option<OwnedSemaphorePermit>,
     request_limiter_data: Arc<Mutex<RequestLimiterData>>,
-    num_events: usize,
 }
 
 impl RequestLimiterPermit {
-    pub fn decoding_finished(&mut self, num_events: usize) {
-        self.num_events = num_events;
+    pub fn decoding_finished(&self, num_events: usize) {
         let mut request_limiter_data = self.request_limiter_data.lock().unwrap();
-        // request_limiter_data.current_in_flight += num_events;
         request_limiter_data.update_average(num_events);
         info!(
             "Request of size {} changed average to {}",
             num_events, request_limiter_data.average_request_size
         );
-
-        //TODO: potential optimization: decide if the permit can be released early here
     }
 }
 
@@ -56,12 +53,15 @@ impl RequestLimiterData {
     pub fn update_average(&mut self, num_events: usize) {
         let num_events = num_events as f32;
         self.average_request_size =
-            (EWMA_WEIGHT * num_events) + (INVERSE_EWMA_WEIGHT * self.average_request_size);
+            (EWMA_WEIGHT * num_events) + ((1.0 - EWMA_WEIGHT) * self.average_request_size);
     }
 
     pub fn target_requests_in_flight(&self) -> usize {
-        let target = ((self.event_limit_target as f32) / self.average_request_size) as usize;
-        target.min(self.num_cpus).max(1)
+        let target = ((self.event_limit_target as f32) / self.average_request_size);
+        if target.is_nan() {
+            return MINIMUM_PERMITS;
+        }
+        (target as usize).min(self.num_cpus).max(MINIMUM_PERMITS)
     }
 
     pub fn increase_permits(&mut self) {
@@ -70,7 +70,7 @@ impl RequestLimiterData {
     }
 
     pub fn decrease_permits(&mut self, permit: OwnedSemaphorePermit) {
-        if self.total_permits > 1 {
+        if self.total_permits > MINIMUM_PERMITS {
             permit.forget();
             self.total_permits -= 1;
         }
@@ -87,15 +87,14 @@ impl RequestLimiter {
     /// event_limit_target: The limit to the number of events that will be in-flight at one time.
     /// The numbers of events in a request is not known until after it has been decoded, so this is not a hard limit.
     pub fn new(event_limit_target: usize) -> RequestLimiter {
-        let initial_permits = 1;
-        let semaphore = Arc::new(Semaphore::new(initial_permits));
+        assert!(event_limit_target > 0);
+
+        let semaphore = Arc::new(Semaphore::new(MINIMUM_PERMITS));
         RequestLimiter {
             semaphore: semaphore.clone(),
             data: Arc::new(Mutex::new(RequestLimiterData {
                 event_limit_target,
-                total_permits: initial_permits,
-
-                // average is initialized to the target so that target requests starts at 1
+                total_permits: MINIMUM_PERMITS,
                 average_request_size: event_limit_target as f32,
                 semaphore,
                 num_cpus: num_cpus::get(),
@@ -104,12 +103,29 @@ impl RequestLimiter {
     }
 
     pub async fn acquire(&self) -> RequestLimiterPermit {
-        // The semaphore is never closed, so this cannot fail
-        let permit = self.semaphore.clone().acquire_owned().await.unwrap();
+        let permit = self.semaphore.clone().acquire_owned().await;
         RequestLimiterPermit {
-            semaphore_permit: Some(permit),
+            semaphore_permit: permit.ok(),
             request_limiter_data: self.data.clone(),
-            num_events: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+
+    #[tokio::test]
+    async fn test() {
+        let limiter = RequestLimiter::new(100);
+
+        for _ in 0..100 {
+            let mut permit = limiter.acquire().await;
+            permit.decoding_finished(5);
+            drop(permit);
+        }
+        let data = limiter.data.lock().unwrap();
+        assert_abs_diff_eq!(data.target_requests_in_flight(), 100 / 5, epsilon = 1);
     }
 }

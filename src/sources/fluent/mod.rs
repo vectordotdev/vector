@@ -492,17 +492,14 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = (
-            LogEvent::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            28,
-        );
-        let got = decode_all(message).unwrap();
-        assert_event_data_eq!(got[0].0, expected.0);
-        assert_eq!(got[0].1, expected.1);
+        let expected = Event::from(btreemap! {
+            "message" => "bar",
+            "tag" => "tag.name",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+        });
+        let got = decode_all(message.clone()).unwrap();
+        assert_event_data_eq!(got.0[0], expected);
+        assert_eq!(got.1, message.len());
     }
 
     #[test]
@@ -518,17 +515,14 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = (
-            LogEvent::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            35,
-        );
-        let got = decode_all(message).unwrap();
-        assert_event_data_eq!(got[0].0, expected.0);
-        assert_eq!(got[0].1, expected.1);
+        let expected = Event::from(btreemap! {
+            "message" => "bar",
+            "tag" => "tag.name",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+        });
+        let got = decode_all(message.clone()).unwrap();
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected);
     }
 
     #[test]
@@ -549,40 +543,29 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                68,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                68,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                68,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     #[test]
@@ -605,40 +588,30 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                75,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                75,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                75,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     #[test]
@@ -661,40 +634,29 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                82,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                82,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                82,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     //  TODO
@@ -719,52 +681,39 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                84,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                84,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                84,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
-    fn decode_all(message: Vec<u8>) -> Result<Vec<(LogEvent, usize)>, DecodeError> {
+    fn decode_all(message: Vec<u8>) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
         let mut buf = BytesMut::from(&message[..]);
 
         let mut decoder = FluentDecoder::new();
 
-        let mut frames = vec![];
-        while let Some((frame, byte_size)) = decoder.decode(&mut buf)? {
-            frames.push((LogEvent::from(frame), byte_size))
-        }
-        Ok(frames)
+        // let mut frames = vec![];
+        let (frame, byte_size) = decoder.decode(&mut buf)?.unwrap();
+        Ok((frame.into(), byte_size))
     }
 
     #[tokio::test]
