@@ -154,14 +154,11 @@ pub async fn build_pieces(
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let rx = builder.add_output(output.clone());
 
-            let (mut fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new();
             let pump = async move {
-                while let Some(event) = rx.next().await {
-                    fanout.feed(event).await?;
-                }
-                fanout.flush().await?;
+                rx.map(Ok).forward(fanout).await?;
                 Ok(TaskOutput::Source)
             };
 
@@ -357,6 +354,7 @@ pub async fn build_pieces(
                             byte_size: event.size_of(),
                         })
                     })
+                    .map(Into::into) // Convert the `Event` into an `EventArray`
                     .take_until_if(tripwire),
             )
             .await
