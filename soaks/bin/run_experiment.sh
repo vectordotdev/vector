@@ -100,7 +100,7 @@ pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
 terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
           -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" \
-          -var "lading_image=ghcr.io/blt/lading:sha-a3340ad8b31a7480bc73e0a2c9d7d8c7e2df5a9e" \
+          -var "lading_image=ghcr.io/blt/lading:sha-e81610664b059422b774c770e741569c6ef8cf08" \
           -auto-approve -compact-warnings -input=false -no-color
 echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
 echo "[${VARIANT}] Sleeping for ${WARMUP_SECONDS} seconds to allow warm-up"
