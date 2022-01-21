@@ -23,7 +23,7 @@ fn get_controller() -> &'static Controller {
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
 /// used to get aggregate metrics.
-fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
+pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
     let mut iter = metrics.into_iter();
     let m = iter.next()?;
 
