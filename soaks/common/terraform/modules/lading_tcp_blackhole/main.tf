@@ -98,7 +98,7 @@ resource "kubernetes_deployment" "tcp-blackhole" {
           }
 
           liveness_probe {
-            tcp_get {
+            http_get {
               port = 9090
               path = "/metrics"
             }
