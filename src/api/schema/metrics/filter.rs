@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use async_graphql::InputObject;
 use async_stream::stream;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
@@ -9,8 +10,10 @@ use super::{
     SentEventsTotal,
 };
 use crate::{
+    api::schema::filter::{self, filter_item},
     config::ComponentKey,
     event::{Metric, MetricValue},
+    filter_check,
     metrics::Controller,
 };
 
@@ -45,13 +48,32 @@ fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metri
     Some(iter.fold(m, |mut m1, m2| if m1.update(&m2) { m1 } else { m2 }))
 }
 
+#[derive(Default, InputObject)]
+pub struct OutputsFilter {
+    output: Option<Vec<filter::StringFilter>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<&Metric> for OutputsFilter {
+    fn matches(&self, metric: &&Metric) -> bool {
+        filter_check!(self.output.as_ref().map(|f| f
+            .iter()
+            .all(|f| f.filter_value(&metric.tag_value("output").unwrap_or_default()))));
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
+    }
+}
+
 pub trait MetricsFilter<'a> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
     fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
     fn events_in_total(&self) -> Option<EventsInTotal>;
     fn events_out_total(&self) -> Option<EventsOutTotal>;
-    fn sent_events_total(&self) -> Option<SentEventsTotal>;
+    fn sent_events_total(&self, filter: Option<OutputsFilter>) -> Option<SentEventsTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
@@ -88,10 +110,11 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         Some(EventsOutTotal::new(sum))
     }
 
-    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+    fn sent_events_total(&self, filter: Option<OutputsFilter>) -> Option<SentEventsTotal> {
+        let filter = filter.unwrap_or_default();
         let sum = sum_metrics(
             self.iter()
-                .filter(|m| m.name() == "component_sent_events_total"),
+                .filter(|m| m.name() == "component_sent_events_total" && filter_item(m, &filter)),
         )?;
 
         Some(SentEventsTotal::new(sum))
@@ -149,10 +172,11 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         Some(EventsOutTotal::new(sum))
     }
 
-    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+    fn sent_events_total(&self, filter: Option<OutputsFilter>) -> Option<SentEventsTotal> {
+        let filter = filter.unwrap_or_default();
         let sum = sum_metrics(
             self.iter()
-                .filter(|m| m.name() == "component_sent_events_total")
+                .filter(|m| m.name() == "component_sent_events_total" && filter_item(*m, &filter))
                 .copied(),
         )?;
 

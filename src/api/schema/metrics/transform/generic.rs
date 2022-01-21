@@ -42,7 +42,10 @@ impl GenericTransformMetrics {
     }
 
     /// Total outgoing events for the current transform
-    pub async fn sent_events_total(&self) -> Option<metrics::SentEventsTotal> {
-        self.0.sent_events_total()
+    pub async fn sent_events_total(
+        &self,
+        filter: Option<metrics::OutputsFilter>,
+    ) -> Option<metrics::SentEventsTotal> {
+        self.0.sent_events_total(filter)
     }
 }

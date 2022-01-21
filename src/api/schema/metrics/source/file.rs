@@ -64,7 +64,7 @@ impl<'a> FileSourceMetricFile<'a> {
 
     /// Metric indicating outgoing events for the current file
     async fn sent_events_total(&self) -> Option<metrics::SentEventsTotal> {
-        self.metrics.sent_events_total()
+        self.metrics.sent_events_total(None)
     }
 }
 
@@ -152,11 +152,11 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
             FileSourceMetricFilesSortFieldName::SentEventsTotal => Ord::cmp(
                 &self
                     .metrics
-                    .sent_events_total()
+                    .sent_events_total(None)
                     .map(|m| m.get_sent_events_total() as i64)
                     .unwrap_or(0),
                 &rhs.metrics
-                    .sent_events_total()
+                    .sent_events_total(None)
                     .map(|m| m.get_sent_events_total() as i64)
                     .unwrap_or(0),
             ),
@@ -248,8 +248,11 @@ impl FileSourceMetrics {
     }
 
     /// Total outgoing events for the current file source
-    pub async fn sent_events_total(&self) -> Option<metrics::SentEventsTotal> {
-        self.0.sent_events_total()
+    pub async fn sent_events_total(
+        &self,
+        filter: Option<metrics::OutputsFilter>,
+    ) -> Option<metrics::SentEventsTotal> {
+        self.0.sent_events_total(filter)
     }
 }
 
