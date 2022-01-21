@@ -2703,11 +2703,11 @@ dependencies = [
 
 [[package]]
 name = "governor"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3de427a64787873c3b196285e6684cddbf0ae7d1d8d56eaafbb4120c4cb641"
+checksum = "7df0ee4b237afb71e99f7e2fbd840ffec2d6c4bb569f69b2af18aa1f63077d38"
 dependencies = [
- "dashmap 5.0.0",
+ "dashmap 4.0.2",
  "futures 0.3.19",
  "futures-timer",
  "no-std-compat",
