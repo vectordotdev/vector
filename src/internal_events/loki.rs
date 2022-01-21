@@ -45,7 +45,8 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
     fn emit_metrics(&self) {
         counter!("events_discarded_total", 1,
                 "reason" => "out_of_order"); // deprecated
-        counter!("component_discarded_events_total", 1);
+        counter!("component_discarded_events_total", 1,
+                "reason" => "out_of_order");
     }
 }
 
@@ -61,6 +62,6 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
     }
 
     fn emit_metrics(&self) {
-        counter!("rewritten_timestamps_total", 1);
+        counter!("rewritten_timestamp_events_total", 1);
     }
 }
