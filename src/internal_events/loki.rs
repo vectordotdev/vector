@@ -36,7 +36,7 @@ pub struct LokiOutOfOrderEventDropped;
 
 impl InternalEvent for LokiOutOfOrderEventDropped {
     fn emit_logs(&self) {
-        warn!(
+        debug!(
             message = "Received out-of-order event; dropping event.",
             internal_log_rate_secs = 30
         );
@@ -55,7 +55,7 @@ pub struct LokiOutOfOrderEventRewritten;
 
 impl InternalEvent for LokiOutOfOrderEventRewritten {
     fn emit_logs(&self) {
-        warn!(
+        debug!(
             message = "Received out-of-order event, rewriting timestamp.",
             internal_log_rate_secs = 30
         );
