@@ -33,7 +33,7 @@ build_vector() {
         popd
     fi
 
-    docker build --file "${BUILD_DIR}/Dockerfile" --tag "${IMAGE}" "${BUILD_DIR}"
+    docker build --file "${BUILD_DIR}/soaks/Dockerfile" --tag "${IMAGE}" "${BUILD_DIR}"
     rm -rf "${BUILD_DIR}"
 }
 
