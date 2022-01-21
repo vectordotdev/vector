@@ -11,7 +11,7 @@ tracing = { version = "0.1", default-features = false, features = ["attributes"]
 snafu = { version = "0.7", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
-lalrpop-util = { version = "0.19.6", features = ["lexer"] }
+lalrpop-util = { version = "0.19.7", features = ["lexer"] }
 lazy_static = "1.3.0"
 quickcheck = { version = "1.0.3", optional = true }
 
