@@ -11,6 +11,7 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
     api::schema::{
@@ -268,7 +269,7 @@ pub fn update_config(config: &Config) {
                     .inner
                     .outputs()
                     .into_iter()
-                    .map(|output| output.port.unwrap_or_else(|| "_default".to_string()))
+                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
             })),
         );
@@ -286,7 +287,7 @@ pub fn update_config(config: &Config) {
                     .inner
                     .outputs()
                     .into_iter()
-                    .map(|output| output.port.unwrap_or_else(|| "_default".to_string()))
+                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
             })),
         );
