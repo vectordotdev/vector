@@ -30,6 +30,7 @@ pub struct LokiConfig {
     pub remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
+    pub compression_level: Option<u32>,
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
@@ -117,7 +118,7 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(config, client).boxed();
 
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
