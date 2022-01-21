@@ -34,4 +34,4 @@ shared = { path = "../../shared" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [build-dependencies]
-lalrpop = { version = "0.19.6", default-features = false }
+lalrpop = { version = "0.19.7", default-features = false }

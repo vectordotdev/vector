@@ -20,7 +20,7 @@ serde_json = { version = "1.0.75", features = ["raw_value"] }
 quickcheck = { version = "1.0.3" }
 
 [build-dependencies]
-lalrpop = "0.19.6"
+lalrpop = "0.19.7"
 
 [features]
 arbitrary = ["quickcheck"]
