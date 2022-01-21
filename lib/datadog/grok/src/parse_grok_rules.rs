@@ -24,14 +24,14 @@ pub struct GrokRule {
 }
 
 #[derive(Debug, Clone)]
-pub struct GrokRuleBuildContext {
+pub struct GrokRuleParseContext {
     pub pattern: String,
     pub fields: HashMap<String, GrokField>,
     pub aliases: BTreeMap<String, String>,
     pub inflight_parsed_aliases: Vec<String>,
 }
 
-impl GrokRuleBuildContext {
+impl GrokRuleParseContext {
     /// appends to the rule's regular expression
     fn append_regex(&mut self, regex: &str) {
         self.pattern.push_str(regex);
@@ -106,7 +106,7 @@ pub fn parse_grok_rules(
         .map(|r| {
             parse_pattern(
                 r,
-                &mut GrokRuleBuildContext::new(aliases.clone()),
+                &mut GrokRuleParseContext::new(aliases.clone()),
                 &mut grok,
             )
         })
@@ -135,12 +135,11 @@ pub struct GrokField {
 ///
 /// - `name` - the name of the alias
 /// - `definition` - the definition of the alias
-/// - `parsed_aliases` - aliases that have already been parsed
-/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
+/// - `context` - the context required to parse the current grok rule
 fn parse_alias(
     name: &str,
     definition: &str,
-    context: &mut GrokRuleBuildContext,
+    context: &mut GrokRuleParseContext,
 ) -> Result<(), Error> {
     // track circular dependencies
     if context.inflight_parsed_aliases.iter().any(|a| a == name) {
@@ -164,11 +163,11 @@ fn parse_alias(
 /// # Arguments
 ///
 /// - `pattern` - the definition of the pattern
-/// - `parsed_aliases` - aliases that have already been parsed
+/// - `context` - the context required to parse the current grok rule
 /// - `grok` - an instance of Grok parser
 fn parse_pattern(
     pattern: &str,
-    context: &mut GrokRuleBuildContext,
+    context: &mut GrokRuleParseContext,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
     parse_grok_rule(pattern, context)?;
@@ -195,9 +194,8 @@ fn parse_pattern(
 ///
 /// - `rule` - the definition of a grok rule(can be a pattern or an alias)
 /// - `aliases` - all aliases and their definitions
-/// - `parsed_aliases` - aliases that have already been parsed
-/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
-fn parse_grok_rule(rule: &str, context: &mut GrokRuleBuildContext) -> Result<(), Error> {
+/// - `context` - the context required to parse the current grok rule
+fn parse_grok_rule(rule: &str, context: &mut GrokRuleParseContext) -> Result<(), Error> {
     lazy_static! {
         static ref GROK_PATTERN_RE: onig::Regex =
             onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap();
@@ -223,13 +221,10 @@ fn parse_grok_rule(rule: &str, context: &mut GrokRuleBuildContext) -> Result<(),
 /// # Arguments
 ///
 /// - `pattern` - a parsed grok pattern
-/// - `fields` - grok fields with their filters
-/// - `aliases` - all aliases and their definitions
-/// - `parsed_aliases` - aliases that have already been parsed
-/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
+/// - `context` - the context required to parse the current grok rule
 fn resolve_grok_pattern(
     pattern: &GrokPattern,
-    context: &mut GrokRuleBuildContext,
+    context: &mut GrokRuleParseContext,
 ) -> Result<(), Error> {
     let grok_alias = pattern
         .destination
@@ -321,7 +316,7 @@ fn resolve_grok_pattern(
 fn resolves_match_function(
     grok_alias: Option<String>,
     pattern: &ast::GrokPattern,
-    context: &mut GrokRuleBuildContext,
+    context: &mut GrokRuleParseContext,
 ) -> Result<(), Error> {
     let match_fn = &pattern.match_fn;
     match match_fn.name.as_ref() {
