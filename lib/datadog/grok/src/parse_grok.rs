@@ -520,6 +520,11 @@ mod tests {
                 "Thu Jun 16 08:29:03 2016",
                 Ok(Value::Integer(1466076543000)),
             ),
+            (
+                r#"%{date("MMM d y HH:mm:ss z"):field}"#,
+                "Nov 16 2020 13:41:29 GMT",
+                Ok(Value::Integer(1605534089000)),
+            ),
         ]);
 
         // check error handling
