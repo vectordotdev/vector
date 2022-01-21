@@ -303,10 +303,6 @@ impl LokiSink {
             Some(x) => Compression::Gzip(flate2::Compression::new(x)),
             None => Compression::None,
         };
-        // let mut compression: Compression = Compression::None;
-        // if !config.compression_level.is_none() {
-        //     compression = Compression::Gzip(flate2::Compression::new(config.compression_level.unwrap()));
-        // }
 
         Ok(Self {
             acker: cx.acker(),
@@ -359,7 +355,7 @@ impl LokiSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink for LokiSink {
+impl StreamSink<Event> for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
