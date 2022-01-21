@@ -177,7 +177,7 @@ jobs:
         uses: docker/build-push-action@v2.8.0
         with:
           context: baseline-vector/
-          file: soaks/Dockerfile
+          file: baseline-vector/soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -224,7 +224,7 @@ jobs:
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: comparison-vector/
-          file: soaks/Dockerfile
+          file: comparison-vector/soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
