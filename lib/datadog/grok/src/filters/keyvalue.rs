@@ -5,7 +5,7 @@ use nom::{
     self,
     branch::alt,
     bytes::complete::{tag, take_until, take_while1},
-    character::complete::{char, digit1, space0, space1},
+    character::complete::{char, space0, space1},
     combinator::{eof, map, opt, peek, rest, value},
     multi::{many_m_n, separated_list1},
     number::complete::double,
@@ -323,17 +323,21 @@ fn parse_value<'a>(
             parse_boolean,
             map(
                 terminated(
-                    digit1,
+                    double,
                     peek(alt((
                         parse_field_delimiter(field_delimiter),
                         parse_end_of_input(),
                     ))),
                 ),
-                |v: &'a str| Value::Integer(v.parse().expect("not an integer")),
+                |v| {
+                    if ((v as i64) as f64 - v).abs() == 0.0 {
+                        // can be safely converted to Integer without precision loss
+                        Value::Integer(v as i64)
+                    } else {
+                        Value::Float(NotNan::new(v).expect("not a float"))
+                    }
+                },
             ),
-            map(double, |value| {
-                Value::Float(NotNan::new(value).expect("not a float"))
-            }),
             map(match_re_or_empty(re, field_delimiter), |value| {
                 Value::Bytes(Bytes::copy_from_slice(value.as_bytes()))
             }),

@@ -784,6 +784,13 @@ mod tests {
                 "key =valueStr",
                 Ok(Value::from(btreemap! {})),
             ),
+            (
+                r#"%{data::keyvalue(":")}"#,
+                r#"kafka_cluster_status:8ca7b736f0aa43e5"#,
+                Ok(Value::from(btreemap! {
+                    "kafka_cluster_status" => "8ca7b736f0aa43e5"
+                })),
+            ),
         ]);
     }
 }
