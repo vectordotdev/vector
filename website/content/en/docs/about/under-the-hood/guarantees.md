@@ -16,7 +16,9 @@ see which components support specific guarantees.
 Vector supports end-to-end acknowledgement for the majority of its
 sources and sinks. This is a system which tracks the delivery status of
 an event through the lifetime of that event is it travels from the
-originating source to any number of destination sinks.
+originating source to any number of destination sinks. Support for this
+feature is indicated by the "acknowledgements" badge at the top of the
+relevant sink or source configuration reference page.
 
 For a source that supports end-to-end acknowledgements and has the
 `acknowledgements` option enabled, this will cause it to wait for _all_
@@ -31,7 +33,10 @@ the final status of each event after delivery has completed. This
 includes waiting until all internal buffering and the retry process is
 complete. Sinks which have a durable buffer configured will mark events
 as delivered once they are persisted to that buffer, as an indicator
-that Vector will continue to retry the event even after restarts.
+that Vector will continue to retry the event even after restarts. If the
+sink does not support acknowledgements, events will be marked as having
+been delivered when they are handed off to the sink component, before
+any deliveries are attempted.
 
 ## Delivery guarantees
 
