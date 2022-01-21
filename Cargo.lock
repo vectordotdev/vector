@@ -315,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.22"
+version = "3.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1638c62bd347185795d8dd9dba394c1dc67816a8daec095f53fce168d261185"
+checksum = "19f19cb7cb6c58d49566322b144551ab69f9e8e68e37019974f8219e1c59a4dc"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -536,9 +536,9 @@ dependencies = [
 
 [[package]]
 name = "aws-config"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56f825bf056b0befe2e18155a9844455f5f29ac4f5a5c74a73006eedefdd6efa"
+checksum = "33df8f310ad3e5937d55b9e92e1404241b4f91b7c1da7822b89fde04caaacd2c"
 dependencies = [
  "aws-http",
  "aws-sdk-sso",
@@ -614,9 +614,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sso"
-version = "0.5.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e148832881b5644b8eeaecc050a5b83d40a3119ae3595f32c55c9be72feab691"
+checksum = "66d34588414f5077e48761d2977dfd2a66a1d2df80034cff50010893b4fa584f"
 dependencies = [
  "aws-endpoint",
  "aws-http",
@@ -636,9 +636,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sts"
-version = "0.5.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dadf29edf5f6b63441202ff5c5fec9eb7b6a1c26b77c372dbaa439a58f1337a8"
+checksum = "56c34df5bea9c58505f7cb4346dc56842f0300f5244827e078f359302b223386"
 dependencies = [
  "aws-endpoint",
  "aws-http",
@@ -761,9 +761,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-json"
-version = "0.35.1"
+version = "0.35.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80ce237964352e56e052617a077e01ce99632d9203ecdcd0c5efaeb9cd6c2daa"
+checksum = "a73ad42c7528114053c4ace79dc2b560cb3fbeb4c677246da066bd639fb61e40"
 dependencies = [
  "aws-smithy-types",
 ]
@@ -1513,9 +1513,9 @@ checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
 
 [[package]]
 name = "crc32fast"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "738c290dfaea84fc1ca15ad9c168d083b05a714e1efddd8edaab678dc28d2836"
+checksum = "a2209c310e29876f7f0b2721e7e26b84aff178aa3da5d091f9bfbf47669e60e3"
 dependencies = [
  "cfg-if 1.0.0",
 ]
@@ -2703,11 +2703,11 @@ dependencies = [
 
 [[package]]
 name = "governor"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3de427a64787873c3b196285e6684cddbf0ae7d1d8d56eaafbb4120c4cb641"
+checksum = "7df0ee4b237afb71e99f7e2fbd840ffec2d6c4bb569f69b2af18aa1f63077d38"
 dependencies = [
- "dashmap 5.0.0",
+ "dashmap 4.0.2",
  "futures 0.3.19",
  "futures-timer",
  "no-std-compat",
