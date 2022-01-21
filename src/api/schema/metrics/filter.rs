@@ -312,3 +312,58 @@ pub fn component_counter_throughputs(
         // Ignore the first, since we only care about sampling between `interval`
         .skip(1)
 }
+
+/// Returns a stream of `Vec<(Metric, Vec<Metric>)>`, where each `Vec<Metric>` is
+/// the component_sent_events_total metric split by output
+pub fn component_sent_events_totals_metrics_with_outputs(
+    interval: i32,
+) -> impl Stream<Item = Vec<(Metric, Vec<Metric>)>> {
+    let mut cache = BTreeMap::new();
+
+    get_all_metrics(interval).map(move |m| {
+        m.into_iter()
+            .filter(|m| m.name() == "component_sent_events_total")
+            .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
+            .fold(BTreeMap::new(), |mut map, (id, m)| {
+                map.entry(id).or_insert_with(Vec::new).push(m);
+                map
+            })
+            .into_iter()
+            .filter_map(|(id, metrics)| {
+                let outputs = metrics
+                    .iter()
+                    .filter_map(|m| m.tag_value("output"))
+                    .collect::<Vec<_>>();
+                let metrics_by_outputs = outputs
+                    .iter()
+                    .filter_map(|output| {
+                        let metrics_by_output = metrics
+                            .iter()
+                            .filter(|m| m.tag_matches("output", output.as_ref()));
+                        let m = sum_metrics(metrics_by_output)?;
+                        match m.value() {
+                            MetricValue::Counter { value }
+                                if cache
+                                    .insert(format!("{}.{}", id, output), *value)
+                                    .unwrap_or(0.00)
+                                    < *value =>
+                            {
+                                Some(m)
+                            }
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                let sum = sum_metrics_owned(metrics)?;
+                match sum.value() {
+                    MetricValue::Counter { value }
+                        if cache.insert(id, *value).unwrap_or(0.00) < *value =>
+                    {
+                        Some((sum, metrics_by_outputs))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    })
+}

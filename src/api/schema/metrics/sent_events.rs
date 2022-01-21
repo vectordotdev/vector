@@ -6,6 +6,8 @@ use crate::{
     event::{Metric, MetricValue},
 };
 
+use super::Output;
+
 pub struct SentEventsTotal(Metric);
 
 impl SentEventsTotal {
@@ -46,20 +48,29 @@ impl From<Metric> for SentEventsTotal {
 
 pub struct ComponentSentEventsTotal {
     component_key: ComponentKey,
+    outputs: Vec<Output>,
     metric: Metric,
 }
 
 impl ComponentSentEventsTotal {
     /// Returns a new `ComponentSentEventsTotal` struct, which is a GraphQL type. The
     /// component id is hoisted for clear field resolution in the resulting payload.
-    pub fn new(metric: Metric) -> Self {
+    pub fn new(metric: Metric, metric_by_outputs: Vec<Metric>) -> Self {
         let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
         let component_key = ComponentKey::from(component_key);
+        let outputs = metric_by_outputs
+            .iter()
+            .filter_map(|m| {
+                m.tag_value("output")
+                    .map(|output_name| Output::new(output_name, Some(m.clone())))
+            })
+            .collect::<Vec<_>>();
 
         Self {
             component_key,
+            outputs,
             metric,
         }
     }
@@ -70,6 +81,10 @@ impl ComponentSentEventsTotal {
     /// Component id
     async fn component_id(&self) -> &str {
         self.component_key.id()
+    }
+
+    async fn outputs(&self) -> Vec<Output> {
+        self.outputs.clone()
     }
 
     /// Total outgoing events metric

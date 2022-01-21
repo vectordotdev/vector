@@ -6,7 +6,7 @@ use super::{sink, state, transform, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoSourceMetrics, Output, sum_metrics},
+        metrics::{self, sum_metrics, IntoSourceMetrics, Output},
         sort,
     },
     config::{ComponentKey, DataType, OutputId},
