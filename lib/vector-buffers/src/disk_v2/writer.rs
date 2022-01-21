@@ -65,9 +65,7 @@ where
     /// For common encoders, failure to write all of the bytes of the input will be the most common
     /// error, and in fact, some some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
-    FailedToEncode {
-        source: <T as EncodeBytes<T>>::Error,
-    },
+    FailedToEncode { source: <T as EncodeBytes>::Error },
 
     /// The writer failed to serialize the record.
     ///

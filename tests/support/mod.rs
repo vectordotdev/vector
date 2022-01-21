@@ -40,7 +40,7 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);

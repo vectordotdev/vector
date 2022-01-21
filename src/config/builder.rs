@@ -1,5 +1,6 @@
 #[cfg(feature = "datadog-pipelines")]
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -180,6 +181,10 @@ impl ConfigBuilder {
 
         self.transforms
             .insert(ComponentKey::from(id.into()), transform);
+    }
+
+    pub fn set_data_dir(&mut self, path: &Path) {
+        self.global.data_dir = Some(path.to_owned());
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
