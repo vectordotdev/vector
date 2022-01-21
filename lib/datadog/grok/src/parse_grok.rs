@@ -164,7 +164,7 @@ mod tests {
             parsed,
             Value::from(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000.0,
+                "duration" => 202000000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",
@@ -190,13 +190,9 @@ mod tests {
     fn supports_matchers() {
         test_grok_pattern(vec![
             ("%{number:field}", "-1.2", Ok(Value::from(-1.2_f64))),
-            ("%{number:field}", "-1", Ok(Value::from(-1_f64))),
-            (
-                "%{numberExt:field}",
-                "-1234e+3",
-                Ok(Value::from(-1234e+3_f64)),
-            ),
-            ("%{numberExt:field}", ".1e+3", Ok(Value::from(0.1e+3_f64))),
+            ("%{number:field}", "-1", Ok(Value::from(-1))),
+            ("%{numberExt:field}", "-1234e+3", Ok(Value::from(-1234000))),
+            ("%{numberExt:field}", ".1e+3", Ok(Value::from(100))),
             ("%{integer:field}", "-2", Ok(Value::from(-2))),
             ("%{integerExt:field}", "+2", Ok(Value::from(2))),
             ("%{integerExt:field}", "-2", Ok(Value::from(-2))),
@@ -208,7 +204,7 @@ mod tests {
     #[test]
     fn supports_filters() {
         test_grok_pattern(vec![
-            ("%{data:field:number}", "1.0", Ok(Value::from(1.0_f64))),
+            ("%{data:field:number}", "1.0", Ok(Value::from(1))),
             ("%{data:field:integer}", "1", Ok(Value::from(1))),
             (
                 "%{data:field:lowercase}",
@@ -220,8 +216,8 @@ mod tests {
                 "Abc",
                 Ok(Value::Bytes("ABC".into())),
             ),
-            ("%{integer:field:scale(10)}", "1", Ok(Value::from(10.0))),
-            ("%{number:field:scale(0.5)}", "10.0", Ok(Value::from(5.0))),
+            ("%{integer:field:scale(10)}", "1", Ok(Value::from(10))),
+            ("%{number:field:scale(0.5)}", "10.0", Ok(Value::from(5))),
         ]);
     }
 
@@ -581,7 +577,7 @@ mod tests {
             (
                 "%{data:field:array(number)}",
                 "[1,2]",
-                Ok(Value::Array(vec![1.0.into(), 2.0.into()])),
+                Ok(Value::Array(vec![1.into(), 2.into()])),
             ),
             (
                 "%{data:field:array(integer)}",
@@ -591,17 +587,17 @@ mod tests {
             (
                 "%{data:field:array(scale(10))}",
                 "[1,2.1]",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
             (
                 r#"%{data:field:array(";", scale(10))}"#,
                 "[1;2.1]",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
             (
                 r#"%{data:field:array("{}",";", scale(10))}"#,
                 "{1;2.1}",
-                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+                Ok(Value::Array(vec![10.into(), 21.into()])),
             ),
         ]);
 
