@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "3.0.22", default-features = false, optional = true }
+async-graphql = { version = "3.0.23", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.3", features = ["derive", "serde"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
@@ -27,7 +27,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
-mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.9", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
@@ -37,7 +37,7 @@ pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.133", default-features = false, features = ["derive"] }
+serde = { version = "1.0.134", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.75", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.7.0", default-features = false }
