@@ -33,6 +33,7 @@ impl DriverResponse for DatadogEventsResponse {
         EventsSent {
             count: 1,
             byte_size: self.event_byte_size,
+            output: None,
         }
     }
 }

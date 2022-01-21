@@ -77,7 +77,9 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
     build_unit_tests(config_builder).await
 }
 
-async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests(
+    mut config_builder: ConfigBuilder,
+) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
     config_builder.sources = Default::default();
     config_builder.sinks = Default::default();

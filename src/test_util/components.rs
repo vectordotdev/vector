@@ -72,6 +72,16 @@ lazy_static! {
             "component_sent_event_bytes_total",
         ],
     };
+    /// The component test specification for components with multiple outputs
+    pub static ref COMPONENT_MULTIPLE_OUTPUTS_TESTS: ComponentTests = ComponentTests {
+        events: &["EventsSent"],
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[
+        ],
+    };
 }
 
 impl ComponentTests {

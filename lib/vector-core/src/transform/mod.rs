@@ -1,6 +1,7 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{SinkExt, Stream};
+use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 
 use crate::{
     config::Output,
@@ -221,18 +222,32 @@ impl TransformOutputs {
 
     pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
         if let Some(primary) = self.primary_output.as_mut() {
+            let count = buf.primary_buffer.as_ref().map_or(0, Vec::len);
+            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
             send_inner(
                 buf.primary_buffer.as_mut().expect("mismatched outputs"),
                 primary,
             )
             .await;
+            emit(&EventsSent {
+                count,
+                byte_size,
+                output: Some(DEFAULT_OUTPUT),
+            });
         }
         for (key, buf) in &mut buf.named_buffers {
+            let count = buf.len();
+            let byte_size = buf.size_of();
             send_inner(
                 buf,
                 self.named_outputs.get_mut(key).expect("unknown output"),
             )
             .await;
+            emit(&EventsSent {
+                count,
+                byte_size,
+                output: Some(key.as_ref()),
+            });
         }
     }
 }

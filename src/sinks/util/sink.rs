@@ -518,7 +518,11 @@ where
                 let status = logic.result_status(result);
                 finalizers.update_status(status);
                 if status == EventStatus::Delivered {
-                    emit!(&EventsSent { count, byte_size });
+                    emit!(&EventsSent {
+                        count,
+                        byte_size,
+                        output: None
+                    });
                     // TODO: Emit a BytesSent event here too
                 }
 
