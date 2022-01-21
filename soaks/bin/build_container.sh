@@ -7,7 +7,6 @@ set -o nounset
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${__dir}/../../"
-SOAK_ROOT="${__dir}/../"
 
 display_usage() {
     echo ""
