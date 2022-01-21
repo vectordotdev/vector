@@ -137,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
-        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> config::DataType {
@@ -397,7 +397,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         drop(trigger);
 
@@ -453,7 +453,6 @@ mod tests {
 mod integration_tests {
     use std::{collections::HashMap, ops::Range};
 
-    use futures::stream;
     use serde_json::Value;
 
     use super::{tests::*, *};
@@ -495,7 +494,7 @@ mod integration_tests {
         let events = create_events(0..5, |n| n * 11.0);
 
         let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let result = query(url, &format!("show series on {}", database)).await;
 

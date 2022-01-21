@@ -58,9 +58,6 @@ jobs:
         include:
           - test: 'humio'
           - test: 'kafka'
-          - test: 'postgresql_metrics'
-          - test: 'pulsar'
-          - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
@@ -106,13 +103,20 @@ jobs:
           - test: 'loki'
           - test: 'mongo'
           - test: 'nginx'
+          - test: 'postgres'
           - test: 'prometheus'
+          - test: 'pulsar'
           - test: 'redis'
+          - test: 'splunk'
+            env:
+              SPLUNK_VERSION: 7.3.9
+          - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make test-integration-${{ matrix.test }}
         env:
           CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 

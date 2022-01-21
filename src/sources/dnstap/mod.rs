@@ -297,7 +297,7 @@ mod integration_tests {
                     break;
                 }
                 Err(e) => {
-                    println!("Error: {}", e.to_string());
+                    println!("Error: {}", e);
                     break;
                 }
             }

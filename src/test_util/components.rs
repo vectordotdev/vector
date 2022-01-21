@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 use vector_core::event_test_util;
 
 use crate::{
-    event::{Event, Metric, MetricValue},
+    event::{Event, EventArray, Metric, MetricValue},
     metrics::{self, Controller},
     sinks::VectorSink,
 };
@@ -161,9 +161,20 @@ impl ComponentTester {
 /// Convenience wrapper for running sink tests
 pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
 where
+    S: Stream<Item = EventArray> + Send,
+{
+    init_test();
+    sink.run(events).await.expect("Running sink failed");
+    SINK_TESTS.assert(tags);
+}
+
+/// Convenience wrapper for running sink tests with a stream of `Event`
+pub async fn run_sink_events<S>(sink: VectorSink, events: S, tags: &[&str])
+where
     S: Stream<Item = Event> + Send,
 {
     init_test();
+    let events = events.map(Into::into);
     sink.run(events).await.expect("Running sink failed");
     SINK_TESTS.assert(tags);
 }
@@ -171,7 +182,7 @@ where
 /// Convenience wrapper for running a sink with a single event
 pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
     init_test();
-    run_sink(sink, stream::once(std::future::ready(event)), tags).await
+    run_sink(sink, stream::once(std::future::ready(event.into())), tags).await
 }
 
 /// Convenience wrapper for running sinks with `send_all`
@@ -184,11 +195,12 @@ where
 }
 
 /// Convenience wrapper for running sinks with a stream of events
-pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
+pub async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
+    let mut events = events.map(|result| result.map(|event| event.into()));
     match sink {
         VectorSink::Sink(mut sink) => {
             sink.send_all(&mut events)

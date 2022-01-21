@@ -98,7 +98,7 @@ impl TcpSinkConfig {
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -250,7 +250,7 @@ impl TcpSink {
 }
 
 #[async_trait]
-impl StreamSink for TcpSink {
+impl StreamSink<Event> for TcpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.

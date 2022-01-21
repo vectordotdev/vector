@@ -10,7 +10,7 @@ use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::internal_events::{SocketEventsSent, SocketMode};
 

@@ -40,7 +40,7 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -380,7 +380,7 @@ impl SinkConfig for MockSinkConfig {
             future::err(HealthcheckError::Unhealthy.into())
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck.boxed()))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -402,7 +402,7 @@ struct MockSink {
 }
 
 #[async_trait]
-impl StreamSink for MockSink {
+impl StreamSink<Event> for MockSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         match self.sink {
             Mode::Normal(mut sink) => {

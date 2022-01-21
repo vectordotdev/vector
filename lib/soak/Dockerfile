@@ -1,7 +1,7 @@
 #
 # BUILDER
 #
-FROM docker.io/rust:1.57-buster as builder
+FROM docker.io/rust:1.58-buster as builder
 WORKDIR vector
 ARG VECTOR_FEATURES
 # RUN apt-get -y update && apt-get -y install build-essential cmake libclang-dev libsasl2-dev

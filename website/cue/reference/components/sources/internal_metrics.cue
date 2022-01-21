@@ -1199,6 +1199,10 @@ components: sources: internal_metrics: {
 				unix: "Unix domain socket"
 			}
 		}
+		_output: {
+			description: "The specific output of the component."
+			required:    false
+		}
 		_stage: {
 			description: "The stage within the component at which the error occurred."
 			required:    true

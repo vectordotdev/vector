@@ -383,6 +383,13 @@ _values: {
 		example:     !=""
 	}
 
+	#ConditionExample: {
+		title:    !=""
+		name:     "vrl" | "datadog_search"
+		example:  !=""
+		vrl_only: bool | *false
+	}
+
 	syntaxes: [#Syntax, ...#Syntax] & [
 			{
 			name:        "vrl"
@@ -426,6 +433,25 @@ _values: {
 			[JSON](\(urls.json)) | `"condition": ".status == 200"`
 			"""
 	}
+
+	condition_examples: [#ConditionExample, ...#ConditionExample] & [
+				{
+			title:   "Standard VRL"
+			name:    "vrl"
+			example: ".status == 500"
+		},
+		{
+			title:   "Datadog Search"
+			name:    "datadog_search"
+			example: "*stack"
+		},
+		{
+			title:    "VRL shorthand"
+			name:     "vrl"
+			example:  ".status == 500"
+			vrl_only: true
+		},
+	]
 }
 
 #TypePrimitive: {

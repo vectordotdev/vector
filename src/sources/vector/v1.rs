@@ -128,7 +128,6 @@ impl TcpSource for VectorSource {
 mod test {
     use std::net::SocketAddr;
 
-    use futures::stream;
     use shared::assert_event_data_eq;
     use tokio::{
         io::AsyncWriteExt,
@@ -189,7 +188,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 

@@ -168,7 +168,7 @@ impl InfluxDbSvc {
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
@@ -897,7 +897,6 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
-    use futures::stream;
     use pretty_assertions::assert_eq;
 
     use crate::{
@@ -961,7 +960,7 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1075,7 +1074,7 @@ mod integration_tests {
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
