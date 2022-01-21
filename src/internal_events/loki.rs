@@ -18,7 +18,7 @@ pub struct LokiEventsProcessed {
 
 impl InternalEvent for LokiEventsProcessed {
     fn emit_metrics(&self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
     }
 }
 
@@ -44,7 +44,8 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
 
     fn emit_metrics(&self) {
         counter!("events_discarded_total", 1,
-                "reason" => "out_of_order");
+                "reason" => "out_of_order"); // deprecated
+        counter!("component_discarded_events_total", 1);
     }
 }
 
