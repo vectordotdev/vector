@@ -6,5 +6,5 @@ socket source's ability to create it, and socket sink's ability to absorb it.
 
 ## Method
 
-Lading `tcp_gen` is used to generate socket load into vector, `socket` acts as a
-sink.
+Lading `tcp_gen` is used to generate socket load into vector, `tcp_blackhole`
+acts as a sink.
