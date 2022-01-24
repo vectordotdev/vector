@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -28,14 +29,15 @@ impl Drop for RequestLimiterPermit {
             let target = request_limiter_data.target_requests_in_flight();
             let current = request_limiter_data.total_permits;
 
-            if target > current {
-                request_limiter_data.increase_permits();
-            } else if target == current {
-                // only release the current permit (when the inner permit is dropped automatically)
-            } else {
-                // target < current
-                let permit = self.semaphore_permit.take().unwrap();
-                request_limiter_data.decrease_permits(permit);
+            match target.cmp(&current) {
+                Ordering::Greater => request_limiter_data.increase_permits(),
+                Ordering::Equal => {
+                    // only release the current permit (when the inner permit is dropped automatically)
+                }
+                Ordering::Less => {
+                    let permit = self.semaphore_permit.take().unwrap();
+                    request_limiter_data.decrease_permits(permit);
+                }
             }
         }
     }
@@ -91,7 +93,7 @@ impl RequestLimiter {
 
         let semaphore = Arc::new(Semaphore::new(MINIMUM_PERMITS));
         RequestLimiter {
-            semaphore: semaphore.clone(),
+            semaphore: Arc::clone(&semaphore),
             data: Arc::new(Mutex::new(RequestLimiterData {
                 event_limit_target,
                 total_permits: MINIMUM_PERMITS,
@@ -103,10 +105,10 @@ impl RequestLimiter {
     }
 
     pub async fn acquire(&self) -> RequestLimiterPermit {
-        let permit = self.semaphore.clone().acquire_owned().await;
+        let permit = Arc::clone(&self.semaphore).acquire_owned().await;
         RequestLimiterPermit {
             semaphore_permit: permit.ok(),
-            request_limiter_data: self.data.clone(),
+            request_limiter_data: Arc::clone(&self.data),
         }
     }
 }

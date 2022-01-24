@@ -1,6 +1,4 @@
-use std::{
-    io::{self, Read},
-};
+use std::io::{self, Read};
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::MultiGzDecoder;
@@ -161,16 +159,11 @@ impl From<decode::Error> for DecodeError {
 }
 
 #[derive(Debug)]
-struct FluentDecoder {
-    // // unread frames from previous fluent message
-// unread_frames: VecDeque<(FluentFrame, usize)>,
-}
+struct FluentDecoder {}
 
 impl FluentDecoder {
-    fn new() -> Self {
-        FluentDecoder {
-            // unread_frames: VecDeque::new(),
-        }
+    const fn new() -> Self {
+        FluentDecoder {}
     }
 
     fn handle_message(
@@ -471,7 +464,7 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_core::event::{Value};
+    use vector_core::event::Value;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
