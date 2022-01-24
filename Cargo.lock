@@ -1317,9 +1317,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.10"
+version = "3.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a30c3bf9ff12dfe5dae53f0a96e0febcd18420d1c0e7fad77796d9d5c4b5375"
+checksum = "bb7216c62891a806990b7b69ccd99f7ed011da4ff13529968fb1625abef7f3c6"
 dependencies = [
  "atty",
  "bitflags",
@@ -8411,7 +8411,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.0.10",
+ "clap 3.0.11",
  "crc32fast",
  "criterion",
  "crossbeam-utils",

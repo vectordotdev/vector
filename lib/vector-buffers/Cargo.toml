@@ -30,7 +30,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["attribute
 vector_common = { path = "../vector-common", default-features = false }
 
 [dev-dependencies]
-clap = "3.0.10"
+clap = "3.0.11"
 criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 human_bytes = "0.3.0"
