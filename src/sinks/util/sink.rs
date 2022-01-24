@@ -518,7 +518,11 @@ where
                 let status = logic.result_status(result);
                 finalizers.update_status(status);
                 if status == EventStatus::Delivered {
-                    emit!(&EventsSent { count, byte_size });
+                    emit!(&EventsSent {
+                        count,
+                        byte_size,
+                        output: None
+                    });
                     // TODO: Emit a BytesSent event here too
                 }
 
@@ -642,7 +646,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
     use tokio::{task::yield_now, time::Instant};
-    use vector_core::buffers::Acker;
+    use vector_buffers::Acker;
 
     use super::*;
     use crate::{

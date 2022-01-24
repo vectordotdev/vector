@@ -27,7 +27,7 @@ pub enum GrokFilter {
     Uppercase,
     Json,
     Array(
-        Option<(char, char)>,
+        Option<(String, String)>,
         Option<String>,
         Box<Option<GrokFilter>>,
     ),
@@ -180,7 +180,9 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
         GrokFilter::Array(brackets, delimiter, value_filter) => match value {
             Value::Bytes(bytes) => array::parse(
                 String::from_utf8_lossy(bytes).as_ref(),
-                brackets.to_owned(),
+                brackets
+                    .as_ref()
+                    .map(|(start, end)| (start.as_str(), end.as_str())),
                 delimiter.as_ref().map(|s| s.as_str()),
             )
             .map_err(|_e| {

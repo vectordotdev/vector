@@ -29,15 +29,15 @@ use crate::{
 pub struct DemoLogsConfig {
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
-    interval: f64,
+    pub interval: f64,
     #[derivative(Default(value = "default_count()"))]
-    count: usize,
+    pub count: usize,
     #[serde(flatten)]
-    format: OutputFormat,
+    pub format: OutputFormat,
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    pub framing: Box<dyn FramingConfig>,
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn DeserializerConfig>,
+    pub decoding: Box<dyn DeserializerConfig>,
 }
 
 const fn default_interval() -> f64 {
