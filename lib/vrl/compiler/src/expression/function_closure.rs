@@ -74,6 +74,36 @@ impl FunctionClosure {
                     state.remove_variable(&value_ident);
                 }
             }
+            Value::Array(array) => {
+                let index_ident = self
+                    .variables
+                    .get(0)
+                    .expect("checked at compile-time")
+                    .clone()
+                    .into_inner();
+                let value_ident = self
+                    .variables
+                    .get(1)
+                    .expect("checked at compile-time")
+                    .clone()
+                    .into_inner();
+
+                for (index, value) in array.into_iter().enumerate() {
+                    let state = ctx.state_mut();
+                    state.insert_variable(index_ident.clone(), index.into());
+                    state.insert_variable(value_ident.clone(), value);
+
+                    let output = Output::Array {
+                        element: self.block.resolve(ctx)?,
+                    };
+
+                    func(ctx, output)?;
+
+                    let state = ctx.state_mut();
+                    state.remove_variable(&index_ident);
+                    state.remove_variable(&value_ident);
+                }
+            }
             _ => unimplemented!(),
         };
 
@@ -90,6 +120,7 @@ impl fmt::Display for FunctionClosure {
 
 pub enum Output {
     Object { key: String, value: Value },
+    Array { element: Value },
 }
 
 // impl crate::Expression for FunctionClosure {
