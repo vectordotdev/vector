@@ -454,7 +454,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		processed_events_total: {
 			description:       """
@@ -592,13 +592,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		datadog_logs_received_in_total: {
 			description:       "Number of Datadog logs received."

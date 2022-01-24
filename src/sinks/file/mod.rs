@@ -301,6 +301,7 @@ impl FileSink {
                 emit!(&EventsSent {
                     count: 1,
                     byte_size: event_size,
+                    output: None,
                 });
                 emit!(&FileBytesSent {
                     byte_size,

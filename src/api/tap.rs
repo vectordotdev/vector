@@ -487,4 +487,132 @@ mod tests {
         );
         let _log = assert_log(transform_tap_events[1][0].clone());
     }
+
+    #[tokio::test]
+    async fn integration_test_tap_non_default_output() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_remap_dropped_stream = create_events_stream(
+            topology.watch(),
+            vec!["transform.dropped".to_string()],
+            500,
+            100,
+        );
+
+        let transform_tap_events: Vec<_> =
+            transform_tap_remap_dropped_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new(
+                "transform.dropped".to_string(),
+                EventNotificationType::Matched
+            )
+        );
+        assert_eq!(
+            assert_log(transform_tap_events[1][0].clone())
+                .get_message()
+                .unwrap_or_default(),
+            "test2"
+        );
+    }
+
+    #[tokio::test]
+    async fn integration_test_tap_multiple_outputs() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in-test1",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test1".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_source(
+            "in-test2",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in*"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_all_outputs_stream =
+            create_events_stream(topology.watch(), vec!["transform*".to_string()], 500, 100);
+
+        let transform_tap_events: Vec<_> = transform_tap_all_outputs_stream.take(2).collect().await;
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new("transform*".to_string(), EventNotificationType::Matched)
+        );
+
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test1"));
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test2"));
+    }
 }
