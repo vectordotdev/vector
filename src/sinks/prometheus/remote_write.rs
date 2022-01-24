@@ -7,7 +7,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
-use vector_core::ByteSizeOf;
+use vector_core::{sink::StreamSink, ByteSizeOf};
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
@@ -137,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
-        Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
+        Ok((crate::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> config::DataType {
@@ -246,6 +246,24 @@ fn snap_block(data: Bytes) -> Vec<u8> {
     snap::raw::Encoder::new()
         .compress_vec(&data)
         .expect("Out of memory")
+}
+
+#[derive(clone)]
+pub struct RemoteWriteSink {
+    service: RemoteWriteService,
+}
+
+impl RemoteWriteSink {
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        todo!()
+    }
+}
+
+#[async_trait::async_trait]
+impl StreamSink<Event> for RemoteWriteSink {
+    async fn run(mut self: Box<Self>, input: stream::BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
+    }
 }
 
 #[cfg(test)]
