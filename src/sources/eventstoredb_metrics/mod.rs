@@ -12,9 +12,8 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{
-        EventStoreDbMetricsBytesReceived, EventStoreDbMetricsEventsReceived,
-        EventStoreDbMetricsEventsSent, EventStoreDbMetricsHttpError,
-        EventStoreDbMetricsSendingError, EventStoreDbStatsParsingError,
+        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
+        StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -103,8 +102,9 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(&EventStoreDbMetricsBytesReceived {
-                            byte_size: bytes.len()
+                        emit!(&BytesReceived {
+                            byte_size: bytes.len(),
+                            protocol: "http",
                         });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
@@ -118,17 +118,15 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = bytes.len();
 
-                                emit!(&EventStoreDbMetricsEventsReceived { count, byte_size });
+                                emit!(&EventsReceived { count, byte_size });
 
                                 let mut metrics = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = cx.out.send_all(&mut metrics).await {
-                                    emit!(&EventStoreDbMetricsSendingError {
+                                    emit!(&StreamClosedError {
                                         count,
                                         error: error.to_string(),
                                     });
                                     break;
-                                } else {
-                                    emit!(&EventStoreDbMetricsEventsSent { count, byte_size })
                                 }
                             }
                         }
