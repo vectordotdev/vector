@@ -17,24 +17,39 @@ use crate::{
     parse_grok_pattern::parse_grok_pattern,
 };
 
+/// The result of parsing a grok rule with a final regular expression and the related field information, needed at runtime.
 #[derive(Debug, Clone)]
 pub struct GrokRule {
+    /// a compiled regex pattern
     pub pattern: Arc<grok::Pattern>,
+    /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
 }
 
+/// A grok field, that should be extracted, with its lookup path and post-processing filters to apply.
+#[derive(Debug, Clone)]
+pub struct GrokField {
+    pub lookup: LookupBuf,
+    pub filters: Vec<GrokFilter>,
+}
+
+/// The context used to parse grok rules.
 #[derive(Debug, Clone)]
 pub struct GrokRuleParseContext {
-    pub pattern: String,
+    /// a currently built regular expression
+    pub regex: String,
+    /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
+    /// aliases and their definitions
     pub aliases: BTreeMap<String, String>,
-    pub inflight_parsed_aliases: Vec<String>,
+    /// used to detect cycles in alias definitions
+    pub alias_stack: Vec<String>,
 }
 
 impl GrokRuleParseContext {
     /// appends to the rule's regular expression
     fn append_regex(&mut self, regex: &str) {
-        self.pattern.push_str(regex);
+        self.regex.push_str(regex);
     }
 
     /// registers a given grok field under a given grok name(used in a regex)
@@ -51,10 +66,10 @@ impl GrokRuleParseContext {
 
     fn new(aliases: BTreeMap<String, String>) -> Self {
         Self {
-            pattern: String::new(),
+            regex: String::new(),
             fields: HashMap::new(),
             aliases,
-            inflight_parsed_aliases: vec![],
+            alias_stack: vec![],
         }
     }
 
@@ -113,21 +128,6 @@ pub fn parse_grok_rules(
         .collect::<Result<Vec<GrokRule>, Error>>()
 }
 
-/// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
-/// and grok fields, that will be extracted, with their filters
-#[derive(Debug, Clone)]
-struct ParsedGrokRule {
-    pub definition: String,
-    pub fields: HashMap<String, GrokField>,
-}
-
-/// A grok field, that should be extracted, with its lookup path and post-processing filters to apply.
-#[derive(Debug, Clone)]
-pub struct GrokField {
-    pub lookup: LookupBuf,
-    pub filters: Vec<GrokFilter>,
-}
-
 ///
 /// Parses alias definitions.
 ///
@@ -142,17 +142,17 @@ fn parse_alias(
     context: &mut GrokRuleParseContext,
 ) -> Result<(), Error> {
     // track circular dependencies
-    if context.inflight_parsed_aliases.iter().any(|a| a == name) {
+    if context.alias_stack.iter().any(|a| a == name) {
         return Err(Error::CircularDependencyInAliasDefinition(
-            context.inflight_parsed_aliases.first().unwrap().to_string(),
+            context.alias_stack.first().unwrap().to_string(),
         ));
     } else {
-        context.inflight_parsed_aliases.push(name.to_string());
+        context.alias_stack.push(name.to_string());
     }
 
     parse_grok_rule(definition, context)?;
 
-    context.inflight_parsed_aliases.pop();
+    context.alias_stack.pop();
 
     Ok(())
 }
@@ -173,7 +173,7 @@ fn parse_pattern(
     parse_grok_rule(pattern, context)?;
     let mut pattern = String::new();
     pattern.push('^');
-    pattern.push_str(&context.pattern);
+    pattern.push_str(&context.regex);
     pattern.push('$');
 
     // compile pattern
