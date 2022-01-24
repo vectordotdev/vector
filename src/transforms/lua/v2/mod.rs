@@ -93,7 +93,7 @@ impl LuaConfig {
         Lua::new(self).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
+    pub fn input_type(&self) -> DataType {
         DataType::Metric | DataType::Log
     }
 
