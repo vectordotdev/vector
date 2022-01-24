@@ -57,7 +57,7 @@ impl RequestLimiterData {
     }
 
     pub fn target_requests_in_flight(&self) -> usize {
-        let target = ((self.event_limit_target as f32) / self.average_request_size);
+        let target = (self.event_limit_target as f32) / self.average_request_size;
         if target.is_nan() {
             return MINIMUM_PERMITS;
         }
@@ -121,7 +121,7 @@ mod test {
         let limiter = RequestLimiter::new(100);
 
         for _ in 0..100 {
-            let mut permit = limiter.acquire().await;
+            let permit = limiter.acquire().await;
             permit.decoding_finished(5);
             drop(permit);
         }
@@ -134,7 +134,7 @@ mod test {
         let limiter = RequestLimiter::new(100);
 
         for _ in 0..100 {
-            let mut permit = limiter.acquire().await;
+            let permit = limiter.acquire().await;
             permit.decoding_finished(5);
             drop(permit);
         }
@@ -147,7 +147,7 @@ mod test {
         let limiter = RequestLimiter::new(100);
 
         for _ in 0..100 {
-            let mut permit = limiter.acquire().await;
+            let permit = limiter.acquire().await;
             permit.decoding_finished(500);
             drop(permit);
         }
@@ -160,7 +160,7 @@ mod test {
         let limiter = RequestLimiter::new(100);
 
         for _ in 0..100 {
-            let mut permit = limiter.acquire().await;
+            let permit = limiter.acquire().await;
             permit.decoding_finished(0);
             drop(permit);
         }

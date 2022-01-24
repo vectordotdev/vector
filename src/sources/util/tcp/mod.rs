@@ -6,11 +6,11 @@ use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
-use std::future::Future;
+
 use std::net::{IpAddr, SocketAddr};
-use std::sync::{LockResult, Mutex};
+
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -33,7 +33,7 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     SourceSender,
 };
-use vector_core::ByteSizeOf;
+
 
 async fn make_listener(
     addr: SocketListenAddr,
@@ -297,7 +297,7 @@ async fn handle_stream<T>(
             res = reader.next() => {
                 match res {
                     Some(Ok((frames, byte_size))) => {
-                        let num_frames = frames.len();
+                        let _num_frames = frames.len();
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 

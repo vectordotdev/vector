@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     io::{self, Read},
 };
 
@@ -472,7 +471,7 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_core::event::{LogEvent, Value};
+    use vector_core::event::{Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
