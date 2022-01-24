@@ -3,36 +3,18 @@ Support Services | {{ site.Title }}
 {{ end }}
 
 {{ define "main" }}
+{{ $form := .Params.marketo_form }}
+
 <div class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
     <div class="my-16">
         {{ partial "hero.html" . }}
     </div>
 
-    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-lg leading-tight tracking-tight">
-        Request Support Services
-    </h2>
-
-    <div class="relative flex pb-16 mt-5">
-        <form id="mktoForm_12479"></form>
-    </div>
+    {{ partial "form-on-page.html" (dict "form" (dict "form_id" $form.form_id "form_title" $form.form_title
+    "form_thankyou" $form.form_thankyou)) }}
 
     <p class="dark:text-gray-200 md:text-lg text-gray-500 prose dark:prose-dark pb-16 mt-5">
         For general support questions or to join our Discord group please review our <a href="/community">contact us and FAQ page</a>.
     </p>
 </div>
-
-<script>
-    const formID = "12479";
-
-    const loadMarketoForm2 = () => {
-        MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', formID, (form) => {
-            const formOnPage = document.getElementById(`mktoForm_${formID}`);
-
-            formOnPage.removeAttribute("style");
-            formOnPage.setAttribute("class", "mktoForm flex flex-col");
-        });
-    };
-
-    window.addEventListener("load", loadMarketoForm2);
-</script>
 {{ end }}

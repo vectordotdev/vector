@@ -1,3 +1,5 @@
+{{/*  modal takes in one arg, "form", that is a SLICE of DICT: [ { form_id, form_title, and form_thankyou }, ... ]  */}}
+
 {{ $form_id_array := slice }}
 
 <script src="https://lp.datadoghq.com/js/forms2/js/forms2.min.js"></script>
@@ -18,6 +20,9 @@
             </div>
             <div class="relative flex flex-auto px-2 pb-4 justify-center">
                 <form id="mktoForm_{{ $form.form_id }}"></form>
+                <p id="modal-thankyou--{{ $form.form_id }}" class="hidden pt-10 pb-14">
+                    {{ $form.form_thankyou }}
+                </p>
             </div>
         </div>
     </div>
@@ -36,20 +41,21 @@
                 formOnPage.removeAttribute("style");
                 formOnPage.setAttribute("class", "mktoForm flex flex-col");
 
-                function displayThankYouMessage(thankYouText) {
-                    const thankYouMsgContainer = document.createElement('div');
-                    thankYouMsgContainer.classList.add('w-full');
-                    thankYouMsgContainer.innerHTML = thankYouText;
-                    formOnPage.classList.add('hidden');
-                    // hide signup header upon form submission
+                function displayThankYouMessage() {
+                    const thankyouMessage = document.getElementById(`modal-thankyou--${id}`);
                     const signUpHeader = document.querySelector(`#modal-container--${id} > div > p`);
-                    signUpHeader.classList.add('hidden');
 
-                    formOnPage.parentNode.appendChild(thankYouMsgContainer);
+                    {{/*  Hide form and modal title, unhide thankyou message  */}}
+                    formOnPage.classList.add('hidden');
+                    signUpHeader.classList.add('hidden');
+                    thankyouMessage.classList.remove('hidden');
                 }
 
                 form.onSuccess((values, followUpUrl) => {
-                    displayThankYouMessage("Thank you for joining our Updates Newsletter");
+                    displayThankYouMessage();
+
+                    {{/*  No redirect  */}}
+                    return false;
                 })
             });
         });

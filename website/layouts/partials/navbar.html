@@ -104,7 +104,4 @@
       {{ partial "button-modal.html" (dict "context" . "form_id" "12461" "text" "Updates" "additional_classes" "h-11") }}
     </div>
   </div>
-
-  {{/*  Include modal partial ONCE - Handles both instances of button-modal partial  */}}
-  {{ partial "modal.html" (dict "form" (slice (dict "form_id" "12461" "form_title" "Sign up to receive emails on the latest Vector content and new releases"))) }}
 </nav>
