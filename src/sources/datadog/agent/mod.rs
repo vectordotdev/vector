@@ -16,7 +16,7 @@ use snafu::Snafu;
 use tokio_util::codec::Decoder;
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
-    internal_event::{EventsReceived, EventsSent},
+    internal_event::EventsReceived,
     ByteSizeOf,
 };
 use warp::{
@@ -38,7 +38,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{DatadogAgentStreamError, HttpBytesReceived, HttpDecompressError},
+    internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
@@ -235,7 +235,6 @@ impl DatadogAgentSource {
             Ok(mut events) => {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
                 let count = events.len();
-                let byte_size = events.size_of();
 
                 let mut events = futures::stream::iter(events);
                 if let Some(name) = output {
@@ -244,10 +243,12 @@ impl DatadogAgentSource {
                     out.send_all(&mut events).await
                 }
                 .map_err(move |error: crate::source_sender::ClosedError| {
-                    emit!(&DatadogAgentStreamError { error, count });
+                    emit!(&StreamClosedError {
+                        error: error.to_string(),
+                        count
+                    });
                     warp::reject::custom(ApiError::ServerShutdown)
                 })?;
-                emit!(&EventsSent { count, byte_size });
                 match receiver {
                     None => Ok(warp::reply().into_response()),
                     Some(receiver) => match receiver.await {
