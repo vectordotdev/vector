@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{diagnostic::Note, prelude::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct AssertEq;
@@ -83,16 +83,27 @@ impl Expression for AssertEqFn {
         if left == right {
             Ok(true.into())
         } else {
-            Err(self
+            let message = self
                 .message
                 .as_ref()
                 .map(|m| {
                     m.resolve(ctx)
                         .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
                 })
-                .transpose()?
-                .unwrap_or_else(|| format!("assertion failed: {} == {}", left, right))
-                .into())
+                .transpose()?;
+
+            if let Some(message) = message {
+                Err(ExpressionError::Error {
+                    message: message.clone(),
+                    labels: vec![],
+                    notes: vec![Note::UserErrorMessage(message)],
+                })
+            } else {
+                Err(ExpressionError::from(format!(
+                    "assertion failed: {} == {}",
+                    left, right
+                )))
+            }
         }
     }
 
