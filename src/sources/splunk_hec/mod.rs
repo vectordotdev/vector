@@ -246,10 +246,14 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let reader: Box<dyn Read + Send> = if gzip {
-                            Box::new(MultiGzDecoder::new(body.reader()))
+                        let mut data = Vec::new();
+                        let body = if gzip {
+                            MultiGzDecoder::new(body.reader())
+                                .read_to_end(&mut data)
+                                .map_err(|_| Rejection::from(ApiError::BadRequest))?;
+                            String::from_utf8_lossy(data.as_slice())
                         } else {
-                            Box::new(body.reader())
+                            String::from_utf8_lossy(body.as_ref())
                         };
 
                         let (batch, receiver) =
@@ -264,7 +268,7 @@ impl SplunkSource {
                             _ => None,
                         };
                         let mut events = stream::iter(EventIterator::new(
-                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
+                            Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
                             xff,
@@ -963,10 +967,9 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
+    use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
@@ -1081,7 +1084,7 @@ mod tests {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run(stream::iter(messages).map(|x| x.into()))
+            sink.run_events(messages.into_iter().map(Into::into))
                 .await
                 .unwrap();
         });
@@ -1260,7 +1263,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()["greeting"], "hello".into());
@@ -1279,7 +1282,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
@@ -1576,6 +1579,33 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn handles_non_utf8() {
+        let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
+        let (source, address) = source(None).await;
+
+        let b = reqwest::Client::new()
+            .post(&format!(
+                "http://{}/{}",
+                address, "services/collector/event"
+            ))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .body::<&[u8]>(message);
+
+        assert_eq!(200, b.send().await.unwrap().status().as_u16());
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()["non"], "A non UTF8 character �".into());
+        assert_eq!(event.as_log()["number"], 2.into());
+        assert_eq!(event.as_log()["bool"], true.into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
