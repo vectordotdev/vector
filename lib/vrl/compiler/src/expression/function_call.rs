@@ -1,13 +1,6 @@
 use crate::compiler::Compiler;
 use crate::expression::assignment::Details;
-use crate::expression::{
-    levenstein, Block, ExpressionError, FunctionArgument, FunctionClosure, Noop,
-};
-use crate::function::{ArgumentList, Parameter};
-use crate::parser::{Ident, Node};
-use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast;
 use std::{fmt, sync::Arc};
 
@@ -15,7 +8,7 @@ use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
     function::{ArgumentList, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
@@ -205,10 +198,10 @@ impl FunctionCall {
         // Check function closure validity.
         match (function.closure(), closure) {
             // Ensure function accepts closure.
-            (None, Some(_)) => todo!("unexpected closure"),
+            (None, Some(_)) => return Err(Error::UnexpectedClosure { call_span }),
 
             // Ensure required closure is present.
-            (Some(_), None) => todo!("missing closure"),
+            (Some(_), None) => return Err(Error::MissingClosure { call_span }),
 
             // Check for invalid closure signature.
             (Some(definition), Some(closure)) => {
@@ -249,7 +242,11 @@ impl FunctionCall {
                     // - set the expected type definition of each argument
 
                     if input.variables.len() != variables.len() {
-                        todo!("invalid function-closure argument arity")
+                        return Err(Error::ClosureArityMismatch {
+                            call_span,
+                            expected: input.variables.len(),
+                            supplied: variables.len(),
+                        });
                     }
 
                     // Get the provided argument identifier in the same position as defined in the
@@ -696,6 +693,19 @@ pub enum Error {
 
     #[error("error updating state {}", error)]
     UpdateState { call_span: Span, error: String },
+
+    #[error("unexpected closure")]
+    UnexpectedClosure { call_span: Span },
+
+    #[error("missing closure")]
+    MissingClosure { call_span: Span },
+
+    #[error("invalid closure arity")]
+    ClosureArityMismatch {
+        call_span: Span,
+        expected: usize,
+        supplied: usize,
+    },
 }
 
 impl DiagnosticError for Error {
@@ -712,6 +722,9 @@ impl DiagnosticError for Error {
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
             UpdateState { .. } => 640,
+            UnexpectedClosure { .. } => 109,
+            MissingClosure { .. } => 110,
+            ClosureArityMismatch { .. } => 120,
         }
     }
 
@@ -865,6 +878,9 @@ impl DiagnosticError for Error {
                 format!("an error occurred updating the compiler state: {}", error),
                 call_span,
             )],
+            UnexpectedClosure { .. } => vec![],
+            MissingClosure { .. } => vec![], //TODO: actually create labels
+            ClosureArityMismatch { .. } => vec![],
         }
     }
 

@@ -21,7 +21,12 @@ impl Function for Map {
         &[/* TODO */]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &vrl::prelude::FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
@@ -76,13 +81,20 @@ impl Expression for MapFn {
         // - Resolving closure should be agnostic. It takes the values you want to assign to
         //   different closure variables, and it takes an `Fn` to apply to the data.
 
-        let mut result: BTreeMap<String, Value> = BTreeMap::default();
-
+        let mut object_result: BTreeMap<String, Value> = BTreeMap::default();
+        let mut array_result: Vec<Value> = Vec::default();
+        let mut is_array = false;
         let value = self.value.resolve(ctx)?;
 
         let mut map = |_: &Context, output: Output| -> Result<()> {
             match output {
-                Output::Object { key, value } => result.insert(key, value),
+                Output::Object { key, value } => {
+                    object_result.insert(key, value);
+                }
+                Output::Array { element } => {
+                    array_result.push(element);
+                    is_array = true;
+                }
             };
 
             Ok(())
@@ -90,7 +102,12 @@ impl Expression for MapFn {
 
         self.closure.resolve(ctx, value, &mut map)?;
 
-        Ok(result.into())
+        if is_array {
+            Ok(Value::Array(array_result))
+        } else {
+            Ok(Value::Object(object_result))
+        }
+        // Ok(result.into())
 
         // let result = match self.value.resolve(ctx)? {
         //     Value::Object(object) => {
