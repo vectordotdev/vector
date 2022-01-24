@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use vector_core::internal_event::DEFAULT_OUTPUT;
+
 use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -136,6 +138,43 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
                 )
             })
             .collect())
+    }
+}
+
+/// To avoid collisions between `output` metric tags, check that a component
+/// does not have a named output with the name [`DEFAULT_OUTPUT`]
+pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    for (key, source) in config.sources.iter() {
+        let outputs = source.inner.outputs();
+        if outputs
+            .iter()
+            .map(|output| output.port.as_deref().unwrap_or(""))
+            .any(|name| name == DEFAULT_OUTPUT)
+        {
+            errors.push(format!(
+                "Source {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
+        }
+    }
+
+    for (key, transform) in config.transforms.iter() {
+        let outputs = transform.inner.outputs();
+        if outputs
+            .iter()
+            .map(|output| output.port.as_deref().unwrap_or(""))
+            .any(|name| name == DEFAULT_OUTPUT)
+        {
+            errors.push(format!(
+                "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 

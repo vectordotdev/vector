@@ -129,6 +129,7 @@ impl DriverResponse for DatadogMetricsResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.byte_size,
+            output: None,
         }
     }
 }

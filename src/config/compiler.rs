@@ -32,6 +32,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(output_errors) = validation::check_outputs(&builder) {
+        errors.extend(output_errors);
+    }
+
     #[cfg(feature = "datadog-pipelines")]
     let version = Some(builder.sha256_hash());
 

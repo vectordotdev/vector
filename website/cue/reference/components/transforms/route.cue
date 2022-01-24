@@ -32,6 +32,7 @@ components: transforms: route: {
 			description: """
 				A table of route identifiers to logical conditions representing the filter of the route. Each route
 				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
+				Note, `_default` is a reserved output name and cannot be used as a route name.
 				"""
 			required: true
 			type: object: {
