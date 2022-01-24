@@ -435,8 +435,8 @@ mod tests {
         assert!(matches!(
             &rules[0]
                 .fields
-                .get("field")
-                .expect("invalid grok pattern")
+                .iter().next()
+                .expect("invalid grok pattern").1
             .filters[0],
             GrokFilter::NullIf(v) if *v == r#"with "escaped" quotes"#
         ));
