@@ -65,7 +65,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "failed",
+            "error_type" => "command_failed",
             "stage" => "receiving",
         );
         // deprecated
@@ -73,7 +73,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "failed",
+            "error_type" => "command_failed",
             "stage" => "receiving",
         );
     }
@@ -114,64 +114,6 @@ impl InternalEvent for ExecTimeoutError<'_> {
             "error_type" => "timed_out",
             "stage" => "receiving",
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct ExecStreamError {
-    pub error: String,
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for ExecStreamError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Failed to forward event, downstream is closed.",
-            error = %self.error,
-            error_type = "stream_closed",
-            stage = "sending",
-            count = %self.count,
-            byte_size = %self.byte_size,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", self.count as u64,
-            "byte_size" => self.byte_size.to_string(),
-            "error" => self.error.clone(),
-            "error_type" => "stream_closed",
-            "stage" => "sending",
-        );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "byte_size" => self.byte_size.to_string(),
-            "error" => self.error.clone(),
-            "error_type" => "stream_closed",
-            "stage" => "sending",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ExecEventsSent {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for ExecEventsSent {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Events sent.",
-            count = %self.count,
-            byte_size = %self.byte_size,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_sent_events_total", self.count as u64);
-        counter!("component_sent_event_bytes_total", self.byte_size as u64);
     }
 }
 
