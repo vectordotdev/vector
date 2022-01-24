@@ -34,6 +34,8 @@ use crate::{
     SourceSender,
 };
 
+const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
+
 async fn make_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
@@ -149,8 +151,7 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            //TODO: pick better target
-            let request_limiter = RequestLimiter::new(100_000);
+            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
 
             listener
                 .accept_stream_limited(max_connections)
@@ -302,8 +303,6 @@ async fn handle_stream<T>(
 
 
                         let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
-
-                        // info!("SIZE: {} frames with {} events of {} bytes. in-memory-bytes={}", num_frames, events.len(), byte_size, byte_size_sum);
 
                         if let Some(permit) = &mut permit {
                             permit.decoding_finished(events.len());

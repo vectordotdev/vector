@@ -89,7 +89,7 @@ struct FluentSource;
 
 impl TcpSource for FluentSource {
     type Error = DecodeError;
-    type Item = FluentFrame2;
+    type Item = FluentFrame;
     type Decoder = FluentDecoder;
     type Acker = FluentAcker;
 
@@ -170,27 +170,27 @@ impl FluentDecoder {
         &mut self,
         message: Result<FluentMessage, DecodeError>,
         byte_size: usize,
-    ) -> Result<Option<(FluentFrame2, usize)>, DecodeError> {
+    ) -> Result<Option<(FluentFrame, usize)>, DecodeError> {
         match message? {
             FluentMessage::Message(tag, timestamp, record) => {
-                let event = Event::from(FluentFrame {
+                let event = Event::from(FluentEvent {
                     tag,
                     timestamp,
                     record,
                 });
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events: smallvec![event],
                     chunk: None,
                 };
                 Ok(Some((frame, byte_size)))
             }
             FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
-                let event = Event::from(FluentFrame {
+                let event = Event::from(FluentEvent {
                     tag,
                     timestamp,
                     record,
                 });
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events: smallvec![event],
                     chunk: options.chunk,
                 };
@@ -200,14 +200,14 @@ impl FluentDecoder {
                 let events = entries
                     .into_iter()
                     .map(|FluentEntry(timestamp, record)| {
-                        Event::from(FluentFrame {
+                        Event::from(FluentEvent {
                             tag: tag.clone(),
                             timestamp,
                             record,
                         })
                     })
                     .collect();
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events,
                     chunk: None,
                 };
@@ -217,14 +217,14 @@ impl FluentDecoder {
                 let events = entries
                     .into_iter()
                     .map(|FluentEntry(timestamp, record)| {
-                        Event::from(FluentFrame {
+                        Event::from(FluentEvent {
                             tag: tag.clone(),
                             timestamp,
                             record,
                         })
                     })
                     .collect();
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events,
                     chunk: options.chunk,
                 };
@@ -237,13 +237,13 @@ impl FluentDecoder {
                 while let Some(FluentEntry(timestamp, record)) =
                     FluentEntryStreamDecoder.decode(&mut buf)?
                 {
-                    events.push(Event::from(FluentFrame {
+                    events.push(Event::from(FluentEvent {
                         tag: tag.clone(),
                         timestamp,
                         record,
                     }));
                 }
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events,
                     chunk: None,
                 };
@@ -268,13 +268,13 @@ impl FluentDecoder {
                 while let Some(FluentEntry(timestamp, record)) =
                     FluentEntryStreamDecoder.decode(&mut buf)?
                 {
-                    events.push(Event::from(FluentFrame {
+                    events.push(Event::from(FluentEvent {
                         tag: tag.clone(),
                         timestamp,
                         record,
                     }));
                 }
-                let frame = FluentFrame2 {
+                let frame = FluentFrame {
                     events,
                     chunk: options.chunk,
                 };
@@ -287,13 +287,10 @@ impl FluentDecoder {
 }
 
 impl Decoder for FluentDecoder {
-    type Item = (FluentFrame2, usize);
+    type Item = (FluentFrame, usize);
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // if let Some(item) = self.unread_frames.pop_front() {
-        //     return Ok(Some(item));
-        // }
         loop {
             if src.is_empty() {
                 return Ok(None);
@@ -377,7 +374,7 @@ struct FluentAcker {
 }
 
 impl FluentAcker {
-    fn new(frames: &[FluentFrame2]) -> Self {
+    fn new(frames: &[FluentFrame]) -> Self {
         Self {
             chunks: frames.iter().filter_map(|f| f.chunk.clone()).collect(),
         }
@@ -404,43 +401,35 @@ impl TcpSourceAcker for FluentAcker {
 
 /// Normalized fluent message.
 #[derive(Debug, PartialEq)]
-struct FluentFrame {
+struct FluentEvent {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
-    // chunk: Option<String>,
 }
 
-impl From<FluentFrame> for Event {
-    fn from(frame: FluentFrame) -> Event {
+impl From<FluentEvent> for Event {
+    fn from(frame: FluentEvent) -> Event {
         LogEvent::from(frame).into()
     }
 }
 
-// impl From<FluentFrame> for SmallVec<[Event; 1]> {
-//     fn from(frame: FluentFrame) -> Self {
-//         smallvec![frame.into()]
-//     }
-// }
-
-struct FluentFrame2 {
+struct FluentFrame {
     events: SmallVec<[Event; 1]>,
     chunk: Option<String>,
 }
 
-impl From<FluentFrame2> for SmallVec<[Event; 1]> {
-    fn from(frame: FluentFrame2) -> Self {
+impl From<FluentFrame> for SmallVec<[Event; 1]> {
+    fn from(frame: FluentFrame) -> Self {
         frame.events
     }
 }
 
-impl From<FluentFrame> for LogEvent {
-    fn from(frame: FluentFrame) -> LogEvent {
-        let FluentFrame {
+impl From<FluentEvent> for LogEvent {
+    fn from(frame: FluentEvent) -> LogEvent {
+        let FluentEvent {
             tag,
             timestamp,
             record,
-            // chunk: _,
         } = frame;
 
         let mut log = LogEvent::default();
@@ -715,7 +704,6 @@ mod tests {
 
         let mut decoder = FluentDecoder::new();
 
-        // let mut frames = vec![];
         let (frame, byte_size) = decoder.decode(&mut buf)?.unwrap();
         Ok((frame.into(), byte_size))
     }

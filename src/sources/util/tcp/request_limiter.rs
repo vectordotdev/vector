@@ -16,10 +16,6 @@ impl RequestLimiterPermit {
     pub fn decoding_finished(&self, num_events: usize) {
         let mut request_limiter_data = self.request_limiter_data.lock().unwrap();
         request_limiter_data.update_average(num_events);
-        info!(
-            "Request of size {} changed average to {}",
-            num_events, request_limiter_data.average_request_size
-        );
     }
 }
 
@@ -48,7 +44,7 @@ struct RequestLimiterData {
     total_permits: usize,
     average_request_size: f32,
     semaphore: Arc<Semaphore>,
-    num_cpus: usize,
+    max_requests: usize,
 }
 
 impl RequestLimiterData {
@@ -63,7 +59,9 @@ impl RequestLimiterData {
         if target.is_nan() {
             return MINIMUM_PERMITS;
         }
-        (target as usize).min(self.num_cpus).max(MINIMUM_PERMITS)
+        (target as usize)
+            .min(self.max_requests)
+            .max(MINIMUM_PERMITS)
     }
 
     pub fn increase_permits(&mut self) {
@@ -87,8 +85,9 @@ pub struct RequestLimiter {
 
 impl RequestLimiter {
     /// event_limit_target: The limit to the number of events that will be in-flight at one time.
+    /// max_requests: The most number of requests that can be processed concurrently
     /// The numbers of events in a request is not known until after it has been decoded, so this is not a hard limit.
-    pub fn new(event_limit_target: usize) -> RequestLimiter {
+    pub fn new(event_limit_target: usize, max_requests: usize) -> RequestLimiter {
         assert!(event_limit_target > 0);
 
         let semaphore = Arc::new(Semaphore::new(MINIMUM_PERMITS));
@@ -99,7 +98,7 @@ impl RequestLimiter {
                 total_permits: MINIMUM_PERMITS,
                 average_request_size: event_limit_target as f32,
                 semaphore,
-                num_cpus: num_cpus::get(),
+                max_requests,
             })),
         }
     }
@@ -119,21 +118,8 @@ mod test {
     use approx::assert_abs_diff_eq;
 
     #[tokio::test]
-    async fn test() {
-        let limiter = RequestLimiter::new(100);
-
-        for _ in 0..100 {
-            let permit = limiter.acquire().await;
-            permit.decoding_finished(5);
-            drop(permit);
-        }
-        let data = limiter.data.lock().unwrap();
-        assert_abs_diff_eq!(data.target_requests_in_flight(), 100 / 5, epsilon = 1);
-    }
-
-    #[tokio::test]
     async fn test_average_convergence() {
-        let limiter = RequestLimiter::new(100);
+        let limiter = RequestLimiter::new(100, 100);
 
         for _ in 0..100 {
             let permit = limiter.acquire().await;
@@ -146,7 +132,7 @@ mod test {
 
     #[tokio::test]
     async fn test_minimum_permits() {
-        let limiter = RequestLimiter::new(100);
+        let limiter = RequestLimiter::new(100, 100);
 
         for _ in 0..100 {
             let permit = limiter.acquire().await;
@@ -159,7 +145,8 @@ mod test {
 
     #[tokio::test]
     async fn test_maximum_permits() {
-        let limiter = RequestLimiter::new(100);
+        let request_limit = 50;
+        let limiter = RequestLimiter::new(1000, request_limit);
 
         for _ in 0..100 {
             let permit = limiter.acquire().await;
@@ -167,6 +154,6 @@ mod test {
             drop(permit);
         }
         let data = limiter.data.lock().unwrap();
-        assert_eq!(data.target_requests_in_flight(), num_cpus::get());
+        assert_eq!(data.target_requests_in_flight(), request_limit);
     }
 }
