@@ -474,7 +474,9 @@ mod test {
         graph.add_sink("out", DataType::Metric, vec!["in"]);
 
         assert_eq!(
-            Err(vec!["Data type mismatch between in (Log) and out (Metric)".into()]),
+            Err(vec![
+                "Data type mismatch between in (Log) and out (Metric)".into()
+            ]),
             graph.typecheck()
         );
     }

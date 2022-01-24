@@ -168,7 +168,7 @@ impl EventContainer for EventArray {
 
     fn len(&self) -> usize {
         match self {
-            Self::Logs(a) => a.len(),
+            Self::Logs(a) | Self::Traces(a) => a.len(),
             Self::Metrics(a) => a.len(),
         }
     }
