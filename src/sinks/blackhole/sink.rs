@@ -99,7 +99,8 @@ impl StreamSink<Event> for BlackholeSink {
             });
             emit!(&EventsSent {
                 count: events.len(),
-                byte_size: message_len
+                byte_size: message_len,
+                output: None,
             });
 
             self.acker.ack(events.len());

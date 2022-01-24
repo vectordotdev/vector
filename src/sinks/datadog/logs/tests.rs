@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
-    stream, StreamExt,
+    StreamExt,
 };
 use http::request::Parts;
 use hyper::StatusCode;
@@ -214,9 +214,10 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.as_mut_log()
-            .metadata_mut()
-            .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.for_each_log(|log| {
+            log.metadata_mut()
+                .set_datadog_api_key(Some(Arc::from(api_key)));
+        });
         e
     });
 
@@ -295,7 +296,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
         Event::from("no API key in metadata"),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut keys = rx
         .take(3)
@@ -354,9 +355,10 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.as_mut_log()
-            .metadata_mut()
-            .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.for_each_log(|log| {
+            log.metadata_mut()
+                .set_datadog_api_key(Some(Arc::from(api_key)));
+        });
         e
     });
 
@@ -418,9 +420,10 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.as_mut_log()
-            .metadata_mut()
-            .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.for_each_log(|log| {
+            log.metadata_mut()
+                .set_datadog_api_key(Some(Arc::from(api_key)));
+        });
         e
     });
 

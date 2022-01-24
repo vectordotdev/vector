@@ -14,7 +14,7 @@ use vector_core::event::{BatchNotifier, BatchStatus};
 use super::*;
 use crate::{
     config::SinkConfig,
-    event::Event,
+    event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{self, HTTP_SINK_TAGS},
@@ -26,14 +26,16 @@ fn random_events_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (
         lines,
-        stream.map(|mut event| {
-            event.as_mut_log().insert("title", "All!");
-            event.as_mut_log().insert("invalid", "Tik");
-            event
+        stream.map(|mut events| {
+            events.for_each_log(|log| {
+                log.insert("title", "All!");
+                log.insert("invalid", "Tik");
+            });
+            events
         }),
     )
 }
@@ -125,14 +127,15 @@ async fn api_key_in_metadata() {
 
     let (expected, events) = random_events_with_stream(100, 10, None);
 
-    let events = events.map(|mut e| {
-        e.as_mut_log()
-            .metadata_mut()
-            .set_datadog_api_key(Some(Arc::from("from_metadata")));
-        Ok(e)
+    let events = events.map(|mut events| {
+        events.for_each_log(|log| {
+            log.metadata_mut()
+                .set_datadog_api_key(Some(Arc::from("from_metadata")));
+        });
+        events
     });
 
-    components::sink_send_stream(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
     for (i, val) in output.iter().enumerate() {
