@@ -391,9 +391,10 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    fn compile_abort(&mut self, node: Node<()>) -> Abort {
+    fn compile_abort(&mut self, node: Node<ast::Abort>) -> Abort {
         self.abortable = true;
-        Abort::new(node.span())
+        let (span, abort) = node.take();
+        Abort::new(span, abort.message)
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {
