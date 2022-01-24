@@ -4,54 +4,6 @@ use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsBytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-    pub http_path: &'a str,
-}
-
-impl<'a> InternalEvent for AwsEcsMetricsBytesReceived<'a> {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = %self.protocol,
-            http_path = %self.http_path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => self.protocol.to_string(),
-            "http_path" => self.http_path.to_string(),
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct AwsEcsMetricsEventsReceived {
-    pub byte_size: usize,
-    pub count: usize,
-}
-
-impl InternalEvent for AwsEcsMetricsEventsReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        counter!("events_in_total", self.count as u64); // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
-    }
-}
-
-#[derive(Debug)]
 pub struct AwsEcsMetricsRequestCompleted {
     pub start: Instant,
     pub end: Instant,
@@ -156,60 +108,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "error_type" => "http_error",
             "endpoint" => self.endpoint.to_owned(),
             "error" => self.error.to_string(),
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct AwsEcsMetricsEventsSent {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for AwsEcsMetricsEventsSent {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Events sent.",
-            count = %self.count,
-            byte_size = %self.byte_size,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_sent_events_total", self.count as u64);
-        counter!("component_sent_event_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
-pub struct AwsEcsMetricsStreamError {
-    pub error: String,
-    pub count: usize,
-}
-
-impl InternalEvent for AwsEcsMetricsStreamError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Error sending metrics downstream.",
-            count = %self.count,
-            error = %self.error,
-            error_type = "stream",
-            stage = "sending",
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", self.count as u64,
-            "error" => self.error.clone(),
-            "error_type" => "stream",
-            "stage" => "sending",
-        );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "error" => self.error.clone(),
-            "error_type" => "stream",
-            "stage" => "sending",
         );
     }
 }

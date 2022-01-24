@@ -10,9 +10,8 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsBytesReceived, AwsEcsMetricsEventsReceived, AwsEcsMetricsEventsSent,
         AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted,
-        AwsEcsMetricsResponseError, AwsEcsMetricsStreamError,
+        AwsEcsMetricsResponseError, HttpBytesReceived, HttpEventsReceived, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -144,9 +143,9 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(&AwsEcsMetricsBytesReceived {
+                        emit!(&HttpBytesReceived {
                             byte_size: body.len(),
-                            protocol: uri.scheme_str().unwrap_or("http"),
+                            protocol: "http",
                             http_path: uri.path(),
                         });
 
@@ -154,17 +153,20 @@ async fn aws_ecs_metrics(
                             Ok(metrics) => {
                                 let byte_size = body.len();
                                 let count = metrics.len();
-                                emit!(&AwsEcsMetricsEventsReceived { byte_size, count });
+                                emit!(&HttpEventsReceived {
+                                    byte_size,
+                                    protocol: "http",
+                                    http_path: uri.path(),
+                                    count
+                                });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
-                                    emit!(&AwsEcsMetricsStreamError {
+                                    emit!(&StreamClosedError {
                                         error: error.to_string(),
                                         count,
                                     });
                                     return Err(());
-                                } else {
-                                    emit!(&AwsEcsMetricsEventsSent { byte_size, count });
                                 }
                             }
                             Err(error) => {
