@@ -1,26 +1,5 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
-
-#[derive(Debug)]
-pub struct DnstapBytesReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for DnstapBytesReceived {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = "file",
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_bytes_total", self.byte_size as u64);
-    }
-}
 
 #[derive(Debug)]
 pub struct DnstapEventsReceived {
