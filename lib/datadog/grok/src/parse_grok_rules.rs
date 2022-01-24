@@ -276,7 +276,7 @@ fn resolve_grok_pattern(
                 parse_alias(match_name, &alias_def, context)?;
                 context.append_regex(")");
             }
-            _ => {
+            None => {
                 parse_alias(match_name, &alias_def, context)?;
             }
         },
@@ -288,7 +288,7 @@ fn resolve_grok_pattern(
                     context.append_regex(grok_alias);
                     context.append_regex(">");
                 }
-                _ => {
+                None => {
                     context.append_regex("(?:"); // non-capturing group
                 }
             }
