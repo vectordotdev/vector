@@ -8,7 +8,10 @@ use crate::{
         Event, EventStatus,
     },
     serde::{default_decoding, default_framing_message_based},
-    test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+    test_util::{
+        components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+    },
     SourceSender,
 };
 use bytes::Bytes;
@@ -783,7 +786,7 @@ async fn decode_sketches() {
 
 #[tokio::test]
 async fn split_outputs() {
-    trace_init();
+    init_test();
     let (_, rx_logs, rx_metrics, addr) = source(EventStatus::Delivered, true, true, true).await;
 
     let mut headers_for_log = HeaderMap::new();
@@ -892,4 +895,6 @@ async fn split_outputs() {
             "12345678abcdefgh12345678abcdefgh"
         );
     }
+
+    COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
 }

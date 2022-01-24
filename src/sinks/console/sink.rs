@@ -45,7 +45,8 @@ where
                 });
                 emit!(&EventsSent {
                     byte_size: event_byte_size,
-                    count: 1
+                    count: 1,
+                    output: None,
                 });
                 emit!(&BytesSent {
                     byte_size: buf.len(),
