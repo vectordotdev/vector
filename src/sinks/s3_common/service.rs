@@ -61,6 +61,7 @@ impl DriverResponse for S3Response {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

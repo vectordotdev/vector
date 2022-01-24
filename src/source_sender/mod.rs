@@ -1,14 +1,19 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{
-    channel::mpsc,
     task::{Context, Poll},
-    SinkExt, Stream, StreamExt,
+    Stream, StreamExt,
 };
 use pin_project::pin_project;
+use tokio::sync::mpsc;
 #[cfg(test)]
 use vector_core::event::EventStatus;
-use vector_core::{config::Output, event::Event, internal_event::EventsSent, ByteSizeOf};
+use vector_core::{
+    config::Output,
+    event::Event,
+    internal_event::{EventsSent, DEFAULT_OUTPUT},
+    ByteSizeOf,
+};
 
 mod errors;
 
@@ -35,16 +40,18 @@ impl Builder {
     }
 
     pub fn add_output(&mut self, output: Output) -> ReceiverStream<Event> {
-        let (inner, rx) = Inner::new_with_buffer(self.buf_size);
         match output.port {
             None => {
+                let (inner, rx) = Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned());
                 self.inner = Some(inner);
+                rx
             }
             Some(name) => {
+                let (inner, rx) = Inner::new_with_buffer(self.buf_size, name.clone());
                 self.named_inners.insert(name, inner);
+                rx
             }
         }
-        rx
     }
 
     // https://github.com/rust-lang/rust/issues/73255
@@ -73,7 +80,7 @@ impl SourceSender {
     }
 
     pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
-        let (inner, rx) = Inner::new_with_buffer(n);
+        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned());
         (
             Self {
                 inner: Some(inner),
@@ -109,7 +116,7 @@ impl SourceSender {
         status: EventStatus,
         name: String,
     ) -> impl Stream<Item = Event> + Unpin {
-        let (inner, recv) = Inner::new_with_buffer(100);
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone());
         let recv = recv.map(move |mut event| {
             let metadata = event.metadata_mut();
             metadata.update_status(status);
@@ -182,12 +189,14 @@ impl SourceSender {
 #[derive(Debug, Clone)]
 struct Inner {
     inner: mpsc::Sender<Event>,
+    output: String,
 }
 
 impl Inner {
-    fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
+    fn new_with_buffer(n: usize, output: String) -> (Self, ReceiverStream<Event>) {
         let (tx, rx) = mpsc::channel(n);
-        (Self { inner: tx }, ReceiverStream::new(rx))
+        let rx = tokio_stream::wrappers::ReceiverStream::new(rx);
+        (Self { inner: tx, output }, ReceiverStream::new(rx))
     }
 
     async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
@@ -196,6 +205,7 @@ impl Inner {
         emit!(&EventsSent {
             count: 1,
             byte_size,
+            output: Some(self.output.as_ref()),
         });
         Ok(())
     }
@@ -223,13 +233,21 @@ impl Inner {
                     byte_size += event_size;
                 }
                 Err(error) => {
-                    emit!(&EventsSent { count, byte_size });
+                    emit!(&EventsSent {
+                        count,
+                        byte_size,
+                        output: Some(self.output.as_ref()),
+                    });
                     return Err(error.into());
                 }
             }
         }
 
-        emit!(&EventsSent { count, byte_size });
+        emit!(&EventsSent {
+            count,
+            byte_size,
+            output: Some(self.output.as_ref()),
+        });
 
         Ok(())
     }
@@ -276,11 +294,11 @@ impl Inner {
 #[derive(Debug)]
 pub struct ReceiverStream<T> {
     #[pin]
-    inner: mpsc::Receiver<T>,
+    inner: tokio_stream::wrappers::ReceiverStream<T>,
 }
 
 impl<T> ReceiverStream<T> {
-    fn new(inner: mpsc::Receiver<T>) -> Self {
+    const fn new(inner: tokio_stream::wrappers::ReceiverStream<T>) -> Self {
         Self { inner }
     }
 

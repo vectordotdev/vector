@@ -410,7 +410,7 @@ mod integration_tests {
 
     use super::*;
     use crate::{
-        event::LogEvent,
+        event::{EventArray, LogEvent},
         test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
 
@@ -697,7 +697,7 @@ mod integration_tests {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },
-                    _ => Err(format!("Unexpected error {}", reason.to_string())),
+                    _ => Err(format!("Unexpected error {}", reason)),
                 },
             };
 
@@ -709,7 +709,7 @@ mod integration_tests {
         len: usize,
         count: usize,
         groups: usize,
-    ) -> (Vec<String>, usize, impl Stream<Item = Event>) {
+    ) -> (Vec<String>, usize, impl Stream<Item = EventArray>) {
         let key = count / groups;
         let lines = random_lines(len).take(count).collect::<Vec<_>>();
         let (size, events) = lines
@@ -724,7 +724,7 @@ mod integration_tests {
             })
             .fold((0, Vec::new()), |(mut size, mut events), event| {
                 size += event.size_of();
-                events.push(event);
+                events.push(event.into());
                 (size, events)
             });
 
