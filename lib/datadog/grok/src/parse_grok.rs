@@ -789,6 +789,16 @@ mod tests {
                 "key =valueStr",
                 Ok(Value::from(btreemap! {})),
             ),
+            (
+                "%{data::keyvalue}",
+                "db.name=my_db,db.operation=insert",
+                Ok(Value::from(btreemap! {
+                    "db" => btreemap! {
+                        "name" => "my_db",
+                        "operation" => "insert",
+                    }
+                })),
+            ),
         ]);
     }
 }
