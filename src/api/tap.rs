@@ -556,7 +556,7 @@ mod tests {
             "in-test1",
             DemoLogsConfig {
                 interval: 0.01,
-                count: 200,
+                count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
                     lines: vec!["test1".to_string()],
@@ -568,7 +568,7 @@ mod tests {
             "in-test2",
             DemoLogsConfig {
                 interval: 0.01,
-                count: 200,
+                count: 1,
                 format: OutputFormat::Shuffle {
                     sequence: false,
                     lines: vec!["test2".to_string()],
