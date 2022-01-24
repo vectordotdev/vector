@@ -24,9 +24,10 @@ where
     F: FnOnce() -> Result<LogSchema, Vec<String>>,
 {
     let log_schema = builder()?;
-    if LOG_SCHEMA.set(log_schema).is_err() && deny_if_set {
-        panic!("Couldn't set schema");
-    }
+    assert!(
+        !(LOG_SCHEMA.set(log_schema).is_err() && deny_if_set),
+        "Couldn't set schema"
+    );
 
     Ok(())
 }

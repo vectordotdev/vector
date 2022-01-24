@@ -338,6 +338,7 @@ urls: {
 	new_feature_request:                                      "\(vector_repo)/issues/new?labels=type%3A+new+feature"
 	new_relic:                                                "https://newrelic.com/"
 	new_relic_log_api:                                        "https://docs.newrelic.com/docs/logs/new-relic-logs/log-api/introduction-log-api"
+	new_relic_apis:                                           "https://docs.newrelic.com/docs/apis/intro-apis/introduction-new-relic-apis/"
 	new_security_report:                                      "\(vector_repo)/issues/new?labels=domain%3A+security"
 	new_sink:                                                 "\(vector_repo)/issues/new?labels=type%3A+new+feature"
 	new_source:                                               "\(vector_repo)/issues/new?labels=type%3A+new+feature"

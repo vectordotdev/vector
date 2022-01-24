@@ -206,15 +206,15 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use buffers::{
+    use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
+    use tokio::time::{sleep, Duration};
+    use vector_buffers::{
         topology::{
             builder::TopologyBuilder,
             channel::{BufferSender, SenderAdapter},
         },
         WhenFull,
     };
-    use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
-    use tokio::time::{sleep, Duration};
 
     use super::{ControlMessage, Fanout};
     use crate::{config::ComponentKey, event::Event, test_util::collect_ready};

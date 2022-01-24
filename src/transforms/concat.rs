@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::BuildError;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
@@ -57,8 +59,8 @@ impl TransformConfig for ConcatConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

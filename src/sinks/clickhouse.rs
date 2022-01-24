@@ -89,7 +89,7 @@ impl SinkConfig for ClickhouseConfig {
 
         let healthcheck = healthcheck(client, config).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -188,7 +188,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
-        .context(super::UriParseError)
+        .context(super::UriParseSnafu)
         .map_err(Into::into)
 }
 
@@ -285,7 +285,7 @@ mod integration_tests {
         },
     };
 
-    use futures::{future, stream};
+    use futures::future;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -301,12 +301,16 @@ mod integration_tests {
         },
     };
 
+    fn clickhouse_address() -> String {
+        std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
+    }
+
     #[tokio::test]
     async fn insert_events() {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -354,7 +358,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -399,7 +403,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
         let encoding = EncodingConfigWithDefault {
             timestamp_format: Some(TimestampFormat::Unix),
             ..Default::default()
@@ -461,7 +465,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let config: ClickhouseConfig = toml::from_str(&format!(
             r#"
@@ -518,7 +522,7 @@ timestamp_format = "unix""#,
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -544,13 +548,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
@@ -589,13 +590,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }

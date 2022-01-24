@@ -3,11 +3,11 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use vector_core::{sink::VectorSink, transform::DataType};
+use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -153,7 +153,7 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
         };
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 

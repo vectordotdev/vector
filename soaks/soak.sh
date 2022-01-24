@@ -27,7 +27,7 @@ USE_LOCAL_IMAGE="true"
 SOAK_CPUS="7"
 SOAK_MEMORY="8g"
 VECTOR_CPUS="4"
-WARMUP_SECONDS="60"
+WARMUP_SECONDS="30"
 SOAKS=""
 
 while [[ $# -gt 0 ]]; do
@@ -99,25 +99,64 @@ for SOAK_NAME in ${SOAKS}; do
     echo "########    ${SOAK_NAME}"
     echo "########"
     echo "########"
+    capture_dir_replica_one="${capture_dir}/1"
+    capture_dir_replica_two="${capture_dir}/2"
+    capture_dir_replica_three="${capture_dir}/3"
     # shellcheck disable=SC2015
     ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "baseline" \
                       --tag "${BASELINE}" \
-                      --capture-dir "${capture_dir}" \
+                      --capture-dir "${capture_dir_replica_one}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
-                      --vector-cpus "${VECTOR_CPUS}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" && \
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" && \
+    ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                      --soak "${SOAK_NAME}" \
+                      --variant "baseline" \
+                      --tag "${BASELINE}" \
+                      --capture-dir "${capture_dir_replica_two}" \
+                      --cpus "${SOAK_CPUS}" \
+                      --memory "${SOAK_MEMORY}" \
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" && \
+    ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                      --soak "${SOAK_NAME}" \
+                      --variant "baseline" \
+                      --tag "${BASELINE}" \
+                      --capture-dir "${capture_dir_replica_three}" \
+                      --cpus "${SOAK_CPUS}" \
+                      --memory "${SOAK_MEMORY}" \
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" && \
     ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "comparison" \
                       --tag "${COMPARISON}" \
-                      --capture-dir "${capture_dir}" \
+                      --capture-dir "${capture_dir_replica_one}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
-                      --vector-cpus "${VECTOR_CPUS}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" || true
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" && \
+    ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                      --soak "${SOAK_NAME}" \
+                      --variant "comparison" \
+                      --tag "${COMPARISON}" \
+                      --capture-dir "${capture_dir_replica_two}" \
+                      --cpus "${SOAK_CPUS}" \
+                      --memory "${SOAK_MEMORY}" \
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" && \
+    ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                      --soak "${SOAK_NAME}" \
+                      --variant "comparison" \
+                      --tag "${COMPARISON}" \
+                      --capture-dir "${capture_dir_replica_three}" \
+                      --cpus "${SOAK_CPUS}" \
+                      --memory "${SOAK_MEMORY}" \
+                      --warmup-seconds "${WARMUP_SECONDS}" \
+                      --vector-cpus "${VECTOR_CPUS}" || true
 done
 
 # Aggregate all captures and analyze them.

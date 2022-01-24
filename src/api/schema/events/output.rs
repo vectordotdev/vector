@@ -6,7 +6,7 @@ use super::{
 };
 use crate::api::tap::{TapNotification, TapPayload};
 
-#[derive(Union, Debug)]
+#[derive(Union, Debug, Clone)]
 /// An event or a notification
 pub enum OutputEventsPayload {
     /// Log event

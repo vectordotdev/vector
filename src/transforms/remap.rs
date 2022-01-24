@@ -11,7 +11,8 @@ use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Ter
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, TransformConfig, TransformContext, TransformDescription,
+        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -49,20 +50,19 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn named_outputs(&self) -> Vec<String> {
-        if self.reroute_dropped {
-            vec![String::from(DROPPED)]
-        } else {
-            vec![]
-        }
-    }
-
     fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        if self.reroute_dropped {
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ]
+        } else {
+            vec![Output::default(DataType::Any)]
+        }
     }
 
     fn transform_type(&self) -> &'static str {
@@ -93,9 +93,9 @@ impl Remap {
                 let mut buffer = String::new();
 
                 File::open(path)
-                    .with_context(|| FileOpenFailed { path })?
+                    .with_context(|_| FileOpenFailedSnafu { path })?
                     .read_to_string(&mut buffer)
-                    .with_context(|| FileReadFailed { path })?;
+                    .with_context(|_| FileReadFailedSnafu { path })?;
 
                 buffer
             }
@@ -261,9 +261,13 @@ mod tests {
     use shared::btreemap;
 
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
+    use crate::{
+        config::{build_unit_tests, ConfigBuilder},
+        event::{
+            metric::{MetricKind, MetricValue},
+            LogEvent, Metric, Value,
+        },
+        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
 
     #[test]
@@ -794,7 +798,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(conf.named_outputs().is_empty());
+        assert_eq!(vec![Output::default(DataType::Any)], conf.outputs());
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -817,13 +821,52 @@ mod tests {
         assert!(out.named[DROPPED].is_empty());
     }
 
+    #[tokio::test]
+    async fn check_remap_branching_metrics_with_output() {
+        init_test();
+
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+            inputs = []
+            type = "remap"
+            drop_on_abort = true
+            reroute_dropped = true
+            source = "abort"
+
+            [[tests]]
+            name = "metric output"
+
+            [tests.input]
+                insert_at = "foo"
+                value = "none"
+
+            [[tests.outputs]]
+                extract_from = "foo.dropped"
+                [[tests.outputs.conditions]]
+                type = "vrl"
+                source = "true"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+    }
+
     struct CollectedOuput {
         primary: Vec<Event>,
         named: HashMap<String, Vec<Event>>,
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 
@@ -844,7 +887,13 @@ mod tests {
         ft: &mut dyn SyncTransform,
         event: Event,
     ) -> std::result::Result<Event, Event> {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 

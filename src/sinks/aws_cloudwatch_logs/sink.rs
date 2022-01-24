@@ -91,7 +91,7 @@ impl Partitioner for CloudwatchParititoner {
 }
 
 #[async_trait]
-impl StreamSink for CloudwatchSink {
+impl StreamSink<Event> for CloudwatchSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::DataType,
+    config::{DataType, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     transforms::{TaskTransform, Transform},
@@ -40,8 +40,8 @@ impl LuaConfig {
         DataType::Log
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Log
+    pub fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     pub const fn transform_type(&self) -> &'static str {
@@ -102,16 +102,16 @@ impl Lua {
             let package = lua
                 .globals()
                 .get::<_, mlua::Table<'_>>("package")
-                .context(InvalidLua)?;
+                .context(InvalidLuaSnafu)?;
             let current_paths = package
                 .get::<_, String>("path")
                 .unwrap_or_else(|_| ";".to_string());
             let paths = format!("{};{}", additional_paths, current_paths);
-            package.set("path", paths).context(InvalidLua)?;
+            package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 
-        let func = lua.load(&source).into_function().context(InvalidLua)?;
-        let vector_func = lua.create_registry_value(func).context(InvalidLua)?;
+        let func = lua.load(&source).into_function().context(InvalidLuaSnafu)?;
+        let vector_func = lua.create_registry_value(func).context(InvalidLuaSnafu)?;
 
         Ok(Self {
             source,

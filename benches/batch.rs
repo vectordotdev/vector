@@ -11,7 +11,7 @@ use vector::{
     },
     test_util::{random_lines, runtime},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;

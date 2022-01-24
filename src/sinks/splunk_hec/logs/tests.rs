@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
-use futures_util::{stream, StreamExt};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use vector_core::{
     config::log_schema,
@@ -183,7 +183,7 @@ async fn splunk_passthrough_token() {
         Event::from("default token will be used"),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)

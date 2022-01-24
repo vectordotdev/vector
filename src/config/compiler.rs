@@ -32,6 +32,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(output_errors) = validation::check_outputs(&builder) {
+        errors.extend(output_errors);
+    }
+
     #[cfg(feature = "datadog-pipelines")]
     let version = Some(builder.sha256_hash());
 
@@ -84,6 +88,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             let inputs = graph.inputs_for(&key);
             (key, transform.with_inputs(inputs))
         })
+        .collect();
+    let tests = tests
+        .into_iter()
+        .map(|test| test.resolve_outputs(&graph))
         .collect();
 
     if errors.is_empty() {
@@ -141,21 +149,23 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-fn expand_globs(config: &mut ConfigBuilder) {
+pub fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
-        .keys()
-        .chain(config.transforms.keys())
-        .map(ToString::to_string)
+        .iter()
+        .flat_map(|(key, s)| {
+            s.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
+            })
+        })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.named_outputs().into_iter().map(move |port| {
-                OutputId {
-                    component: key.clone(),
-                    port: Some(port),
-                }
-                .to_string()
+            t.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
             })
         }))
+        .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
 
     for (id, transform) in config.transforms.iter_mut() {
@@ -215,8 +225,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-            TransformContext,
+            DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -243,8 +253,8 @@ mod test {
             "mock"
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 
@@ -263,8 +273,8 @@ mod test {
             DataType::Any
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 

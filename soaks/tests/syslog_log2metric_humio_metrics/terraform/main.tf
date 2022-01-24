@@ -18,6 +18,7 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
+  depends_on      = [module.vector, module.http-blackhole, module.tcp-gen]
 }
 
 # Setup the soak pieces

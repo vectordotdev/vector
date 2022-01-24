@@ -142,7 +142,7 @@ impl S3SinkConfig {
 
         let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {

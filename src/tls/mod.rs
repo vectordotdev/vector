@@ -165,7 +165,7 @@ impl MaybeTlsStream<TcpStream> {
 }
 
 pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
-    let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnector)?;
+    let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
     }
@@ -180,7 +180,7 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let configure = tls_connector_builder(settings)?
         .build()
         .configure()
-        .context(TlsBuildConnector)?
+        .context(TlsBuildConnectorSnafu)?
         .verify_hostname(verify_hostname);
     Ok(configure)
 }

@@ -2,17 +2,16 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use indexmap::{set::IndexSet, IndexMap};
 
-use super::{ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, TransformOuter};
+use super::{ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter};
 
 #[derive(Debug, Clone)]
 pub enum Node {
     Source {
-        ty: DataType,
+        outputs: Vec<Output>,
     },
     Transform {
         in_ty: DataType,
-        out_ty: DataType,
-        named_outputs: Vec<String>,
+        outputs: Vec<Output>,
     },
     Sink {
         ty: DataType,
@@ -62,7 +61,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    ty: config.inner.output_type(),
+                    outputs: config.inner.outputs(),
                 },
             );
         }
@@ -72,8 +71,7 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: config.inner.input_type(),
-                    out_ty: config.inner.output_type(),
-                    named_outputs: config.inner.named_outputs(),
+                    outputs: config.inner.outputs(),
                 },
             );
         }
@@ -107,7 +105,7 @@ impl Graph {
             }
         }
 
-        if errors.is_empty() || ignore_errors {
+        if ignore_errors || errors.is_empty() {
             Ok(graph)
         } else {
             Err(errors)
@@ -139,28 +137,50 @@ impl Graph {
         }
     }
 
+    /// Return the input type of a given component.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the given key is not present in the graph or identifies a source, which can't
+    /// have inputs.
+    fn get_input_type(&self, key: &ComponentKey) -> DataType {
+        match self.nodes[key] {
+            Node::Source { .. } => panic!("no inputs on sources"),
+            Node::Transform { in_ty, .. } => in_ty,
+            Node::Sink { ty } => ty,
+        }
+    }
+
+    /// Return the output type associated with a given `OutputId`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the given id is not present in the graph or identifies a sink, which can't
+    /// have inputs.
+    fn get_output_type(&self, id: &OutputId) -> DataType {
+        match &self.nodes[&id.component] {
+            Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+                .iter()
+                .find(|output| output.port == id.port)
+                .map(|output| output.ty)
+                .expect("output didn't exist"),
+            Node::Sink { .. } => panic!("no outputs on sinks"),
+        }
+    }
+
     pub fn typecheck(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         // check that all edges connect components with compatible data types
         for edge in &self.edges {
-            let (in_key, out_key) = (&edge.from.component, &edge.to);
-            if self.nodes.get(in_key).is_none() || self.nodes.get(out_key).is_none() {
-                continue;
-            }
-            match (self.nodes[in_key].clone(), self.nodes[out_key].clone()) {
-                (Node::Source { ty: ty1 }, Node::Sink { ty: ty2, .. })
-                | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. })
-                | (Node::Transform { out_ty: ty1, .. }, Node::Transform { in_ty: ty2, .. })
-                | (Node::Transform { out_ty: ty1, .. }, Node::Sink { ty: ty2, .. }) => {
-                    if ty1 != ty2 && ty1 != DataType::Any && ty2 != DataType::Any {
-                        errors.push(format!(
-                            "Data type mismatch between {} ({:?}) and {} ({:?})",
-                            in_key, ty1, out_key, ty2
-                        ));
-                    }
-                }
-                (Node::Sink { .. }, _) | (_, Node::Source { .. }) => unreachable!(),
+            let from_ty = self.get_output_type(&edge.from);
+            let to_ty = self.get_input_type(&edge.to);
+
+            if from_ty != to_ty && from_ty != DataType::Any && to_ty != DataType::Any {
+                errors.push(format!(
+                    "Data type mismatch between {} ({:?}) and {} ({:?})",
+                    edge.from, from_ty, edge.to, to_ty
+                ));
             }
         }
 
@@ -230,17 +250,13 @@ impl Graph {
             .iter()
             .flat_map(|(key, node)| match node {
                 Node::Sink { .. } => vec![],
-                Node::Source { .. } => vec![key.clone().into()],
-                Node::Transform { named_outputs, .. } => {
-                    let mut outputs = vec![key.clone().into()];
-                    outputs.extend(
-                        named_outputs
-                            .clone()
-                            .into_iter()
-                            .map(|n| OutputId::from((key, n))),
-                    );
-                    outputs
-                }
+                Node::Source { outputs } | Node::Transform { outputs, .. } => outputs
+                    .iter()
+                    .map(|output| OutputId {
+                        component: key.clone(),
+                        port: output.port.clone(),
+                    })
+                    .collect(),
             })
             .collect()
     }
@@ -283,6 +299,48 @@ impl Graph {
             .map(|edge| edge.from.clone())
             .collect()
     }
+
+    /// From a given root node, get all paths from the root node to leaf nodes
+    /// where the leaf node must be a sink. This is useful for determining which
+    /// components are relevant in a Vector unit test.
+    ///
+    /// Caller must check for cycles before calling this function.
+    pub fn paths_to_sink_from(&self, root: &ComponentKey) -> Vec<Vec<ComponentKey>> {
+        let mut traversal: VecDeque<(ComponentKey, Vec<_>)> = VecDeque::new();
+        let mut paths = Vec::new();
+
+        traversal.push_back((root.to_owned(), Vec::new()));
+        while !traversal.is_empty() {
+            let (n, mut path) = traversal.pop_back().expect("can't be empty");
+            path.push(n.clone());
+            let neighbors = self
+                .edges
+                .iter()
+                .filter(|e| e.from.component == n)
+                .map(|e| e.to.clone())
+                .collect::<Vec<_>>();
+
+            if neighbors.is_empty() {
+                paths.push(path.clone());
+            } else {
+                for neighbor in neighbors {
+                    traversal.push_back((neighbor, path.clone()));
+                }
+            }
+        }
+
+        // Keep only components from paths that end at a sink
+        paths
+            .into_iter()
+            .filter(|path| {
+                if let Some(key) = path.last() {
+                    matches!(self.nodes.get(key), Some(Node::Sink { ty: _ }))
+                } else {
+                    false
+                }
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -293,7 +351,12 @@ mod test {
 
     impl Graph {
         fn add_source(&mut self, id: &str, ty: DataType) {
-            self.nodes.insert(id.into(), Node::Source { ty });
+            self.nodes.insert(
+                id.into(),
+                Node::Source {
+                    outputs: vec![Output::default(ty)],
+                },
+            );
         }
 
         fn add_transform(
@@ -309,8 +372,7 @@ mod test {
                 id.clone(),
                 Node::Transform {
                     in_ty,
-                    out_ty,
-                    named_outputs: Default::default(),
+                    outputs: vec![Output::default(out_ty)],
                 },
             );
             for from in inputs {
@@ -321,10 +383,10 @@ mod test {
             }
         }
 
-        fn add_transform_output(&mut self, id: &str, name: &str) {
+        fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { named_outputs, .. }) => named_outputs.push(name.into()),
+                Some(Node::Transform { outputs, .. }) => outputs.push(Output::from((name, ty))),
                 _ => panic!("invalid transform"),
             }
         }
@@ -514,7 +576,7 @@ mod test {
             DataType::Log,
             vec!["log_source"],
         );
-        graph.add_transform_output("log_to_log", "errors");
+        graph.add_transform_output("log_to_log", "errors", DataType::Log);
         graph.add_sink("good_log_sink", DataType::Log, vec!["log_to_log"]);
 
         // don't add inputs to these yet since they're not validated via these helpers
@@ -541,32 +603,42 @@ mod test {
         // these all look like "foo.bar", but should only yield one error
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::Source { ty: DataType::Any },
+            Node::Source {
+                outputs: vec![Output::default(DataType::Any)],
+            },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::Source { ty: DataType::Any },
+            Node::Source {
+                outputs: vec![Output::default(DataType::Any)],
+            },
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
             Node::Transform {
                 in_ty: DataType::Any,
-                out_ty: DataType::Any,
-                named_outputs: vec![String::from("bar")],
+                outputs: vec![
+                    Output::default(DataType::Any),
+                    Output::from(("bar", DataType::Any)),
+                ],
             },
         );
 
         // make sure we return more than one
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
-            Node::Source { ty: DataType::Any },
+            Node::Source {
+                outputs: vec![Output::default(DataType::Any)],
+            },
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
             Node::Transform {
                 in_ty: DataType::Any,
-                out_ty: DataType::Any,
-                named_outputs: vec![String::from("errors")],
+                outputs: vec![
+                    Output::default(DataType::Any),
+                    Output::from(("errors", DataType::Any)),
+                ],
             },
         );
 
@@ -579,5 +651,77 @@ mod test {
                 String::from("Input specifier foo.bar is ambiguous"),
             ]
         );
+    }
+
+    #[test]
+    fn paths_to_sink_simple() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
+        graph.add_sink("out", DataType::Log, vec!["three"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("in"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"])
+    }
+
+    #[test]
+    fn paths_to_sink_non_existent_root() {
+        let graph = Graph::default();
+        let paths = graph.paths_to_sink_from(&ComponentKey::from("in"));
+
+        assert_eq!(paths.len(), 0);
+    }
+
+    #[test]
+    fn paths_to_sink_irrelevant_transforms() {
+        let mut graph = Graph::default();
+        graph.add_source("source", DataType::Log);
+        // These transforms do not link to a sink
+        graph.add_transform("t1", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t2", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_transform("t3", DataType::Log, DataType::Log, vec!["t1"]);
+        // These transforms do link to a sink
+        graph.add_transform("t4", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t5", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_sink("sink1", DataType::Log, vec!["t4"]);
+        graph.add_sink("sink2", DataType::Log, vec!["t5"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("source"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], vec!["source", "t5", "sink2"]);
+        assert_eq!(paths[1], vec!["source", "t4", "sink1"]);
+    }
+
+    #[test]
+    fn paths_to_sink_multiple_inputs_into_sink() {
+        let mut graph = Graph::default();
+        graph.add_source("source", DataType::Log);
+        graph.add_transform("t1", DataType::Log, DataType::Log, vec!["source"]);
+        graph.add_transform("t2", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_transform("t3", DataType::Log, DataType::Log, vec!["t1"]);
+        graph.add_sink("sink1", DataType::Log, vec!["t2", "t3"]);
+
+        let paths: Vec<Vec<_>> = graph
+            .paths_to_sink_from(&ComponentKey::from("source"))
+            .into_iter()
+            .map(|keys| keys.into_iter().map(|key| key.to_string()).collect())
+            .collect();
+
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], vec!["source", "t1", "t3", "sink1"]);
+        assert_eq!(paths[1], vec!["source", "t1", "t2", "sink1"]);
     }
 }
