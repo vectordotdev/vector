@@ -6,7 +6,7 @@ use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_core::event::BatchNotifier;
 use warp::reject;
 
 use super::{
@@ -19,9 +19,8 @@ use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseBytesReceived,
-        AwsKinesisFirehoseEventsReceived, AwsKinesisFirehoseEventsSent,
-        AwsKinesisFirehoseStreamError,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
+        StreamClosedError,
     },
     sources::util::StreamDecodingError,
     SourceSender,
@@ -43,15 +42,16 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(&AwsKinesisFirehoseBytesReceived {
-            byte_size: bytes.len()
+        emit!(&BytesReceived {
+            byte_size: bytes.len(),
+            protocol: "http",
         });
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {
             match stream.next().await {
                 Some(Ok((events, byte_size))) => {
-                    emit!(&AwsKinesisFirehoseEventsReceived {
+                    emit!(&EventsReceived {
                         count: events.len(),
                         byte_size
                     });
@@ -77,12 +77,9 @@ pub async fn firehose(
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
-                        let byte_size = event.size_of();
-
                         if let Err(error) = out.send(event).await {
-                            emit!(&AwsKinesisFirehoseStreamError {
+                            emit!(&StreamClosedError {
                                 error: error.to_string(),
-                                request_id: request_id.clone(),
                                 count: 1,
                             });
                             let error = RequestError::ShuttingDown {
@@ -90,11 +87,6 @@ pub async fn firehose(
                                 source: error,
                             };
                             warp::reject::custom(error);
-                        } else {
-                            emit!(&AwsKinesisFirehoseEventsSent {
-                                count: 1,
-                                byte_size,
-                            });
                         }
                     }
 
