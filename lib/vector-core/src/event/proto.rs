@@ -286,10 +286,9 @@ impl From<event::Event> for Event {
 impl From<event::Event> for WithMetadata<Event> {
     fn from(event: event::Event) -> Self {
         match event {
-            event::Event::Log(log_event) | event::Event::Trace(log_event) => {
-                WithMetadata::<Log>::from(log_event).into()
-            }
+            event::Event::Log(log_event) => WithMetadata::<Log>::from(log_event).into(),
             event::Event::Metric(metric) => WithMetadata::<Metric>::from(metric).into(),
+            event::Event::Trace(trace) => WithMetadata::<Trace>::from(trace).into(),
         }
     }
 }
