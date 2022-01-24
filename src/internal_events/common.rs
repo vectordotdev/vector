@@ -90,3 +90,36 @@ impl InternalEvent for AwsBytesSent {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct StreamClosedError {
+    pub error: String,
+    pub count: usize,
+}
+
+impl InternalEvent for StreamClosedError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to forward event, downstream is closed.",
+            error = %self.error,
+            error_type = "stream_closed",
+            stage = "sending",
+            count = %self.count,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", self.count as u64,
+            "error" => self.error.clone(),
+            "error_type" => "stream_closed",
+            "stage" => "sending",
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error" => self.error.clone(),
+            "error_type" => "stream_closed",
+            "stage" => "sending",
+        );
+    }
+}
