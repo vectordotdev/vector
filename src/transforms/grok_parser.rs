@@ -12,7 +12,7 @@ use crate::{
     },
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
 
@@ -112,7 +112,7 @@ impl Clone for GrokParser {
 }
 
 impl FunctionTransform for GrokParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
 
@@ -164,6 +164,7 @@ mod tests {
     use crate::{
         config::{log_schema, TransformConfig, TransformContext},
         event::{self, Event, LogEvent},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -192,7 +193,7 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);

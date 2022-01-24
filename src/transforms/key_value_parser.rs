@@ -9,7 +9,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
 
@@ -137,7 +137,7 @@ impl KeyValue {
 }
 
 impl FunctionTransform for KeyValue {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
@@ -195,6 +195,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     async fn parse_log(
@@ -228,7 +229,7 @@ mod tests {
 
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
