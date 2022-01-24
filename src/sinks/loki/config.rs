@@ -16,6 +16,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
+use crate::sinks::util::Compression;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -30,7 +31,8 @@ pub struct LokiConfig {
     pub remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
-    pub compression_level: Option<u32>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 

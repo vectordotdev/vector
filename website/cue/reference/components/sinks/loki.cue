@@ -106,6 +106,12 @@ components: sinks: loki: {
 				}
 			}
 		}
+        compression: {
+            enabled: true
+            default: "none"
+            algorithms: ["none", "gzip"]
+            levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        }
 		out_of_order_action: {
 			common: false
 			description: """
@@ -129,11 +135,7 @@ components: sinks: loki: {
 			required:    false
 			type: bool: default: false
 		}
-		compression_level: {
-			description: "If this is set to 1-9 then post into loki be compressed."
-			required:    false
-			type: integer: default: false
-		}
+
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."

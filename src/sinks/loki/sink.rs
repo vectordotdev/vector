@@ -92,15 +92,6 @@ impl From<std::io::Error> for RequestBuildError {
     }
 }
 
-impl Default for LokiRequestBuilder {
-    fn default() -> Self {
-        Self {
-            compression: Compression::None,
-            encoder: LokiBatchEncoder::default(),
-        }
-    }
-}
-
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
@@ -299,10 +290,7 @@ pub struct LokiSink {
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
-        let compression = match config.compression_level {
-            Some(x) => Compression::Gzip(flate2::Compression::new(x)),
-            None => Compression::None,
-        };
+        let compression = config.compression;
 
         Ok(Self {
             acker: cx.acker(),
