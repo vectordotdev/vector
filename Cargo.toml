@@ -319,7 +319,7 @@ tonic-build = { version = "0.6", default-features = false, features = ["transpor
 [dev-dependencies]
 datadog-filter-test = { path = "lib/datadog/filter-test"}
 
-approx = "0.5.0"
+approx = "0.5.1"
 assert_cmd = "2.0.4"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
