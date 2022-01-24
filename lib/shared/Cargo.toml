@@ -15,7 +15,7 @@ nom = { version = "7", optional = true }
 serde = { version = "1.0.134", optional = true, features = ["derive"] }
 snafu = { version = "0.7", optional = true }
 tracing = { version = "0.1", optional = true }
-serde_json = { version = "1.0.75", optional = true }
+serde_json = { version = "1.0.78", optional = true }
 
 [features]
 default = [
