@@ -802,6 +802,13 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
             (
+                r#"%{data::keyvalue("=", "\\w.\\-_@:")}"#,
+                r#"IN=eth0 OUT= MAC"#,// no value
+                Ok(Value::from(btreemap! {
+                    "IN" => "eth0"
+                })),
+            ),
+            (
                 "%{data::keyvalue}",
                 "db.name=my_db,db.operation=insert",
                 Ok(Value::from(btreemap! {
