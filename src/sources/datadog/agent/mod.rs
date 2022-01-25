@@ -243,10 +243,7 @@ impl DatadogAgentSource {
                     out.send_all(&mut events).await
                 }
                 .map_err(move |error: crate::source_sender::ClosedError| {
-                    emit!(&StreamClosedError {
-                        error: error.to_string(),
-                        count
-                    });
+                    emit!(&StreamClosedError { error, count });
                     warp::reject::custom(ApiError::ServerShutdown)
                 })?;
                 match receiver {
