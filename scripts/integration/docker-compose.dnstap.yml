@@ -1,0 +1,49 @@
+services:
+  dnstap:
+    build:
+      context: ${PWD}/tests/data/dnstap
+    container_name: vector_dnstap
+    hostname: ns.example.com
+    volumes:
+      - ${PWD}/tests/data/dnstap/socket:/bind1/etc/bind/socket
+      - ${PWD}/tests/data/dnstap/socket:/bind2/etc/bind/socket
+      - ${PWD}/tests/data/dnstap/socket:/bind3/etc/bind/socket
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "dnstap-integration-tests"
+      - "--lib"
+      - "::dnstap::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - dnstap
+    environment:
+      - BIND_SOCKET=/run/bind/socket
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
+      - ${PWD}:/code
+
+networks:
+  public: {}
+  proxy: {}
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

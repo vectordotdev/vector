@@ -40,6 +40,7 @@ impl DriverResponse for LokiResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

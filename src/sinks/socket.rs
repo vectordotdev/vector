@@ -85,10 +85,11 @@ impl SinkConfig for SocketSinkConfig {
 mod test {
     use std::{
         future::ready,
+        iter,
         net::{SocketAddr, UdpSocket},
     };
 
-    use futures::stream::{self, StreamExt};
+    use futures::stream::StreamExt;
     use serde_json::Value;
     use tokio::{
         net::TcpListener,
@@ -120,7 +121,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(iter::once(event)).await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -209,6 +210,7 @@ mod test {
         };
         use tokio_stream::wrappers::IntervalStream;
 
+        use crate::event::EventArray;
         use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
 
         trace_init();
@@ -233,7 +235,7 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(0);
+        let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
             let stream = receiver
                 .take_while(|event| ready(event.is_some()))

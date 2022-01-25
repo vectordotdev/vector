@@ -12,12 +12,12 @@ use crate::{kubernetes::client::config::kubeconfig_types::*, tls::TlsOptions};
 impl Config {
     /// Prepares a config by reading a kubeconfig file from defined path
     pub fn kubeconfig(path: &Path) -> Result<Self, Error> {
-        kubeconfig_reader(&std::fs::read_to_string(path).context(Io)?)
+        kubeconfig_reader(&std::fs::read_to_string(path).context(IoSnafu)?)
     }
 }
 
 fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
-    let kc: Kubeconfig = serde_yaml::from_str(config).context(Parse)?;
+    let kc: Kubeconfig = serde_yaml::from_str(config).context(ParseSnafu)?;
 
     // resolve "current_context"
     let current_context = &kc.current_context;
@@ -25,7 +25,7 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
         .contexts
         .iter()
         .find(|c| &c.name == current_context)
-        .context(MissingRelation {
+        .context(MissingRelationSnafu {
             from: "current_context",
             missing: "context",
         })?
@@ -38,7 +38,7 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
         .clusters
         .iter()
         .find(|c| &c.name == current_cluster)
-        .context(MissingRelation {
+        .context(MissingRelationSnafu {
             from: "context.cluster",
             missing: "cluster",
         })?
@@ -48,18 +48,18 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
         .auth_infos
         .iter()
         .find(|a| &a.name == current_user)
-        .context(MissingRelation {
+        .context(MissingRelationSnafu {
             from: "context.user",
             missing: "auth_info",
         })?
         .auth_info;
 
-    let base = cluster.server.parse().context(InvalidUrl)?;
+    let base = cluster.server.parse().context(InvalidUrlSnafu)?;
 
     let token = match &user.token {
         Some(t) => Some(t.clone()),
         None => match &user.token_file {
-            Some(file) => Some(std::fs::read_to_string(&file).context(Token)?),
+            Some(file) => Some(std::fs::read_to_string(&file).context(TokenSnafu)?),
             None => None,
         },
     };

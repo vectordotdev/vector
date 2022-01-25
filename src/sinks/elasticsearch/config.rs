@@ -21,8 +21,8 @@ use crate::{
             retry::ElasticSearchRetryLogic,
             service::{ElasticSearchService, HttpRequestBuilder},
             sink::ElasticSearchSink,
-            BatchActionTemplate, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchCommonMode,
-            ElasticSearchMode, IndexTemplate,
+            BatchActionTemplateSnafu, ElasticSearchAuth, ElasticSearchCommon,
+            ElasticSearchCommonMode, ElasticSearchMode, IndexTemplateSnafu,
         },
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
@@ -88,7 +88,7 @@ impl ElasticSearchConfig {
             .bulk
             .as_ref()
             .and_then(|n| n.action.as_deref())
-            .map(|value| Template::try_from(value).context(BatchActionTemplate))
+            .map(|value| Template::try_from(value).context(BatchActionTemplateSnafu))
             .transpose()?)
     }
 
@@ -99,7 +99,7 @@ impl ElasticSearchConfig {
             .and_then(|n| n.index.as_deref())
             .map(String::from)
             .unwrap_or_else(BulkConfig::default_index);
-        Ok(Template::try_from(index.as_str()).context(IndexTemplate)?)
+        Ok(Template::try_from(index.as_str()).context(IndexTemplateSnafu)?)
     }
 
     pub fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
@@ -337,7 +337,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(self)?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
-        let stream = VectorSink::Stream(Box::new(sink));
+        let stream = VectorSink::from_event_streamsink(sink);
         Ok((stream, healthcheck))
     }
 

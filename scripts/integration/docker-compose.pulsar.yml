@@ -1,0 +1,39 @@
+services:
+  pulsar:
+    image: apachepulsar/pulsar
+    command: bin/pulsar standalone
+    ports:
+      - 6650:6650
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "pulsar-integration-tests"
+      - "--lib"
+      - "::pulsar::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - pulsar
+    environment:
+      - PULSAR_ADDRESS=pulsar://pulsar:6650
+    volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - ${PWD}:/code
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

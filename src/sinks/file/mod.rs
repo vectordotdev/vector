@@ -131,7 +131,7 @@ impl SinkConfig for FileSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx.acker());
         Ok((
-            super::VectorSink::Stream(Box::new(sink)),
+            super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
         ))
     }
@@ -301,6 +301,7 @@ impl FileSink {
                 emit!(&EventsSent {
                     count: 1,
                     byte_size: event_size,
+                    output: None,
                 });
                 emit!(&FileBytesSent {
                     byte_size,
@@ -354,7 +355,7 @@ async fn write_event_to_file(
 }
 
 #[async_trait]
-impl StreamSink for FileSink {
+impl StreamSink<Event> for FileSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         FileSink::run(&mut self, input)
             .await

@@ -7,8 +7,8 @@ use warp::Filter;
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
@@ -58,12 +58,13 @@ impl fmt::Display for Compression {
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled(),
             cx.out,
         );
 
@@ -83,8 +84,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -109,7 +110,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -137,7 +138,7 @@ mod tests {
         event::{Event, EventStatus},
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
@@ -177,7 +178,7 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {

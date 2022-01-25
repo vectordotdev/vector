@@ -80,7 +80,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink for S3Sink<Svc, RB>
+impl<Svc, RB> StreamSink<Event> for S3Sink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
