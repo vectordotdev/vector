@@ -101,7 +101,7 @@ fn handle_dd_trace_payload(
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = dd_proto::TracePayload::decode(frame.clone())?;
+    let decoded_payload = dd_proto::TracePayload::decode(frame)?;
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
     let trace_events: Vec<Event> =
