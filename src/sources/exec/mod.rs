@@ -408,7 +408,7 @@ async fn run_command(
                 Err(error) => {
                     emit!(&StreamClosedError {
                         count: total_count - processed_count,
-                        error: error.to_string(),
+                        error,
                     });
                     break 'send;
                 }
