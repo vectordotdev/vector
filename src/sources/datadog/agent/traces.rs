@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event, LogEvent, Value},
+    event::{Event, TraceEvent, Value},
     internal_events::EventsReceived,
     sources::datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
     sources::util::ErrorMessage,
@@ -101,16 +101,39 @@ fn handle_dd_trace_payload(
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let trace_events;
-    // Try newer version first
-    let decoded_payload = dd_proto::AgentPayload::decode(frame.clone())?;
-    if decoded_payload.agent_version.is_empty() {
-        warn!(message = "Failed to decode trace payload, trying with older format");
-        let decoded_payload = dd_proto::TracePayload::decode(frame)?;
-        trace_events = handle_dd_trace_payload_v1(decoded_payload, api_key, lang, source);
-    } else {
-        trace_events = handle_dd_trace_payload_v2(decoded_payload, api_key, source);
-    }
+    let decoded_payload = dd_proto::TracePayload::decode(frame.clone())?;
+    let env = decoded_payload.env;
+    let hostname = decoded_payload.host_name;
+    let trace_events: Vec<Event> =
+    // Each traces is mapped to one event...
+    decoded_payload
+        .traces
+        .iter()
+        .map(|dd_trace| convert_dd_trace(dd_trace, env.clone(), hostname.clone(), source))
+        //... and each APM event is also mapped into its own event
+        .chain(decoded_payload.transactions.iter().map(|s| {
+            let mut trace_event = TraceEvent::from(convert_span(s));
+            trace_event.insert(
+                source.log_schema_source_type_key,
+                Bytes::from("datadog_agent"),
+            );
+            trace_event.insert(source.log_schema_host_key, hostname.clone());
+            trace_event.insert("env", env.clone());
+            trace_event
+        }))
+        .map(|mut trace_event| {
+            if let Some(k) = &api_key {
+                trace_event
+                    .metadata_mut()
+                    .set_datadog_api_key(Some(Arc::clone(k)));
+            }
+            if let Some(lang) = lang {
+                trace_event.insert("language", lang.clone());
+            }
+            trace_event.insert("payload_version", "v1".to_string());
+            Event::Trace(trace_event)
+        })
+        .collect();
     emit!(&EventsReceived {
         byte_size: trace_events.size_of(),
         count: trace_events.len(),
@@ -118,63 +141,23 @@ fn handle_dd_trace_payload(
     Ok(trace_events)
 }
 
-fn handle_dd_trace_payload_v1(
-    trace_payload: dd_proto::TracePayload,
-    api_key: Option<Arc<str>>,
-    lang: Option<&String>,
-    source: &DatadogAgentSource,
-) -> Vec<Event> {
-    let env = trace_payload.env;
-    let hostname = trace_payload.host_name;
-    // Each traces is mapped to one event...
-    trace_payload
-        .traces
-        .iter()
-        .map(|dd_traces| convert_dd_trace_v1(dd_traces, env.clone(), hostname.clone(), source))
-        //... and each APM event is also mapped into its own event
-        .chain(trace_payload.transactions.iter().map(|s| {
-            let mut log_event = LogEvent::from(convert_span(s));
-            log_event.insert(
-                source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
-            );
-            log_event.insert(source.log_schema_host_key, hostname.clone());
-            log_event.insert("env", env.clone());
-            log_event
-        }))
-        .map(|mut log_event| {
-            if let Some(k) = &api_key {
-                log_event
-                    .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
-            }
-            if let Some(lang) = lang {
-                log_event.insert("language", lang.clone());
-            }
-            log_event.insert("payload_version", "v1".to_string());
-            Event::Trace(log_event)
-        })
-        .collect()
-}
-
-fn convert_dd_trace_v1(
+fn convert_dd_trace(
     dd_trace: &dd_proto::ApiTrace,
     env: String,
     hostname: String,
     source: &DatadogAgentSource,
-) -> LogEvent {
-    let mut log_event = LogEvent::default();
-    log_event.insert(
+) -> TraceEvent {
+    let mut trace_event = TraceEvent::default();
+    trace_event.insert(
         source.log_schema_source_type_key,
         Bytes::from("datadog_agent"),
     );
-    log_event.insert(source.log_schema_host_key, hostname);
-    log_event.insert("env", env);
-
-    log_event.insert("trace_id", dd_trace.trace_id as i64);
-    log_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
-    log_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
-    log_event.insert(
+    trace_event.insert(source.log_schema_host_key, hostname);
+    trace_event.insert("env", env);
+    trace_event.insert("trace_id", dd_trace.trace_id as i64);
+    trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
+    trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
+    trace_event.insert(
         "spans",
         dd_trace
             .spans
@@ -182,117 +165,7 @@ fn convert_dd_trace_v1(
             .map(|s| Value::from(convert_span(s)))
             .collect::<Vec<Value>>(),
     );
-    log_event
-}
-
-fn handle_dd_trace_payload_v2(
-    agent_payload: dd_proto::AgentPayload,
-    api_key: Option<Arc<str>>,
-    source: &DatadogAgentSource,
-) -> Vec<Event> {
-    let env = agent_payload.env;
-    let hostname = agent_payload.host_name;
-    let agent_version = agent_payload.agent_version;
-    let target_tps = agent_payload.target_tps;
-    let error_tps = agent_payload.error_tps;
-
-    let common_tags = agent_payload
-        .tags
-        .iter()
-        .map(|(k, v)| (k.clone(), Value::from(v.clone())))
-        .collect::<BTreeMap<String, Value>>();
-
-    // Iterate over tracer payload, each payload will be an events
-    // This remains TBC
-    agent_payload
-        .tracer_payloads
-        .iter()
-        .map(|tracer_payload| {
-            convert_tracer_payload(
-                tracer_payload,
-                env.clone(),
-                hostname.clone(),
-                agent_version.clone(),
-                target_tps,
-                error_tps,
-                common_tags.clone(),
-                source,
-            )
-        })
-        .map(|mut log_event| {
-            if let Some(k) = &api_key {
-                log_event
-                    .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
-            }
-            log_event.insert("payload_version", "v2".to_string());
-            Event::Trace(log_event)
-        })
-        .collect()
-}
-
-fn convert_tracer_payload(
-    payload: &dd_proto::TracerPayload,
-    env: String,
-    hostname: String,
-    agent_version: String,
-    target_tps: f64,
-    error_tps: f64,
-    common_tags: BTreeMap<String, Value>,
-    source: &DatadogAgentSource,
-) -> LogEvent {
-    let mut log_event = LogEvent::default();
-    log_event.insert(
-        source.log_schema_source_type_key,
-        Bytes::from("datadog_agent"),
-    );
-    log_event.insert(source.log_schema_host_key, hostname);
-    log_event.insert("env", env);
-    log_event.insert("agent_version", agent_version);
-    log_event.insert("target_tps", target_tps);
-    log_event.insert("error_tps", error_tps);
-
-    log_event.insert("container_id", payload.container_id.clone());
-    log_event.insert("language_name", payload.language_name.clone());
-    log_event.insert("language_version", payload.language_version.clone());
-    log_event.insert("tracer_version", payload.tracer_version.clone());
-    log_event.insert("runtime_id", payload.runtime_id.clone());
-    log_event.insert(
-        "chunks",
-        Value::from(
-            payload
-                .chunks
-                .iter()
-                .map(|c| Value::from(convert_chunk(c)))
-                .collect::<Vec<Value>>(),
-        ),
-    );
-    let mut tags = convert_tags(&payload.tags);
-    tags.extend(common_tags);
-    log_event.insert("tags", Value::from(tags));
-    log_event.insert("tracer_env", payload.env.clone());
-    log_event.insert("tracer_hostname", payload.hostname.clone());
-    log_event.insert("app_version", payload.app_version.clone());
-    log_event
-}
-
-fn convert_chunk(chunk: &dd_proto::TraceChunk) -> BTreeMap<String, Value> {
-    let mut c = BTreeMap::<String, Value>::new();
-    c.insert("priority".into(), Value::from(chunk.priority as i64));
-    c.insert("origin".into(), chunk.origin.clone().into());
-    c.insert(
-        "spans".into(),
-        Value::from(
-            chunk
-                .spans
-                .iter()
-                .map(|s| Value::from(convert_span(s)))
-                .collect::<Vec<Value>>(),
-        ),
-    );
-    c.insert("tags".into(), Value::from(convert_tags(&chunk.tags)));
-    c.insert("dropped_trace".into(), Value::from(chunk.dropped_trace));
-    c
+    trace_event
 }
 
 fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {

@@ -11,7 +11,6 @@ use crate::{
         metrics::DatadogSeriesRequest,
         DatadogAgentConfig, DatadogAgentSource,
     },
-    serde::{default_decoding, default_framing_message_based},
     test_util::{
         components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         next_addr, spawn_collect_n, trace_init, wait_for_tcp,
@@ -33,7 +32,7 @@ mod dd_metrics_proto {
 }
 
 mod dd_traces_proto {
-    include!(concat!(env!("OUT_DIR"), "/pb.rs"));
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
 impl Arbitrary for LogMsg {
@@ -854,7 +853,7 @@ async fn decode_traces() {
     .await;
 
     {
-        let trace = events[0].as_log();
+        let trace = events[0].as_trace();
         assert_eq!(trace["host"], "a_hostname".into());
         assert_eq!(trace["env"], "an_environment".into());
         assert_eq!(trace["language"], "ada".into());
@@ -888,7 +887,7 @@ async fn decode_traces() {
             "12345678abcdefgh12345678abcdefgh"
         );
 
-        let apm_event = events[1].as_log();
+        let apm_event = events[1].as_trace();
         assert!(!apm_event.contains("spans"));
         assert_eq!(apm_event["env"], "an_environment".into());
         assert_eq!(apm_event["language"], "ada".into());
