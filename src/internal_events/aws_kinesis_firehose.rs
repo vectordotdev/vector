@@ -47,8 +47,8 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => "receiving",
+            "error" => self.code.to_string(),
             "error_type" => "http_error",
-            "code" => self.code.to_string(),
         );
         // deprecated
         counter!("request_read_errors_total", 1);
@@ -63,7 +63,7 @@ pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
 
 impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
             error = ?self.error,
             stage = "processing",
@@ -76,6 +76,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
         counter!(
             "component_errors_total", 1,
             "stage" => "processing",
+            "error" => self.error.to_string(),
             "error_type" => "decoding_error",
         );
         // deprecated
