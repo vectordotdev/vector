@@ -123,12 +123,14 @@ impl Expression for Query {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        vm.write_opcode(OpCode::GetPath);
-
         // Write the target depending on what target we are trying to retrieve.
         let variable = match &self.target {
-            Target::External => vm::Variable::External(self.path.clone()),
+            Target::External => {
+                vm.write_opcode(OpCode::GetPath);
+                vm::Variable::External(self.path.clone())
+            }
             Target::Internal(variable) => {
+                vm.write_opcode(OpCode::GetPath);
                 vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
             }
             Target::FunctionCall(call) => {
@@ -136,6 +138,7 @@ impl Expression for Query {
                 call.compile_to_vm(vm)?;
 
                 // Then retrieve the given path from the returned value that has been pushed on the stack
+                vm.write_opcode(OpCode::GetPath);
                 vm::Variable::Stack(self.path.clone())
             }
             Target::Container(container) => {
@@ -143,9 +146,11 @@ impl Expression for Query {
                 container.compile_to_vm(vm)?;
 
                 // Then retrieve the given path from the returned value that has been pushed on the stack
+                vm.write_opcode(OpCode::GetPath);
                 vm::Variable::Stack(self.path.clone())
             }
         };
+
         let target = vm.get_target(&variable);
         vm.write_primitive(target);
 

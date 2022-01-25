@@ -45,7 +45,7 @@ impl<'a> VmState<'a> {
         self.instruction_pointer += 1;
         match byte {
             Instruction::Primitive(primitive) => Ok(primitive),
-            _ => Err("Expecting primitive".into()),
+            _ => Err(format!("Expecting primitive at {}", self.instruction_pointer - 1).into()),
         }
     }
 
