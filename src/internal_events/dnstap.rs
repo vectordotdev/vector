@@ -44,6 +44,7 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => "processing",
+            "error" => self.error.to_string(),
             "error_type" => "parse_failed",
         );
         // deprecated
