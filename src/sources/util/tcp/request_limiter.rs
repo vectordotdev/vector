@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 const EWMA_WEIGHT: f32 = 0.1;
-// const INVERSE_EWMA_WEIGHT: f32 = 1.0 - EWMA_WEIGHT;
 
 const MINIMUM_PERMITS: usize = 2;
 

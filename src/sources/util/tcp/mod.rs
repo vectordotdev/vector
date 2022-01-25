@@ -305,6 +305,9 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
 
                         if let Some(permit) = &mut permit {
+                            // Note that this is intentionally not the "number of events in a single request", but rather
+                            // the "number of events currently available". This may contain events from multiple events,
+                            // but it should always contain all events from each request.
                             permit.decoding_finished(events.len());
                         }
 
