@@ -60,7 +60,7 @@ Please head over to Vector's [download page].
 ### Stable channel
 
 * **Every 6 weeks**
-* Release patch fixes as needed to fix high-priority bugs and regressions
+* Release patch fixes as needed to fix high-priority bugs and regressions from the last major or minor release
 * Release daily builds representing the latest state of Vector for feedback
 
 ### Nightly channel
@@ -86,8 +86,13 @@ for the next nightly release. For example, you could choose to run the nightly
 version in your development environments and save stable for production.
 Otherwise, the stable release is your best bet.
 
+[Vector public calendar]: calendar.vector.dev
+[chat]: chat.vector.dev
+[package manager]: https://vector.dev/docs/setup/installation/package-managers/
+[download page]: https://vector.dev/download/
+[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
 [Github repository]: https://github.com/timberio/vector
 [Github subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
 [`master` branch]: https://github.com/timberio/vector/tree/master
-[versioning policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[versioning policy]: https://github.com/timberio/vector/blob/master/VERSIONING.md

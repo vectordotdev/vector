@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
-use futures::stream;
 use shared::encode_logfmt;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
@@ -14,17 +13,22 @@ use crate::{
     test_util::{generate_events_with_stream, generate_lines_with_stream, random_lines},
 };
 
+fn loki_address() -> String {
+    std::env::var("LOKI_ADDRESS").unwrap_or_else(|_| "http://localhost:3100".into())
+}
+
 async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();
 
     let config = format!(
         r#"
-            endpoint = "http://localhost:3100"
+            endpoint = "{}"
             labels = {{test_name = "placeholder"}}
             encoding = "{}"
             remove_timestamp = false
             tenant_id = "default"
         "#,
+        loki_address(),
         encoding
     );
 
@@ -139,15 +143,13 @@ async fn many_streams() {
     let stream1 = uuid::Uuid::new_v4();
     let stream2 = uuid::Uuid::new_v4();
 
-    let (config, cx) = load_sink::<LokiConfig>(
-        r#"
-            endpoint = "http://localhost:3100"
+    let config = format!("endpoint = \"{}\"", loki_address())
+        + r#"
             labels = {test_name = "{{ stream_id }}"}
             encoding = "text"
             tenant_id = "default"
-        "#,
-    )
-    .unwrap();
+        "#;
+    let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -201,15 +203,13 @@ async fn many_streams() {
 async fn interpolate_stream_key() {
     let stream = uuid::Uuid::new_v4();
 
-    let (mut config, cx) = load_sink::<LokiConfig>(
-        r#"
-            endpoint = "http://localhost:3100"
+    let config = format!("endpoint = \"{}\"", loki_address())
+        + r#"
             labels = {"{{ stream_key }}" = "placeholder"}
             encoding = "text"
             tenant_id = "default"
-        "#,
-    )
-    .unwrap();
+        "#;
+    let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
         Template::try_from("{{ stream_key }}").unwrap(),
         Template::try_from(stream.to_string()).unwrap(),
@@ -250,15 +250,13 @@ async fn interpolate_stream_key() {
 async fn many_tenants() {
     let stream = uuid::Uuid::new_v4();
 
-    let (mut config, cx) = load_sink::<LokiConfig>(
-        r#"
-            endpoint = "http://localhost:3100"
+    let config = format!("endpoint = \"{}\"", loki_address())
+        + r#"
             labels = {test_name = "placeholder"}
             encoding = "text"
             tenant_id = "{{ tenant_id }}"
-        "#,
-    )
-    .unwrap();
+        "#;
+    let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
     let test_name = config
         .labels
@@ -281,14 +279,12 @@ async fn many_tenants() {
     for i in 0..10 {
         let event = events.get_mut(i).unwrap();
 
-        if i % 2 == 0 {
-            event.as_mut_log().insert("tenant_id", "tenant1");
-        } else {
-            event.as_mut_log().insert("tenant_id", "tenant2");
-        }
+        event
+            .as_mut_log()
+            .insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
     }
 
-    let _ = sink.run(&mut stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
@@ -412,15 +408,13 @@ async fn test_out_of_order_events(
     crate::test_util::trace_init();
     let stream = uuid::Uuid::new_v4();
 
-    let (mut config, cx) = load_sink::<LokiConfig>(
-        r#"
-            endpoint = "http://localhost:3100"
+    let config = format!("endpoint = \"{}\"", loki_address())
+        + r#"
             labels = {test_name = "placeholder"}
             encoding = "text"
             tenant_id = "default"
-        "#,
-    )
-    .unwrap();
+        "#;
+    let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.out_of_order_action = action;
     config.labels.insert(
         Template::try_from("test_name").unwrap(),
@@ -430,7 +424,7 @@ async fn test_out_of_order_events(
     config.batch.max_bytes = Some(4_000_000);
 
     let (sink, _) = config.build(cx).await.unwrap();
-    sink.run(&mut stream::iter(events.clone())).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
@@ -464,7 +458,8 @@ fn get_timestamp(event: &Event) -> DateTime<Utc> {
 async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
     let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
     let query = format!(
-        "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
+        "{}/loki/api/v1/query_range?query={}&direction=forward",
+        loki_address(),
         query
     );
 

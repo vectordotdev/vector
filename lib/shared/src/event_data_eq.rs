@@ -13,13 +13,12 @@ macro_rules! assert_event_data_eq {
         use $crate::EventDataEq as _;
         match (&($left), &($right)) {
             (left, right) => {
-                if !left.event_data_eq(right) {
-                    panic!(
-                        "assertion failed: {}\n\n{}\n",
-                        $message,
-                        pretty_assertions::Comparison::new(left, right)
-                    );
-                }
+                assert!(
+                    left.event_data_eq(right),
+                    "assertion failed: {}\n\n{}\n",
+                    $message,
+                    pretty_assertions::Comparison::new(left, right),
+                );
             }
         }
     }};

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext},
+    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
@@ -56,6 +56,7 @@ impl SourceConfig for AwsSqsConfig {
 
         let client = aws_sdk_sqs::Client::from_conf(config_builder.build());
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         Ok(Box::pin(
             SqsSource {
@@ -64,14 +65,14 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: self.acknowledgements.enabled,
+                acknowledgements: acknowledgements.enabled(),
             }
             .run(cx.out, cx.shutdown),
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

@@ -117,7 +117,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

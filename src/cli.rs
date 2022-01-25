@@ -36,7 +36,8 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
-            | Some(SubCommand::List(_)) => {
+            | Some(SubCommand::List(_))
+            | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {
@@ -194,7 +195,7 @@ pub enum SubCommand {
     #[cfg(feature = "api-client")]
     Top(top::Opts),
 
-    /// Observe log events from topology components
+    /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
     #[cfg(feature = "api-client")]
     Tap(tap::Opts),
 

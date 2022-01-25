@@ -9,10 +9,10 @@ use crate::tls::TlsOptions;
 impl Config {
     /// Prepares a config suitable for use when running in k8s cluster.
     pub fn in_cluster() -> Result<Self, Error> {
-        let host = std::env::var("KUBERNETES_SERVICE_HOST").context(NotInCluster {
+        let host = std::env::var("KUBERNETES_SERVICE_HOST").context(NotInClusterSnafu {
             missing: "KUBERNETES_SERVICE_HOST",
         })?;
-        let port = std::env::var("KUBERNETES_SERVICE_PORT").context(NotInCluster {
+        let port = std::env::var("KUBERNETES_SERVICE_PORT").context(NotInClusterSnafu {
             missing: "KUBERNETES_SERVICE_PORT",
         })?;
 
@@ -21,12 +21,12 @@ impl Config {
             .authority(join_host_port(host.as_str(), port.as_str()).as_str())
             .path_and_query("/")
             .build()
-            .context(InvalidUrl)?;
+            .context(InvalidUrlSnafu)?;
 
         let token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token";
         let root_ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
-        let token = Some(std::fs::read_to_string(token_file).context(Token)?);
+        let token = Some(std::fs::read_to_string(token_file).context(TokenSnafu)?);
 
         let tls_options = TlsOptions {
             ca_file: Some(root_ca_file.into()),

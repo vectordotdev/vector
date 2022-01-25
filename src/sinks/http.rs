@@ -156,7 +156,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
-        let sink = super::VectorSink::Sink(Box::new(sink));
+        let sink = super::VectorSink::from_event_sink(sink);
 
         Ok((sink, healthcheck))
     }
@@ -292,8 +292,10 @@ fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crat
             return Err("Authorization header can not be used with defined auth options".into());
         }
 
-        HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
-        HeaderValue::from_bytes(value.as_bytes()).with_context(|| InvalidHeaderValue { value })?;
+        HeaderName::from_bytes(name.as_bytes())
+            .with_context(|_| InvalidHeaderNameSnafu { name })?;
+        HeaderValue::from_bytes(value.as_bytes())
+            .with_context(|_| InvalidHeaderValueSnafu { value })?;
     }
 
     Ok(())

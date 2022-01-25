@@ -140,8 +140,15 @@ pub fn time_format_to_regex(
         if ('A'..='Z').contains(&c) || ('a'..='z').contains(&c) {
             let token: String = chars.by_ref().peeking_take_while(|&cn| cn == c).collect();
             match token.chars().next().unwrap() {
-                'h' | 'H' | 'm' | 's' | 'S' | 'y' | 'Y' | 'x' | 'c' | 'C' | 'd' | 'e' | 'D'
-                | 'w' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                'h' | 'H' | 'm' | 's' | 'S' | 'Y' | 'x' | 'c' | 'C' | 'e' | 'D' | 'w' => {
+                    regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str())
+                }
+                // days
+                'd' if token.len() == 1 => regex.push_str("[\\d]{2}"), // expand d to dd
+                'd' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                // years
+                'y' if token.len() == 1 => regex.push_str("[\\d]{4}"), // expand y to yyyy
+                'y' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
                 'M' if token.len() == 2 =>
                 // Month number
                 {
