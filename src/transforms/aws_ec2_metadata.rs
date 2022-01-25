@@ -202,7 +202,7 @@ impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
         if let Ok(state) = self.state.read() {
             match event {
-                Event::Log(ref mut log) | Event::Trace(ref mut log) => {
+                Event::Log(ref mut log) => {
                     state.iter().for_each(|(k, v)| {
                         log.insert(k.clone(), v.clone());
                     });
@@ -212,10 +212,11 @@ impl Ec2MetadataTransform {
                         metric.insert_tag(k.clone(), String::from_utf8_lossy(v).to_string());
                     });
                 }
+                Event::Trace(_) => panic!("Traces are not supported.")
             }
         }
 
-        event
+    event
     }
 }
 

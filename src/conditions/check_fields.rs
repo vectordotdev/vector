@@ -280,7 +280,7 @@ impl RegexPredicate {
 impl CheckFieldsPredicate for RegexPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(log) | Event::Trace(log) => log
+            Event::Log(log) => log
                 .get(&self.target)
                 .map(|field| field.to_string_lossy())
                 .map_or(false, |field| self.regex.is_match(&field)),
@@ -288,6 +288,10 @@ impl CheckFieldsPredicate for RegexPredicate {
                 .tags()
                 .and_then(|tags| tags.get(&self.target))
                 .map_or(false, |field| self.regex.is_match(field)),
+            Event::Trace(trace) => trace
+                .get(&self.target)
+                .map(|field| field.to_string_lossy())
+                .map_or(false, |field| self.regex.is_match(&field)),
         }
     }
 }

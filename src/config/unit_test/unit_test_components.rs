@@ -207,11 +207,14 @@ fn events_to_string(events: &[Event]) -> String {
     events
         .iter()
         .map(|event| match event {
-            Event::Log(log) | Event::Trace(log) => {
+            Event::Log(log) => {
                 serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string())
             }
             Event::Metric(metric) => {
                 serde_json::to_string(metric).unwrap_or_else(|_| "{}".to_string())
+            }
+            Event::Trace(trace) => {
+                serde_json::to_string(trace).unwrap_or_else(|_| "{}".to_string())
             }
         })
         .collect::<Vec<_>>()

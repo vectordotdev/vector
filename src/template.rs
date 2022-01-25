@@ -186,11 +186,15 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
 
 fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     let timestamp = match event {
-        EventRef::Log(log) | EventRef::Trace(log) => log
+        EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp)
             .copied(),
         EventRef::Metric(metric) => metric.timestamp(),
+        EventRef::Trace(trace) => trace
+            .get(log_schema().timestamp_key())
+            .and_then(Value::as_timestamp)
+            .copied(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()

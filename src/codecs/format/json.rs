@@ -119,8 +119,9 @@ impl Encoder<Event> for JsonSerializer {
     fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
         match event {
-            Event::Log(log) | Event::Trace(log) => serde_json::to_writer(writer, &log),
+            Event::Log(log) => serde_json::to_writer(writer, &log),
             Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+            Event::Trace(trace) => serde_json::to_writer(writer, &trace),
         }
         .map_err(Into::into)
     }

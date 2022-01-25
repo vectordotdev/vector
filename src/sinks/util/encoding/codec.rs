@@ -164,10 +164,11 @@ pub struct StandardJsonEncoding;
 impl Encoder<Event> for StandardJsonEncoding {
     fn encode_input(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         match event {
-            Event::Log(log) | Event::Trace(log) => self.encode_input(log, writer),
+            Event::Log(log) => self.encode_input(log, writer),
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
+            Event::Trace(trace) => self.encode_input(trace, writer),
         }
     }
 }
@@ -192,7 +193,7 @@ pub struct StandardTextEncoding;
 impl Encoder<Event> for StandardTextEncoding {
     fn encode_input(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         match event {
-            Event::Log(log) | Event::Trace(log) => {
+            Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
                     .map(|v| v.as_bytes())
@@ -203,6 +204,7 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
+            Event::Trace(_) =>  panic!("standard text encoding cannot be used for traces"),
         }
     }
 }

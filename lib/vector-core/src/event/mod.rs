@@ -211,7 +211,7 @@ impl Event {
     /// This function panics if self is anything other than an `Event::Trace`.
     pub fn into_trace(self) -> TraceEvent {
         match self {
-            Event::Trace(log) => log,
+            Event::Trace(trace) => trace,
             _ => panic!("Failed type coercion, {:?} is not a trace event", self),
         }
     }
@@ -432,8 +432,8 @@ pub trait MaybeAsLogMut {
 impl MaybeAsLogMut for Event {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
         match self {
-            Event::Log(log) | Event::Trace(log) => Some(log),
-            Event::Metric(_) => None,
+            Event::Log(log) => Some(log),
+            _ => None,
         }
     }
 }

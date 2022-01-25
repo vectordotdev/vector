@@ -229,7 +229,7 @@ pub struct MockTransform {
 impl FunctionTransform for MockTransform {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         match &mut event {
-            Event::Log(log) | Event::Trace(log) => {
+            Event::Log(log) => {
                 let mut v = log
                     .get(vector::config::log_schema().message_key())
                     .unwrap()
@@ -270,6 +270,14 @@ impl FunctionTransform for MockTransform {
                         value: increment,
                     }));
                 }
+            }
+            Event::Trace(trace) => {
+                let mut v = trace
+                    .get(vector::config::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy();
+                v.push_str(&self.suffix);
+                trace.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
         };
         output.push(event);
