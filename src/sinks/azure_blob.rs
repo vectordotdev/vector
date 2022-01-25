@@ -1,6 +1,6 @@
 use std::{convert::TryInto, io, sync::Arc};
 
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

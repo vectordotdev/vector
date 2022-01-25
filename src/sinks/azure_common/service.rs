@@ -5,7 +5,7 @@ use std::{
 };
 
 use azure_core::HttpError;
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing_futures::Instrument;

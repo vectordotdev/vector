@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use azure_core::{prelude::*, HttpError};
-use azure_storage::{
-    blob::{blob::responses::PutBlockBlobResponse, prelude::*},
-    core::prelude::*,
-};
+use azure_core::{new_http_client, HttpError};
+use azure_storage::prelude::*;
+use azure_storage_blobs::{blob::responses::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
