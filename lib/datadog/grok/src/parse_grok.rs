@@ -830,7 +830,7 @@ mod tests {
         assert_eq!(
             parsed,
             Value::from(btreemap! {
-                 "field" =>  Value::Array(vec![1.0.into(), 2.into()]),
+                 "field" =>  Value::Array(vec![1.into(), 2.into()]),
             })
         );
     }
