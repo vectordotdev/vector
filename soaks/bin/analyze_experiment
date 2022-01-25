@@ -62,6 +62,10 @@ for exp in bytes_written.experiment.unique():
                                            comparison_stdev,
                                            len(comparison),
                                            equal_var=False)
+
+    baseline_shapiro_res = scipy.stats.shapiro(baseline.throughput.array)
+    comparison_shapiro_res = scipy.stats.shapiro(comparison.throughput.array)
+
     ttest_results.append({'experiment': exp,
                           'Δ mean': diff.mean(),
                           'Δ mean %': percent_change,
@@ -72,6 +76,8 @@ for exp in bytes_written.experiment.unique():
                           'comparison stdev': comparison_stdev,
                           'comparison outlier percentage': (comparison_outliers / len(comparison)) * 100,
                           'p-value': res.pvalue,
+                          'baseline normal?': "{} ({})".format("yes" if baseline_shapiro_res.pvalue < 0.05 else "no", baseline_shapiro_res.pvalue),
+                          'comparison normal?': "{} ({})".format("yes" if comparison_shapiro_res.pvalue < 0.05 else  "no", comparison_shapiro_res.pvalue),
                           'erratic': exp in erratic_soaks
                           })
 
