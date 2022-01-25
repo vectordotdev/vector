@@ -122,10 +122,7 @@ fn eventstoredb(
 
                                 let mut metrics = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = cx.out.send_all(&mut metrics).await {
-                                    emit!(&StreamClosedError {
-                                        count,
-                                        error: error.to_string(),
-                                    });
+                                    emit!(&StreamClosedError { count, error });
                                     break;
                                 }
                             }
