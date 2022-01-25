@@ -204,7 +204,7 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
-            Event::Trace(_) =>  panic!("standard text encoding cannot be used for traces"),
+            Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
         }
     }
 }

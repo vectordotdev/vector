@@ -212,11 +212,11 @@ impl Ec2MetadataTransform {
                         metric.insert_tag(k.clone(), String::from_utf8_lossy(v).to_string());
                     });
                 }
-                Event::Trace(_) => panic!("Traces are not supported.")
+                Event::Trace(_) => panic!("Traces are not supported."),
             }
         }
 
-    event
+        event
     }
 }
 
