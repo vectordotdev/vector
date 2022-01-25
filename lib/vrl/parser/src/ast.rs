@@ -1083,7 +1083,7 @@ impl fmt::Debug for Not {
 
 #[derive(Clone, PartialEq)]
 pub struct Abort {
-    pub message: Option<String>,
+    pub message: Option<Box<Node<Expr>>>,
 }
 
 impl fmt::Display for Abort {
