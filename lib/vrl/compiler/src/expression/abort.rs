@@ -1,9 +1,11 @@
 use std::fmt;
 
-use diagnostic::DiagnosticError;
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+use parser::ast::Node;
 
 use crate::{
     expression::{ExpressionError, Resolved},
+    value::Kind,
     Context, Expression, Span, State, TypeDef,
 };
 
@@ -16,16 +18,20 @@ pub struct Abort {
 }
 
 impl Abort {
-    pub fn new(span: Span, message: Option<Expr>, state: &State) -> Result<Self, Error> {
-        if let Some(expr) = message {
+    pub fn new(span: Span, message: Option<Node<Expr>>, state: &State) -> Result<Self, Error> {
+        if let Some(node) = message {
+            let (expr_span, expr) = node.take();
             let type_def = expr.type_def(state);
+
             if type_def.is_fallible() {
                 Err(Error {
                     variant: ErrorVariant::FallibleExpr,
+                    expr_span,
                 })
             } else if !type_def.is_bytes() {
                 Err(Error {
-                    variant: ErrorVariant::NonString,
+                    variant: ErrorVariant::NonString(type_def.kind()),
+                    expr_span,
                 })
             } else {
                 Ok(Self {
@@ -79,12 +85,13 @@ impl fmt::Display for Abort {
 #[derive(Debug)]
 pub struct Error {
     variant: ErrorVariant,
+    expr_span: Span,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
-    #[error("non-string message")]
-    NonString,
+    #[error("non-string abort message")]
+    NonString(Kind),
     #[error("unhandled fallible expression")]
     FallibleExpr,
 }
@@ -106,8 +113,46 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match self.variant {
-            NonString => 300,
+            NonString(_) => 300,
             FallibleExpr => 630,
+        }
+    }
+
+    fn labels(&self) -> Vec<Label> {
+        match self.variant {
+            ErrorVariant::NonString(kind) => vec![
+                Label::primary(
+                    "abort only accepts an expression argument resolving to a string",
+                    self.expr_span,
+                ),
+                Label::context(
+                    format!("this expression resolves to {}", kind),
+                    self.expr_span,
+                ),
+            ],
+            ErrorVariant::FallibleExpr => vec![
+                Label::primary(
+                    "abort only accepts an infallible expression argument",
+                    self.expr_span,
+                ),
+                Label::context(
+                    "handle errors before using the expression as an abort message",
+                    self.expr_span,
+                ),
+            ],
+        }
+    }
+
+    fn notes(&self) -> Vec<Note> {
+        match self.variant {
+            ErrorVariant::NonString(_) => vec![
+                Note::CoerceValue,
+                Note::SeeDocs(
+                    "type coercion".to_owned(),
+                    Urls::func_docs("#coerce-functions"),
+                ),
+            ],
+            ErrorVariant::FallibleExpr => vec![Note::SeeErrorDocs],
         }
     }
 }
