@@ -791,6 +791,13 @@ mod tests {
                     "kafka_cluster_status" => "8ca7b736f0aa43e5"
                 })),
             ),
+            (
+                r#"%{data::keyvalue}"#,
+                r#"field=2.0f"#,
+                Ok(Value::from(btreemap! {
+                    "field" => "2.0f"
+                })),
+            ),
         ]);
     }
 }
