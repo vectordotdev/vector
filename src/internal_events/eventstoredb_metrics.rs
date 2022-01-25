@@ -20,6 +20,7 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
         counter!(
             "component_errors_total", 1,
             "stage" => "receiving",
+            "error" => self.error.to_string(),
             "error_type" => "http_error",
         );
         // deprecated
@@ -46,6 +47,7 @@ impl InternalEvent for EventStoreDbStatsParsingError {
         counter!(
             "component_errors_total", 1,
             "stage" => "processing",
+            "error" => self.error.to_string(),
             "error_type" => "parse_failed",
         );
         // deprecated
