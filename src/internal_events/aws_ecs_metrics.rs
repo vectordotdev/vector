@@ -66,8 +66,8 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
         error!(
             message = "HTTP error response.",
             endpoint = %self.endpoint,
-            code = %self.code,
             stage = "receiving",
+            error = %self.code,
             error_type = "http_error",
         );
     }
