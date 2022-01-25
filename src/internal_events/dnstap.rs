@@ -46,11 +46,6 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
             "stage" => "processing",
             "error_type" => "parse_failed",
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "stage" => "processing",
-            "error_type" => "parse_failed",
-        );
         // deprecated
         counter!("parse_errors_total", 1);
     }
