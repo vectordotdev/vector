@@ -74,7 +74,7 @@ pub trait CustomFilter<T> {
 }
 
 /// Returns true if a provided `Item` passes all 'AND' or 'OR' filter rules, recursively.
-pub fn filter_item<Item, Filter>(item: &Item, f: &Filter) -> bool
+fn filter_item<Item, Filter>(item: &Item, f: &Filter) -> bool
 where
     Filter: CustomFilter<Item>,
 {

@@ -7,7 +7,7 @@ use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
     SentEventsTotal,
 };
-use crate::{api::schema::metrics, event::Metric};
+use crate::event::Metric;
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -19,11 +19,7 @@ use crate::{api::schema::metrics, event::Metric};
         type = "Option<EventsInTotal>",
         deprecation = "Use received_events_total instead"
     ),
-    field(
-        name = "sent_events_total",
-        type = "Option<SentEventsTotal>",
-        arg(name = "filter", type = "Option<metrics::OutputsFilter>")
-    ),
+    field(name = "sent_events_total", type = "Option<SentEventsTotal>"),
     field(
         name = "events_out_total",
         type = "Option<EventsOutTotal>",
