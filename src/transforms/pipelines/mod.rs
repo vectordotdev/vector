@@ -68,7 +68,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::AnyCondition,
     config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     transforms::Transform,
@@ -246,8 +246,8 @@ impl TransformConfig for PipelinesConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -295,8 +295,7 @@ impl GenerateConfig for PipelinesConfig {
 #[cfg(test)]
 impl PipelinesConfig {
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 }
 

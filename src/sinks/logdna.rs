@@ -98,7 +98,7 @@ impl SinkConfig for LogdnaConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -291,7 +291,7 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{channel::mpsc, StreamExt};
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -404,7 +404,7 @@ mod tests {
         }
         drop(batch);
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }

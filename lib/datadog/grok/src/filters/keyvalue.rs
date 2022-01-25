@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
 use bytes::Bytes;
+use lookup::{Lookup, LookupBuf};
 use nom::{
     self,
     branch::alt,
@@ -15,7 +17,7 @@ use nom::{
 use nom_regex::str::re_find;
 use ordered_float::NotNan;
 use regex::Regex;
-use vrl_compiler::Value;
+use vrl_compiler::{Target, Value};
 
 use crate::{
     ast::{Function, FunctionArgument},
@@ -120,7 +122,8 @@ impl std::fmt::Display for KeyValueFilter {
 
 pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, GrokRuntimeError> {
     match value {
-        Value::Bytes(bytes) => Ok(Value::from_iter::<Vec<(String, Value)>>(
+        Value::Bytes(bytes) => {
+            let mut result = Value::Object(BTreeMap::default());
             parse(
                 String::from_utf8_lossy(bytes).as_ref(),
                 &filter.key_value_delimiter,
@@ -132,18 +135,23 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                 &filter.quotes,
                 &filter.value_re,
             )
-            .map_err(|_e| {
-                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-            })?
-            .iter()
-            .filter(|(k, v)| {
-                !(v.is_null()
-                    || matches!(v, Value::Bytes(b) if b.is_empty())
+            .unwrap_or_default()
+            .into_iter()
+            .for_each(|(k, v)| {
+                if !(v.is_null()
+                    || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
-            })
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect(),
-        )),
+                {
+                    let lookup: LookupBuf = Lookup::from_str(&k)
+                        .unwrap_or_else(|_| Lookup::from(&k))
+                        .into();
+                    result.insert(&lookup, v).unwrap_or_else(
+                        |error| warn!(message = "Error updating field value", field = %lookup, %error)
+                    );
+                }
+            });
+            Ok(result)
+        }
         _ => Err(GrokRuntimeError::FailedToApplyFilter(
             filter.to_string(),
             value.to_string(),
@@ -235,7 +243,7 @@ fn parse_key_value<'a>(
                         ),
                         preceded(space0, parse_key(field_delimiter, quotes, non_quoted_re)),
                     )),
-                    many_m_n(1, 1, tag(key_value_delimiter)),
+                    many_m_n(0, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter, quotes, non_quoted_re),
                 ))(input)
             },

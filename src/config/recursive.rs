@@ -30,7 +30,7 @@ pub fn load_file(path: &Path) -> Result<Option<(String, toml::Value, Vec<String>
         open_file(path),
         Format::from_path(path),
     ) {
-        load(file, Some(format)).map(|(value, warnings)| Some((name, value, warnings)))
+        load(file, format).map(|(value, warnings)| Some((name, value, warnings)))
     } else {
         Ok(None)
     }

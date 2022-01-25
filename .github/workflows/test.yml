@@ -38,7 +38,6 @@ jobs:
         source: ${{ steps.filter.outputs.source }}
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
-        helm: ${{ steps.filter.outputs.helm }}
         cue: ${{ steps.filter.outputs.cue }}
         markdown: ${{ steps.filter.outputs.markdown }}
       steps:
@@ -78,8 +77,6 @@ jobs:
               - '**/**.md'
             internal_events:
               - 'src/internal_events/**'
-            helm:
-              - 'distribution/helm/**'
             docker:
               - 'distribution/docker/**'
 
@@ -91,6 +88,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
@@ -127,6 +125,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
       - uses: actions/cache@v2.1.7
@@ -268,6 +267,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -292,6 +292,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -317,6 +318,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
+      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -371,18 +373,6 @@ jobs:
         run: make check-version
       - name: Check scripts
         run: make check-scripts
-      - name: Check helm dependencies
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-helm-dependencies
-      - name: Check helm lint
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-helm-lint
-      - name: Check that Helm template snapshots don't diverge from Helm
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-helm-snapshots
-      - name: Check that generated Kubernetes YAMLs don't diverge from Helm
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-kubernetes-yaml
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events

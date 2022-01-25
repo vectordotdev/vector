@@ -6,7 +6,7 @@ use vector::{
     topology,
 };
 
-async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
+async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
     match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
@@ -53,7 +53,7 @@ async fn happy_path() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -69,7 +69,7 @@ async fn happy_path() {
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sample"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
-      Some(Format::Toml),
+      Format::Toml,
     )
     .await
     .unwrap();
@@ -77,7 +77,7 @@ async fn happy_path() {
 
 #[tokio::test]
 async fn early_eof() {
-    let err = load("[sinks]\n[sin", Some(Format::Toml)).await.unwrap_err();
+    let err = load("[sinks]\n[sin", Format::Toml).await.unwrap_err();
 
     assert_eq!(
         err,
@@ -87,7 +87,7 @@ async fn early_eof() {
 
 #[tokio::test]
 async fn bad_syntax() {
-    let err = load(r#"{{{"#, Some(Format::Toml)).await.unwrap_err();
+    let err = load(r#"{{{"#, Format::Toml).await.unwrap_err();
 
     assert_eq!(
         err,
@@ -109,7 +109,7 @@ async fn missing_key() {
         mode = "tcp"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -135,7 +135,7 @@ async fn missing_key2() {
         inputs = ["in"]
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -161,7 +161,7 @@ async fn bad_type() {
         inputs = ["in"]
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -213,7 +213,7 @@ async fn bad_inputs() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -260,7 +260,7 @@ async fn duplicate_name() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -300,7 +300,7 @@ async fn bad_regex() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -327,7 +327,7 @@ async fn bad_regex() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -365,7 +365,7 @@ async fn good_regex_parser() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await;
 
@@ -402,7 +402,7 @@ async fn good_tokenizer() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await;
 
@@ -457,7 +457,7 @@ async fn bad_s3_region() {
         [sinks.out4.batch]
         max_bytes = 100000
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -517,7 +517,7 @@ async fn warnings() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -576,7 +576,7 @@ async fn cycle() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -605,7 +605,7 @@ async fn disabled_healthcheck() {
         encoding = "text"
         healthcheck = false
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -625,7 +625,7 @@ async fn parses_sink_no_request() {
         uri = "https://localhost"
         encoding = "json"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -648,7 +648,7 @@ async fn parses_sink_partial_request() {
         [sinks.out.request]
         concurrency = 42
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -677,7 +677,7 @@ async fn parses_sink_full_request() {
         retry_max_duration_secs = 10
         retry_initial_backoff_secs = 6
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -701,7 +701,7 @@ async fn parses_sink_full_batch_bytes() {
         max_bytes = 100
         timeout_secs = 10
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -727,7 +727,7 @@ async fn parses_sink_full_batch_event() {
         max_events = 100
         timeout_secs = 10
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -752,7 +752,7 @@ async fn parses_sink_full_auth() {
         user = "user"
         password = "password"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -769,14 +769,14 @@ async fn parses_sink_full_es_basic_auth() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://localhost"
+        endpoint = "https://localhost"
 
         [sinks.out.auth]
         strategy = "basic"
         user = "user"
         password = "password"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -793,12 +793,12 @@ async fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://es.us-east-1.amazonaws.com"
+        endpoint = "https://es.us-east-1.amazonaws.com"
 
         [sinks.out.auth]
         strategy = "aws"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -837,7 +837,7 @@ async fn route() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();

@@ -28,7 +28,8 @@ address = "0.0.0.0:9090"
 type = "elasticsearch"
 inputs = [ "fluent"]
 endpoint = "http://http-blackhole:8080"
-index = "vector-%F"
-mode = "normal"
+mode = "bulk"
 pipeline = "pipeline-name"
 compression = "none"
+[sinks.elasticsearch.bulk]
+index = "vector-%F"

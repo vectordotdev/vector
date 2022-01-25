@@ -1,17 +1,11 @@
-use std::{
-    fmt, io,
-    mem::drop,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
+use std::net::{IpAddr, SocketAddr};
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -31,6 +25,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    SourceSender,
 };
 
 async fn make_listener(
@@ -118,10 +113,9 @@ where
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
+        max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
-        let out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending event.", %error));
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
 
         let listenfd = ListenFd::from_env();
 
@@ -150,13 +144,13 @@ where
             let shutdown_clone = cx.shutdown.clone();
 
             listener
-                .accept_stream()
+                .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
-                .for_each(move |connection| {
+                .for_each(move |(connection, permit)| {
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
-                    let out = out.clone();
+                    let out = cx.out.clone();
                     let connection_gauge = connection_gauge.clone();
 
                     async move {
@@ -198,11 +192,15 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled,
+                                acknowledgements.enabled(),
                             );
 
                             tokio::spawn(
-                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                                fut.map(move |()| {
+                                    drop(open_token);
+                                    drop(permit);
+                                })
+                                .instrument(span.clone()),
                             );
                         });
                     }
@@ -221,7 +219,7 @@ async fn handle_stream<T>(
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: IpAddr,
-    mut out: impl Sink<Event> + Send + 'static + Unpin,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
@@ -292,7 +290,7 @@ async fn handle_stream<T>(
                             }
                         }
                         source.handle_events(&mut events, host.clone(), byte_size);
-                        match out.send_all(&mut stream::iter(events).map(Ok)).await {
+                        match out.send_all(&mut stream::iter(events)).await {
                             Ok(_) => {
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,

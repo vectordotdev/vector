@@ -19,4 +19,4 @@ thiserror = "1"
 test-case = "1"
 
 [build-dependencies]
-lalrpop = "0.19.6"
+lalrpop = "0.19.7"

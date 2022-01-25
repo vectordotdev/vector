@@ -1,5 +1,6 @@
 #[cfg(feature = "datadog-pipelines")]
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -37,7 +38,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition>,
+    pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -52,7 +53,7 @@ struct ConfigBuilderHash<'a> {
     sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
-    tests: &'a Vec<TestDefinition>,
+    tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -94,6 +95,8 @@ impl From<Config> for ConfigBuilder {
             .into_iter()
             .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
             .collect();
+
+        let tests = tests.into_iter().map(TestDefinition::stringify).collect();
 
         ConfigBuilder {
             global,
@@ -154,7 +157,10 @@ impl ConfigBuilder {
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
+        self.add_sink_outer(id, sink);
+    }
 
+    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
@@ -175,6 +181,10 @@ impl ConfigBuilder {
 
         self.transforms
             .insert(ComponentKey::from(id.into()), transform);
+    }
+
+    pub fn set_data_dir(&mut self, path: &Path) {
+        self.global.data_dir = Some(path.to_owned());
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
@@ -295,14 +305,12 @@ impl ConfigBuilder {
 
     #[cfg(test)]
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
     #[cfg(test)]
     pub fn from_json(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }
 }
 

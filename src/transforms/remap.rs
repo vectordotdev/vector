@@ -7,11 +7,16 @@ use std::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+use vrl::{
+    diagnostic::{Formatter, Note},
+    prelude::{DiagnosticError, ExpressionError},
+    Program, Runtime, Terminate,
+};
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, TransformConfig, TransformContext, TransformDescription,
+        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -49,20 +54,19 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn named_outputs(&self) -> Vec<String> {
-        if self.reroute_dropped {
-            vec![String::from(DROPPED)]
-        } else {
-            vec![]
-        }
-    }
-
     fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        if self.reroute_dropped {
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ]
+        } else {
+            vec![Output::default(DataType::Any)]
+        }
     }
 
     fn transform_type(&self) -> &'static str {
@@ -93,9 +97,9 @@ impl Remap {
                 let mut buffer = String::new();
 
                 File::open(path)
-                    .with_context(|| FileOpenFailed { path })?
+                    .with_context(|_| FileOpenFailedSnafu { path })?
                     .read_to_string(&mut buffer)
-                    .with_context(|| FileReadFailed { path })?;
+                    .with_context(|_| FileReadFailedSnafu { path })?;
 
                 buffer
             }
@@ -132,12 +136,19 @@ impl Remap {
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
             Event::Log(ref mut log) => {
+                let message = error
+                    .notes()
+                    .iter()
+                    .filter(|note| matches!(note, Note::UserErrorMessage(_)))
+                    .last()
+                    .map(|note| note.to_string())
+                    .unwrap_or_else(|| error.to_string());
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
                         "dropped": {
                             "reason": reason,
-                            "message": error.to_string(),
+                            "message": message,
                             "component_id": self.component_key,
                             "component_type": "remap",
                             "component_kind": "transform",
@@ -261,9 +272,13 @@ mod tests {
     use shared::btreemap;
 
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
+    use crate::{
+        config::{build_unit_tests, ConfigBuilder},
+        event::{
+            metric::{MetricKind, MetricValue},
+            LogEvent, Metric, Value,
+        },
+        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
 
     #[test]
@@ -767,6 +782,69 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_branching_assert_with_message() {
+        let error_trigger_assert_custom_message =
+            Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let error_trigger_default_assert_message =
+            Event::try_from(serde_json::json!({"hello": 0})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                assert_eq!(.hello, 0, "custom message here")
+                assert_eq!(.hello, 1)
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_default_assert_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 0.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"assert_eq\" at (45:66): assertion failed: 0 == 1",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn check_remap_branching_disabled() {
         let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
         let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
@@ -794,7 +872,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(conf.named_outputs().is_empty());
+        assert_eq!(vec![Output::default(DataType::Any)], conf.outputs());
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -817,13 +895,52 @@ mod tests {
         assert!(out.named[DROPPED].is_empty());
     }
 
+    #[tokio::test]
+    async fn check_remap_branching_metrics_with_output() {
+        init_test();
+
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+            inputs = []
+            type = "remap"
+            drop_on_abort = true
+            reroute_dropped = true
+            source = "abort"
+
+            [[tests]]
+            name = "metric output"
+
+            [tests.input]
+                insert_at = "foo"
+                value = "none"
+
+            [[tests.outputs]]
+                extract_from = "foo.dropped"
+                [[tests.outputs.conditions]]
+                type = "vrl"
+                source = "true"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+    }
+
     struct CollectedOuput {
         primary: Vec<Event>,
         named: HashMap<String, Vec<Event>>,
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 
@@ -844,7 +961,13 @@ mod tests {
         ft: &mut dyn SyncTransform,
         event: Event,
     ) -> std::result::Result<Event, Event> {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![
+                Output::default(DataType::Any),
+                Output::from((DROPPED, DataType::Any)),
+            ],
+            1,
+        );
 
         ft.transform(event, &mut outputs);
 

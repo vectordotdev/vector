@@ -99,7 +99,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.21.0",
+              "v1.24.0",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },
@@ -111,7 +111,8 @@ jobs:
             const container_runtime = [
               "docker",
               "containerd",
-              "crio",
+              // https://github.com/kubernetes/minikube/issues/12928
+              // "crio",
             ]
             const ci_condition_label = 'ci-condition: k8s e2e all targets'
 

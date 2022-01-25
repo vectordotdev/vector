@@ -15,7 +15,7 @@ mod integration_tests {
     use tokio_stream::StreamExt;
     use vector_core::{
         config::proxy::ProxyConfig,
-        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
     };
 
     use crate::{
@@ -28,6 +28,10 @@ mod integration_tests {
         },
         test_util::{random_lines_with_stream, random_string},
     };
+
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     #[tokio::test]
     async fn s3_insert_message_into_with_flat_key_prefix() {
@@ -130,7 +134,7 @@ mod integration_tests {
             Event::from(e)
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -295,7 +299,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         use rusoto_core::HttpClient;
@@ -319,7 +323,7 @@ mod integration_tests {
             filename_append_uuid: None,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
             batch,
@@ -332,13 +336,15 @@ mod integration_tests {
     fn make_events_batch(
         len: usize,
         count: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
-        let (lines, events) = random_lines_with_stream(len, count, None);
-
+    ) -> (
+        Vec<String>,
+        impl Stream<Item = EventArray>,
+        BatchStatusReceiver,
+    ) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+        let (lines, events) = random_lines_with_stream(len, count, Some(batch));
 
-        (lines, events, receiver)
+        (lines, events.map(Into::into), receiver)
     }
 
     async fn create_bucket(bucket: &str, object_lock_enabled: bool) {

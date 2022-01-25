@@ -345,7 +345,7 @@ impl LokiSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink for LokiSink {
+impl StreamSink<Event> for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

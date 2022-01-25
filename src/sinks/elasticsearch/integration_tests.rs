@@ -1,7 +1,7 @@
-use std::{fs::File, future::ready, io::Read};
+use std::{fs::File, io::Read};
 
 use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde_json::{json, Value};
@@ -21,6 +21,18 @@ use crate::{
     test_util::{random_events_with_stream, random_string, trace_init},
     tls::{self, TlsOptions},
 };
+
+fn aws_server() -> String {
+    std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+}
+
+fn http_server() -> String {
+    std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
+}
+
+fn https_server() -> String {
+    std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
+}
 
 impl ElasticSearchCommon {
     async fn flush_request(&self) -> crate::Result<()> {
@@ -99,7 +111,10 @@ fn ensure_pipeline_in_params() {
 
     let config = ElasticSearchConfig {
         endpoint: "http://localhost:9200".into(),
-        index: Some(index),
+        bulk: Some(BulkConfig {
+            index: Some(index),
+            action: None,
+        }),
         pipeline: Some(pipeline.clone()),
         ..config()
     };
@@ -112,8 +127,11 @@ fn ensure_pipeline_in_params() {
 async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticSearchConfig {
-        endpoint: "http://localhost:9200".into(),
-        index: Some(index.clone()),
+        endpoint: http_server(),
+        bulk: Some(BulkConfig {
+            index: Some(index.clone()),
+            action: None,
+        }),
         doc_type: Some("log_lines".into()),
         id_key: Some("my_id".into()),
         compression: Compression::None,
@@ -133,9 +151,7 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    sink.run(stream::once(ready(input_event.into())))
-        .await
-        .unwrap();
+    sink.run_events(vec![input_event.into()]).await.unwrap();
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -186,7 +202,7 @@ async fn insert_events_over_http() {
 
     run_insert_tests(
         ElasticSearchConfig {
-            endpoint: "http://localhost:9200".into(),
+            endpoint: http_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -207,7 +223,7 @@ async fn insert_events_over_https() {
                 user: "elastic".into(),
                 password: "vector".into(),
             }),
-            endpoint: "https://localhost:9201".into(),
+            endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             tls: Some(TlsOptions {
@@ -229,7 +245,7 @@ async fn insert_events_on_aws() {
     run_insert_tests(
         ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-            endpoint: "http://localhost:4571".into(),
+            endpoint: aws_server(),
             ..config()
         },
         false,
@@ -245,7 +261,7 @@ async fn insert_events_on_aws_with_compression() {
     run_insert_tests(
         ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-            endpoint: "http://localhost:4571".into(),
+            endpoint: aws_server(),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -261,7 +277,7 @@ async fn insert_events_with_failure() {
 
     run_insert_tests(
         ElasticSearchConfig {
-            endpoint: "http://localhost:9200".into(),
+            endpoint: http_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -279,9 +295,12 @@ async fn insert_events_in_data_stream() {
     let stream_index = format!("my-stream-{}", gen_index());
 
     let cfg = ElasticSearchConfig {
-        endpoint: "http://localhost:9200".into(),
+        endpoint: http_server(),
         mode: ElasticSearchMode::DataStream,
-        index: Some(stream_index.clone()),
+        bulk: Some(BulkConfig {
+            index: Some(stream_index.clone()),
+            action: None,
+        }),
         ..config()
     };
     let common = ElasticSearchCommon::parse_config(&cfg).expect("Config error");
@@ -302,7 +321,10 @@ async fn run_insert_tests(
     break_events: bool,
     status: BatchStatus,
 ) {
-    config.index = Some(gen_index());
+    config.bulk = Some(BulkConfig {
+        index: Some(gen_index()),
+        action: None,
+    });
     run_insert_tests_with_config(&config, break_events, status).await;
 }
 
@@ -333,7 +355,11 @@ async fn run_insert_tests_with_config(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticSearchMode::Bulk => config.index.clone().unwrap(),
+        ElasticSearchMode::Bulk => config
+            .bulk
+            .as_ref()
+            .map(|x| x.index.clone().unwrap())
+            .unwrap(),
     };
     let base_url = common.base_url.clone();
 
@@ -350,12 +376,14 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut event| {
+        sink.run(events.map(move |mut events| {
             if doit {
-                event.as_mut_log().insert("_type", 1);
+                events.for_each_log(|log| {
+                    log.insert("_type", 1);
+                });
             }
             doit = true;
-            event
+            events
         }))
         .await
         .expect("Sending events failed");

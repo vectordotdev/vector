@@ -27,7 +27,7 @@ pub enum GrokFilter {
     Uppercase,
     Json,
     Array(
-        Option<(char, char)>,
+        Option<(String, String)>,
         Option<String>,
         Box<Option<GrokFilter>>,
     ),
@@ -108,35 +108,51 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
-            Value::Bytes(v) => Ok(String::from_utf8_lossy(v)
-                .parse::<f64>()
-                .map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?
-                .into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(
-                filter.to_string(),
-                value.to_string(),
-            )),
-        },
-        GrokFilter::Scale(scale_factor) => match value {
-            Value::Integer(v) => Ok(Value::Float(
-                NotNan::new((*v as f64) * scale_factor).expect("NaN"),
-            )),
-            Value::Float(v) => Ok(Value::Float(
-                NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
-            )),
             Value::Bytes(v) => {
-                let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?;
-                Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
+                let v = Ok(String::from_utf8_lossy(v)
+                    .parse::<f64>()
+                    .map_err(|_e| {
+                        GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                    })?
+                    .into());
+                match v {
+                    Ok(Value::Float(v)) if (v.into_inner() as i64) as f64 == v.into_inner() => {
+                        Ok(Value::Integer(v.into_inner() as i64))
+                    }
+                    _ => v,
+                }
             }
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
             )),
         },
+        GrokFilter::Scale(scale_factor) => {
+            let v = match value {
+                Value::Integer(v) => Ok(Value::Float(
+                    NotNan::new((*v as f64) * scale_factor).expect("NaN"),
+                )),
+                Value::Float(v) => Ok(Value::Float(
+                    NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
+                )),
+                Value::Bytes(v) => {
+                    let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
+                        GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                    })?;
+                    Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
+                }
+                _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                    filter.to_string(),
+                    value.to_string(),
+                )),
+            };
+            match v {
+                Ok(Value::Float(v)) if (v.into_inner() as i64) as f64 == v.into_inner() => {
+                    Ok(Value::Integer(v.into_inner() as i64))
+                }
+                _ => v,
+            }
+        }
         GrokFilter::Lowercase => match value {
             Value::Bytes(bytes) => Ok(String::from_utf8_lossy(bytes).to_lowercase().into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
@@ -180,7 +196,9 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
         GrokFilter::Array(brackets, delimiter, value_filter) => match value {
             Value::Bytes(bytes) => array::parse(
                 String::from_utf8_lossy(bytes).as_ref(),
-                brackets.to_owned(),
+                brackets
+                    .as_ref()
+                    .map(|(start, end)| (start.as_str(), end.as_str())),
                 delimiter.as_ref().map(|s| s.as_str()),
             )
             .map_err(|_e| {

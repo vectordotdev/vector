@@ -17,7 +17,7 @@ use vector_core::{
 };
 
 use crate::{
-    http::{BuildRequest, CallRequest, HttpClient, HttpError},
+    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
@@ -129,6 +129,7 @@ impl DriverResponse for DatadogMetricsResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.byte_size,
+            output: None,
         }
     }
 }
@@ -167,10 +168,14 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let byte_size = request.payload.len();
             let batch_size = request.batch_size;
 
-            let request = request.into_http_request(api_key).context(BuildRequest)?;
+            let request = request
+                .into_http_request(api_key)
+                .context(BuildRequestSnafu)?;
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body).await.context(CallRequest)?;
+            let mut body = hyper::body::aggregate(body)
+                .await
+                .context(CallRequestSnafu)?;
             let body = body.copy_to_bytes(body.remaining());
 
             Ok(DatadogMetricsResponse {

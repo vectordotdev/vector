@@ -7,7 +7,7 @@ use crate::{
     event::{self, Value},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Log {
     output_id: OutputId,
     event: event::LogEvent,
