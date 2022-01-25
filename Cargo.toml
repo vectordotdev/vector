@@ -552,7 +552,6 @@ transforms-logs = [
   "transforms-split",
   "transforms-throttle",
   "transforms-tokenizer",
-  "transforms-trace_to_log",
 ]
 transforms-metrics = [
   "transforms-add_tags",
@@ -603,7 +602,6 @@ transforms-split = []
 transforms-tag_cardinality_limit = ["bloom"]
 transforms-throttle = ["governor"]
 transforms-tokenizer = []
-transforms-trace_to_log = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
