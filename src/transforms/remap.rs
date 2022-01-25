@@ -7,7 +7,11 @@ use std::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+use vrl::{
+    diagnostic::{Formatter, Note},
+    prelude::{DiagnosticError, ExpressionError},
+    Program, Runtime, Terminate,
+};
 
 use crate::{
     config::{
@@ -132,12 +136,19 @@ impl Remap {
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
             Event::Log(ref mut log) => {
+                let message = error
+                    .notes()
+                    .iter()
+                    .filter(|note| matches!(note, Note::UserErrorMessage(_)))
+                    .last()
+                    .map(|note| note.to_string())
+                    .unwrap_or_else(|| error.to_string());
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
                         "dropped": {
                             "reason": reason,
-                            "message": error.to_string(),
+                            "message": message,
                             "component_id": self.component_key,
                             "component_type": "remap",
                             "component_kind": "transform",
@@ -767,6 +778,69 @@ mod tests {
                     tags
                 }))
             )
+        );
+    }
+
+    #[test]
+    fn check_remap_branching_assert_with_message() {
+        let error_trigger_assert_custom_message =
+            Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let error_trigger_default_assert_message =
+            Event::try_from(serde_json::json!({"hello": 0})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                assert_eq!(.hello, 0, "custom message here")
+                assert_eq!(.hello, 1)
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_default_assert_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 0.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"assert_eq\" at (45:66): assertion failed: 0 == 1",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
         );
     }
 
