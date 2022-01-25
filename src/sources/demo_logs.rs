@@ -16,7 +16,7 @@ use crate::{
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::DemoLogsEventProcessed,
+    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -156,13 +156,21 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
+        emit!(&BytesReceived {
+            byte_size: 0,
+            protocol: "none",
+        });
 
         let line = format.generate_line(n);
 
         let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, _byte_size)) => {
+                Ok((events, byte_size)) => {
+                    emit!(&EventsReceived {
+                        count: events.len(),
+                        byte_size,
+                    });
                     let now = Utc::now();
 
                     for mut event in events {
@@ -171,11 +179,12 @@ async fn demo_logs_source(
                         log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
                         log.try_insert(log_schema().timestamp_key(), now);
 
-                        out.send(event)
-                            .await
-                            .map_err(|_: crate::source_sender::ClosedError| {
+                        out.send(event).await.map_err(
+                            |error: crate::source_sender::ClosedError| {
+                                emit!(&StreamClosedError { error, count: 1 });
                                 error!(message = "Failed to forward events; downstream is closed.");
-                            })?;
+                            },
+                        )?;
                     }
                 }
                 Err(error) => {
