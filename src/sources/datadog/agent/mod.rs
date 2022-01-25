@@ -45,8 +45,6 @@ pub struct DatadogAgentConfig {
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-
-    // Those are probably useless as we know input encoding
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
