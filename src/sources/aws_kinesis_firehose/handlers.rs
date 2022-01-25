@@ -79,8 +79,8 @@ pub async fn firehose(
 
                         if let Err(error) = out.send(event).await {
                             emit!(&StreamClosedError {
-                                error: error.to_string(),
-                                count: 1,
+                                error: error.clone(),
+                                count: 1
                             });
                             let error = RequestError::ShuttingDown {
                                 request_id: request_id.clone(),
