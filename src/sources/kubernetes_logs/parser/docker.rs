@@ -67,17 +67,17 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-        .context(TimeParsing)?;
+        .context(TimeParsingSnafu)?;
     log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG).context(LogFieldMissing)?;
+    let message = log.remove(&*LOG).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),

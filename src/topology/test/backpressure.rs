@@ -5,15 +5,15 @@ use tokio::time::Duration;
 
 use crate::config::SinkOuter;
 
-use crate::topology::builder::PIPELINE_BUFFER_SIZE;
+use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
 
-use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 // Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.
 // https://docs.rs/futures/0.3.19/futures/channel/mpsc/fn.channel.html
-pub const EXTRA_SENDER_EVENTS: usize = 3;
+pub const EXTRA_SENDER_EVENTS: usize = 2;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
@@ -25,7 +25,7 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -53,7 +53,7 @@ async fn serial_backpressure() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
-/// Connects a single source to two sinks test and makes sure that the source is only able
+/// Connects a single source to two sinks and makes sure that the source is only able
 /// to emit events that the slower sink accepts.
 #[tokio::test]
 async fn default_fan_out() {
@@ -63,7 +63,7 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -110,7 +110,7 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE
+        + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SENDER_EVENTS;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -162,7 +162,7 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + PIPELINE_BUFFER_SIZE * 2
+        + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SENDER_EVENTS * 2;
 
     let source_counter_1 = Arc::new(AtomicUsize::new(0));
@@ -216,7 +216,7 @@ mod test_sink {
     }
 
     #[async_trait]
-    impl StreamSink for TestBackpressureSink {
+    impl StreamSink<Event> for TestBackpressureSink {
         async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
             let _num_taken = input.take(self.num_to_consume).count().await;
             futures::future::pending::<()>().await;
@@ -237,7 +237,7 @@ mod test_sink {
                 num_to_consume: self.num_to_consume,
             };
             let healthcheck = futures::future::ok(()).boxed();
-            Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+            Ok((VectorSink::from_event_streamsink(sink), healthcheck))
         }
 
         fn input_type(&self) -> DataType {
@@ -251,11 +251,11 @@ mod test_sink {
 }
 
 mod test_source {
-    use crate::config::{DataType, SourceConfig, SourceContext};
+    use crate::config::{DataType, Output, SourceConfig, SourceContext};
     use crate::event::Event;
     use crate::sources::Source;
     use async_trait::async_trait;
-    use futures::{FutureExt, SinkExt};
+    use futures::FutureExt;
     use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -282,8 +282,8 @@ mod test_source {
             .boxed())
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
 
         fn source_type(&self) -> &'static str {

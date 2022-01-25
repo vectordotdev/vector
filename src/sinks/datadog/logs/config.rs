@@ -134,7 +134,7 @@ impl DatadogLogsConfig {
             .compression(self.compression.unwrap_or_default())
             .build();
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {

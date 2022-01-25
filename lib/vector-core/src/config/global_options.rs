@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 
-use crate::config::{proxy::ProxyConfig, LogSchema};
+use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
 pub enum DataDirError {
@@ -40,6 +41,12 @@ pub struct GlobalOptions {
     pub proxy: ProxyConfig,
     #[serde(skip)]
     pub enterprise: bool,
+    #[serde(
+        default,
+        deserialize_with = "bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GlobalOptions {
@@ -89,7 +96,7 @@ impl GlobalOptions {
         DirBuilder::new()
             .recursive(true)
             .create(&data_subdir)
-            .with_context(|| CouldNotCreate { subdir, data_dir })?;
+            .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
     }
 }

@@ -1,6 +1,5 @@
-use std::{convert::TryFrom, future::ready, num::NonZeroU8, sync::Arc};
+use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
 
-use futures::stream;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -11,7 +10,7 @@ use crate::{
         splunk_hec::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
-                integration_test_helpers::get_token,
+                integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
             },
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
         },
@@ -37,10 +36,13 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
     // https://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
     let search_query = match index {
         Some(index) => format!("search index={}", index),
-        None => "search *".into(),
+        None => "search index=*".into(),
     };
     let res = client
-        .post("https://localhost:8089/services/search/jobs?output_mode=json")
+        .post(format!(
+            "{}/services/search/jobs?output_mode=json",
+            splunk_api_address()
+        ))
         .form(&vec![
             ("search", &search_query[..]),
             ("exec_mode", "oneshot"),
@@ -100,7 +102,7 @@ async fn config(
 
     HecLogsSinkConfig {
         default_token: get_token().await,
-        endpoint: "http://localhost:8088/".into(),
+        endpoint: splunk_hec_address(),
         host_key: "host".into(),
         indexed_fields,
         index: None,
@@ -152,7 +154,7 @@ async fn splunk_insert_broken_token() {
         .with_batch_notifier(&batch)
         .into();
     drop(batch);
-    sink.run(stream::once(ready(event))).await.unwrap();
+    sink.run_events(iter::once(event)).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 

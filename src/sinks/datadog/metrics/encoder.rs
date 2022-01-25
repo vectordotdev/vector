@@ -205,7 +205,7 @@ impl DatadogMetricsEncoder {
                         return Ok(Some(metric));
                     }
                     let _ = serde_json::to_writer(&mut self.state.buf, series)
-                        .context(JsonEncodingFailed)?;
+                        .context(JsonEncodingFailedSnafu)?;
                 }
             }
             // We can't encode sketches incrementally (yet), so we don't do any encoding here.  We
@@ -329,9 +329,9 @@ impl DatadogMetricsEncoder {
             self.log_schema,
             &mut self.state.buf,
         )
-        .context(PendingEncodeFailed)?;
+        .context(PendingEncodeFailedSnafu)?;
 
-        if self.try_compress_buffer().context(CompressionFailed)? {
+        if self.try_compress_buffer().context(CompressionFailedSnafu)? {
             // Since we encoded and compressed them successfully, add them to the "processed" list.
             self.state.processed.extend(pending);
             Ok(())
@@ -353,12 +353,12 @@ impl DatadogMetricsEncoder {
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
-            .context(CompressionFailed)?;
+            .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
-        let payload = state.writer.finish().context(CompressionFailed)?;
+        let payload = state.writer.finish().context(CompressionFailedSnafu)?;
         let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
@@ -593,7 +593,7 @@ where
     };
 
     // Now try encoding this sketch payload, and then try to compress it.
-    sketch_payload.encode(buf).context(ProtoEncodingFailed)
+    sketch_payload.encode(buf).context(ProtoEncodingFailedSnafu)
 }
 
 fn get_compressor() -> Compressor {

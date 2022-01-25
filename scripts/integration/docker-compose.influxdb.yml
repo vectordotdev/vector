@@ -1,0 +1,58 @@
+services:
+  influxdb-v1:
+    image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
+
+  influxdb-v1-tls:
+    image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
+      - INFLUXDB_HTTP_HTTPS_ENABLED=true
+      - INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/influxdb.crt
+      - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/influxdb.key
+    volumes:
+      - ${PWD}/tests/data:/etc/ssl:ro
+
+  influxdb-v2:
+    image: influxdb:2.0
+    command: influxd --reporting-disabled
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "influxdb-integration-tests"
+      - "--lib"
+      - "${FILTER:-::influxdb::}"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - influxdb-v1
+      - influxdb-v1-tls
+      - influxdb-v2
+    environment:
+      - INFLUXDB_V1_HTTP_ADDRESS=http://influxdb-v1:8086
+      - INFLUXDB_V1_HTTPS_ADDRESS=https://influxdb-v1-tls:8086
+      - INFLUXDB_V2_ADDRESS=http://influxdb-v2:8086
+    volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - ${PWD}:/code
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

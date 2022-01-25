@@ -83,7 +83,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for HecLogsSink<S>
+impl<S> StreamSink<Event> for HecLogsSink<S>
 where
     S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,

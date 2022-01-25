@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -47,8 +49,8 @@ impl TransformConfig for FilterConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn enable_concurrency(&self) -> bool {

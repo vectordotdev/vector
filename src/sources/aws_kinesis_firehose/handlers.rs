@@ -3,14 +3,14 @@ use std::{io::Read, sync::Arc};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::event::BatchNotifier;
 use warp::reject;
 
 use super::{
-    errors::{ParseRecords, RequestError},
+    errors::{ParseRecordsSnafu, RequestError},
     models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
     Compression,
 };
@@ -22,7 +22,7 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
     },
     sources::util::StreamDecodingError,
-    Pipeline,
+    SourceSender,
 };
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -33,11 +33,11 @@ pub async fn firehose(
     compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
         let bytes = decode_record(&record, compression)
-            .with_context(|| ParseRecords {
+            .with_context(|_| ParseRecordsSnafu {
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
@@ -139,7 +139,7 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64 {})?;
+    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());
@@ -147,7 +147,7 @@ fn decode_record(
 
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
-        Compression::Gzip => decode_gzip(&buf[..]).with_context(|| Decompression {
+        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
             compression: compression.to_owned(),
         }),
         Compression::Auto => {

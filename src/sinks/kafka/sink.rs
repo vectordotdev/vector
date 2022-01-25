@@ -53,7 +53,7 @@ pub fn create_producer(
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext)
-        .context(KafkaCreateFailed)?;
+        .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }
 
@@ -67,7 +67,7 @@ impl KafkaSink {
             encoding: config.encoding,
             acker,
             service: KafkaService::new(producer),
-            topic: Template::try_from(config.topic).context(TopicTemplate)?,
+            topic: Template::try_from(config.topic).context(TopicTemplateSnafu)?,
             key_field: config.key_field,
         })
     }
@@ -93,7 +93,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match Template::try_from(config.topic)
-        .context(TopicTemplate)?
+        .context(TopicTemplateSnafu)?
         .render_string(&Event::from(""))
     {
         Ok(topic) => Some(topic),
@@ -120,7 +120,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 }
 
 #[async_trait]
-impl StreamSink for KafkaSink {
+impl StreamSink<Event> for KafkaSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

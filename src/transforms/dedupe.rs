@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, Value},
@@ -90,8 +90,8 @@ impl TransformConfig for DedupeConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {

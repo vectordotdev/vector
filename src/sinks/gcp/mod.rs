@@ -19,8 +19,8 @@ use crate::{
     config::ProxyConfig,
     http::HttpClient,
     sinks::gcs_common::config::{
-        BuildHttpClient, GcpError, GetImplicitToken, GetToken, GetTokenBytes, InvalidCredentials1,
-        InvalidRsaKey,
+        BuildHttpClientSnafu, GcpError, GetImplicitTokenSnafu, GetTokenBytesSnafu, GetTokenSnafu,
+        InvalidCredentials1Snafu, InvalidRsaKeySnafu,
     },
 };
 
@@ -65,13 +65,15 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
 
     let proxy = ProxyConfig::from_env();
     let res = HttpClient::new(None, &proxy)
-        .context(BuildHttpClient)?
+        .context(BuildHttpClientSnafu)?
         .send(req)
         .await
-        .context(GetImplicitToken)?;
+        .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
+    let bytes = hyper::body::to_bytes(body)
+        .await
+        .context(GetTokenBytesSnafu)?;
 
     // Token::from_str is irresponsible and may panic!
     match serde_json::from_slice::<Token>(&bytes) {
@@ -85,9 +87,11 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
 
 impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
+        let creds = Credentials::from_file(path).context(InvalidCredentials1Snafu)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token(&jwt, &creds).await.context(GetToken)?;
+        let token = goauth::get_token(&jwt, &creds)
+            .await
+            .context(GetTokenSnafu)?;
         Ok(Self {
             creds: Some(creds),
             scope,
@@ -147,7 +151,7 @@ impl GcpCredentials {
 
 fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>> {
     let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
-    let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
+    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     Ok(Jwt::new(claims, rsa_key, None))
 }
 

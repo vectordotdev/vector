@@ -181,7 +181,7 @@ async fn finish_signer(
     let credentials = credentials_provider
         .credentials()
         .await
-        .context(AwsCredentialsGenerateFailed)?;
+        .context(AwsCredentialsGenerateFailedSnafu)?;
 
     signer.sign(&credentials);
 

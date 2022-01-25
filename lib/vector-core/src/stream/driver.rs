@@ -5,12 +5,12 @@ use std::{
     task::Poll,
 };
 
-use buffers::{Ackable, Acker};
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+use vector_buffers::{Ackable, Acker};
 
 use super::FuturesUnorderedChunked;
 use crate::{
@@ -327,8 +327,6 @@ mod tests {
         time::Duration,
     };
 
-    use buffers::{Ackable, Acker};
-    use core_common::internal_event::EventsSent;
     use futures_util::{ready, stream};
     use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
@@ -339,6 +337,8 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
+    use vector_buffers::{Ackable, Acker};
+    use vector_common::internal_event::EventsSent;
 
     use super::{Driver, DriverResponse};
     use crate::{
@@ -371,6 +371,7 @@ mod tests {
             EventsSent {
                 count: 1,
                 byte_size: 1,
+                output: None,
             }
         }
     }
@@ -434,9 +435,10 @@ mod tests {
             Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            if self.permit.is_some() {
-                panic!("should not call poll_ready again after a successful call");
-            }
+            assert!(
+                !self.permit.is_some(),
+                "should not call poll_ready again after a successful call"
+            );
 
             match ready!(self.semaphore.poll_acquire(cx)) {
                 None => panic!("semaphore should not be closed!"),
