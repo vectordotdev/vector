@@ -60,6 +60,7 @@ components: transforms: route: {
 			set:          true
 			summary:      true
 		}
+		traces:  true
 	}
 
 	examples: [

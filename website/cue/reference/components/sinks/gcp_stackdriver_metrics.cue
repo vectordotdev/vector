@@ -134,6 +134,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces:  false
 	}
 
 	how_it_works: {

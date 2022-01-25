@@ -105,6 +105,7 @@ components: sinks: http: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

@@ -51,6 +51,7 @@ components: sinks: nats: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: components._nats.how_it_works

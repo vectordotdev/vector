@@ -170,45 +170,13 @@ components: sources: datadog_agent: {
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
 		}
-		traces: line: {
-			description: "An individual event from a batch of events received through an HTTP POST request sent by a Datadog Agent."
+		traces: {
+			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
 			fields: {
-				message: {
-					description: "The message field, containing the plain text message."
+				spans: {
+					description: "The list of spans composing the trace."
 					required:    true
-					type: string: {
-						examples: ["Hi from erlang"]
-					}
-				}
-				status: {
-					description: "The status field extracted from the event."
-					required:    true
-					type: string: {
-						examples: ["info"]
-					}
-				}
-				timestamp: fields._current_timestamp
-				hostname:  fields._local_host
-				service: {
-					description: "The service field extracted from the event."
-					required:    true
-					type: string: {
-						examples: ["backend"]
-					}
-				}
-				ddsource: {
-					description: "The source field extracted from the event."
-					required:    true
-					type: string: {
-						examples: ["java"]
-					}
-				}
-				ddtags: {
-					description: "The coma separated tags list extracted from the event."
-					required:    true
-					type: string: {
-						examples: ["env:prod,region:ap-east-1"]
-					}
+					type: array: items: type: object: options: {}
 				}
 			}
 		}

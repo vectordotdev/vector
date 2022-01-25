@@ -105,6 +105,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			set:          false
 			summary:      false
 		}
+		traces:  false
 	}
 
 	permissions: iam: [

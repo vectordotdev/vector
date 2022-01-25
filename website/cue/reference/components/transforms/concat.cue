@@ -61,6 +61,7 @@ components: transforms: concat: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [

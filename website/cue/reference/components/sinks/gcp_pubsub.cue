@@ -111,6 +111,7 @@ components: sinks: gcp_pubsub: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

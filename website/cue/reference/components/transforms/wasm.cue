@@ -103,5 +103,6 @@ components: transforms: wasm: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 }

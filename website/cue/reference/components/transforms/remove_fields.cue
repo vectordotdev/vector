@@ -51,5 +51,6 @@ components: transforms: remove_fields: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 }

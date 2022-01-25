@@ -139,6 +139,7 @@ components: transforms: key_value_parser: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

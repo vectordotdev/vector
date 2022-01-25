@@ -53,6 +53,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	output: logs: line: {

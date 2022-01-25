@@ -106,6 +106,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

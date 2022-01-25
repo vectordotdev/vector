@@ -75,6 +75,7 @@ components: transforms: throttle: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {
