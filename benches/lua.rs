@@ -30,7 +30,7 @@ fn bench_add_fields(c: &mut Criterion) {
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = format!(
@@ -45,7 +45,7 @@ fn bench_add_fields(c: &mut Criterion) {
                 "#},
                 key, value
             );
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
                     .unwrap(),
             )
@@ -67,7 +67,7 @@ fn bench_add_fields(c: &mut Criterion) {
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -121,7 +121,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     event = nil
                 end
             "#});
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = indoc! {r#"
@@ -134,7 +134,7 @@ fn bench_field_filter(c: &mut Criterion) {
                 end
                 """
             "#};
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
             )
         }),
@@ -155,7 +155,7 @@ fn bench_field_filter(c: &mut Criterion) {
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
