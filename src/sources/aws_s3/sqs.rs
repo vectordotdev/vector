@@ -21,10 +21,11 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::aws_s3::source::{
-        SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
-        SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored, SqsS3EventsReceived,
     },
+    internal_events::{BytesReceived, StreamClosedError},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -253,13 +254,18 @@ impl IngestorProcess {
         let messages = self.receive_messages().await;
         let messages = messages
             .map(|messages| {
+                let byte_size = messages.iter().map(std::mem::size_of_val).sum();
+                emit!(&BytesReceived {
+                    byte_size,
+                    protocol: "tcp",
+                });
                 emit!(&SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             })
             .map_err(|err| {
-                emit!(&SqsMessageReceiveFailed { error: &err });
+                emit!(&SqsMessageReceiveError { error: &err });
                 err
             })
             .unwrap_or_default();
@@ -295,7 +301,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageProcessingFailed {
+                    emit!(&SqsMessageProcessingError {
                         message_id: &message_id,
                         error: &err,
                     });
@@ -317,13 +323,13 @@ impl IngestorProcess {
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(&SqsMessageDeletePartialFailure {
+                        emit!(&SqsMessageDeletePartialError {
                             entries: result.failed
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageDeleteBatchFailed {
+                    emit!(&SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -432,7 +438,14 @@ impl IngestorProcess {
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
                     FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                         .map(|res| {
-                            res.map_err(|err| {
+                            res.map(|bytes| {
+                                emit!(&BytesReceived {
+                                    byte_size: bytes.len(),
+                                    protocol: "http",
+                                });
+                                bytes
+                            })
+                            .map_err(|err| {
                                 read_error = Some(err);
                             })
                             .ok()
@@ -457,7 +470,7 @@ impl IngestorProcess {
                 let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
                 let mut stream = lines.filter_map(move |line| {
-                    emit!(&SqsS3EventReceived {
+                    emit!(&SqsS3EventsReceived {
                         byte_size: line.len()
                     });
 
@@ -478,9 +491,17 @@ impl IngestorProcess {
                     ready(Some(log.into()))
                 });
 
+                let (count, _) = stream.size_hint();
+
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
-                    Err(_) => Some(crate::source_sender::ClosedError),
+                    Err(err) => {
+                        emit!(&StreamClosedError {
+                            error: err.to_string(),
+                            count,
+                        });
+                        Some(crate::source_sender::ClosedError)
+                    }
                 };
 
                 // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
