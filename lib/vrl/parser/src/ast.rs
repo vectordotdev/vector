@@ -1,3 +1,7 @@
+use arbitrary::{Arbitrary, Unstructured};
+use diagnostic::Span;
+use lookup::LookupBuf;
+use ordered_float::{Float, NotNan};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -6,10 +10,6 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
-
-use diagnostic::Span;
-use lookup::LookupBuf;
-use ordered_float::NotNan;
 
 use crate::lex::Error;
 
@@ -124,6 +124,15 @@ impl<T: Hash> Hash for Node<T> {
 #[derive(PartialEq)]
 pub struct Program(pub Vec<Node<RootExpr>>);
 
+impl<'a> Arbitrary<'a> for Program {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Program(vec![Node::new(
+            Span::default(),
+            RootExpr::arbitrary(u)?,
+        )]))
+    }
+}
+
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for expr in &self.0 {
@@ -175,6 +184,15 @@ pub enum RootExpr {
     Error(Error),
 }
 
+impl<'a> Arbitrary<'a> for RootExpr {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(RootExpr::Expr(Node::new(
+            Span::default(),
+            Expr::arbitrary(u)?,
+        )))
+    }
+}
+
 impl fmt::Debug for RootExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use RootExpr::*;
@@ -216,6 +234,15 @@ pub enum Expr {
     Variable(Node<Ident>),
     Unary(Node<Unary>),
     Abort(Node<Abort>),
+}
+
+impl<'a> Arbitrary<'a> for Expr {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Expr::Literal(Node::new(
+            Span::default(),
+            Literal::arbitrary(u)?,
+        )))
+    }
 }
 
 impl fmt::Debug for Expr {
@@ -314,6 +341,17 @@ pub enum Literal {
     Regex(String),
     Timestamp(String),
     Null,
+}
+
+impl<'a> Arbitrary<'a> for Literal {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let choice = usize::arbitrary(u)? % 3;
+        Ok(match choice {
+            0 => Literal::String(String::arbitrary(u)?),
+            1 => Literal::Integer(i64::arbitrary(u)?),
+            _ => Literal::Boolean(bool::arbitrary(u)?),
+        })
+    }
 }
 
 impl fmt::Display for Literal {

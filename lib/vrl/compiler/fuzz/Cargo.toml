@@ -1,0 +1,28 @@
+[package]
+name = "vrl-compiler-fuzz"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+parser = { package = "vrl-parser", path = "../../parser" }
+core =  { package = "vrl", path = "../../core" }
+
+[dependencies.vrl-compiler]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_target_1"
+path = "fuzz_targets/fuzz_target_1.rs"
+test = false
+doc = false
