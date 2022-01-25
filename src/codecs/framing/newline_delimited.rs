@@ -1,6 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
 use crate::codecs::{decoding, encoding, CharacterDelimitedDecoder, CharacterDelimitedEncoder};
 
@@ -129,11 +129,9 @@ impl NewlineDelimitedEncoder {
     }
 }
 
-impl Encoder<()> for NewlineDelimitedEncoder {
-    type Error = encoding::BoxedFramingError;
-
-    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-        self.0.encode((), dst)
+impl encoding::Framer for NewlineDelimitedEncoder {
+    fn frame(&self, buffer: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
+        self.0.frame(buffer)
     }
 }
 

@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use memchr::memchr;
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
 use crate::codecs::{decoding, encoding};
 
@@ -171,11 +171,9 @@ impl CharacterDelimitedEncoder {
     }
 }
 
-impl Encoder<()> for CharacterDelimitedEncoder {
-    type Error = encoding::BoxedFramingError;
-
-    fn encode(&mut self, _: (), buf: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
-        buf.put_u8(self.delimiter);
+impl encoding::Framer for CharacterDelimitedEncoder {
+    fn frame(&self, buffer: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
+        buffer.put_u8(self.delimiter);
         Ok(())
     }
 }
@@ -187,6 +185,7 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+    use encoding::Framer;
 
     #[test]
     fn character_delimited_decode() {
@@ -198,10 +197,10 @@ mod tests {
 
     #[test]
     fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedEncoder::new(b'\n');
+        let codec = CharacterDelimitedEncoder::new(b'\n');
 
         let mut buf = BytesMut::from("abc");
-        codec.encode((), &mut buf).unwrap();
+        codec.frame(&mut buf).unwrap();
 
         assert_eq!(b"abc\n", &buf[..]);
     }

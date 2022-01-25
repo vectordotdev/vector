@@ -4,12 +4,11 @@ use bytes::{BufMut, Bytes};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use tokio_util::codec::Encoder;
 
 use crate::{
     codecs::{
         decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
-        encoding::{BoxedSerializer, SerializerConfig},
+        encoding::{BoxedSerializer, Serializer, SerializerConfig},
     },
     config::log_schema,
     event::Event,
@@ -113,10 +112,8 @@ impl JsonSerializer {
     }
 }
 
-impl Encoder<Event> for JsonSerializer {
-    type Error = crate::Error;
-
-    fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+impl Serializer for JsonSerializer {
+    fn serialize(&self, event: Event, buffer: &mut bytes::BytesMut) -> crate::Result<()> {
         let writer = buffer.writer();
         match event {
             Event::Log(log) => serde_json::to_writer(writer, &log),
@@ -182,10 +179,10 @@ mod tests {
         let event = Event::from(btreemap! {
             "foo" => Value::from("bar")
         });
-        let mut serializer = JsonSerializer::new();
+        let serializer = JsonSerializer::new();
         let mut bytes = BytesMut::new();
 
-        serializer.encode(event, &mut bytes).unwrap();
+        serializer.serialize(event, &mut bytes).unwrap();
 
         assert_eq!(bytes.freeze(), r#"{"foo":"bar"}"#);
     }

@@ -57,17 +57,17 @@ impl From<std::io::Error> for BoxedFramingError {
 pub type BoxedFramingError = Box<dyn FramingError>;
 
 /// Wrap bytes into a frame.
-pub trait Framer:
-    tokio_util::codec::Encoder<(), Error = BoxedFramingError> + DynClone + Debug + Send + Sync
-{
+pub trait Framer: DynClone + Debug + Send + Sync {
+    /// Wrap the buffer into a byte frame.
+    fn frame(&self, buffer: &mut BytesMut) -> Result<(), BoxedFramingError>;
 }
 
-/// Default implementation for `Framer`s that implement
-/// `tokio_util::codec::Encoder`.
-impl<Encoder> Framer for Encoder where
-    Encoder:
-        tokio_util::codec::Encoder<(), Error = BoxedFramingError> + Clone + Debug + Send + Sync
-{
+impl tokio_util::codec::Encoder<()> for dyn Framer {
+    type Error = BoxedFramingError;
+
+    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+        self.frame(dst)
+    }
 }
 
 dyn_clone::clone_trait_object!(Framer);
@@ -91,16 +91,17 @@ pub trait FramingConfig: Debug + DynClone + Send + Sync {
 dyn_clone::clone_trait_object!(FramingConfig);
 
 /// Serialize a structured event into a byte frame.
-pub trait Serializer:
-    tokio_util::codec::Encoder<Event, Error = crate::Error> + DynClone + Debug + Send + Sync
-{
+pub trait Serializer: DynClone + Debug + Send + Sync {
+    /// Serialize an event into the provided buffer.
+    fn serialize(&self, event: Event, buffer: &mut BytesMut) -> crate::Result<()>;
 }
 
-/// Default implementation for `Serializer`s that implement
-/// `tokio_util::codec::Encoder`.
-impl<Encoder> Serializer for Encoder where
-    Encoder: tokio_util::codec::Encoder<Event, Error = crate::Error> + Clone + Debug + Send + Sync
-{
+impl tokio_util::codec::Encoder<Event> for dyn Serializer {
+    type Error = crate::Error;
+
+    fn encode(&mut self, item: Event, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        self.serialize(item, dst)
+    }
 }
 
 dyn_clone::clone_trait_object!(Serializer);
@@ -146,26 +147,24 @@ impl Encoder {
     pub fn new(framer: BoxedFramer, serializer: BoxedSerializer) -> Self {
         Self { framer, serializer }
     }
-}
 
-impl tokio_util::codec::Encoder<Event> for Encoder {
-    type Error = Error;
-
-    fn encode(&mut self, item: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+    /// Encode an event into the provided buffer by first serializing the event
+    /// and subsequently wrapping the buffer into a byte frame.
+    pub fn encode(&self, item: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         let len = buffer.len();
 
         let mut payload = buffer.split_off(len);
 
         // Serialize the event.
         self.serializer
-            .encode(item, &mut payload)
+            .serialize(item, &mut payload)
             .map_err(|error| {
                 emit!(&EncoderSerializeFailed { error: &error });
                 Error::SerializingError(error)
             })?;
 
         // Frame the serialized event.
-        self.framer.encode((), &mut payload).map_err(|error| {
+        self.framer.frame(&mut payload).map_err(|error| {
             emit!(&EncoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
@@ -173,6 +172,14 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
         buffer.unsplit(payload);
 
         Ok(())
+    }
+}
+
+impl tokio_util::codec::Encoder<Event> for Encoder {
+    type Error = Error;
+
+    fn encode(&mut self, item: Event, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        Self::encode(self, item, dst)
     }
 }
 
@@ -206,6 +213,11 @@ impl EncodingConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        cell::Cell,
+        sync::{Arc, Mutex},
+    };
+
     use super::*;
     use crate::codecs::RawMessageSerializer;
     use bytes::BufMut;
@@ -221,47 +233,44 @@ mod tests {
         }
     }
 
-    impl tokio_util::codec::Encoder<()> for ParenEncoder {
-        type Error = BoxedFramingError;
-
-        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-            dst.reserve(2);
-            let inner = dst.split();
-            dst.put_u8(b'(');
-            dst.unsplit(inner);
-            dst.put_u8(b')');
+    impl Framer for ParenEncoder {
+        fn frame(&self, buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
+            buffer.reserve(2);
+            let inner = buffer.split();
+            buffer.put_u8(b'(');
+            buffer.unsplit(inner);
+            buffer.put_u8(b')');
             Ok(())
         }
     }
 
     #[derive(Debug, Clone)]
-    struct ErrorNthEncoder<T>(T, usize, usize)
+    struct ErrorNthEncoder<T>(T, Arc<Mutex<Cell<usize>>>, usize)
     where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>;
+        T: Framer;
 
     impl<T> ErrorNthEncoder<T>
     where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
+        T: Framer,
     {
         pub fn new(encoder: T, n: usize) -> Self {
-            Self(encoder, 0, n)
+            Self(encoder, Arc::new(Mutex::new(Cell::new(0))), n)
         }
     }
 
-    impl<T> tokio_util::codec::Encoder<()> for ErrorNthEncoder<T>
+    impl<T> Framer for ErrorNthEncoder<T>
     where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
+        T: Framer + Clone,
     {
-        type Error = BoxedFramingError;
-
-        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-            self.0.encode((), dst)?;
-            let result = if self.1 == self.2 {
+        fn frame(&self, buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
+            self.0.frame(buffer)?;
+            let i = self.1.lock().unwrap();
+            let result = if i.get() == self.2 {
                 Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "error")) as _)
             } else {
                 Ok(())
             };
-            self.1 += 1;
+            i.set(i.get() + 1);
             result
         }
     }

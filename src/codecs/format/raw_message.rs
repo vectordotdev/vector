@@ -1,11 +1,10 @@
 use crate::{
-    codecs::encoding::{BoxedSerializer, SerializerConfig},
+    codecs::encoding::{BoxedSerializer, Serializer, SerializerConfig},
     config::log_schema,
     event::Event,
 };
 use bytes::BufMut;
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::Encoder;
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -36,10 +35,8 @@ impl RawMessageSerializer {
     }
 }
 
-impl Encoder<Event> for RawMessageSerializer {
-    type Error = crate::Error;
-
-    fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+impl Serializer for RawMessageSerializer {
+    fn serialize(&self, event: Event, buffer: &mut bytes::BytesMut) -> crate::Result<()> {
         let bytes = match event {
             Event::Log(log) => log
                 .get(log_schema().message_key())
@@ -63,10 +60,10 @@ mod tests {
     #[test]
     fn serialize_bytes() {
         let input = Event::from("foo");
-        let mut serializer = RawMessageSerializer;
+        let serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();
-        serializer.encode(input, &mut buffer).unwrap();
+        serializer.serialize(input, &mut buffer).unwrap();
 
         assert_eq!(buffer.freeze(), Bytes::from("foo"));
     }
