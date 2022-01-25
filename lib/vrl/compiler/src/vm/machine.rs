@@ -117,7 +117,17 @@ pub enum OpCode {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Instruction {
+    /// An OpCode is an instruction to the machine to perform some operation.
     OpCode(OpCode),
+
+    /// Primitives can represent several different things:
+    ///
+    /// Index into constants.
+    /// The amout to jump during a Jump instruction.
+    /// Index into targets for path get and set operations.
+    /// Number of fields whilst building up arrays and objects.
+    /// Index into the list of functions during a call.
+    /// Index into statics for static parameters.
     Primitive(usize),
 }
 
@@ -220,7 +230,7 @@ impl Vm {
         let mut state: VmState = VmState::new(self);
 
         loop {
-            let next = state.next()?;
+            let next = state.next_opcode()?;
 
             match next {
                 OpCode::Abort => {
@@ -266,7 +276,7 @@ impl Vm {
                 }
                 OpCode::Pop => {
                     // Removes the top item from the stack
-                    let _ = state.stack.pop();
+                    let _ = state.pop_stack()?;
                 }
                 OpCode::ClearError => {
                     // Resets the state of the error.
@@ -382,7 +392,6 @@ impl Vm {
                     for _ in 0..count {
                         arr.push(state.pop_stack()?);
                     }
-                    arr.reverse();
 
                     state.stack.push(Value::Array(arr));
                 }

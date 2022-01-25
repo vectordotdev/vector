@@ -28,7 +28,7 @@ impl<'a> VmState<'a> {
     /// Return the Opcode at the current position and advance the instruction pointer.
     /// Returns an error if the current position is not an OpCode.
     /// This error should never occur for a correctly compiled program!
-    pub(super) fn next(&mut self) -> Result<OpCode, ExpressionError> {
+    pub(super) fn next_opcode(&mut self) -> Result<OpCode, ExpressionError> {
         let byte = self.vm.instructions[self.instruction_pointer];
         self.instruction_pointer += 1;
         match byte {

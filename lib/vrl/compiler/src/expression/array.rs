@@ -59,7 +59,7 @@ impl Expression for Array {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         // Evaluate each of the elements of the array, the result of each
         // will be added to the stack.
-        for value in &self.inner {
+        for value in self.inner.iter().rev() {
             value.compile_to_vm(vm)?;
         }
 
