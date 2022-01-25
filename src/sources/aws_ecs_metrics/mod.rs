@@ -162,10 +162,7 @@ async fn aws_ecs_metrics(
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
-                                    emit!(&StreamClosedError {
-                                        error: error.to_string(),
-                                        count,
-                                    });
+                                    emit!(&StreamClosedError { error, count });
                                     return Err(());
                                 }
                             }
