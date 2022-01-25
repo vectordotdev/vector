@@ -4,7 +4,7 @@
 
 use std::{iter, vec};
 
-use super::{Event, LogEvent, Metric};
+use super::{Event, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -78,6 +78,9 @@ impl EventContainer for Metric {
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;
 
+/// The type alias for an array of `TraceEvent` elements.
+pub type TraceArray = Vec<TraceEvent>;
+
 impl EventContainer for LogArray {
     type IntoIter = iter::Map<vec::IntoIter<LogEvent>, fn(LogEvent) -> Event>;
 
@@ -112,8 +115,8 @@ pub enum EventArray {
     Logs(LogArray),
     /// An array of type `Metric`
     Metrics(MetricArray),
-    /// An array of type `LogEvent` but for Traces
-    Traces(LogArray),
+    /// An array of type `TraceEvent`
+    Traces(TraceArray),
 }
 
 impl EventArray {
@@ -128,6 +131,13 @@ impl EventArray {
     pub fn for_each_metric(&mut self, update: impl FnMut(&mut Metric)) {
         if let Self::Metrics(metrics) = self {
             metrics.iter_mut().for_each(update);
+        }
+    }
+
+    /// Run the given update function over each `Trace` in this array.
+    pub fn for_each_trace(&mut self, update: impl FnMut(&mut TraceEvent)) {
+        if let Self::Traces(traces) = self {
+            traces.iter_mut().for_each(update);
         }
     }
 }

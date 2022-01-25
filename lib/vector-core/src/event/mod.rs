@@ -444,7 +444,7 @@ impl MaybeAsLogMut for Event {
 pub enum EventRef<'a> {
     Log(&'a LogEvent),
     Metric(&'a Metric),
-    Trace(&'a LogEvent),
+    Trace(&'a TraceEvent),
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {
