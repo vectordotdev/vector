@@ -243,7 +243,7 @@ fn parse_key_value<'a>(
                         ),
                         preceded(space0, parse_key(field_delimiter, quotes, non_quoted_re)),
                     )),
-                    many_m_n(1, 1, tag(key_value_delimiter)),
+                    many_m_n(0, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter, quotes, non_quoted_re),
                 ))(input)
             },
