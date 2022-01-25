@@ -930,6 +930,14 @@ mod tests {
             ),
             // disable DOTALL mode with (?-s)
             ("(?s)(?-s)%{data:field}", "a\nb", Err(Error::NoMatch)),
+            // disable and then enable DOTALL mode
+            (
+                "(?-s)%{data:field} (?s)%{data:field}",
+                "abc d\ne",
+                Ok(Value::from(btreemap! {
+                    "field" => Value::Array(vec!["abc".into(), "d\ne".into()]),
+                })),
+            ),
         ]);
     }
 }
