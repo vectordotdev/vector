@@ -69,6 +69,24 @@ components: sources: datadog_agent: {
 			required: false
 			type: bool: default: false
 		}
+		disable_logs: {
+			common:      false
+			description: "If this settings is set to `true`, logs won't be accepted by the component."
+			required:    false
+			type: bool: default: false
+		}
+		disable_metrics: {
+			common:      false
+			description: "If this settings is set to `true`, metrics won't be accepted by the component."
+			required:    false
+			type: bool: default: false
+		}
+		disable_traces: {
+			common:      false
+			description: "If this settings is set to `true`, traces won't be accepted by the component."
+			required:    false
+			type: bool: default: false
+		}
 		store_api_key: {
 			common:      false
 			description: "When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event metadata and will be used if the event is sent to a Datadog sink."
@@ -94,6 +112,12 @@ components: sources: datadog_agent: {
 			name: "metrics"
 			description: """
 				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "traces"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
@@ -145,6 +169,48 @@ components: sources: datadog_agent: {
 			counter:      output._passthrough_counter
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
+		}
+		traces: line: {
+			description: "An individual event from a batch of events received through an HTTP POST request sent by a Datadog Agent."
+			fields: {
+				message: {
+					description: "The message field, containing the plain text message."
+					required:    true
+					type: string: {
+						examples: ["Hi from erlang"]
+					}
+				}
+				status: {
+					description: "The status field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["info"]
+					}
+				}
+				timestamp: fields._current_timestamp
+				hostname:  fields._local_host
+				service: {
+					description: "The service field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["backend"]
+					}
+				}
+				ddsource: {
+					description: "The source field extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["java"]
+					}
+				}
+				ddtags: {
+					description: "The coma separated tags list extracted from the event."
+					required:    true
+					type: string: {
+						examples: ["env:prod,region:ap-east-1"]
+					}
+				}
+			}
 		}
 	}
 

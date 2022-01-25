@@ -417,9 +417,16 @@ components: {
 	#Input: {
 		logs:    bool
 		metrics: #MetricInput | null
+		trace:   bool
 	}
 
 	#LogOutput: [Name=string]: {
+		description: string
+		name:        Name
+		fields:      #Schema
+	}
+
+	#TraceOutput: {
 		description: string
 		name:        Name
 		fields:      #Schema
@@ -446,6 +453,7 @@ components: {
 	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+		traces?:  #TraceOutput
 	}
 
 	#Output: {
