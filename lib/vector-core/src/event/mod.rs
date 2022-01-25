@@ -47,18 +47,22 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
+// Traces are `LogEvent`
+pub type TraceEvent = LogEvent;
+
 #[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
-    Trace(LogEvent),
+    Trace(TraceEvent),
 }
 
 impl ByteSizeOf for Event {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Event::Log(log_event) | Event::Trace(log_event) => log_event.allocated_bytes(),
+            Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
+            Event::Trace(trace_event) => trace_event.allocated_bytes(),
         }
     }
 }
@@ -66,8 +70,9 @@ impl ByteSizeOf for Event {
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log_event) | Event::Trace(log_event) => log_event.take_finalizers(),
+            Event::Log(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
+            Event::Trace(trace_event) => trace_event.take_finalizers(),
         }
     }
 }
@@ -80,17 +85,17 @@ impl Event {
 
     #[must_use]
     pub fn new_empty_trace() -> Self {
-        Event::Trace(LogEvent::default())
+        Event::Trace(TraceEvent::default())
     }
 
     /// Return self as a `LogEvent`
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
-            Event::Log(log) | Event::Trace(log) => log,
+            Event::Log(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -99,10 +104,10 @@ impl Event {
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
-            Event::Log(log) | Event::Trace(log) => log,
+            Event::Log(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -111,10 +116,10 @@ impl Event {
     ///
     /// # Panics
     ///
-    /// This function panics if self is anything other than an `Event::Log` or `Event::Trace`.
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn into_log(self) -> LogEvent {
         match self {
-            Event::Log(log) | Event::Trace(log) => log,
+            Event::Log(log) => log,
             _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
@@ -124,7 +129,7 @@ impl Event {
     /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
     pub fn try_into_log(self) -> Option<LogEvent> {
         match self {
-            Event::Log(log) | Event::Trace(log) => Some(log),
+            Event::Log(log) => Some(log),
             _ => None,
         }
     }
@@ -175,47 +180,99 @@ impl Event {
         }
     }
 
+    /// Return self as a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_trace(&self) -> &TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Return self as a mutable `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_mut_trace(&mut self) -> &mut TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Coerces self into a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn into_trace(self) -> TraceEvent {
+        match self {
+            Event::Trace(log) => log,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Fallibly coerces self into a `TraceEvent`
+    ///
+    /// If the event is a `TraceEvent`, then `Some(trace)` is returned, otherwise `None`.
+    pub fn try_into_trace(self) -> Option<TraceEvent> {
+        match self {
+            Event::Trace(trace) => Some(trace),
+            _ => None,
+        }
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         match self {
-            Self::Log(log) | Self::Trace(log) => log.metadata(),
+            Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+            Self::Trace(trace) => trace.metadata(),
         }
     }
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         match self {
-            Self::Log(log) | Self::Trace(log) => log.metadata_mut(),
+            Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
+            Self::Trace(trace) => trace.metadata_mut(),
         }
     }
 
     /// Destroy the event and return the metadata.
     pub fn into_metadata(self) -> EventMetadata {
         match self {
-            Self::Log(log) | Self::Trace(log) => log.into_parts().1,
+            Self::Log(log) => log.into_parts().1,
             Self::Metric(metric) => metric.into_parts().2,
+            Self::Trace(trace) => trace.into_parts().1,
         }
     }
 
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {
-            Self::Log(log) | Self::Trace(log) => log.add_finalizer(finalizer),
+            Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
         }
     }
 
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         match self {
-            Self::Log(log) | Self::Trace(log) => log.with_batch_notifier(batch).into(),
+            Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier(batch).into(),
         }
     }
 
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         match self {
-            Self::Log(log) | Self::Trace(log) => log.with_batch_notifier_option(batch).into(),
+            Self::Log(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier_option(batch).into(),
         }
     }
 }
@@ -393,8 +450,9 @@ pub enum EventRef<'a> {
 impl<'a> From<&'a Event> for EventRef<'a> {
     fn from(event: &'a Event) -> Self {
         match event {
-            Event::Log(log) | Event::Trace(log) => log.into(),
-            Event::Metric(metric) => metric.into(),
+            Event::Log(log) => EventRef::Log(log),
+            Event::Metric(metric) => EventRef::Metric(metric),
+            Event::Trace(trace) => EventRef::Trace(trace),
         }
     }
 }
