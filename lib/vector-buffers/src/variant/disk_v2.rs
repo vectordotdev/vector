@@ -57,7 +57,7 @@ where
         let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
         let config = DiskBufferConfigBuilder::from_path(buffer_path)
             .max_buffer_size(self.max_size as u64)
-            .build();
+            .build()?;
         let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
 
         let wrapped_reader = WrappedReader::new(reader);
@@ -182,8 +182,8 @@ where
     FS: Filesystem,
     FS::File: Unpin,
 {
-    // TODO: use a control message struct so callers can send both items to write and flush
-    // requests, facilitating the ability to allow for `send_all` at the frontend
+    // TODO: Use a control message approach so callers can send both items to write and flush
+    // requests, facilitating the ability to allow for `send_all` at the frontend.
     while let Some(record) = input.recv().await {
         if let Err(e) = writer.write_record(record).await {
             error!("failed to write record to the buffer: {}", e);

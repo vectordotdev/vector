@@ -16,7 +16,9 @@ async fn ack_updates_ledger_correctly() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop();
-            let config = DiskBufferConfigBuilder::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("should not fail to build config");
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");
@@ -44,7 +46,9 @@ async fn ack_wakes_reader() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop();
-            let config = DiskBufferConfigBuilder::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("should not fail to build config");
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");

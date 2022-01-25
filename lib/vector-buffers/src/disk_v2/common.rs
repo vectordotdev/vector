@@ -5,6 +5,7 @@ use std::{
 };
 
 use crc32fast::Hasher;
+use snafu::Snafu;
 
 use super::io::{Filesystem, ProductionFilesystem};
 
@@ -12,6 +13,11 @@ use super::io::{Filesystem, ProductionFilesystem};
 pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
 pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
+// Using 256KB as it aligns nicely with the I/O size exposed by major cloud providers.  This may not
+// be the underlying block size used by the OS, but it still aligns well with what will happen on
+// the "backend" for cloud providers, which is simply a useful default for when we want to look at
+// buffer throughput and estimate how many IOPS will be consumed, etc.
+pub const DEFAULT_WRITE_BUFFER_SIZE: usize = 256 * 1024;
 
 // We specifically limit ourselves to 0-31 for file IDs in test, because it lets us more quickly
 // create/consume the file IDs so we can test edge cases like file ID rollover and "writer is
@@ -25,6 +31,15 @@ pub(crate) fn create_crc32c_hasher() -> Hasher {
     crc32fast::Hasher::new()
 }
 
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("parameter '{}' was invalid: {}", param_name, reason))]
+    InvalidParameter {
+        param_name: &'static str,
+        reason: &'static str,
+    },
+}
+
 /// Buffer configuration.
 #[derive(Clone, Debug)]
 pub struct DiskBufferConfig<FS> {
@@ -33,6 +48,7 @@ pub struct DiskBufferConfig<FS> {
     /// Must be unique from all other buffers, whether within the same process or other Vector
     /// processes on the machine.
     pub(crate) data_dir: PathBuf,
+
     /// Maximum size, in bytes, that the buffer can consume.
     ///
     /// The actual maximum on-disk buffer size is this amount rounded up to the next multiple of
@@ -42,6 +58,7 @@ pub struct DiskBufferConfig<FS> {
     /// This ensures that we never use more then the documented "rounded to the next multiple"
     /// amount, as we must account for one full data file's worth of extra data.
     pub(crate) max_buffer_size: u64,
+
     /// Maximum size, in bytes, to target for each individual data file.
     ///
     /// This value is not strictly obey because we cannot know ahead of encoding/serializing if the
@@ -49,11 +66,18 @@ pub struct DiskBufferConfig<FS> {
     /// write to a data file if it is as larger or larger than this value, but may write a record
     /// that causes a data file to exceed this value by as much as `max_record_size`.
     pub(crate) max_data_file_size: u64,
+
     /// Maximum size, in bytes, of an encoded record.
     ///
     /// Any record which, when encoded, is larger than this amount (with a small caveat, see note)
     /// will not be written to the buffer.
     pub(crate) max_record_size: usize,
+
+    /// Size, in bytes, of the writer's internal buffer.
+    ///
+    /// This buffer is used to coalesce writes to the underlying data file where possible, which in
+    /// turn reduces the number of syscalls needed to issue writes to the underlying data file.
+    pub(crate) write_buffer_size: usize,
 
     /// Flush interval for ledger and data files.
     ///
@@ -74,16 +98,18 @@ pub struct DiskBufferConfig<FS> {
 }
 
 /// Builder for [`DiskBufferConfig`].
+#[derive(Clone, Debug)]
 pub struct DiskBufferConfigBuilder<FS = ProductionFilesystem>
 where
     FS: Filesystem,
 {
-    data_dir: PathBuf,
-    max_buffer_size: Option<u64>,
-    max_data_file_size: Option<u64>,
-    max_record_size: Option<usize>,
-    flush_interval: Option<Duration>,
-    filesystem: FS,
+    pub(crate) data_dir: PathBuf,
+    pub(crate) max_buffer_size: Option<u64>,
+    pub(crate) max_data_file_size: Option<u64>,
+    pub(crate) max_record_size: Option<usize>,
+    pub(crate) write_buffer_size: Option<usize>,
+    pub(crate) flush_interval: Option<Duration>,
+    pub(crate) filesystem: FS,
 }
 
 impl DiskBufferConfigBuilder {
@@ -96,6 +122,7 @@ impl DiskBufferConfigBuilder {
             max_buffer_size: None,
             max_data_file_size: None,
             max_record_size: None,
+            write_buffer_size: None,
             flush_interval: None,
             filesystem: ProductionFilesystem,
         }
@@ -149,6 +176,18 @@ where
         self
     }
 
+    /// Size, in bytes, of the writer's internal buffer.
+    ///
+    /// This buffer is used to coalesce writes to the underlying data file where possible, which in
+    /// turn reduces the number of syscalls needed to issue writes to the underlying data file.
+    ///
+    /// Defaults to 256KB.
+    #[allow(dead_code)]
+    pub fn write_buffer_size(mut self, amount: usize) -> Self {
+        self.write_buffer_size = Some(amount);
+        self
+    }
+
     /// Sets the flush interval for ledger and data files.
     ///
     /// While data is asynchronously flushed by the OS, and the reader/writer can proceed with a
@@ -182,21 +221,53 @@ where
             max_buffer_size: self.max_buffer_size,
             max_data_file_size: self.max_data_file_size,
             max_record_size: self.max_record_size,
+            write_buffer_size: self.write_buffer_size,
             flush_interval: self.flush_interval,
             filesystem,
         }
     }
 
     /// Consumes this builder and constructs a `DiskBufferConfig`.
-    pub fn build(self) -> DiskBufferConfig<FS> {
+    pub fn build(self) -> Result<DiskBufferConfig<FS>, BuildError> {
+        let max_buffer_size = self.max_buffer_size.unwrap_or(u64::MAX);
         let max_data_file_size = self
             .max_data_file_size
             .unwrap_or(DEFAULT_MAX_DATA_FILE_SIZE);
         let max_record_size = self.max_record_size.unwrap_or(DEFAULT_MAX_RECORD_SIZE);
+        let write_buffer_size = self.write_buffer_size.unwrap_or(DEFAULT_WRITE_BUFFER_SIZE);
         let flush_interval = self
             .flush_interval
             .unwrap_or_else(|| Duration::from_millis(500));
         let filesystem = self.filesystem;
+
+        // Validate the input parameters.
+        if max_buffer_size == 0 {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_buffer_size",
+                reason: "cannot be zero",
+            });
+        }
+
+        if max_data_file_size == 0 {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_data_file_size",
+                reason: "cannot be zero",
+            });
+        }
+
+        if max_record_size == 0 {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_record_size",
+                reason: "cannot be zero",
+            });
+        }
+
+        if write_buffer_size == 0 {
+            return Err(BuildError::InvalidParameter {
+                param_name: "write_buffer_size",
+                reason: "cannot be zero",
+            });
+        }
 
         // The actual on-disk maximum buffer size will be the user-supplied `max_buffer_size`
         // rounded up to the next multiple of `DATA_FILE_TARGET_MAX_SIZE`.  Internally, we'll limit
@@ -206,17 +277,17 @@ where
         //
         // We also ensure that `max_buffer_size` is at least as big as `DATA_FILE_TARGET_MAX_SIZE`
         // which means the overall minimum on-disk buffer size is 256MB (2x 128MB).
-        let max_buffer_size = self.max_buffer_size.unwrap_or(u64::MAX);
         let max_buffer_size = max_buffer_size - (max_buffer_size % max_data_file_size);
         let max_buffer_size = cmp::max(max_buffer_size, max_data_file_size);
 
-        DiskBufferConfig {
+        Ok(DiskBufferConfig {
             data_dir: self.data_dir,
             max_buffer_size,
             max_data_file_size,
             max_record_size,
+            write_buffer_size,
             flush_interval,
             filesystem,
-        }
+        })
     }
 }

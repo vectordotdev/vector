@@ -6,6 +6,7 @@ use crate::{assert_buffer_is_empty, assert_buffer_records};
 
 #[tokio::test]
 async fn basic_read_write_loop() {
+    let _ = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -17,7 +18,7 @@ async fn basic_read_write_loop() {
             let expected_items = (512..768)
                 .into_iter()
                 .cycle()
-                .take(2000)
+                .take(10)
                 .map(SizedRecord)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();

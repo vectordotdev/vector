@@ -306,7 +306,9 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfigBuilder::from_path(data_dir).build();
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("should not fail to build config");
     let usage_handle = BufferUsageHandle::noop();
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -328,7 +330,9 @@ where
 {
     // We override `max_buffer_size` directly because otherwise `build` has built-in logic that
     // ensures it is a minimum size related to the data file size limit, etc.
-    let mut config = DiskBufferConfigBuilder::from_path(data_dir).build();
+    let mut config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("should not fail to build config");
     config.max_buffer_size = max_buffer_size;
     let usage_handle = BufferUsageHandle::noop();
 
@@ -352,7 +356,8 @@ where
 {
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_record_size(max_record_size)
-        .build();
+        .build()
+        .expect("should not fail to build config");
     let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
@@ -375,7 +380,8 @@ where
 {
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
-        .build();
+        .build()
+        .expect("should not fail to build config");
     let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)

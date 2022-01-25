@@ -6,6 +6,7 @@ use std::{
 };
 
 use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures_util::stream;
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -154,12 +155,14 @@ pub async fn build_pieces(
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let rx = builder.add_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
-                while let Some(event) = rx.next().await {
-                    fanout.feed(event).await?;
+                let mut rx = rx.ready_chunks(128);
+                while let Some(events) = rx.next().await {
+                    let mut events = stream::iter(events).map(Ok);
+                    fanout.send_all(&mut events).await?;
                 }
                 fanout.flush().await?;
                 Ok(TaskOutput::Source)

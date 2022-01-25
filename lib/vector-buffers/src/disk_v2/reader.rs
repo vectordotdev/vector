@@ -247,6 +247,8 @@ where
             });
         }
 
+        trace!("got record length delimiter of {} bytes", record_len);
+
         // Read in all of the bytes we need first.
         self.aligned_buf.clear();
         while self.aligned_buf.len() < record_len {
@@ -798,16 +800,23 @@ where
                 .await
                 .context(IoSnafu)?;
 
-            // If the writer has marked themselves as done, and the buffer has been emptied, then
-            // we're done and can return.  We have to look at something besides simply the writer
-            // being marked as done to know if we're actually done or not, and "buffer size" is better
-            // than "total records" because we update buffer size when handling acknowledgements,
-            // whether it's an individual ack or an entire file being deleted.
+            // If the writer is done, check if we can reasonably finish up on the reader side.
             //
-            // If we used "total records", we could end up stuck in cases where we skipped
-            // corrupted records, but hadn't yet had a "good" record that we could read, since the
-            // "we skipped records due to corruption" logic requires performing valid read to
-            // detect, and calculate a valid delta from.
+            // Practically speaking, a writer is "done" whether it's been cleanly or uncleanly
+            // closed.  However, even when a writer is "done", the reader may still have more
+            // records it could read before itself being done.
+            //
+            // When the writer is "uncleanly" closed -- aka closed via `Drop` -- then we need to
+            // properly account for that so that we know here, in the reader, when we've read all of
+            // the records that were flushed to disk.
+            //
+            // To that end, the ledger tracks flushed vs unflushed records and bytes.  Internally,
+            // we look at the "flushed" versions of counters when figuring out if we're done on the
+            // reader side.  Naturally, this may mean that some records were actually written but
+            // not accounted for, such as when buffered writes were automatically flushed under the
+            // hood but not logically flushed.  However, the buffer initialization logic will figure
+            // out any discrepancies between the flushed ledger state and the actual buffer state as
+            // determined by the data files on disk.
             //
             // TODO: Validate this with a test that messes with a data file without having to reload
             // the buffer, since reloading the buffer will recalculate our buffer size.

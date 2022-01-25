@@ -131,8 +131,11 @@ impl ArchivedLedgerState {
         self.writer_next_record_id.load(Ordering::Acquire)
     }
 
-    pub(super) fn increment_next_writer_record_id(&self) {
-        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel);
+    pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
+        let previous = self
+            .writer_next_record_id
+            .fetch_add(amount, Ordering::AcqRel);
+        previous.wrapping_add(amount)
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
@@ -276,7 +279,7 @@ where
             "incremented total buffer size by {} bytes ({} -> {})",
             amount,
             last_total_buffer_size,
-            last_total_buffer_size + amount
+            last_total_buffer_size.wrapping_add(amount)
         );
     }
 
@@ -287,7 +290,7 @@ where
             "decremented total buffer size by {} bytes ({} -> {})",
             amount,
             last_total_buffer_size,
-            last_total_buffer_size - amount
+            last_total_buffer_size.wrapping_sub(amount)
         );
     }
 
@@ -642,12 +645,6 @@ where
 
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
-        /*let ledger_handle = ledger_handle.into_std().await;
-        let ledger_mmap = unsafe {
-            MmapOptions::new()
-                .map_mut(&ledger_handle)
-                .context(IoSnafu)?
-        };*/
         let ledger_mmap = config
             .filesystem
             .open_mmap_writable(&ledger_path)

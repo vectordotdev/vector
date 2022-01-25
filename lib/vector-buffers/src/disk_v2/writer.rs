@@ -104,9 +104,9 @@ where
     ///
     /// Internally, the writer is wrapped in a [`BufWriter`], so callers should not pass in an
     /// already buffered writer.
-    pub fn new(writer: W, record_max_size: usize) -> Self {
+    pub fn new(writer: W, buffer_capacity: usize, record_max_size: usize) -> Self {
         Self {
-            writer: BufWriter::new(writer),
+            writer: BufWriter::with_capacity(buffer_capacity, writer),
             encode_buf: Vec::with_capacity(16_384),
             ser_buf: AlignedVec::with_capacity(16_384),
             ser_scratch: AlignedVec::with_capacity(16_384),
@@ -152,7 +152,7 @@ where
         let encoded_len = encode_result
             .map(|_| self.encode_buf.len())
             .context(FailedToEncodeSnafu)?;
-        if encoded_len >= self.max_record_size {
+        if encoded_len > self.max_record_size {
             return Err(WriterError::RecordTooLarge {
                 limit: self.max_record_size,
             });
@@ -213,7 +213,7 @@ where
         let length_delimiter_dst = &mut self.ser_buf.as_mut_slice()[0..8];
         length_delimiter_dst.copy_from_slice(&archive_len_buf[..]);
 
-        Ok(archive_len)
+        Ok(serializer_pos)
     }
 
     /// Writes a record.
@@ -272,7 +272,10 @@ where
 {
     ledger: Arc<Ledger<FS>>,
     writer: Option<RecordWriter<FS::File, T>>,
+    next_record_id: u64,
+    next_record_id_offset: u64,
     data_file_size: u64,
+    unflushed_bytes: u64,
     skip_to_next: bool,
     _t: PhantomData<T>,
 }
@@ -285,18 +288,43 @@ where
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
+        let next_record_id = ledger.state().get_next_writer_record_id();
         Writer {
             ledger,
             writer: None,
             data_file_size: 0,
+            unflushed_bytes: 0,
+            next_record_id,
+            next_record_id_offset: 0,
             skip_to_next: false,
             _t: PhantomData,
         }
     }
 
+    fn get_next_record_id(&mut self) -> u64 {
+        self.next_record_id.wrapping_add(self.next_record_id_offset)
+    }
+
+    fn increment_next_record_id(&mut self) {
+        self.next_record_id_offset += 1;
+    }
+
     fn track_write(&mut self, record_size: u64) {
         self.data_file_size += record_size;
-        self.ledger.track_write(record_size);
+        self.unflushed_bytes += record_size;
+    }
+
+    fn flush_writes(&mut self) {
+        let next_record_id = self
+            .ledger
+            .state()
+            .increment_next_writer_record_id(self.next_record_id_offset);
+        self.next_record_id = next_record_id;
+        self.next_record_id_offset = 0;
+
+        let unflushed_bytes = self.unflushed_bytes;
+        self.unflushed_bytes = 0;
+        self.ledger.track_write(unflushed_bytes);
     }
 
     fn can_write(&mut self) -> bool {
@@ -404,9 +432,15 @@ where
                         // the reader will detect it, and this way, we avoid duplicate record IDs.
                         trace!("missing ledger update detected, fast forwarding writer_next_record_id to {}",
                             last_id.wrapping_add(1));
-                        while self.ledger.state().get_next_writer_record_id() <= last_id {
-                            self.ledger.state().increment_next_writer_record_id();
-                        }
+
+                        let forward_amount = last_id.wrapping_sub(ledger_next).wrapping_add(1);
+                        let next_record_id = self
+                            .ledger
+                            .state()
+                            .increment_next_writer_record_id(forward_amount);
+                        self.next_record_id = next_record_id;
+                        self.next_record_id_offset = 0;
+
                         false
                     }
                 }
@@ -571,6 +605,7 @@ where
 
                 self.writer = Some(RecordWriter::new(
                     data_file,
+                    self.ledger.config().write_buffer_size,
                     self.ledger.config().max_record_size,
                 ));
                 self.data_file_size = data_file_size;
@@ -611,7 +646,7 @@ where
         self.ensure_ready_for_write().await.context(IoSnafu)?;
 
         // Grab the next record ID and attempt to write the record.
-        let id = self.ledger.state().get_next_writer_record_id();
+        let id = self.get_next_record_id();
         let n = self
             .writer
             .as_mut()
@@ -621,8 +656,11 @@ where
 
         // Since we succeeded in writing the record, increment the next record ID and metadata for
         // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
-        // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
-        self.ledger.state().increment_next_writer_record_id();
+        // depend on the "record IDs are monotonic" invariant for detecting skipped records during
+        // read.
+
+        // Track the write in terms of size, which will be deferred until we `flush`.
+        self.increment_next_record_id();
         self.track_write(n as u64);
 
         let file_id = self.ledger.get_current_writer_file_id();
@@ -674,7 +712,9 @@ where
     /// variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
-        self.flush_inner(false).await
+        self.flush_inner(false).await?;
+        self.flush_writes();
+        Ok(())
     }
 }
 

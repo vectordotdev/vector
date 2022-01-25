@@ -107,7 +107,7 @@ pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
 
 pub trait ReadableMemoryMap: AsRef<[u8]> + Send + Sync {}
 
-pub trait WritableMemoryMap: AsRef<[u8]> + AsMut<[u8]> + Send + Sync {
+pub trait WritableMemoryMap: ReadableMemoryMap {
     /// Flushes outstanding memory map modifications to disk.
     ///
     /// When this method returns with a non-error result, all outstanding changes to a file-backed
@@ -185,6 +185,8 @@ impl AsyncFile for tokio::fs::File {
 }
 
 impl ReadableMemoryMap for memmap2::Mmap {}
+
+impl ReadableMemoryMap for memmap2::MmapMut {}
 
 impl WritableMemoryMap for memmap2::MmapMut {
     fn flush(&self) -> io::Result<()> {
