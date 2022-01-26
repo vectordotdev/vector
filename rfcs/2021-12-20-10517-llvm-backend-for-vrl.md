@@ -720,8 +720,7 @@ after the RFC is approved:
   execution model to get a first peek on end-to-end performance.
 - Refine code generation by taking into account type information.
 - Add unit tests for each expression in isolation.
-- Add fuzz testing infrastructure that compares results of all three execution
-  modes.
+- Add fuzz tests that cross-validate results of all three execution modes.
 
 ---
 
