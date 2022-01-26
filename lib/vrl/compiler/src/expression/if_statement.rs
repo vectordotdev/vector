@@ -59,17 +59,17 @@ impl Expression for IfStatement {
         // If the value is false, we want to jump to the alternative block.
         // We need to store this jump as it will need updating when we know where
         // the alternative block actually starts.
-        let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
+        let else_jump = vm.emit_jump(OpCode::JumpIfFalse);
         vm.write_opcode(OpCode::Pop);
 
         // Write the consequent block.
         self.consequent.compile_to_vm(vm)?;
 
         // After the consequent block we want to jump over the alternative.
-        let else_jump = vm.emit_jump(OpCode::Jump);
+        let continue_jump = vm.emit_jump(OpCode::Jump);
 
         // Update the initial if jump to jump to the current position.
-        vm.patch_jump(if_jump);
+        vm.patch_jump(else_jump);
         vm.write_opcode(OpCode::Pop);
 
         if let Some(alternative) = &self.alternative {
@@ -77,8 +77,8 @@ impl Expression for IfStatement {
             alternative.compile_to_vm(vm)?;
         }
 
-        // Update the else jump to jump to the current position.
-        vm.patch_jump(else_jump);
+        // Update the continue jump to jump to the current position after the else block.
+        vm.patch_jump(continue_jump);
 
         Ok(())
     }

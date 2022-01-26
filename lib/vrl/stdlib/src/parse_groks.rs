@@ -151,7 +151,7 @@ impl Function for ParseGroks {
                 })
                 .unwrap_or_default();
 
-                // we use a datadog library here because it is a superset of grok
+                // We use a datadog library here because it is a superset of grok.
                 let grok_rules =
                     parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
                         Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>

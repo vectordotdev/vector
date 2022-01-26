@@ -276,7 +276,7 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        (*self.expr).resolve(ctx).map_err(|err| match err {
+        self.expr.resolve(ctx).map_err(|err| match err {
             ExpressionError::Abort { .. } => {
                 panic!("abort errors must only be defined by `abort` statement")
             }
@@ -390,14 +390,14 @@ impl Expression for FunctionCall {
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
-                    // The function has compiled this argument as a static
+                    // The function has compiled this argument as a static.
                     let stat = vm.add_static(stat);
                     vm.write_opcode(OpCode::MoveStaticParameter);
                     vm.write_primitive(stat);
                 }
                 None => match argument {
                     Some(argument) => {
-                        // Compile the argument, MoveParameter will move the result of the expression onto the
+                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
                         // parameter stack to be passed into the function.
                         argument.compile_to_vm(vm)?;
                         vm.write_opcode(OpCode::MoveParameter);

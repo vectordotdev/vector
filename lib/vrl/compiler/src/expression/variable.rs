@@ -63,7 +63,7 @@ impl Expression for Variable {
     fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
         vm.write_opcode(OpCode::GetPath);
 
-        // Store the required path in the targets list, write it's index to the vm.
+        // Store the required path in the targets list, write its index to the vm.
         let variable = vm::Variable::Internal(self.ident().clone(), None);
         let target = vm.get_target(&variable);
         vm.write_primitive(target);

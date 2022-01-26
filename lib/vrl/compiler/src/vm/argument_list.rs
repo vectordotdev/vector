@@ -22,7 +22,7 @@ impl<'a> VmArgument<'a> {
     }
 
     /// Returns the kind that this parameter is.
-    /// If the parameter is an Any, we return None since the function that has created this parameter will
+    /// If the parameter is an `Any`, we return `None` since the function that has created this parameter will
     /// have already done the required typechecking.
     fn kind(&self) -> Option<Kind> {
         match self {
@@ -43,10 +43,10 @@ impl<'a> VmArgumentList<'a> {
     }
 
     /// Returns the parameter with the given name.
-    /// Note the this can only be called once per parameter since the value is
+    /// Note that this can only be called once per parameter since the value is
     /// removed from the list.
     pub fn required(&mut self, name: &str) -> Value {
-        // Get the position the given argument is found in the parameter stack.
+        // Get the position where the given argument is found in the parameter stack.
         let pos = self
             .args
             .iter()
@@ -58,10 +58,10 @@ impl<'a> VmArgumentList<'a> {
     }
 
     /// Returns the parameter with the given name.
-    /// Note the this can only be called once per parameter since the value is
+    /// Note that this can only be called once per parameter since the value is
     /// removed from the list.
     pub fn optional(&mut self, name: &str) -> Option<Value> {
-        // Get the position the given argument is found in the parameter stack.
+        // Get the position where the given argument is found in the parameter stack.
         let pos = self
             .args
             .iter()
@@ -73,10 +73,10 @@ impl<'a> VmArgumentList<'a> {
     }
 
     /// Returns the parameter with the given name.
-    /// Note the this can only be called once per parameter since the value is
+    /// Note that this can only be called once per parameter since the value is
     /// removed from the list.
     pub fn required_any(&mut self, name: &str) -> &'a Box<dyn Any + Send + Sync> {
-        // Get the position the given argument is found in the parameter stack.
+        // Get the position where the given argument is found in the parameter stack.
         let pos = self
             .args
             .iter()
@@ -88,10 +88,10 @@ impl<'a> VmArgumentList<'a> {
     }
 
     /// Returns the parameter with the given name.
-    /// Note the this can only be called once per parameter since the value is
+    /// Note that this can only be called once per parameter since the value is
     /// removed from the list.
     pub fn optional_any(&mut self, name: &str) -> Option<&'a Box<dyn Any + Send + Sync>> {
-        // Get the position the given argument is found in the parameter stack.
+        // Get the position where the given argument is found in the parameter stack.
         let pos = self
             .args
             .iter()
@@ -107,7 +107,7 @@ impl<'a> VmArgumentList<'a> {
         for (param, args) in self.args.iter().zip(self.values.iter()) {
             match args.as_ref() {
                 None if param.required => return Err("parameter is required".into()),
-                Some(arg) if matches!( arg.kind(), Some(kind) if !param.kind().intersects(kind)) => {
+                Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(kind)) => {
                     return Err("parameter type mismatch".into())
                 }
                 _ => (),

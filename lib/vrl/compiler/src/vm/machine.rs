@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
-    /// Aborts the process, returning `Err(ExpressionError::Abort)`
+    /// Aborts the process, returning `Err(ExpressionError::Abort)`.
     Abort,
 
     /// Ends the process, returning the top value from the stack.
@@ -32,7 +32,7 @@ pub enum OpCode {
     /// Merges the two objects at the top of the stack, placing the result back on the stack.
     Merge,
 
-    /// Pops the boolean at the top of the stack, nots it, placing the result back on the stack.
+    /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
     Not,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater than the first.
@@ -97,7 +97,7 @@ pub enum OpCode {
     /// the stack.
     CreateArray,
 
-    /// Creates an object. The ensuing primitive indicatos the number of elements in the object.
+    /// Creates an object. The ensuing primitive indicates the number of elements in the object.
     /// This amount of keys (as string constants) and values are popped from the stack. The resulting object
     /// is then pushed back on the stack.
     CreateObject,
@@ -123,7 +123,7 @@ pub enum Instruction {
     /// Primitives can represent several different things:
     ///
     /// Index into constants.
-    /// The amout to jump during a Jump instruction.
+    /// The amount to jump during a Jump instruction.
     /// Index into targets for path get and set operations.
     /// Number of fields whilst building up arrays and objects.
     /// Index into the list of functions during a call.
@@ -223,7 +223,7 @@ impl Vm {
     /// Interpret the VM.
     /// Interpreting is essentially a process of looping through a list of intstructions and interpreting
     /// each one.
-    /// The VM is stack based. When the `Return` OpCode is encountered the top item on the stack is popped and returned.
+    /// The VM is stack based. When the `Return` `OpCode` is encountered the top item on the stack is popped and returned.
     /// It is expected that the final instruction is a `Return`.
     pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, ExpressionError> {
         // Any mutable state during the run is stored here.
@@ -242,7 +242,7 @@ impl Vm {
                     });
                 }
                 OpCode::Return => {
-                    // Ends the process and returns the top item from the stack - or Null if the stack is empty.
+                    // Ends the process and returns the top item from the stack - or `Null` if the stack is empty.
                     return Ok(state.stack.pop().unwrap_or(Value::Null));
                 }
                 OpCode::Constant => {
@@ -275,7 +275,7 @@ impl Vm {
                     state.stack.push(lhs.eq_lossy(&rhs).into());
                 }
                 OpCode::Pop => {
-                    // Removes the top item from the stack
+                    // Removes the top item from the stack.
                     let _ = state.pop_stack()?;
                 }
                 OpCode::ClearError => {
@@ -283,14 +283,14 @@ impl Vm {
                     state.error = None;
                 }
                 OpCode::JumpIfFalse => {
-                    // If the value at the top of the stack is false, jump by the given amount
+                    // If the value at the top of the stack is false, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if !is_true(state.peek_stack()?) {
                         state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
-                    // If the value at the top of the stack is true, jump by the given amount
+                    // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if is_true(state.peek_stack()?) {
                         state.instruction_pointer += jump;
@@ -304,7 +304,7 @@ impl Vm {
                     }
                 }
                 OpCode::Jump => {
-                    // Moves the instruction pointer by the amount specified
+                    // Moves the instruction pointer by the amount specified.
                     let jump = state.next_primitive()?;
                     state.instruction_pointer += jump;
                 }
@@ -312,7 +312,7 @@ impl Vm {
                     // Sets the path specified by the target to the value at the top of the stack.
                     // The value is then pushed back onto the stack since the assignment expression
                     // also returns this value.
-                    // (Allows statements such as `a = b = 32`.
+                    // (Allows statements such as `a = b = 32`.)
                     let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
                     let value = state.pop_stack()?;
@@ -322,7 +322,7 @@ impl Vm {
                 }
                 OpCode::SetPathInfallible => {
                     // Sets the path for an infallible assignment statement ie.
-                    // thing, err = fallible_call()
+                    // `thing, err = fallible_call()`
                     let variable = state.next_primitive()?;
                     let variable = &self.targets[variable];
 
@@ -396,7 +396,7 @@ impl Vm {
                     state.stack.push(Value::Array(arr));
                 }
                 OpCode::CreateObject => {
-                    // Creates on object from the values on the stack.
+                    // Creates an object from the values on the stack.
                     // The next primitive on the stack is the number of fields in the object
                     // followed by key, value pairs.
                     let count = state.next_primitive()?;
@@ -443,7 +443,6 @@ impl Vm {
                                 labels,
                                 notes,
                             } => {
-                                // labels.push(Label::primary(message.clone(), self.span));
                                 state.error = Some(ExpressionError::Error {
                                     message: format!(
                                         r#"function call error for "{}" at ({}:{}): {}"#,
@@ -471,7 +470,7 @@ impl Vm {
                 }
                 OpCode::MoveStaticParameter => {
                     // Moves a static parameter onto the parameter stack.
-                    // A static parameter will have been created by the functions `compile_argument` method
+                    // A static parameter will have been created by the function`s `compile_argument` method
                     // during compile time.
                     let idx = state.next_primitive()?;
                     state
@@ -530,7 +529,7 @@ fn set_variable<'a>(
         }
         Variable::External(path) => ctx.target_mut().insert(path, value)?,
 
-        // Setting these cases should not be allowed by the compiler
+        // Setting these cases should not be allowed by the compiler.
         Variable::None | Variable::Stack(_) => (),
     }
 

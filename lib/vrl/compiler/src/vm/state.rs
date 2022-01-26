@@ -25,7 +25,7 @@ impl<'a> VmState<'a> {
         }
     }
 
-    /// Return the Opcode at the current position and advance the instruction pointer.
+    /// Return the `Opcode` at the current position and advance the instruction pointer.
     /// Returns an error if the current position is not an OpCode.
     /// This error should never occur for a correctly compiled program!
     pub(super) fn next_opcode(&mut self) -> Result<OpCode, ExpressionError> {

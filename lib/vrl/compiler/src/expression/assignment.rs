@@ -410,8 +410,8 @@ where
 
                 vm.write_opcode(OpCode::SetPath);
 
-                // Add the target to the list of targets, write it's index as a primitive for the
-                // SetPath opcode to retrieve.
+                // Add the target to the list of targets, write its index as a primitive for the
+                //  `SetPath` opcode to retrieve.
                 let target = vm.get_target(&target.into());
                 vm.write_primitive(target);
             }
@@ -425,15 +425,15 @@ where
                 expr.compile_to_vm(vm)?;
                 vm.write_opcode(OpCode::SetPathInfallible);
 
-                // Write the target for the Ok path.
+                // Write the target for the `Ok` path.
                 let target = vm.get_target(&ok.into());
                 vm.write_primitive(target);
 
-                // Write the target for the Error path.
+                // Write the target for the `Error` path.
                 let target = vm.get_target(&err.into());
                 vm.write_primitive(target);
 
-                // Add the default value (the value to set to the Ok target should we have an error).
+                // Add the default value (the value to set to the `Ok` target should we have an error).
                 let default = vm.add_constant(default.clone());
                 vm.write_primitive(default);
             }
