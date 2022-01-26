@@ -6,8 +6,8 @@ use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 use super::{
-    EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
-    SentEventsTotal,
+    filter_output_metric, EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal,
+    ReceivedEventsTotal, SentEventsTotal,
 };
 use crate::{
     api::schema::filter::{self},
@@ -332,13 +332,11 @@ pub fn component_sent_events_totals_metrics_with_outputs(
                     .iter()
                     .filter_map(|m| m.tag_value("output"))
                     .collect::<Vec<_>>();
+
                 let metrics_by_outputs = outputs
                     .iter()
                     .filter_map(|output| {
-                        let metrics_by_output = metrics
-                            .iter()
-                            .filter(|m| m.tag_matches("output", output.as_ref()));
-                        let m = sum_metrics(metrics_by_output)?;
+                        let m = filter_output_metric(metrics.as_ref(), output.as_ref())?;
                         match m.value() {
                             MetricValue::Counter { value }
                                 if cache
@@ -352,6 +350,7 @@ pub fn component_sent_events_totals_metrics_with_outputs(
                         }
                     })
                     .collect();
+
                 let sum = sum_metrics_owned(metrics)?;
                 match sum.value() {
                     MetricValue::Counter { value }
