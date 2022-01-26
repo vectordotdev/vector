@@ -197,8 +197,6 @@ components: sources: exec: {
 		processing_errors_total:              components.sources.internal_metrics.output.metrics.processing_errors_total
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
 		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
