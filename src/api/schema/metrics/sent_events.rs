@@ -83,8 +83,8 @@ impl ComponentSentEventsTotal {
         self.component_key.id()
     }
 
-    async fn outputs(&self) -> Vec<Output> {
-        self.outputs.clone()
+    async fn outputs(&self) -> &Vec<Output> {
+        &self.outputs
     }
 
     /// Total outgoing events metric

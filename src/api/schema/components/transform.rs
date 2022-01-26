@@ -6,7 +6,7 @@ use super::{sink, source, state, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, sum_metrics, IntoTransformMetrics, Output},
+        metrics::{self, IntoTransformMetrics, Output},
         sort,
     },
     config::{ComponentKey, OutputId},
@@ -69,23 +69,7 @@ impl Transform {
 
     /// Transform output streams
     pub async fn outputs(&self) -> Vec<Output> {
-        let metrics = metrics::by_component_key(&self.0.component_key)
-            .into_iter()
-            .filter(|m| m.name() == "component_sent_events_total")
-            .collect::<Vec<_>>();
-        self.get_outputs()
-            .iter()
-            .map(|output| {
-                Output::new(
-                    output.clone(),
-                    sum_metrics(
-                        metrics
-                            .iter()
-                            .filter(|m| m.tag_matches("output", output.as_ref())),
-                    ),
-                )
-            })
-            .collect::<Vec<_>>()
+        metrics::outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Source inputs

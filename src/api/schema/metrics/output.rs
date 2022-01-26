@@ -1,8 +1,9 @@
 use async_graphql::Object;
+use vector_core::config::ComponentKey;
 
 use crate::event::Metric;
 
-use super::SentEventsTotal;
+use super::{by_component_key, sum_metrics, SentEventsTotal};
 
 #[derive(Debug, Clone)]
 pub struct Output {
@@ -34,4 +35,29 @@ impl Output {
             None
         }
     }
+}
+
+pub fn outputs_by_component_key(component_key: &ComponentKey, outputs: &[String]) -> Vec<Output> {
+    let metrics = by_component_key(component_key)
+        .into_iter()
+        .filter(|m| m.name() == "component_sent_events_total")
+        .collect::<Vec<_>>();
+
+    outputs
+        .iter()
+        .map(|output| {
+            Output::new(
+                output.clone(),
+                filter_output_metric(&metrics, output.as_ref()),
+            )
+        })
+        .collect::<Vec<_>>()
+}
+
+fn filter_output_metric(metrics: &[Metric], output_name: &str) -> Option<Metric> {
+    sum_metrics(
+        metrics
+            .iter()
+            .filter(|m| m.tag_matches("output", output_name)),
+    )
 }
