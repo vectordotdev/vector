@@ -8,5 +8,5 @@ rm -f vector-v0.19.0.tar.gz
 
 pushd ../..
 cargo clean && cargo build --release --no-default-features --features sources-stdin,sinks-http
-popd
+popd || exit
 cp ../../target/release/vector vector-pr
