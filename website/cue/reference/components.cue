@@ -417,7 +417,7 @@ components: {
 	#Input: {
 		logs:    bool
 		metrics: #MetricInput | null
-		traces:   bool
+		traces:  bool
 	}
 
 	#LogOutput: [Name=string]: {

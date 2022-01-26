@@ -64,7 +64,7 @@ components: sinks: console: {
 			set:          true
 			summary:      true
 		}
-		traces:  true
+		traces: true
 	}
 
 	telemetry: metrics: {

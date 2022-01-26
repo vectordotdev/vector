@@ -48,7 +48,7 @@ components: transforms: metric_to_log: {
 			set:          true
 			summary:      true
 		}
-		traces:  false
+		traces: false
 	}
 
 	examples: [

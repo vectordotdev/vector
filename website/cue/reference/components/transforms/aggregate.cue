@@ -51,7 +51,7 @@ components: transforms: aggregate: {
 			set:          true
 			summary:      true
 		}
-		traces:  false
+		traces: false
 	}
 
 	examples: [

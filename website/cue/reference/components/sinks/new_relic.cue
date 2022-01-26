@@ -121,7 +121,7 @@ components: sinks: new_relic: {
 			set:          true
 			summary:      true
 		}
-		traces:  false
+		traces: false
 	}
 
 	telemetry: components.sinks.http.telemetry

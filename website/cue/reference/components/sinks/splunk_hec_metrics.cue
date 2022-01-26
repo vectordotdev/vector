@@ -139,7 +139,7 @@ components: sinks: splunk_hec_metrics: {
 			set:          false
 			summary:      false
 		}
-		traces:  false
+		traces: false
 	}
 
 	telemetry: components.sinks.splunk_hec_logs.telemetry
