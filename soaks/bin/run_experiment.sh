@@ -114,7 +114,6 @@ periods=0
 (( target_samples = TOTAL_SAMPLES + WARMUP_SECONDS ))
 while [ $recorded_samples -le $target_samples ]
 do
-    kubectl get pods -owide -A
     # Check that the capture file grows monotonically. If it shrinks this
     # indicates a serious problem.
     observed_samples=$(grep "bytes_written" "${SOAK_CAPTURE_FILE}" | wc -l)
