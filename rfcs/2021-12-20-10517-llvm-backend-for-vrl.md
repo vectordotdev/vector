@@ -254,6 +254,18 @@ with memory layout and doesn't force us to define an FFI when we only use basic
 integer types or pointers/references. It also provides us with Rust's memory
 safety guarantees for large parts of the emitted LLVM IR.
 
+Specifically, the idea is to compose VRLs functionality entirely via the
+following LLVM instructions only:
+
+- `alloca` stack allocations
+- `br` conditional and unconditional branching
+- `call`s to Rust stubs
+- `global`s for constants
+
+This makes the implementation quite maintainable to Rust programmers, even with
+only a superficial understanding of LLVM and the emitted LLVM IR can be
+sufficiently optimized by LLVM's optimization passes.
+
 Most expressions which rely predominantly on precompiled Rust build LLVM IR
 similar to the following
 
