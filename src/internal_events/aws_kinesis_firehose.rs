@@ -47,7 +47,8 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => "receiving",
-            "error" => self.code.to_string(),
+            "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
+            "error_code" => self.code.to_string(),
             "error_type" => "http_error",
         );
         // deprecated
