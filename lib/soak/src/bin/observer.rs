@@ -294,7 +294,7 @@ impl TargetWorker {
                     }
                 }
                 Err(e) => {
-                    debug!(
+                    error!(
                         "Did not receive a response from {} with error: {}",
                         self.target_id, e
                     );
