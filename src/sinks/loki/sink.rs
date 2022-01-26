@@ -299,7 +299,10 @@ impl LokiSink {
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         Ok(Self {
             acker: cx.acker(),
-            request_builder: LokiRequestBuilder::default(),
+            request_builder: LokiRequestBuilder {
+                compression: config.compression,
+                encoder: LokiBatchEncoder::default(),
+            },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
                 encoding: config.encoding,
@@ -309,7 +312,7 @@ impl LokiSink {
             },
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
-            service: LokiService::new(client, config.endpoint, config.auth)?,
+            service: LokiService::new(client, config.endpoint, config.auth, config.compression)?,
         })
     }
 

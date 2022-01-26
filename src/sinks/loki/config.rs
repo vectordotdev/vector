@@ -10,6 +10,7 @@ use crate::{
     sinks::{
         util::{
             encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
+            Compression,
         },
         VectorSink,
     },
@@ -22,6 +23,8 @@ use crate::{
 pub struct LokiConfig {
     pub endpoint: UriSerde,
     pub encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
+    pub compression: Compression,
 
     pub tenant_id: Option<Template>,
     pub labels: HashMap<Template, Template>,
