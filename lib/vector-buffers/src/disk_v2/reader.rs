@@ -118,8 +118,8 @@ where
     /// This can occur when records written to a buffer in previous versions of Vector are read by
     /// newer versions of Vector where the encoding scheme, or record schema, used in the previous
     /// version of Vector are no longer able to be decoded in this version of Vector.
-    #[snafu(display("record version not compatible"))]
-    Incompatible,
+    #[snafu(display("record version not compatible: {}", reason))]
+    Incompatible { reason: String },
 
     /// The reader detected that a data file contains a partially-written record.
     ///
@@ -327,19 +327,26 @@ where
         // - `try_next_record` is the only method that can hand back a `ReadToken`
         // - we only get a `ReadToken` if there's a valid record in `self.aligned_buf`
         // - `try_next_record` does all the archive checks, checksum validation, etc
-        let archived_record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
+        let record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
 
         // Try and convert the raw record metadata into the true metadata type used by `T`, and then
         // also verify that `T` is able to decode records with the metadata used for this record in particular.
         let metadata =
-            T::Metadata::from_u32(archived_record.metadata()).ok_or(ReaderError::Incompatible)?;
+            T::Metadata::from_u32(record.metadata()).ok_or(ReaderError::Incompatible {
+                reason: format!("invalid metadata for {}", std::any::type_name::<T>()),
+            })?;
 
         if !T::can_decode(metadata) {
-            return Err(ReaderError::Incompatible);
+            return Err(ReaderError::Incompatible {
+                reason: format!(
+                    "record metadata not supported (metadata: {:#036b})",
+                    record.metadata()
+                ),
+            });
         }
 
         // Now we can finally try decoding.
-        T::decode(metadata, archived_record.payload()).context(DecodeSnafu)
+        T::decode(metadata, record.payload()).context(DecodeSnafu)
     }
 }
 

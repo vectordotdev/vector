@@ -675,7 +675,8 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
 
 #[tokio::test]
 async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
-    static METADATA_VALUE: AtomicU32 = AtomicU32::new(0);
+    static GET_METADATA_VALUE: AtomicU32 = AtomicU32::new(0);
+    static CAN_DECODE_VALUE: AtomicU32 = AtomicU32::new(0);
 
     impl AsMetadata for u32 {
         fn into_u32(self) -> u32 {
@@ -683,7 +684,11 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
         }
 
         fn from_u32(value: u32) -> Option<Self> {
-            Some(value)
+            if value < 32 {
+                Some(value)
+            } else {
+                None
+            }
         }
     }
 
@@ -696,11 +701,11 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
         type DecodeError = io::Error;
 
         fn get_metadata() -> Self::Metadata {
-            METADATA_VALUE.load(Ordering::Relaxed)
+            GET_METADATA_VALUE.load(Ordering::Relaxed)
         }
 
         fn can_decode(metadata: Self::Metadata) -> bool {
-            METADATA_VALUE.load(Ordering::Relaxed) == metadata
+            CAN_DECODE_VALUE.load(Ordering::Relaxed) == metadata
         }
 
         fn encode<B: BufMut>(self, buffer: &mut B) -> Result<(), Self::EncodeError> {
@@ -727,7 +732,7 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             // Create a regular buffer, no customizations required.
             let (mut writer, mut reader, _acker, _ledger) = create_default_buffer(data_dir).await;
 
-            // Write two`ControllableRecord` records which will encode with metadata matching our
+            // Write two `ControllableRecord` records which will encode with metadata matching our
             // starting metadata state.  We'll then make sure we can read the first one out before
             // tweaking the value underpinning the `can_decode` logic.
             writer
@@ -742,6 +747,17 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
 
+            // Write one more `ControllableRecord` record but with an adjusted metadata value that
+            // we'll make sure doesn't correctly convert from `u32` to `T::Metadata`.  This is to
+            // exercise the codepath where the flags don't even seem to be valid at all i.e. bits
+            // are set that aren't even defined on the Vector side.
+            GET_METADATA_VALUE.store(33, Ordering::Relaxed);
+            writer
+                .write_record(ControllableRecord(54))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
             // Now try to read back the first record, which should return correctly:
             let first_read_result = reader.next().await;
             assert!(matches!(
@@ -752,9 +768,33 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             // And now try to read back the second record, but first, we'll tweak `CAN_DECODE_VALUE`
             // so that it doesn't match the metadata value the second record was encoded with, which
             // should cause an "incompatible" error:
-            METADATA_VALUE.store(1, Ordering::Relaxed);
+            CAN_DECODE_VALUE.store(1, Ordering::Relaxed);
             let second_read_result = reader.next().await;
-            assert!(matches!(second_read_result, Err(ReaderError::Incompatible)));
+            assert!(matches!(second_read_result, Err(ReaderError::Incompatible { .. })));
+            let second_read_error_reason = if let ReaderError::Incompatible { reason } = second_read_result.unwrap_err() {
+                reason
+            } else {
+                panic!("error should be ReadError::Incompatible");
+            };
+            let expected_second_read_error_reason = format!("record metadata not supported (metadata: {:#036b})", 0_u32);
+            assert_eq!(expected_second_read_error_reason, second_read_error_reason);
+
+            // And finally we try to read back the third record, which shouldn't even get to the
+            // `can_decode` step because the metadata value just couldn't be converted:
+            // And now try to read back the second record, but first, we'll tweak `CAN_DECODE_VALUE`
+            // so that it doesn't match the metadata value the second record was encoded with, which
+            // should cause an "incompatible" error:
+            let third_read_result = reader.next().await;
+            assert!(matches!(third_read_result, Err(ReaderError::Incompatible { .. })));
+            let third_read_error_reason = if let ReaderError::Incompatible { reason } = third_read_result.unwrap_err() {
+                reason
+            } else {
+                panic!("error should be ReadError::Incompatible");
+            };
+            let expected_third_read_error_reason_prefix = "invalid metadata for";
+            assert!(third_read_error_reason.starts_with(expected_third_read_error_reason_prefix),
+                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{}' instead",
+                third_read_error_reason);
         }
     })
     .await;
