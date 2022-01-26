@@ -46,6 +46,8 @@ jobs:
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
+      coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
+      erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
     steps:
       - uses: actions/checkout@v2.3.5
         with:
@@ -91,14 +93,20 @@ jobs:
           export SOAK_CPUS="7"
           export SOAK_MEMORY="30g"
           export VECTOR_CPUS="4"
+          export COEFFICIENT_OF_VARIATION="0.3"
+          export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
+          echo "coefficient of variation limit: ${COEFFICIENT_OF_VARIATION}"
+          echo "list of erratic soaks: ${ERRATIC_SOAKS}"
 
           echo "::set-output name=SOAK_CPUS::${SOAK_CPUS}"
+          echo "::set-output name=COEFFICIENT_OF_VARIATION::${COEFFICIENT_OF_VARIATION}"
           echo "::set-output name=SOAK_MEMORY::${SOAK_MEMORY}"
           echo "::set-output name=VECTOR_CPUS::${VECTOR_CPUS}"
+          echo "::set-output name=ERRATIC_SOAKS::${ERRATIC_SOAKS}"
 
   compute-test-plan:
     name: Compute soak test plan
@@ -268,6 +276,46 @@ jobs:
           minikube delete --all --purge
           docker system prune --all --volumes --force
 
+  detect-erratic-baseline:
+    name: Erratic detection - baseline
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-20.04
+    needs:
+      - compute-soak-meta
+      - soak-baseline
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.1"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant baseline \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
+
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
     if: ${{ github.actor != 'dependabot[bot]' }}
@@ -305,6 +353,46 @@ jobs:
         run: |
           minikube delete --all --purge
           docker system prune --all --volumes --force
+
+  detect-erratic-comparison:
+    name: Erratic detection - comparison
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-20.04
+    needs:
+      - compute-soak-meta
+      - soak-comparison
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.1"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant comparison \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   analyze-results:
     name: Soak analysis
@@ -345,6 +433,8 @@ jobs:
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                          --warmup-seconds 30 \
+                                         --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                         --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
@@ -396,6 +486,7 @@ jobs:
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
+                                         --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1
 
   plot-analysis:
