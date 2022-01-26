@@ -680,10 +680,6 @@ LLVM, some of which I linked to [above](#introduction-to-llvm). In addition,
 there should be great focus to document this part of the code base
 extraordinarily well.
 
-## Prior Art
-
-_TODO._
-
 ## Alternatives
 
 ### Compile to Rust
