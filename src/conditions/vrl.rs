@@ -102,8 +102,10 @@ impl Condition for Vrl {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
             })
-            .unwrap_or_else(|_| {
-                emit!(&VrlConditionExecutionError);
+            .unwrap_or_else(|err| {
+                emit!(&VrlConditionExecutionError {
+                    error: err.to_string().as_ref()
+                });
                 false
             })
     }
