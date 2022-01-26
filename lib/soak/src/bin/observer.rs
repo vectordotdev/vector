@@ -25,7 +25,7 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     time::{interval_at, Instant},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 fn default_config_path() -> String {
