@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::time::Duration;
 
 use metrics::{counter, histogram};
@@ -55,7 +53,7 @@ impl InternalEvent for ExecFailedError<'_> {
             message = "Unable to exec.",
             command = %self.command,
             error = ?self.error,
-            error_type = "failed",
+            error_type = "command_failed",
             stage = "receiving",
         );
     }
