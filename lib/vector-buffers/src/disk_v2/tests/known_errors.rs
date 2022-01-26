@@ -1,11 +1,16 @@
-use std::io::SeekFrom;
+use std::{
+    io::{self, SeekFrom},
+    sync::atomic::{AtomicU32, Ordering},
+};
 
+use bytes::{Buf, BufMut};
 use memmap2::MmapMut;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncSeekExt, AsyncWriteExt},
 };
 use tracing::Instrument;
+use vector_common::byte_size_of::ByteSizeOf;
 
 use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, UndecodableRecord};
 use crate::{
@@ -17,6 +22,7 @@ use crate::{
         tests::{create_buffer_with_max_data_file_size, SizedRecord},
         ReaderError,
     },
+    encoding::{AsMetadata, Encodable},
 };
 
 #[tokio::test]
@@ -665,4 +671,131 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
     let parent =
         trace_span!("writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented");
     fut.instrument(parent).await;
+}
+
+#[tokio::test]
+async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
+    static GET_METADATA_VALUE: AtomicU32 = AtomicU32::new(0);
+    static CAN_DECODE_VALUE: AtomicU32 = AtomicU32::new(0);
+
+    impl AsMetadata for u32 {
+        fn into_u32(self) -> u32 {
+            self
+        }
+
+        fn from_u32(value: u32) -> Option<Self> {
+            if value < 32 {
+                Some(value)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct ControllableRecord(u8);
+
+    impl Encodable for ControllableRecord {
+        type Metadata = u32;
+        type EncodeError = io::Error;
+        type DecodeError = io::Error;
+
+        fn get_metadata() -> Self::Metadata {
+            GET_METADATA_VALUE.load(Ordering::Relaxed)
+        }
+
+        fn can_decode(metadata: Self::Metadata) -> bool {
+            CAN_DECODE_VALUE.load(Ordering::Relaxed) == metadata
+        }
+
+        fn encode<B: BufMut>(self, buffer: &mut B) -> Result<(), Self::EncodeError> {
+            buffer.put_u8(self.0);
+            Ok(())
+        }
+
+        fn decode<B: Buf>(_: Self::Metadata, mut buffer: B) -> Result<Self, Self::DecodeError> {
+            let b = buffer.get_u8();
+            Ok(ControllableRecord(b))
+        }
+    }
+
+    impl ByteSizeOf for ControllableRecord {
+        fn allocated_bytes(&self) -> usize {
+            0
+        }
+    }
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a regular buffer, no customizations required.
+            let (mut writer, mut reader, _acker, _ledger) = create_default_buffer(data_dir).await;
+
+            // Write two `ControllableRecord` records which will encode with metadata matching our
+            // starting metadata state.  We'll then make sure we can read the first one out before
+            // tweaking the value underpinning the `can_decode` logic.
+            writer
+                .write_record(ControllableRecord(21))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            writer
+                .write_record(ControllableRecord(86))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            // Write one more `ControllableRecord` record but with an adjusted metadata value that
+            // we'll make sure doesn't correctly convert from `u32` to `T::Metadata`.  This is to
+            // exercise the codepath where the flags don't even seem to be valid at all i.e. bits
+            // are set that aren't even defined on the Vector side.
+            GET_METADATA_VALUE.store(33, Ordering::Relaxed);
+            writer
+                .write_record(ControllableRecord(54))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            // Now try to read back the first record, which should return correctly:
+            let first_read_result = reader.next().await;
+            assert!(matches!(
+                first_read_result,
+                Ok(Some(ControllableRecord(21)))
+            ));
+
+            // And now try to read back the second record, but first, we'll tweak `CAN_DECODE_VALUE`
+            // so that it doesn't match the metadata value the second record was encoded with, which
+            // should cause an "incompatible" error:
+            CAN_DECODE_VALUE.store(1, Ordering::Relaxed);
+            let second_read_result = reader.next().await;
+            assert!(matches!(second_read_result, Err(ReaderError::Incompatible { .. })));
+            let second_read_error_reason = if let ReaderError::Incompatible { reason } = second_read_result.unwrap_err() {
+                reason
+            } else {
+                panic!("error should be ReadError::Incompatible");
+            };
+            let expected_second_read_error_reason = format!("record metadata not supported (metadata: {:#036b})", 0_u32);
+            assert_eq!(expected_second_read_error_reason, second_read_error_reason);
+
+            // And finally we try to read back the third record, which shouldn't even get to the
+            // `can_decode` step because the metadata value just couldn't be converted:
+            // And now try to read back the second record, but first, we'll tweak `CAN_DECODE_VALUE`
+            // so that it doesn't match the metadata value the second record was encoded with, which
+            // should cause an "incompatible" error:
+            let third_read_result = reader.next().await;
+            assert!(matches!(third_read_result, Err(ReaderError::Incompatible { .. })));
+            let third_read_error_reason = if let ReaderError::Incompatible { reason } = third_read_result.unwrap_err() {
+                reason
+            } else {
+                panic!("error should be ReadError::Incompatible");
+            };
+            let expected_third_read_error_reason_prefix = "invalid metadata for";
+            assert!(third_read_error_reason.starts_with(expected_third_read_error_reason_prefix),
+                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{}' instead",
+                third_read_error_reason);
+        }
+    })
+    .await;
 }
