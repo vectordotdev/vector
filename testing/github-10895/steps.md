@@ -18,21 +18,21 @@ also create a buffer.
 ## Test Case(s)
 
 1. Establish a baseline of ther "old to new" migration behavior from 0.18.1 to 0.19.1:
-  - Run the 0.18.1 binary with a clean data directory and ensure it creates the old-style buffer
+    - Run the 0.18.1 binary with a clean data directory and ensure it creates the old-style buffer
     data directory, but don't send any data through.
-  - Run the PR binary and ensure that it renames the old-style buffer data directory to the
+    - Run the PR binary and ensure that it renames the old-style buffer data directory to the
     new-style buffer data directory.  Again, send no data through.
-  - No other data directories for the buffer should exist.
+    - No other data directories for the buffer should exist.
 2. Ensure that the "old to new" migration logic still works from 0.18.1 (old) to the PR (new) version:
-  - Run the 0.18.1 binary with a clean data directory and ensure it creates the old-style buffer
+    - Run the 0.18.1 binary with a clean data directory and ensure it creates the old-style buffer
     data directory, but don't send any data through.
-  - Run the PR binary and ensure that it renames the old-style buffer data directory to the
+    - Run the PR binary and ensure that it renames the old-style buffer data directory to the
     new-style buffer data directory.  Again, send no data through.
-  - No other data directories for the buffer should exist.
-  - Crucially, each step should appear identical to the output in test case #1.
+    - No other data directories for the buffer should exist.
+    - Crucially, each step should appear identical to the output in test case #1.
 3. Ensure that the "new" style name still holds through from 0.19.1 to the PR version:
-  - Run the 0.19.1 binary with a clean data directory and ensure it creates the new-style buffer
+    - Run the 0.19.1 binary with a clean data directory and ensure it creates the new-style buffer
     data directory, but don't send any data through.
-  - Run the PR binary and ensure that it leaves the data directory, as created by the 0.19.1 binary,
+    - Run the PR binary and ensure that it leaves the data directory, as created by the 0.19.1 binary,
     as is, in terms of naming.
-  - No other data directories for the buffer should exist.
+    - No other data directories for the buffer should exist.
