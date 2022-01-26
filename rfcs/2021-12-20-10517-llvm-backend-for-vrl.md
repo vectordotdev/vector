@@ -305,7 +305,15 @@ which will emit the LLVM instruction
 
 it is our responsibility to initialize and drop the value accordingly. This can
 be accomplished by calling the implementations for `vrl_resolved_initialize` and
-`vrl_resolved_drop` shown further below.
+`vrl_resolved_drop` as shown further below. To facilitate safe usage, we can
+expose a module builder API where allocating a temporary value immediately
+inserts a call to `vrl_resolved_initialize` and to `vrl_resolved_drop` when the
+builder value is dropped from the scope. In combination with the
+[`llvm.lifetime.start`](https://llvm.org/docs/LangRef.html#llvm-lifetime-start-intrinsic)
+and
+[`llvm.lifetime.end`](https://llvm.org/docs/LangRef.html#llvm-lifetime-end-intrinsic)
+intrinsics, that should guard us against use of uninitialized values or usage
+after the value has been dropped.
 
 Constants can be moved into the LLVM module by consuming the constant value of
 type `T`, transmuting it to `[i8]` and transmuting it back to `T` when unloading
