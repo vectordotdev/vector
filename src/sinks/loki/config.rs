@@ -4,6 +4,7 @@ use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::sinks::util::Compression;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
@@ -16,7 +17,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use crate::sinks::util::Compression;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

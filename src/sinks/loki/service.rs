@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::{UriSerde, Compression},
+    sinks::util::{Compression, UriSerde},
 };
 
 #[derive(Debug, Snafu)]

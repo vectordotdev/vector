@@ -23,7 +23,12 @@ components: sinks: loki: {
 				max_events:   100_000
 				timeout_secs: 1
 			}
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -106,12 +111,6 @@ components: sinks: loki: {
 				}
 			}
 		}
-        compression: {
-            enabled: true
-            default: "none"
-            algorithms: ["none", "gzip"]
-            levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-        }
 		out_of_order_action: {
 			common: false
 			description: """
