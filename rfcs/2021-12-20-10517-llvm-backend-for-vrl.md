@@ -1,90 +1,179 @@
 # RFC 10517 - 2021-12-20 - LLVM Backend for VRL
 
-Performance is a key aspect of VRL. We aim to provide a language that is ["extremely fast and efficient"](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L6) and ["ergonomically safe in that it makes it difficult to create slow or buggy VRL programs"](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/ergonomic_safety.cue#L4). Moving towards this goal, we propose to speed up general program execution by using LLVM to eliminate any runtime overhead that is currently associated with interpreting a VRL program.
+Performance is a key aspect of VRL. We aim to provide a language that is
+["extremely fast and efficient"](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L6)
+and
+["ergonomically safe in that it makes it difficult to create slow or buggy VRL programs"](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/ergonomic_safety.cue#L4).
+Moving towards this goal, we propose to speed up general program execution by
+using LLVM to eliminate any runtime overhead that is currently associated with
+interpreting a VRL program.
 
 ## Common Misconceptions
 
-Below we present a list of statements that have commonly come up when discussing the current execution model of VRL. We illustrate where these thoughts come from and how their understanding is often counter-intuitive.
+Below we present a list of statements that have commonly come up when discussing
+the current execution model of VRL. We illustrate where these thoughts come from
+and how their understanding is often counter-intuitive.
 
 ### "VRL programs are compiled to and run as native Rust code" [↪](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L4)
 
-Vector's codebase consists entirely of code written in Rust, so one might be inclined to conclude that anything running inside of Vector is running as "native Rust" code. This is true from a computability point of view - VRL processes events in a way that is semantically indistinguishable from transformations that were hand-written in Rust. However, implementation details are critical for execution time, not just the semantic definition of their computation.
+Vector's codebase consists entirely of code written in Rust, so one might be
+inclined to conclude that anything running inside of Vector is running as
+"native Rust" code. This is true from a computability point of view - VRL
+processes events in a way that is semantically indistinguishable from
+transformations that were hand-written in Rust. However, implementation details
+are critical for execution time, not just the semantic definition of their
+computation.
 
-In particular, removing the hidden indirection of "we implement a mechanism that can perform sufficiently general computation within our program to execute program logic" to "we implement a program that executes program logic" makes a surprisingly large [difference](#the-time-spent-within-the-vrl-interpretervm-itself-is-small-removing-this-overhead-can-hardly-result-in-significant-performance-improvements), even if the aforementioned mechanism is written in a high-performance language.
+In particular, removing the hidden indirection of "we implement a mechanism that
+can perform sufficiently general computation within our program to execute
+program logic" to "we implement a program that executes program logic" makes a
+surprisingly large
+[difference](#the-time-spent-within-the-vrl-interpretervm-itself-is-small-removing-this-overhead-can-hardly-result-in-significant-performance-improvements),
+even if the aforementioned mechanism is written in a high-performance language.
 
-In its current implementation, "VRL programs are compiled to a representation that is interpreted in native Rust code" would be a more fitting description.
+In its current implementation, "VRL programs are compiled to a representation
+that is interpreted in native Rust code" would be a more fitting description.
 
 ### "VRL programs are extremely fast and efficient, with performance characteristics very close to Rust itself" [↪](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L6)
 
-Many code paths taken during execution of a VRL program have been compiled by Rust, e.g. when inserting or deleting paths of a VRL value, parsing JSON or matching with regular expressions. These paths are highly optimized and don't incur any runtime overhead on top of what the Rust compiler is able to produce.
+Many code paths taken during execution of a VRL program have been compiled by
+Rust, e.g. when inserting or deleting paths of a VRL value, parsing JSON or
+matching with regular expressions. These paths are highly optimized and don't
+incur any runtime overhead on top of what the Rust compiler is able to produce.
 
-However, the top-level control flow of a VRL program is orchestrated at runtime and therefore different from a semantically equivalent transformation that has been implemented in Rust. The main difference lies in that when compiling a Rust program, the CPU knows statically which branches are taken between VRL expressions (minus conditionals and error handling). We elaborate on the **super-proportional** effects this has on performance further [below](#the-time-spent-within-the-vrl-interpretervm-itself-is-small-removing-this-overhead-can-hardly-result-in-significant-performance-improvements).
+However, the top-level control flow of a VRL program is orchestrated at runtime
+and therefore different from a semantically equivalent transformation that has
+been implemented in Rust. The main difference lies in that when compiling a Rust
+program, the CPU knows statically which branches are taken between VRL
+expressions (minus conditionals and error handling). We elaborate on the
+**super-proportional** effects this has on performance further
+[below](#the-time-spent-within-the-vrl-interpretervm-itself-is-small-removing-this-overhead-can-hardly-result-in-significant-performance-improvements).
 
 ### "VRL has no runtime [...]" [↪](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L7)
 
-There is no way to point the CPU instruction counter to a VRL [`Program`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/program.rs#L5-L10) to execute it. Instead, it relies on a runtime to interpret a VRL program by implementing a [`resolve`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L51-L56) method for each expression. Even though we didn't explicitly name this runtime system, it fits the very definition of ["_any behavior not directly attributable to the program itself_"](https://en.wikipedia.org/wiki/Runtime_system#Overview) well.
+There is no way to point the CPU instruction counter to a VRL
+[`Program`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/program.rs#L5-L10)
+to execute it. Instead, it relies on a runtime to interpret a VRL program by
+implementing a
+[`resolve`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L51-L56)
+method for each expression. Even though we didn't explicitly name this runtime
+system, it fits the very definition of
+["_any behavior not directly attributable to the program itself_"](https://en.wikipedia.org/wiki/Runtime_system#Overview)
+well.
 
 ### "The time spent within the VRL interpreter/VM itself is small, removing this overhead can hardly result in significant performance improvements"
 
-When inspecting flamegraphs of VRL program execution one can see that, on a very roughly estimate, no more than 25% of the time is spent in the interpret call itself without progressing the program state. So, how can one expect that by removing this overhead, any performance increase bigger than 33% would be attainable?
+When inspecting flamegraphs of VRL program execution one can see that, on a very
+roughly estimate, no more than 25% of the time is spent in the interpret call
+itself without progressing the program state. So, how can one expect that by
+removing this overhead, any performance increase bigger than 33% would be
+attainable?
 
-The answer has largely to do with the [memory bottleneck in the von Neumann architecture](https://en.wikipedia.org/wiki/Von_Neumann_architecture#Von_Neumann_bottleneck) and the mechanisms modern CPU architecture employ to mitigate it.
+The answer has largely to do with the
+[memory bottleneck in the von Neumann architecture](https://en.wikipedia.org/wiki/Von_Neumann_architecture#Von_Neumann_bottleneck)
+and the mechanisms modern CPU architecture employ to mitigate it.
 
-The CPU can improve execution speed of subsequent CPU instructions by using [instruction pipelining](https://en.wikipedia.org/wiki/Instruction_pipelining) as long as these instructions are not fragmented between unpredictable paths. When conditional branches exist but are heavily biased, the CPU can [speculatively execute](https://en.wikipedia.org/wiki/Branch_predictor) instructions and read/write from main memory to hide the [latency of memory access](https://en.wikipedia.org/wiki/Memory_hierarchy#Examples), which is _orders of magnitude_ higher than accessing CPU registers/caches or executing arithmetic operations.
+The CPU can improve execution speed of subsequent CPU instructions by using
+[instruction pipelining](https://en.wikipedia.org/wiki/Instruction_pipelining)
+as long as these instructions are not fragmented between unpredictable paths.
+When conditional branches exist but are heavily biased, the CPU can
+[speculatively execute](https://en.wikipedia.org/wiki/Branch_predictor)
+instructions and read/write from main memory to hide the
+[latency of memory access](https://en.wikipedia.org/wiki/Memory_hierarchy#Examples),
+which is _orders of magnitude_ higher than accessing CPU registers/caches or
+executing arithmetic operations.
 
-In the current execution model, the CPU is not able to predict any control flow on the boundary between any VRL (sub)expression, majorly limiting the CPU utilization by [stalling](https://en.wikipedia.org/wiki/CPU_cache#CPU_stalls) the CPU.
+In the current execution model, the CPU is not able to predict any control flow
+on the boundary between any VRL (sub)expression, majorly limiting the CPU
+utilization by [stalling](https://en.wikipedia.org/wiki/CPU_cache#CPU_stalls)
+the CPU.
 
 ### "Optimizing for single core performance is not as important when one can resort to parallelism first"
 
-When a problem looks [embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel) one might think that squeezing out single-core performance does not look very worthwhile when adding more threads would seemingly always have an outsized effect.
+When a problem looks
+[embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel)
+one might think that squeezing out single-core performance does not look very
+worthwhile when adding more threads would seemingly always have an outsized
+effect.
 
-However, even a small amount of synchronization points can have a detrimental impact on optimal performance. According to [Amdahl's law](https://en.wikipedia.org/wiki/Amdahl%27s_law), even when only 5% of a program can not be parallelized, the maximum performance increase with an _infinite_ amount of threads is capped at 20x.
+However, even a small amount of synchronization points can have a detrimental
+impact on optimal performance. According to
+[Amdahl's law](https://en.wikipedia.org/wiki/Amdahl%27s_law), even when only 5%
+of a program can not be parallelized, the maximum performance increase with an
+_infinite_ amount of threads is capped at 20x.
 
 ### "LLVM is a virtual machine"
 
-Judging from its name, one might assume that LL**VM** stands for "... virtual machine"[^1] and that it's merely a more general and sophisticated VM implementation than our upcoming special purpose VRL virtual machine.
+Judging from its name, one might assume that LL**VM** stands for "... virtual
+machine"[^1] and that it's merely a more general and sophisticated VM
+implementation than our upcoming special purpose VRL virtual machine.
 
-However, even though LLVM provides a virtual instruction set architecture, it is an intermediate representation that exists only during the compilation process between high-level language and machine code **without** any interpretation at runtime.
+However, even though LLVM provides a virtual instruction set architecture, it is
+an intermediate representation that exists only during the compilation process
+between high-level language and machine code **without** any interpretation at
+runtime.
 
-One essential part of LLVM are optimization passes that act on LLVM IR, e.g. by inlining functions, merging code branches, promoting memory access to register access, performing constant-folding, batching allocations and more.
+One essential part of LLVM are optimization passes that act on LLVM IR, e.g. by
+inlining functions, merging code branches, promoting memory access to register
+access, performing constant-folding, batching allocations and more.
 
-Rust uses LLVM to emit machine code, and we intend to employ the exact same technique.
+Rust uses LLVM to emit machine code, and we intend to employ the exact same
+technique.
 
 ## Context / Cross cutting concerns
 
-There's ongoing work on implementing a VM for VRL: [#10011](https://github.com/vectordotdev/vector/pull/10011). While it reduces the interpretation overhead over the current expression traversal, it doesn't eliminate the overhead entirely. More importantly, it doesn't fundamentally improve behavior for speculative execution / branch prediction, since the CPU can't predict the next instruction in the interpreter loop.
+There's ongoing work on implementing a VM for VRL:
+[#10011](https://github.com/vectordotdev/vector/pull/10011). While it reduces
+the interpretation overhead over the current expression traversal, it doesn't
+eliminate the overhead entirely. More importantly, it doesn't fundamentally
+improve behavior for speculative execution / branch prediction, since the CPU
+can't predict the next instruction in the interpreter loop.
 
 ## Scope
 
 ### In scope
 
-Migrating the execution model of VRL to direct machine code execution without runtime interpretation overhead.
+Migrating the execution model of VRL to direct machine code execution without
+runtime interpretation overhead.
 
 ### Out of scope
 
-Any optimization that applies to all execution models for VRL (traversal, VM and LLVM) are not interesting for this consideration, e.g. improving access paths to VRL [`Value`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/value.rs#L21-L32)s.
+Any optimization that applies to all execution models for VRL (traversal, VM and
+LLVM) are not interesting for this consideration, e.g. improving access paths to
+VRL
+[`Value`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/value.rs#L21-L32)s.
 
 ## Pain
 
-Performance investigations of various Vector topologies suggested that the single-core performance of VRL is a bottleneck in many cases.
+Performance investigations of various Vector topologies suggested that the
+single-core performance of VRL is a bottleneck in many cases.
 
 ## Proposal
 
 ### User Experience
 
-The semantics of VRL stay **unchanged**. Any case where a VRL program is not strictly faster in the LLVM execution model versus traversal or VM is considered a definite bug.
+The semantics of VRL stay **unchanged**. Any case where a VRL program is not
+strictly faster in the LLVM execution model versus traversal or VM is considered
+a definite bug.
 
 This is an unconditional win for user experience.
 
 ### Introduction to LLVM
 
-To get familiar with how LLVM looks like and how its code generation builder works, I recommend reading through the official tutorial ["Kaleidoscope: Code generation to LLVM IR"](https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl03.html).
+To get familiar with how LLVM looks like and how its code generation builder
+works, I recommend reading through the official tutorial
+["Kaleidoscope: Code generation to LLVM IR"](https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl03.html).
 
-There exist an adapted version of the [LLVM Kaleidoscope tutorial in Rust](https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs) for [`inkwell`](https://github.com/TheDan64/inkwell), a crate that exposes a safe wrapper around [LLVM's C API](https://llvm.org/doxygen/group__LLVMC.html).
+There exist an adapted version of the
+[LLVM Kaleidoscope tutorial in Rust](https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs)
+for [`inkwell`](https://github.com/TheDan64/inkwell), a crate that exposes a
+safe wrapper around [LLVM's C API](https://llvm.org/doxygen/group__LLVMC.html).
 
-Another great reference is Mukul Rathi's ["A Complete Guide to LLVM for Programming Language Creators"](https://mukulrathi.com/create-your-own-programming-language/llvm-ir-cpp-api-tutorial/).
+Another great reference is Mukul Rathi's
+["A Complete Guide to LLVM for Programming Language Creators"](https://mukulrathi.com/create-your-own-programming-language/llvm-ir-cpp-api-tutorial/).
 
-Godbolt's [Compiler Explorer](https://godbolt.org/) is a great way to understand how compilers emit LLVM. E.g. running
+Godbolt's [Compiler Explorer](https://godbolt.org/) is a great way to understand
+how compilers emit LLVM. E.g. running
 
 ```rust
 #[no_mangle]
@@ -93,7 +182,8 @@ pub extern "C" fn foo(n: i32) -> i32 {
 }
 ```
 
-through the compiler and setting the `rustc` argument to `--emit=llvm-ir -O` emits
+through the compiler and setting the `rustc` argument to `--emit=llvm-ir -O`
+emits
 
 ```llvm
 define i32 @foo(i32 %n) unnamed_addr #0 !dbg !6 {
@@ -102,13 +192,22 @@ define i32 @foo(i32 %n) unnamed_addr #0 !dbg !6 {
 }
 ```
 
-Running `rustc ./program.rs --crate-type=lib --emit=llvm-ir -O` locally will accomplish the same.
+Running `rustc ./program.rs --crate-type=lib --emit=llvm-ir -O` locally will
+accomplish the same.
 
 ### Implementation
 
-On a high level, the goal is to produce executable machine code for a VRL program via emitting LLVM IR. When Vector launches, the VRL program is parsed, translated to LLVM IR, compiled to machine code via LLVM and dynamically loaded into the running process. The resulting `vrl_execute` function symbol is then resolved from the binary and called for each event to be transformed.
+On a high level, the goal is to produce executable machine code for a VRL
+program via emitting LLVM IR. When Vector launches, the VRL program is parsed,
+translated to LLVM IR, compiled to machine code via LLVM and dynamically loaded
+into the running process. The resulting `vrl_execute` function symbol is then
+resolved from the binary and called for each event to be transformed.
 
-Instead of recursively calling [`resolve`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L51-L56) on an [`Expression`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L50), we add an `emit_llvm` method to the trait:
+Instead of recursively calling
+[`resolve`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L51-L56)
+on an
+[`Expression`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L50),
+we add an `emit_llvm` method to the trait:
 
 ```rust
 /// Emit LLVM IR that computes the `Value` for this expression.
@@ -134,15 +233,29 @@ pub struct Context<'ctx> {
 }
 ```
 
-By convention, each expression can call `context.result_ref()` to get an LLVM `PointerValue` with a pointer to where the [`Resolved`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L48) value should be stored.
+By convention, each expression can call `context.result_ref()` to get an LLVM
+`PointerValue` with a pointer to where the
+[`Resolved`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L48)
+value should be stored.
 
-The result pointer can be temporarily changed using `context.set_result_ref()`. This mechanism allows the parent expression to call `emit_llvm` on the child while controlling where the machine code emitted for the child expression stores the result. This is useful, e.g. when emitting a binary operation where both of its operands need to be computed first.
+The result pointer can be temporarily changed using `context.set_result_ref()`.
+This mechanism allows the parent expression to call `emit_llvm` on the child
+while controlling where the machine code emitted for the child expression stores
+the result. This is useful, e.g. when emitting a binary operation where both of
+its operands need to be computed first.
 
-Calling `context.context_ref()` returns a reference to the VRL [`Context`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/context.rs#L5-L9) that is provided by the `remap` transform as a function argument.
+Calling `context.context_ref()` returns a reference to the VRL
+[`Context`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/context.rs#L5-L9)
+that is provided by the `remap` transform as a function argument.
 
-For anything less trivial than emitting branches or calling functions, we want to leverage the Rust compiler. For one, this allows us to not concern ourselves with memory layout and doesn't force us to define an FFI when we only use basic integer types or pointers/references. It also provides us with Rust's memory safety guarantees for large parts of the emitted LLVM IR.
+For anything less trivial than emitting branches or calling functions, we want
+to leverage the Rust compiler. For one, this allows us to not concern ourselves
+with memory layout and doesn't force us to define an FFI when we only use basic
+integer types or pointers/references. It also provides us with Rust's memory
+safety guarantees for large parts of the emitted LLVM IR.
 
-Most expressions which rely predominantly on precompiled Rust build LLVM IR similar to the following
+Most expressions which rely predominantly on precompiled Rust build LLVM IR
+similar to the following
 
 ```rust
 let fn_ident = "vrl_resolved_initialize";
@@ -160,9 +273,13 @@ which will emit the LLVM instruction
 call void @vrl_resolved_initialize(%"std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>"* %result)
 ```
 
-This call refers to a function compiled by Rust in the same LLVM module. However, we don't need to actually call this function, the implementation can be inlined and optimized by LLVM since the whole source code is known. This way of emitting LLVM IR is merely very convenient to stitch together code fragments.
+This call refers to a function compiled by Rust in the same LLVM module.
+However, we don't need to actually call this function, the implementation can be
+inlined and optimized by LLVM since the whole source code is known. This way of
+emitting LLVM IR is merely very convenient to stitch together code fragments.
 
-For temporary values needed e.g. in binary operations we can allocate uninitialized stack values:
+For temporary values needed e.g. in binary operations we can allocate
+uninitialized stack values:
 
 ```rust
 let result_temp_ref = ctx.build_alloca_resolved("temp")?;
@@ -174,11 +291,20 @@ which will emit the LLVM instruction
 %temp = alloca %"std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>", align 8
 ```
 
-it is our responsibility to initialize and drop the value accordingly. This can be accomplished by calling the implementations for `vrl_resolved_initialize` and `vrl_resolved_drop` shown further below.
+it is our responsibility to initialize and drop the value accordingly. This can
+be accomplished by calling the implementations for `vrl_resolved_initialize` and
+`vrl_resolved_drop` shown further below.
 
-Constants can be moved into the LLVM module by consuming the constant value of type `T`, transmuting it to `[i8]` and transmuting it back to `T` when unloading the LLVM module. This is safe since Rust's semantics allow all types to be moved in memory unless they are `Pin`. Writing constants into the LLVM module has the benefit of allowing LLVM to apply constant folding at compile time.
+Constants can be moved into the LLVM module by consuming the constant value of
+type `T`, transmuting it to `[i8]` and transmuting it back to `T` when unloading
+the LLVM module. This is safe since Rust's semantics allow all types to be moved
+in memory unless they are `Pin`. Writing constants into the LLVM module has the
+benefit of allowing LLVM to apply constant folding at compile time.
 
-Below we show a preliminary, work-in-progress excerpt of the precompiled functions. The LLVM module will be initialized with the resulting bitcode. Therefore, these function symbols possibly do not exist at runtime anymore if they are optimized out by LLVM.
+Below we show a preliminary, work-in-progress excerpt of the precompiled
+functions. The LLVM module will be initialized with the resulting bitcode.
+Therefore, these function symbols possibly do not exist at runtime anymore if
+they are optimized out by LLVM.
 
 ```rust
 #[no_mangle]
@@ -240,7 +366,9 @@ pub extern "C" fn vrl_expression_query_target_external_impl(
 }
 ```
 
-With the precompiled library, we can emit code in terms of it by utilizing stack allocations, branches and functions calls only. E.g. the LLVM IR for the following VRL program:
+With the precompiled library, we can emit code in terms of it by utilizing stack
+allocations, branches and functions calls only. E.g. the LLVM IR for the
+following VRL program:
 
 ```vrl
 if .status == 123 {
@@ -478,27 +606,56 @@ NewDefault:                                       ; preds = %LeafBlock21, %LeafB
 }
 ```
 
-Note the batched stack allocations, inlining of function calls and consolidation of control flow.
+Note the batched stack allocations, inlining of function calls and consolidation
+of control flow.
 
 ## Rationale
 
-As long as the single-core performance of VRL is the bottleneck of a topology, general performance improvements to VRL are extremely valuable as they equate to an equally sized performance improvement to the entire topology.
+As long as the single-core performance of VRL is the bottleneck of a topology,
+general performance improvements to VRL are extremely valuable as they equate to
+an equally sized performance improvement to the entire topology.
 
-We want to live up to the [performance guarantees](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L4-L8) outlined in VRL's list of features.
+We want to live up to the
+[performance guarantees](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/website/cue/reference/remap/features/compilation.cue#L4-L8)
+outlined in VRL's list of features.
 
-Every VRL program benefits from the reduced runtime overhead, without us needing to optimize any specific use case. Consistent execution speed is important to build trust in the language.
+Every VRL program benefits from the reduced runtime overhead, without us needing
+to optimize any specific use case. Consistent execution speed is important to
+build trust in the language.
 
-Being able to execute our log transformation DSL at speeds which would otherwise only be attainable by hand-writing Rust programs will strengthen a key value proposition of Vector: best-in-class performance.
+Being able to execute our log transformation DSL at speeds which would otherwise
+only be attainable by hand-writing Rust programs will strengthen a key value
+proposition of Vector: best-in-class performance.
 
 ## Drawbacks
 
-By generating machine code via LLVM, we are no longer (largely) immune to memory violations. To reduce the error surface as much as possible, we employ industry practices like fuzz-testing VRL programs, static analysis via LLVM and rely on the Rust compiler for any non-trivial code fragments. That being said, memory safety is an illusion - with the difference that we are now exposing ourselves to being partly responsible for maintaining invariants instead of being able to defer to a third party for correctness. We still provide an inherently memory safe language to the user.
+By generating machine code via LLVM, we are no longer (largely) immune to memory
+violations. To reduce the error surface as much as possible, we employ industry
+practices like fuzz-testing VRL programs, static analysis via LLVM and rely on
+the Rust compiler for any non-trivial code fragments. That being said, memory
+safety is an illusion - with the difference that we are now exposing ourselves
+to being partly responsible for maintaining invariants instead of being able to
+defer to a third party for correctness. We still provide an inherently memory
+safe language to the user.
 
-Producing LLVM bitcode for Rust's `std` library is guarded behind the [`-Z build-std`](https://doc.rust-lang.org/cargo/reference/unstable.html#build-std) flag and only available on the nightly compiler toolchain. We need `std` to fully link our precompiled LLVM bitcode. Further investigation is needed here if this means that we need to upgrade our entire compiler toolchain to nightly or if it's possible to build a binary-compatible `std` according to our `rust-toolchain.toml` file.
+Producing LLVM bitcode for Rust's `std` library is guarded behind the
+[`-Z build-std`](https://doc.rust-lang.org/cargo/reference/unstable.html#build-std)
+flag and only available on the nightly compiler toolchain. We need `std` to
+fully link our precompiled LLVM bitcode. Further investigation is needed here if
+this means that we need to upgrade our entire compiler toolchain to nightly or
+if it's possible to build a binary-compatible `std` according to our
+`rust-toolchain.toml` file.
 
-Statically linking LLVM to the Vector binary adds roughly 9MB, additionally to precompiled bitcode that needs to be included with the binary. If this is a concern, we can consider shipping binaries with the LLVM feature disabled.
+Statically linking LLVM to the Vector binary adds roughly 9MB, additionally to
+precompiled bitcode that needs to be included with the binary. If this is a
+concern, we can consider shipping binaries with the LLVM feature disabled.
 
-While LLVM is a highly used framework within the industry, working with it requires rather specialized knowledge about compiler construction. However, there exists plenty of publicly accessible material for code generation using LLVM, some of which I linked to [above](#introduction-to-llvm). In addition, there should be great focus to document this part of the code base extraordinarily well.
+While LLVM is a highly used framework within the industry, working with it
+requires rather specialized knowledge about compiler construction. However,
+there exists plenty of publicly accessible material for code generation using
+LLVM, some of which I linked to [above](#introduction-to-llvm). In addition,
+there should be great focus to document this part of the code base
+extraordinarily well.
 
 ## Prior Art
 
@@ -533,28 +690,43 @@ and therefore not provide any significant benefits over using LLVM directly.
 Using WebAssembly as a compilation target would require us to
 
 - ship a Wasm runtime
-- copy data in and out of WebAssembly or use `mmap`ing techniques which would constrain in which memory regions event data must reside
-- likely slower execution speed because of higher abstraction level and semantics that allow untrusted code to execute safely
+- copy data in and out of WebAssembly or use `mmap`ing techniques which would
+  constrain in which memory regions event data must reside
+- likely slower execution speed because of higher abstraction level and
+  semantics that allow untrusted code to execute safely
 - precompile WebAssembly bitcode or miss optimization potential
 
-additionally to these drawbacks, we just dropped support for the WebAssembly transform.
+additionally to these drawbacks, we just dropped support for the WebAssembly
+transform.
 
 ### Compile to Bitcode
 
-As mentioned in the context, we are currently moving forward with a VM for VRL. Compared to the current execution model and an LLVM-based approach, the VM provides a middle ground for execution speed, memory safety and sophistication.
+As mentioned in the context, we are currently moving forward with a VM for VRL.
+Compared to the current execution model and an LLVM-based approach, the VM
+provides a middle ground for execution speed, memory safety and sophistication.
 
 Weighing the benefits depends on the real world performance of both approaches.
 
 ## Plan Of Attack
 
-Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
+Incremental steps to execute this change. These will be converted to issues
+after the RFC is approved:
 
-- Submit a PR with spike-level code _roughly_ demonstrating the change: [#10442](https://github.com/vectordotdev/vector/pull/10442).
-- Extract a core library from VRL for exposing its types with minimal dependencies, necessary to reduce size of the precompiled bitcode.
+- Submit a PR with spike-level code _roughly_ demonstrating the change:
+  [#10442](https://github.com/vectordotdev/vector/pull/10442).
+- Extract a core library from VRL for exposing its types with minimal
+  dependencies, necessary to reduce size of the precompiled bitcode.
 - Refine code generation by taking into account type information.
 - Add unit tests for each expression in isolation.
-- Add fuzz testing infrastructure that compares results of all three execution modes.
+- Add fuzz testing infrastructure that compares results of all three execution
+  modes.
 
 ---
 
-[^1]: It certainly doesn't help that "LLVM was originally an initialism for Low Level Virtual Machine". However, the "LLVM abbreviation has officially been removed to avoid confusion, as LLVM has evolved into an umbrella project that has little relationship to what most current developers think of as (more specifically) process virtual machines." [↪](https://en.wikipedia.org/wiki/LLVM#History)
+[^1]:
+    It certainly doesn't help that "LLVM was originally an initialism for Low
+    Level Virtual Machine". However, the "LLVM abbreviation has officially been
+    removed to avoid confusion, as LLVM has evolved into an umbrella project
+    that has little relationship to what most current developers think of as
+    (more specifically) process virtual machines."
+    [↪](https://en.wikipedia.org/wiki/LLVM#History)
