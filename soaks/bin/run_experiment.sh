@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TOTAL_SAMPLES=60
+TOTAL_SAMPLES=200
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
 
@@ -108,13 +108,16 @@ sleep "${WARMUP_SECONDS}"
 echo "[${VARIANT}] Waiting for captures file to become available"
 while [ ! -f "${SOAK_CAPTURE_FILE}" ]; do sleep 1; done
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}. Waiting for ${TOTAL_SAMPLES} sample periods."
-periods=0
 recorded_samples=0
-while [ $periods -le $TOTAL_SAMPLES ]
+target_samples=0
+periods=0
+(( target_samples = TOTAL_SAMPLES + WARMUP_SECONDS ))
+while [ $recorded_samples -le $target_samples ]
 do
+    kubectl get pods -owide -A
     # Check that the capture file grows monotonically. If it shrinks this
     # indicates a serious problem.
-    observed_samples=$(wc -l "${SOAK_CAPTURE_FILE}" | awk '{print $1}')
+    observed_samples=$(grep "bytes_written" "${SOAK_CAPTURE_FILE}" | wc -l)
     # shellcheck disable=SC2086
     if [ $recorded_samples -gt $observed_samples ]; then
         echo "SAMPLES LOST. THIS IS A CATASTROPHIC, UNRECOVERABLE FAILURE."
@@ -124,7 +127,7 @@ do
     (( periods = periods + 1 ))
     sleep 1
 done
-echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR} complete. At least ${recorded_samples} collected."
+echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR} complete in ${periods} seconds. At least ${recorded_samples} collected."
 kill "${CAPTURE_MOUNT_PID}"
 popd
 
