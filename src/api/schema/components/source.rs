@@ -6,7 +6,7 @@ use super::{sink, state, transform, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoSourceMetrics, Output},
+        metrics::{self, outputs_by_component_key, IntoSourceMetrics, Output},
         sort,
     },
     config::{ComponentKey, DataType, OutputId},
@@ -100,7 +100,7 @@ impl Source {
 
     /// Source output streams
     pub async fn outputs(&self) -> Vec<Output> {
-        metrics::outputs_by_component_key(self.get_component_key(), self.get_outputs())
+        outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Transform outputs
@@ -173,19 +173,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Any,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
         ]
     }
@@ -251,19 +251,19 @@ mod tests {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
         ];
 
@@ -285,19 +285,19 @@ mod tests {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
         ];
 
@@ -319,19 +319,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
         ];
 
@@ -353,19 +353,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
-                outputs: vec!["_default".to_string()],
+                outputs: vec![],
             }),
         ];
 

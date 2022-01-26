@@ -6,7 +6,7 @@ use super::{sink, source, state, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoTransformMetrics, Output},
+        metrics::{self, outputs_by_component_key, IntoTransformMetrics, Output},
         sort,
     },
     config::{ComponentKey, OutputId},
@@ -69,7 +69,7 @@ impl Transform {
 
     /// Transform output streams
     pub async fn outputs(&self) -> Vec<Output> {
-        metrics::outputs_by_component_key(self.get_component_key(), self.get_outputs())
+        outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Source inputs

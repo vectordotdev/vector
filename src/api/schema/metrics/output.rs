@@ -29,11 +29,9 @@ impl Output {
 
     /// Total sent events for the current output stream
     pub async fn sent_events_total(&self) -> Option<SentEventsTotal> {
-        if let Some(metric) = &self.sent_events_total {
-            Some(SentEventsTotal::new(metric.clone()))
-        } else {
-            None
-        }
+        self.sent_events_total
+            .as_ref()
+            .map(|metric| SentEventsTotal::new(metric.clone()))
     }
 }
 
