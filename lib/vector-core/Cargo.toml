@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "3.0.23", default-features = false, optional = true }
+async-graphql = { version = "3.0.25", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.3", features = ["derive", "serde"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
@@ -37,8 +37,8 @@ pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.134", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.75", default-features = false }
+serde = { version = "1.0.136", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.78", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.7.0", default-features = false }
 substring = { version = "1.4", default-features = false }
@@ -50,7 +50,7 @@ tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.3.6", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
 vector_buffers = { path = "../vector-buffers", default-features = false }
@@ -72,7 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.3"
-tracing-subscriber = { version = "0.3.6", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]

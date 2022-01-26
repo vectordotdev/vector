@@ -1,29 +1,29 @@
-resource "kubernetes_config_map" "vector" {
+resource "kubernetes_config_map" "lading" {
   metadata {
-    name      = "vector"
+    name      = "lading-tcp-blackhole"
     namespace = var.namespace
   }
 
   data = {
-    "vector.toml" = var.vector-toml
+    "tcp_blackhole.yaml" = var.tcp-blackhole-yaml
   }
 }
 
-resource "kubernetes_service" "vector" {
+resource "kubernetes_service" "tcp-blackhole" {
   metadata {
-    name      = "vector"
+    name      = "tcp-blackhole"
     namespace = var.namespace
   }
   spec {
     selector = {
-      app  = "vector"
+      app  = "tcp-blackhole"
       type = var.type
     }
     session_affinity = "ClientIP"
     port {
-      name        = "source"
-      port        = 8282
-      target_port = 8282
+      name        = "ingress"
+      port        = 8080
+      target_port = 8080
     }
     port {
       name        = "prom-export"
@@ -34,13 +34,12 @@ resource "kubernetes_service" "vector" {
   }
 }
 
-
-resource "kubernetes_deployment" "vector" {
+resource "kubernetes_deployment" "tcp-blackhole" {
   metadata {
-    name      = "vector"
+    name      = "tcp-blackhole"
     namespace = var.namespace
     labels = {
-      app  = "vector"
+      app  = "tcp-blackhole"
       type = var.type
     }
   }
@@ -50,7 +49,7 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
-        app  = "vector"
+        app  = "tcp-blackhole"
         type = var.type
       }
     }
@@ -58,7 +57,7 @@ resource "kubernetes_deployment" "vector" {
     template {
       metadata {
         labels = {
-          app  = "vector"
+          app  = "tcp-blackhole"
           type = var.type
         }
         annotations = {
@@ -72,41 +71,26 @@ resource "kubernetes_deployment" "vector" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = var.vector_image
-          name              = "vector"
-
-          env {
-            name  = "VECTOR_THREADS"
-            value = var.vector_cpus
-          }
+          image             = var.lading_image
+          name              = "tcp-blackhole"
+          command           = ["/tcp_blackhole"]
 
           volume_mount {
-            mount_path = "/var/lib/vector"
-            name       = "var-lib-vector"
-          }
-
-          volume_mount {
-            mount_path = "/etc/vector"
-            name       = "etc-vector"
+            mount_path = "/etc/lading"
+            name       = "etc-lading"
             read_only  = true
           }
 
           resources {
-            # Because we do not have the ability to self-constrain vector's
-            # memory consumption we only make a request here on memory. This
-            # avoids vector crashing for want of a malloc.
-            limits = {
-              cpu = var.vector_cpus
-            }
             requests = {
-              cpu    = var.vector_cpus
-              memory = "512Mi"
+              cpu    = "100m"
+              memory = "32Mi"
             }
           }
 
           port {
-            container_port = 8282
-            name           = "source"
+            container_port = 8080
+            name           = "ingress"
           }
           port {
             container_port = 9090
@@ -122,16 +106,11 @@ resource "kubernetes_deployment" "vector" {
         }
 
         volume {
-          name = "var-lib-vector"
-          empty_dir {}
-        }
-        volume {
-          name = "etc-vector"
+          name = "etc-lading"
           config_map {
-            name = kubernetes_config_map.vector.metadata[0].name
+            name = kubernetes_config_map.lading.metadata[0].name
           }
         }
-
       }
     }
   }

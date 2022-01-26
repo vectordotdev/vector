@@ -106,7 +106,7 @@ impl EventContainer for MetricArray {
 }
 
 /// An array of one of the `Event` variants exclusively.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
