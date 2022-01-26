@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use async_graphql::InputObject;
 use async_stream::stream;
@@ -6,8 +6,8 @@ use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 use super::{
-    filter_output_metric, EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal,
-    ReceivedEventsTotal, SentEventsTotal,
+    filter_output_metric, EventsInTotal, EventsOutTotal, OutputThroughput, ProcessedBytesTotal,
+    ProcessedEventsTotal, ReceivedEventsTotal, SentEventsTotal,
 };
 use crate::{
     api::schema::filter::{self},
@@ -363,4 +363,69 @@ pub fn component_sent_events_totals_metrics_with_outputs(
             })
             .collect()
     })
+}
+
+/// Returns the throughput of the 'component_sent_events_total' metric, sampled over `interval` milliseconds,
+/// for each component. Within a particular component, throughput per output stream is also included.
+pub fn component_sent_events_total_throughputs_with_outputs(
+    interval: i32,
+) -> impl Stream<Item = Vec<(ComponentKey, i64, Vec<OutputThroughput>)>> {
+    let mut cache = BTreeMap::new();
+
+    component_sent_events_total_metrics(interval)
+        .map(move |map| {
+            map.into_iter()
+                .filter_map(|(id, metrics)| {
+                    let outputs = metrics
+                        .iter()
+                        .filter_map(|m| m.tag_value("output"))
+                        .collect::<HashSet<_>>();
+
+                    let throughput_by_outputs = outputs
+                        .iter()
+                        .filter_map(|output| {
+                            let m = filter_output_metric(metrics.as_ref(), output.as_ref())?;
+                            let throughput =
+                                throughput(&m, format!("{}.{}", id, output), &mut cache)?;
+                            Some(OutputThroughput::new(output.clone(), throughput as i64))
+                        })
+                        .collect::<Vec<_>>();
+
+                    let sum = sum_metrics_owned(metrics)?;
+                    let total_throughput = throughput(&sum, id.clone(), &mut cache)?;
+                    Some((
+                        ComponentKey::from(id),
+                        total_throughput as i64,
+                        throughput_by_outputs,
+                    ))
+                })
+                .collect()
+        })
+        // Ignore the first, since we only care about sampling between `interval`
+        .skip(1)
+}
+
+fn component_sent_events_total_metrics(
+    interval: i32,
+) -> impl Stream<Item = BTreeMap<String, Vec<Metric>>> {
+    get_all_metrics(interval).map(move |m| {
+        m.into_iter()
+            .filter(|m| m.name() == "component_sent_events_total")
+            .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
+            .fold(BTreeMap::new(), |mut map, (id, m)| {
+                map.entry(id).or_insert_with(Vec::new).push(m);
+                map
+            })
+    })
+}
+
+fn throughput(metric: &Metric, id: String, cache: &mut BTreeMap<String, f64>) -> Option<f64> {
+    match metric.value() {
+        MetricValue::Counter { value } => {
+            let last = cache.insert(id, *value).unwrap_or(0.00);
+            let throughput = value - last;
+            Some(throughput)
+        }
+        _ => None,
+    }
 }

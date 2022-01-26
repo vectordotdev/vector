@@ -6,7 +6,7 @@ use crate::{
     event::{Metric, MetricValue},
 };
 
-use super::Output;
+use super::{Output, OutputThroughput};
 
 pub struct SentEventsTotal(Metric);
 
@@ -83,27 +83,34 @@ impl ComponentSentEventsTotal {
         self.component_key.id()
     }
 
-    async fn outputs(&self) -> &Vec<Output> {
-        &self.outputs
-    }
-
     /// Total outgoing events metric
     async fn metric(&self) -> SentEventsTotal {
         SentEventsTotal::new(self.metric.clone())
+    }
+
+    /// Output streams with outgoing events metrics
+    async fn outputs(&self) -> &Vec<Output> {
+        &self.outputs
     }
 }
 
 pub struct ComponentSentEventsThroughput {
     component_key: ComponentKey,
     throughput: i64,
+    outputs: Vec<OutputThroughput>,
 }
 
 impl ComponentSentEventsThroughput {
     /// Returns a new `ComponentSentEventsThroughput`, set to the provided id/throughput values
-    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
+    pub const fn new(
+        component_key: ComponentKey,
+        throughput: i64,
+        outputs: Vec<OutputThroughput>,
+    ) -> Self {
         Self {
             component_key,
             throughput,
+            outputs,
         }
     }
 }
@@ -115,8 +122,13 @@ impl ComponentSentEventsThroughput {
         self.component_key.id()
     }
 
-    /// Events processed throughput
+    /// Total events processed throughput
     async fn throughput(&self) -> i64 {
         self.throughput
+    }
+
+    /// Output streams with throughputs
+    async fn outputs(&self) -> &Vec<OutputThroughput> {
+        &self.outputs
     }
 }
