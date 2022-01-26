@@ -736,7 +736,7 @@
             },
             {
               "name": "throughput",
-              "description": "Events processed throughput",
+              "description": "Total events processed throughput",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -745,6 +745,30 @@
                   "kind": "SCALAR",
                   "name": "Int",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "outputs",
+              "description": "Output streams with throughputs",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "OutputThroughput",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -778,8 +802,24 @@
               "deprecationReason": null
             },
             {
+              "name": "metric",
+              "description": "Total outgoing events metric",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SentEventsTotal",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "outputs",
-              "description": null,
+              "description": "Output streams with outgoing events metrics",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -796,22 +836,6 @@
                       "ofType": null
                     }
                   }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Total outgoing events metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SentEventsTotal",
-                  "ofType": null
                 }
               },
               "isDeprecated": false,
@@ -1737,18 +1761,7 @@
             {
               "name": "sentEventsTotal",
               "description": "Total outgoing events for the current file source",
-              "args": [
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
+              "args": [],
               "type": {
                 "kind": "OBJECT",
                 "name": "SentEventsTotal",
@@ -2042,18 +2055,7 @@
             {
               "name": "sentEventsTotal",
               "description": "Total outgoing events for the current source",
-              "args": [
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
+              "args": [],
               "type": {
                 "kind": "OBJECT",
                 "name": "SentEventsTotal",
@@ -2142,18 +2144,7 @@
             {
               "name": "sentEventsTotal",
               "description": "Total outgoing events for the current transform",
-              "args": [
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
+              "args": [],
               "type": {
                 "kind": "OBJECT",
                 "name": "SentEventsTotal",
@@ -2880,13 +2871,9 @@
               "description": "Total sent events for the current output stream",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
+                "kind": "OBJECT",
+                "name": "SentEventsTotal",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2919,49 +2906,45 @@
           ]
         },
         {
-          "kind": "INPUT_OBJECT",
-          "name": "OutputsFilter",
+          "kind": "OBJECT",
+          "name": "OutputThroughput",
           "description": null,
-          "fields": null,
-          "inputFields": [
+          "fields": [
             {
-              "name": "output",
-              "description": null,
+              "name": "outputId",
+              "description": "Id of the output stream",
+              "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "StringFilter",
-                    "ofType": null
-                  }
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
                 }
               },
-              "defaultValue": null
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
-              "name": "or",
-              "description": null,
+              "name": "throughput",
+              "description": "Throughput for the output stream",
+              "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  }
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
                 }
               },
-              "defaultValue": null
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
-          "interfaces": null,
+          "inputFields": null,
+          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -4368,18 +4351,7 @@
             {
               "name": "sentEventsTotal",
               "description": null,
-              "args": [
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
+              "args": [],
               "type": {
                 "kind": "OBJECT",
                 "name": "SentEventsTotal",
@@ -6232,18 +6204,7 @@
             {
               "name": "sentEventsTotal",
               "description": null,
-              "args": [
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "OutputsFilter",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
+              "args": [],
               "type": {
                 "kind": "OBJECT",
                 "name": "SentEventsTotal",
