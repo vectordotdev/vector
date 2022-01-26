@@ -716,6 +716,8 @@ after the RFC is approved:
   [#10442](https://github.com/vectordotdev/vector/pull/10442).
 - Extract a core library from VRL for exposing its types with minimal
   dependencies, necessary to reduce size of the precompiled bitcode.
+- Get feature parity close enough to run first soak tests against current
+  execution model to get a first peek on end-to-end performance.
 - Refine code generation by taking into account type information.
 - Add unit tests for each expression in isolation.
 - Add fuzz testing infrastructure that compares results of all three execution
