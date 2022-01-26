@@ -9,8 +9,8 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
-            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
-            Compression,
+            encoding::EncodingConfig, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig, UriSerde,
         },
         VectorSink,
     },

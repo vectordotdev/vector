@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::{UriSerde, Compression},
+    sinks::util::{Compression, UriSerde},
 };
 
 #[derive(Debug, Snafu)]
@@ -73,10 +73,19 @@ pub struct LokiService {
 }
 
 impl LokiService {
-    pub fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>, compression: Compression) -> crate::Result<Self> {
+    pub fn new(
+        client: HttpClient,
+        endpoint: UriSerde,
+        auth: Option<Auth>,
+        compression: Compression,
+    ) -> crate::Result<Self> {
         let endpoint = endpoint.append_path("loki/api/v1/push")?.with_auth(auth);
 
-        Ok(Self { client, endpoint, compression })
+        Ok(Self {
+            client,
+            endpoint,
+            compression,
+        })
     }
 }
 
