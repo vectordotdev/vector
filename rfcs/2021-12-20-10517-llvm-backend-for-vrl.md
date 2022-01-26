@@ -664,10 +664,11 @@ safe language to the user.
 Producing LLVM bitcode for Rust's `std` library is guarded behind the
 [`-Z build-std`](https://doc.rust-lang.org/cargo/reference/unstable.html#build-std)
 flag and only available on the nightly compiler toolchain. We need `std` to
-fully link our precompiled LLVM bitcode. Further investigation is needed here if
-this means that we need to upgrade our entire compiler toolchain to nightly or
-if it's possible to build a binary-compatible `std` according to our
-`rust-toolchain.toml` file.
+fully link our precompiled LLVM bitcode. It's possible to circumvent the nightly
+requirement by setting the `RUSTC_BOOTSTRAP=1` environment variable, such that
+we have a `std` that is built using the same Rust and LLVM version as Vector. We
+isolate the usage of this hack by building a separate crate with `std` only, and
+link it to the library bitcode in a build step.
 
 Statically linking LLVM to the Vector binary adds roughly 9MB, additionally to
 precompiled bitcode that needs to be included with the binary. If this is a
