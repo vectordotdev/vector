@@ -158,7 +158,7 @@ where
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
-            match T::decode(buffer) {
+            match T::decode(T::get_metadata(), buffer) {
                 Ok(event) => {
                     this.usage_handle
                         .increment_sent_event_count_and_byte_size(1, bytes_read);
