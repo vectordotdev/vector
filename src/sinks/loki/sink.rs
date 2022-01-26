@@ -133,10 +133,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         emit!(&LokiEventsProcessed {
             byte_size: payload.len(),
         });
-        let is_compressed = self.compression().is_compressed();
+        let compression = self.compression();
 
         LokiRequest {
-            is_compressed,
+            compression,
             batch_size,
             finalizers,
             payload,

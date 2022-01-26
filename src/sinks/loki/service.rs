@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::UriSerde,
+    sinks::util::{UriSerde, Compression},
 };
 
 #[derive(Debug, Snafu)]
@@ -45,7 +45,7 @@ impl DriverResponse for LokiResponse {
 }
 
 pub struct LokiRequest {
-    pub is_compressed: bool,
+    pub compression: Compression,
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
     pub payload: Vec<u8>,
@@ -95,8 +95,9 @@ impl Service<LokiRequest> for LokiService {
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
-        if request.is_compressed {
-            req = req.header("Content-Encoding", "gzip");
+
+        if let Some(ce) = request.compression.content_encoding() {
+            req = req.header("Content-Encoding", ce);
         }
 
         let body = hyper::Body::from(request.payload);
