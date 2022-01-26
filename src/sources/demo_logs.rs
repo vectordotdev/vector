@@ -3,7 +3,7 @@ use std::task::Poll;
 use bytes::Bytes;
 use chrono::Utc;
 use fakedata::logs::*;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -167,25 +167,21 @@ async fn demo_logs_source(
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, byte_size)) => {
-                    emit!(&EventsReceived {
-                        count: events.len(),
-                        byte_size,
-                    });
+                    let count = events.len();
+                    emit!(&EventsReceived { count, byte_size });
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let mut events = stream::iter(events).map(|mut event| {
                         let log = event.as_mut_log();
 
                         log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
                         log.try_insert(log_schema().timestamp_key(), now);
 
-                        out.send(event).await.map_err(
-                            |error: crate::source_sender::ClosedError| {
-                                emit!(&StreamClosedError { error, count: 1 });
-                                error!(message = "Failed to forward events; downstream is closed.");
-                            },
-                        )?;
-                    }
+                        event
+                    });
+                    out.send_all(&mut events).await.map_err(|error| {
+                        emit!(&StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further
