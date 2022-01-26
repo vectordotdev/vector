@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TOTAL_SAMPLES=200
+TOTAL_SAMPLES=60
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
 
@@ -100,7 +100,7 @@ pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
 terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
           -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" \
-          -var "lading_image=ghcr.io/blt/lading:sha-a3340ad8b31a7480bc73e0a2c9d7d8c7e2df5a9e" \
+          -var "lading_image=ghcr.io/blt/lading:sha-1224888ad643ad7525aac8816391ad79c21ef544" \
           -auto-approve -compact-warnings -input=false -no-color
 echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
 echo "[${VARIANT}] Sleeping for ${WARMUP_SECONDS} seconds to allow warm-up"

@@ -1,6 +1,3 @@
-# Set up the providers needed to run this soak and other terraform related
-# business. Here we only require 'kubernetes' to interact with the soak
-# minikube.
 terraform {
   required_providers {
     kubernetes = {
@@ -10,8 +7,6 @@ terraform {
   }
 }
 
-# Rig the kubernetes provider to communicate with minikube. The details of
-# adjusting `~/.kube/config` are addressed by the soak control scripts.
 provider "kubernetes" {
   config_path = "~/.kube/config"
 }
@@ -23,13 +18,13 @@ module "monitoring" {
   experiment_name = var.experiment_name
   variant         = var.type
   vector_image    = var.vector_image
-  depends_on      = [module.vector, module.splunk-hec-gen]
+  depends_on      = [module.vector, module.tcp-blackhole, module.tcp-gen]
 }
 
 # Setup the soak pieces
 #
-# This soak config sets up a vector soak with lading/splunk-hec-gen feeding into vector,
-# blackhole receiving.
+# This soak config sets up a vector soak with lading/tcp-gen feeding into vector,
+# lading/tcp-blackhole receiving.
 resource "kubernetes_namespace" "soak" {
   metadata {
     name = "soak"
@@ -43,12 +38,20 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
+  depends_on   = [module.tcp-blackhole]
 }
-module "splunk-hec-gen" {
-  source              = "../../../common/terraform/modules/lading_splunk_hec_gen"
+module "tcp-blackhole" {
+  source              = "../../../common/terraform/modules/lading_tcp_blackhole"
   type                = var.type
-  splunk-hec-gen-yaml = file("${path.module}/../../../common/configs/splunk_hec_gen.yaml")
+  tcp-blackhole-yaml = file("${path.module}/../../../common/configs/tcp_blackhole.yaml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
   lading_image        = var.lading_image
-  depends_on          = [module.vector]
+}
+module "tcp-gen" {
+  source       = "../../../common/terraform/modules/lading_tcp_gen"
+  type         = var.type
+  tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_syslog_source.yaml")
+  namespace    = kubernetes_namespace.soak.metadata[0].name
+  lading_image = var.lading_image
+  depends_on   = [module.vector]
 }

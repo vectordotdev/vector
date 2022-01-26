@@ -33,7 +33,7 @@ pub struct LuaConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::task)
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
     pub const fn input_type(&self) -> DataType {
@@ -158,7 +158,7 @@ impl Lua {
     }
 }
 
-impl TaskTransform for Lua {
+impl TaskTransform<Event> for Lua {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
