@@ -37,7 +37,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             message = "Error occurred while handling request.",
             error = ?self.error,
             error_type = "http_error",
-            code = %self.code,
+            error_code = %self.code,
             stage = "receiving",
             internal_log_rate_secs = 10
         );
