@@ -315,11 +315,14 @@ and
 intrinsics, that should guard us against use of uninitialized values or usage
 after the value has been dropped.
 
-Constants can be moved into the LLVM module by consuming the constant value of
-type `T`, transmuting it to `[i8]` and transmuting it back to `T` when unloading
-the LLVM module. This is safe since Rust's semantics allow all types to be moved
-in memory unless they are `Pin`. Writing constants into the LLVM module has the
-benefit of allowing LLVM to apply constant folding at compile time.
+VRL constants can be moved into the LLVM module by consuming the constant value
+of type `T` on the Rust side and transmuting it to `[i8]` written to a LLVM
+global. This is safe since Rust's semantics allow all types to be moved in
+memory unless they are `Pin`. Writing constants into the LLVM module has the
+benefit of allowing LLVM to apply constant folding at compile time. To guarantee
+that the resources that may have been allocated on the Rust side for creating
+the VRL constant are cleaned up properly, we transmute it back to `T` when
+unloading the LLVM module and drop it afterwards accordingly.
 
 Below we show a preliminary, work-in-progress excerpt of the precompiled
 functions. The LLVM module will be initialized with the resulting bitcode.
