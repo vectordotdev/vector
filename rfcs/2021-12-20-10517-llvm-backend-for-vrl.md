@@ -741,6 +741,7 @@ after the RFC is approved:
   dependencies, necessary to reduce size of the precompiled bitcode.
 - Get feature parity close enough to run first soak tests against current
   execution model to get a first peek on end-to-end performance.
+- Define conventions around optional, named and compiled function arguments.
 - Refine code generation by taking into account type information.
 - Add unit tests for each expression in isolation.
 - Add fuzz tests that cross-validate results of all three execution modes.
