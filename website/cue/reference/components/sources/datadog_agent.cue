@@ -76,16 +76,16 @@ components: sources: datadog_agent: {
 			type: bool: default: false
 		}
 		disable_metrics: {
-				common:      false
-				description: "If this settings is set to `true`, metrics won't be accepted by the component."
-				required:    false
-				type: bool: default: false
+			common:      false
+			description: "If this settings is set to `true`, metrics won't be accepted by the component."
+			required:    false
+			type: bool: default: false
 		}
 		disable_traces: {
-				common:      false
-				description: "If this settings is set to `true`, traces won't be accepted by the component."
-				required:    false
-				type: bool: default: false
+			common:      false
+			description: "If this settings is set to `true`, traces won't be accepted by the component."
+			required:    false
+			type: bool: default: false
 		}
 		store_api_key: {
 			common:      false
