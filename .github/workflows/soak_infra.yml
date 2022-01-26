@@ -6,8 +6,8 @@ name: Soak Infra
 
 on:
   pull_request:
-    # paths:
-    #   - 'lib/soak'
+    paths:
+      - 'lib/soak'
   push:
     branches:
       - master
