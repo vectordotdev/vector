@@ -253,11 +253,10 @@ async fn run_scheduled(
                 shutdown.clone(),
                 out.clone(),
             ),
-        );
+        )
+        .await;
 
-        let timeout_result = timeout.await;
-
-        match timeout_result {
+        match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
                     emit!(&ExecFailedError {
@@ -270,7 +269,7 @@ async fn run_scheduled(
                 emit!(&ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
-                    error: error.to_string(),
+                    error,
                 });
             }
         }

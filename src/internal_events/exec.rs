@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use metrics::{counter, histogram};
+use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -81,7 +82,7 @@ impl InternalEvent for ExecFailedError<'_> {
 pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
-    pub error: String,
+    pub error: Elapsed,
 }
 
 impl InternalEvent for ExecTimeoutError<'_> {
@@ -100,7 +101,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
         counter!(
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.clone(),
+            "error" => self.error.to_string(),
             "error_type" => "timed_out",
             "stage" => "receiving",
         );
@@ -108,7 +109,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
         counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.clone(),
+            "error" => self.error.to_string(),
             "error_type" => "timed_out",
             "stage" => "receiving",
         );
