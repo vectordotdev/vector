@@ -47,7 +47,7 @@ tempdir = "0.3"
 tokio-test = "0.4.2"
 # https://github.com/tobz/tracing-fluent-assertions/pull/1
 tracing-fluent-assertions = { git = "https://github.com/vectordotdev/tracing-fluent-assertions", branch = "bump-tracing-subscriber" }
-tracing-subscriber = { version = "0.3.6", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 
 [[bench]]
 name = "sized_records"
