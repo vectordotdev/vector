@@ -152,7 +152,7 @@ components: sources: internal_logs: {
 				"""
 		}
 	}
-	
+
 	telemetry: metrics: {
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
 		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
