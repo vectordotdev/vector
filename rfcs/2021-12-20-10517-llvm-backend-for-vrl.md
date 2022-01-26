@@ -742,6 +742,8 @@ after the RFC is approved:
 - Refine code generation by taking into account type information.
 - Add unit tests for each expression in isolation.
 - Add fuzz tests that cross-validate results of all three execution modes.
+- Investigate if heap allocations use the same strategy as our main Vector
+  binary and are covered by our regular performance analysis tools
 
 ---
 
