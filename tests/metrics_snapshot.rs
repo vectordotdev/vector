@@ -9,20 +9,16 @@ fn prepare_metrics(cardinality: usize) -> &'static Controller {
         metrics::counter!("test", 1, "idx" => format!("{}", idx));
     }
 
-    assert_cardinality_matches(&controller.capture_metrics(), cardinality + 1);
+    assert_eq!(controller.capture_metrics().len(), cardinality + 1);
 
     controller
-}
-
-fn assert_cardinality_matches(iter: &impl Iterator, cardinality: usize) {
-    assert_eq!(iter.size_hint(), (cardinality, Some(cardinality)));
 }
 
 #[test]
 fn cardinality_matches() {
     for cardinality in &[0, 1, 10, 100, 1000, 10000] {
         let controller = prepare_metrics(*cardinality);
-        let iter = controller.capture_metrics();
-        assert_cardinality_matches(&iter, *cardinality + 1);
+        let list = controller.capture_metrics();
+        assert_eq!(list.len(), cardinality + 1);
     }
 }
