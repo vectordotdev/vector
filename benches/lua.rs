@@ -9,7 +9,7 @@ use vector::{
     config::{TransformConfig, TransformContext},
     event::Event,
     test_util::{collect_ready, runtime},
-    transforms::{self, Transform},
+    transforms::{self, OutputBuffer, Transform},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
@@ -59,9 +59,9 @@ fn bench_add_fields(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
             Transform::Synchronous(_t) => {
@@ -147,9 +147,9 @@ fn bench_field_filter(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
             Transform::Synchronous(_t) => {
