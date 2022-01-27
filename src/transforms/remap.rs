@@ -338,7 +338,7 @@ mod tests {
         config::{build_unit_tests, ConfigBuilder},
         event::{
             metric::{MetricKind, MetricValue},
-            EventArray, EventContainer, LogEvent, Metric, Value,
+            LogEvent, Metric, Value,
         },
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         transforms::OutputBuffer,
@@ -1093,14 +1093,8 @@ mod tests {
 
         ft.transform(event, &mut outputs);
 
-        let mut buf = outputs
-            .drain()
-            .flat_map(EventArray::into_events)
-            .collect::<Vec<_>>();
-        let mut err_buf = outputs
-            .drain_named(DROPPED)
-            .flat_map(EventArray::into_events)
-            .collect::<Vec<_>>();
+        let mut buf = outputs.drain().collect::<Vec<_>>();
+        let mut err_buf = outputs.drain_named(DROPPED).collect::<Vec<_>>();
 
         assert!(buf.len() < 2);
         assert!(err_buf.len() < 2);

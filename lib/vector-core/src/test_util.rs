@@ -31,6 +31,6 @@ where
 {
     collect_ready(rx)
         .into_iter()
-        .flat_map(EventContainer::into_events)
+        .flat_map(EventArray::into_events)
         .collect()
 }

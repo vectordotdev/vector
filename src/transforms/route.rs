@@ -133,7 +133,6 @@ mod test {
 
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
-        event::{EventArray, EventContainer},
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
 
@@ -223,10 +222,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs
-                .drain_named(output_name)
-                .flat_map(EventArray::into_events)
-                .collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
@@ -261,10 +257,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs
-                .drain_named(output_name)
-                .flat_map(EventArray::into_events)
-                .collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);

@@ -342,14 +342,14 @@ impl TransformOutputsBuf {
             .append(slice);
     }
 
-    pub fn drain(&mut self) -> impl Iterator<Item = EventArray> + '_ {
+    pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
             .drain()
     }
 
-    pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = EventArray> + '_ {
+    pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
@@ -452,8 +452,8 @@ impl OutputBuffer {
         })
     }
 
-    fn drain(&mut self) -> impl Iterator<Item = EventArray> + '_ {
-        self.0.drain(..)
+    fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
+        self.0.drain(..).flat_map(EventArray::into_events)
     }
 
     async fn send(&mut self, output: &mut Fanout) {
