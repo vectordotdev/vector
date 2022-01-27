@@ -729,12 +729,13 @@ Using WebAssembly as a compilation target would require us to
 - ship a Wasm runtime
 - copy data in and out of WebAssembly or use `mmap`ing techniques which would
   constrain in which memory regions event data must reside
-- likely slower execution speed because of higher abstraction level and
-  semantics that allow untrusted code to execute safely
-- precompile WebAssembly bitcode or miss optimization potential
 
-additionally to these drawbacks, we just dropped support for the WebAssembly
-transform.
+On the upside, WebAssembly provides a higher abstraction level and semantics
+that allow to execute untrusted code to safely, however at the cost of slower
+execution speed.
+
+Tangentially related to this consideration stands the fact we recently dropped
+support for the WebAssembly transform.
 
 ### Compile to Bitcode
 
