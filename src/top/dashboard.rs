@@ -18,6 +18,7 @@ use tui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
+use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{events::capture_key_press, state};
 
@@ -200,20 +201,23 @@ impl<'a> Widgets<'a> {
             data.extend_from_slice(&formatted_metrics);
             items.push(Row::new(data).style(Style::default()));
 
-            // Add output rows
-            for (id, output) in r.outputs.iter() {
-                let sent_events_metric = format_metric(
-                    output.sent_events_total,
-                    output.sent_events_throughput_sec,
-                    self.opts.human_metrics,
-                );
-                let mut data = [""; NUM_COLUMNS]
-                    .into_iter()
-                    .map(Cell::from)
-                    .collect::<Vec<_>>();
-                data[1] = Cell::from(id.as_ref());
-                data[5] = Cell::from(sent_events_metric);
-                items.push(Row::new(data).style(Style::default()));
+            // Add output rows. Note, we ignore outputs if it only contains
+            // [`DEFAULT_OUTPUT`] to avoid redundancy
+            if !(r.outputs.len() == 1 && r.outputs.contains_key(DEFAULT_OUTPUT)) {
+                for (id, output) in r.outputs.iter() {
+                    let sent_events_metric = format_metric(
+                        output.sent_events_total,
+                        output.sent_events_throughput_sec,
+                        self.opts.human_metrics,
+                    );
+                    let mut data = [""; NUM_COLUMNS]
+                        .into_iter()
+                        .map(Cell::from)
+                        .collect::<Vec<_>>();
+                    data[1] = Cell::from(id.as_ref());
+                    data[5] = Cell::from(sent_events_metric);
+                    items.push(Row::new(data).style(Style::default()));
+                }
             }
         }
 
