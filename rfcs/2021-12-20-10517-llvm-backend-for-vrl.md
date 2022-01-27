@@ -256,7 +256,7 @@ its operands need to be computed first.
 
 Calling `context.context_ref()` returns a reference to the VRL
 [`Context`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/context.rs#L5-L9)
-that is provided by the `remap` transform as a function argument.
+that is provided by any Vector component that uses VRL internally.
 
 For anything less trivial than emitting branches or calling functions, we want
 to leverage the Rust compiler. For one, this allows us to not concern ourselves
