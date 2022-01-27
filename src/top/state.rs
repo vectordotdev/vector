@@ -98,7 +98,7 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                             for (id, v) in m.outputs {
                                 r.outputs
                                     .entry(id)
-                                    .or_insert(Default::default())
+                                    .or_insert_with(Default::default())
                                     .sent_events_total = v;
                             }
                         }
@@ -113,7 +113,7 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                                 let throughput = (v as f64 * (1000.0 / interval as f64)) as i64;
                                 r.outputs
                                     .entry(id)
-                                    .or_insert(Default::default())
+                                    .or_insert_with(Default::default())
                                     .sent_events_throughput_sec = throughput;
                             }
                         }
