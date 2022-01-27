@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-set -o errexit
-#set -o pipefail # grep will exit 1 without a match, even with --count
+#set -o errexit # grep will exit 1 without a match, even with --count
+set -o pipefail # grep will exit 1 without a match, even with --count
 set -o nounset
 set -o xtrace
 
