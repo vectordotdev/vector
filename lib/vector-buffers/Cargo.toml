@@ -20,7 +20,7 @@ memmap2 = { version = "0.5.2", default-features = false }
 metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 parking_lot = { version = "0.11.2", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
-rkyv = { version = "0.7.30", default-features = false, features = ["size_32", "std", "strict", "validation"] }
+rkyv = { version = "0.7.31", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde = { version = "1.0.136", default-features = false, features = ["derive"] }
 snafu = { version = "0.7.0", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
