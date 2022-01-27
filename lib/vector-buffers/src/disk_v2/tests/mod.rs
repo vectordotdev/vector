@@ -11,7 +11,7 @@ use super::Ledger;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
-    encoding::{DecodeBytes, EncodeBytes},
+    encoding::FixedEncodable,
     Acker, Bufferable,
 };
 
@@ -182,10 +182,11 @@ impl ByteSizeOf for SizedRecord {
     }
 }
 
-impl EncodeBytes for SizedRecord {
-    type Error = io::Error;
+impl FixedEncodable for SizedRecord {
+    type EncodeError = io::Error;
+    type DecodeError = io::Error;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
     {
@@ -200,12 +201,8 @@ impl EncodeBytes for SizedRecord {
         buffer.put_bytes(0x42, self.0 as usize);
         Ok(())
     }
-}
 
-impl DecodeBytes for SizedRecord {
-    type Error = io::Error;
-
-    fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::DecodeError>
     where
         B: Buf,
     {
@@ -224,10 +221,11 @@ impl ByteSizeOf for UndecodableRecord {
     }
 }
 
-impl EncodeBytes for UndecodableRecord {
-    type Error = io::Error;
+impl FixedEncodable for UndecodableRecord {
+    type EncodeError = io::Error;
+    type DecodeError = io::Error;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
     {
@@ -241,12 +239,8 @@ impl EncodeBytes for UndecodableRecord {
         buffer.put_u32(42);
         Ok(())
     }
-}
 
-impl DecodeBytes for UndecodableRecord {
-    type Error = io::Error;
-
-    fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::Error>
+    fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::DecodeError>
     where
         B: Buf,
     {

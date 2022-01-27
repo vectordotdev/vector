@@ -8,7 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
 
@@ -128,7 +128,7 @@ struct City<'a> {
 }
 
 impl FunctionTransform for Geoip {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut isp: Isp = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();

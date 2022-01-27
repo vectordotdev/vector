@@ -8,7 +8,7 @@ use crate::{
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
     serde::Fields,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -68,7 +68,7 @@ impl RenameFields {
 }
 
 impl FunctionTransform for RenameFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
             match log.remove_prune(&old_key, self.drop_empty) {

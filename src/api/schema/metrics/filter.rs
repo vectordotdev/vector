@@ -182,7 +182,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     stream! {
         loop {
             interval.tick().await;
-            yield controller.capture_metrics().collect()
+            yield controller.capture_metrics()
         }
     }
 }
@@ -191,6 +191,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
+        .into_iter()
         .filter_map(|m| m.tag_matches("component_id", component_key.id()).then(|| m))
         .collect()
 }

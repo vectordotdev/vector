@@ -5,7 +5,7 @@ use crate::{
         DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -56,7 +56,7 @@ impl RemoveTags {
 }
 
 impl FunctionTransform for RemoveTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let metric = event.as_mut_metric();
 
         for tag in &self.tags {

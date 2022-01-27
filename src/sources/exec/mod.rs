@@ -27,7 +27,10 @@ use crate::{
     },
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
+    internal_events::{
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        StreamClosedError,
+    },
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -250,23 +253,23 @@ async fn run_scheduled(
                 shutdown.clone(),
                 out.clone(),
             ),
-        );
+        )
+        .await;
 
-        let timeout_result = timeout.await;
-
-        match timeout_result {
+        match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailed {
+                    emit!(&ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
-            Err(_) => {
-                emit!(&ExecTimeout {
+            Err(error) => {
+                emit!(&ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
+                    error,
                 });
             }
         }
@@ -301,7 +304,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailed {
+                        emit!(&ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -323,7 +326,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailed {
+            emit!(&ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -385,6 +388,9 @@ async fn run_command(
             byte_size,
         });
 
+        let total_count = events.len();
+        let mut processed_count = 0;
+
         for mut event in events {
             handle_event(
                 &config,
@@ -394,9 +400,17 @@ async fn run_command(
                 &mut event,
             );
 
-            if out.send(event).await.is_err() {
-                error!(message = "Failed to forward event; downstream is closed.");
-                break 'send;
+            match out.send(event).await {
+                Ok(_) => {
+                    processed_count += 1;
+                }
+                Err(error) => {
+                    emit!(&StreamClosedError {
+                        count: total_count - processed_count,
+                        error,
+                    });
+                    break 'send;
+                }
             }
         }
     }

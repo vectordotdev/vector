@@ -279,6 +279,7 @@ mod tests {
             LogEvent, Metric, Value,
         },
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -424,12 +425,14 @@ mod tests {
 
         let out = collect_outputs(&mut tform, event);
         assert_eq!(2, out.primary.len());
-        let result = out.primary;
+        let mut result = out.primary.into_events();
 
-        assert_eq!(get_field_string(&result[0], "message"), "foo");
-        assert_eq!(get_field_string(&result[1], "message"), "bar");
-        assert_eq!(result[0].metadata(), &metadata);
-        assert_eq!(result[1].metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "foo");
+        assert_eq!(r.metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "bar");
+        assert_eq!(r.metadata(), &metadata);
     }
 
     #[test]
@@ -929,8 +932,8 @@ mod tests {
     }
 
     struct CollectedOuput {
-        primary: Vec<Event>,
-        named: HashMap<String, Vec<Event>>,
+        primary: OutputBuffer,
+        named: HashMap<String, OutputBuffer>,
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {

@@ -112,6 +112,7 @@ mod tests {
 
         controller
             .capture_metrics()
+            .into_iter()
             .find(|metric| {
                 metric.name() == "k8s_state_ops_total" && metric.tags() == tags_to_lookup.as_ref()
             })

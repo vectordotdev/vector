@@ -9,7 +9,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -136,7 +136,7 @@ impl Concat {
 }
 
 impl FunctionTransform for Concat {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 
         for substring in self.items.iter() {

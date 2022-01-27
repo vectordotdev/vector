@@ -8,7 +8,7 @@ use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 
@@ -102,7 +102,7 @@ impl Tokenizer {
 }
 
 impl FunctionTransform for Tokenizer {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -135,6 +135,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -165,7 +166,7 @@ mod tests {
         let parser = parser.as_function();
 
         let metadata = event.metadata().clone();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
