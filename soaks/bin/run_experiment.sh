@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -o errexit
-set -o pipefail
+#set -o pipefail # grep will exit 1 without a match
 set -o nounset
 set -o xtrace
 
@@ -116,7 +116,7 @@ while [ $recorded_samples -le $target_samples ]
 do
     # Check that the capture file grows monotonically. If it shrinks this
     # indicates a serious problem.
-    observed_samples=$(grep "bytes_written" "${SOAK_CAPTURE_FILE}" || echo "" | wc -l)
+    observed_samples=$(grep "bytes_written" "${SOAK_CAPTURE_FILE}" | wc -l)
     # shellcheck disable=SC2086
     if [ $recorded_samples -gt $observed_samples ]; then
         echo "SAMPLES LOST. THIS IS A CATASTROPHIC, UNRECOVERABLE FAILURE."
