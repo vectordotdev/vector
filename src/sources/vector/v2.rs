@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
-    internal_events::{EventsReceived, TcpBytesReceived},
+    internal_events::{EventsReceived, StreamClosedError, TcpBytesReceived},
     proto::vector as proto,
     serde::bool_or_struct,
     shutdown::ShutdownSignalToken,
@@ -42,8 +42,10 @@ impl proto::Service for Service {
             .map(Event::from)
             .collect();
 
+        let count = events.len();
+
         emit!(&EventsReceived {
-            count: events.len(),
+            count,
             byte_size: events.size_of(),
         });
 
@@ -52,7 +54,11 @@ impl proto::Service for Service {
         self.pipeline
             .clone()
             .send_all(&mut futures::stream::iter(events))
-            .map_err(|err| Status::unavailable(err.to_string()))
+            .map_err(|error| {
+                let message = error.to_string();
+                emit!(&StreamClosedError { error, count });
+                Status::unavailable(message)
+            })
             .and_then(|_| handle_batch_status(receiver))
             .await?;
 
