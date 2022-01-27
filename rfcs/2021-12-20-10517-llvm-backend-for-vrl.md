@@ -134,13 +134,18 @@ can't predict the next instruction in the interpreter loop.
 
 ### In scope
 
-Migrating the execution model of VRL to direct machine code execution without
-runtime interpretation overhead.
+Introducing a new execution model to VRL that directly executes machine code
+without runtime interpretation overhead, which can be opt in by users.
 
 ### Out of scope
 
+Overall, this is an experiment to gauge how much performance improvements can be
+won by using LLVM. We will not roll out the new backend for production use yet
+and need to investigate the specific security and performance needs of our users
+going forward.
+
 Any optimization that applies to all execution models for VRL (traversal, VM and
-LLVM) are not interesting for this consideration, e.g. improving access paths to
+LLVM) is not interesting for this consideration, e.g. improving access paths to
 VRL
 [`Value`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/value.rs#L21-L32)s.
 
