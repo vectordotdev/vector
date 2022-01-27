@@ -131,11 +131,10 @@ pub fn build_proxy_connector(
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
-    let settings = tls_settings.into();
-    let tls = tls_connector_builder(&settings).context(BuildTlsConnectorSnafu)?;
+    let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
     let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
 
-    let settings = settings.tls().cloned();
+    let settings = tls_settings.tls().cloned();
     https.set_callback(move |c, _uri| {
         if let Some(settings) = &settings {
             settings.apply_connect_configuration(c);
