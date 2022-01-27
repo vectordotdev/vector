@@ -26,7 +26,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     assert!(read_token.is_some());
 
     let read_token = read_token.unwrap();
-    assert_eq!(bytes_written, read_token.record_size());
+    assert_eq!(bytes_written, read_token.record_len());
     assert_eq!(314, read_token.record_id());
 
     let roundtrip_record = record_reader

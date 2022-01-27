@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
+use futures::{future::try_join_all, FutureExt, Sink};
 use itertools::Itertools;
 use tokio::sync::{
     mpsc as tokio_mpsc,
@@ -143,14 +143,13 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
+fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
         let _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
-            .await
             .is_err()
         {
             debug!(message = "Couldn't disconnect sink.", ?sink_id);
@@ -208,7 +207,7 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output_id, mut control_tx) in outputs.iter() {
+                for (output_id,  control_tx) in outputs.iter() {
                     match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&output_id.to_string()))
@@ -229,7 +228,6 @@ async fn tap_handler(
                             // Attempt to connect the sink.
                             match control_tx
                                 .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
-                                .await
                             {
                                 Ok(_) => {
                                     debug!(

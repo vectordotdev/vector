@@ -7,7 +7,7 @@ use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
     internal_events::CoercerConversionFailed,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
 
@@ -66,7 +66,7 @@ impl Coercer {
 }
 
 impl FunctionTransform for Coercer {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut log = event.into_log();
 
         if self.drop_unspecified {
@@ -111,6 +111,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -144,7 +145,7 @@ mod tests {
         .await
         .unwrap();
         let coercer = coercer.as_function();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         coercer.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(&metadata, result.metadata());

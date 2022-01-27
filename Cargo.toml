@@ -152,14 +152,15 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = { version = "0.5.2", optional = true }
-aws-types = { version = "0.5.1", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-sqs = { version = "0.5.2", optional = true }
-aws-smithy-client = { version = "0.35.2", optional = true }
+aws-config = { version = "0.6.0", optional = true }
+aws-types = { version = "0.6.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-sqs = { version = "0.6.0", optional = true }
+aws-smithy-client = { version = "0.36.0", optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["blob"], optional = true }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, optional = true }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, optional = true }
 reqwest = { version = "0.11", optional = true }
 
 # Tower
@@ -188,8 +189,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.25", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.24", default-features = false, optional = true }
+async-graphql = { version = "3.0.26", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.26", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -249,7 +250,7 @@ infer = { version = "0.6.0", default-features = false, optional = true}
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
-k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", "v1_16"], optional = true }
+k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
@@ -339,8 +340,9 @@ walkdir = "2.3.2"
 wiremock = "0.5.10"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 
 
 [patch.crates-io]
@@ -659,7 +661,7 @@ sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
-sinks-azure_blob = ["azure_core", "azure_storage", "reqwest"]
+sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs", "reqwest"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []

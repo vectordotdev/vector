@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use crate::encoding::{DecodeBytes, EncodeBytes};
+use crate::encoding::FixedEncodable;
 
 #[derive(Debug)]
 pub struct EncodeError;
@@ -57,10 +57,11 @@ impl Arbitrary for Message {
     }
 }
 
-impl EncodeBytes for Message {
-    type Error = EncodeError;
+impl FixedEncodable for Message {
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
@@ -72,12 +73,8 @@ impl EncodeBytes for Message {
     fn encoded_size(&self) -> Option<usize> {
         Some(mem::size_of::<u64>())
     }
-}
 
-impl DecodeBytes for Message {
-    type Error = DecodeError;
-
-    fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
     where
         B: Buf,
         Self: Sized,
