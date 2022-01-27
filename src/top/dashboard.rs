@@ -201,7 +201,7 @@ impl<'a> Widgets<'a> {
             items.push(Row::new(data).style(Style::default()));
 
             // Add output rows
-            for output in r.outputs.iter() {
+            for (id, output) in r.outputs.iter() {
                 let sent_events_metric = format_metric(
                     output.sent_events_total,
                     output.sent_events_throughput_sec,
@@ -211,7 +211,7 @@ impl<'a> Widgets<'a> {
                     .into_iter()
                     .map(Cell::from)
                     .collect::<Vec<_>>();
-                data[1] = Cell::from(output.id.as_ref());
+                data[1] = Cell::from(id.as_ref());
                 data[5] = Cell::from(sent_events_metric);
                 items.push(Row::new(data).style(Style::default()));
             }

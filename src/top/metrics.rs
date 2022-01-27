@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use tokio_stream::StreamExt;
 use vector_api_client::{
@@ -6,8 +6,8 @@ use vector_api_client::{
     Client, SubscriptionClient,
 };
 
-use super::state::{self, ComponentOutput};
-use crate::config::ComponentKey;
+use super::state::{self, OutputMetrics};
+use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
 /// Components that have been added
 async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
@@ -26,7 +26,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
                     key,
                     kind: c.on.to_string(),
                     component_type: c.component_type,
-                    outputs: vec![],
+                    outputs: HashMap::new(),
                     received_events_total: 0,
                     received_events_throughput_sec: 0,
                     sent_events_total: 0,
@@ -126,11 +126,10 @@ async fn sent_events_totals(client: Arc<SubscriptionClient>, tx: state::EventTx,
             let _ = tx
                 .send(state::EventType::SentEventsTotals(
                     c.into_iter()
-                        .map(|c| {
-                            (
-                                ComponentKey::from(c.component_id.as_str()),
-                                c.metric.sent_events_total as i64,
-                            )
+                        .map(|c| SentEventsMetric {
+                            key: ComponentKey::from(c.component_id.as_str()),
+                            total: c.metric.sent_events_total as i64,
+                            outputs: c.outputs().into_iter().collect(),
                         })
                         .collect(),
                 ))
@@ -157,7 +156,11 @@ async fn sent_events_throughputs(
                 .send(state::EventType::SentEventsThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
+                        .map(|c| SentEventsMetric {
+                            key: ComponentKey::from(c.component_id.as_str()),
+                            total: c.throughput,
+                            outputs: c.outputs().into_iter().collect(),
+                        })
                         .collect(),
                 ))
                 .await;
@@ -289,7 +292,9 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                             .on
                             .outputs()
                             .into_iter()
-                            .map(ComponentOutput::from)
+                            .map(|(id, sent_events_total)| {
+                                (id, OutputMetrics::from(sent_events_total))
+                            })
                             .collect(),
                         received_events_total: d.on.received_events_total(),
                         received_events_throughput_sec: 0,
