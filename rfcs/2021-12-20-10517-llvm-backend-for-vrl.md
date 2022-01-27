@@ -642,6 +642,13 @@ NewDefault:                                       ; preds = %LeafBlock21, %LeafB
 Note the batched stack allocations, inlining of function calls and consolidation
 of control flow.
 
+The behavior that occurs when `panic`ing inside the Rust stubs can be controlled
+by linking either the `panic_unwind*.bc` or `panic_abort*.bc` files, analogous
+to
+[setting the `panic` key in `Cargo.toml`](https://doc.rust-lang.org/book/ch09-01-unrecoverable-errors-with-panic.html#unwinding-the-stack-or-aborting-in-response-to-a-panic).
+We use the same strategy that is used in our Vector binary, which currently uses
+the default "unwind".
+
 ## Rationale
 
 As long as the single-core performance of VRL is the bottleneck of a topology,
