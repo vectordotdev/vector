@@ -86,7 +86,7 @@ TOTAL_SAMPLES=200
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
 
-pushd "${__dir}"
+pushd "${__dir}" || exit
 ./boot_minikube.sh --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}"
 mkdir --parents "${SOAK_CAPTURE_DIR}"
 minikube image load "${IMAGE}"
@@ -94,9 +94,9 @@ minikube image load "${IMAGE}"
 # the minikube will be placed on the host.
 minikube mount "${SOAK_CAPTURE_DIR}:/captures" &
 CAPTURE_MOUNT_PID=$!
-popd
+popd || exit
 
-pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
+pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform" || exit
 terraform init
 terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
           -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" \
@@ -129,8 +129,8 @@ do
 done
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR} complete in ${periods} seconds. At least ${recorded_samples} collected."
 kill "${CAPTURE_MOUNT_PID}"
-popd
+popd || exit
 
-pushd "${__dir}"
+pushd "${__dir}" || exit
 ./shutdown_minikube.sh
-popd
+popd || exit
