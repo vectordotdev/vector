@@ -1,6 +1,5 @@
-// ## skip check-events ##
-
 use metrics::{counter, gauge};
+
 use vector_core::{internal_event::InternalEvent, update_counter};
 
 #[derive(Debug)]
