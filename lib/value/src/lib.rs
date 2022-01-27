@@ -21,5 +21,7 @@
 )]
 
 pub mod kind;
+mod value;
 
 pub use kind::Kind;
+pub use value::Value2;

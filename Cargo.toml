@@ -95,7 +95,8 @@ members = [
   "lib/datadog/filter",
   "lib/datadog/filter-test",
   "lib/vector-datadog-filter",
-  "lib/soak"
+  "lib/soak",
+  "lib/value",
 ]
 
 [dependencies]
