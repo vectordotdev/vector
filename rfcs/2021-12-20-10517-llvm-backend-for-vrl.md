@@ -56,10 +56,11 @@ There is no way to point the CPU instruction counter to a VRL
 to execute it. Instead, it relies on a runtime to interpret a VRL program by
 implementing a
 [`resolve`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L51-L56)
-method for each expression. Even though we didn't explicitly name this runtime
-system, it fits the very definition of
+method for each expression. It fits the very definition of
 ["_any behavior not directly attributable to the program itself_"](https://en.wikipedia.org/wiki/Runtime_system#Overview)
-well.
+well and even exists as
+[`Runtime`](https://github.com/vectordotdev/vector/blob/80268ee9b66def9e8cba848b29371013b7cd8b9c/lib/vrl/core/src/runtime.rs#L11-L15)
+in our code.
 
 ### "The time spent within the VRL interpreter/VM itself is small, removing this overhead can hardly result in significant performance improvements"
 
