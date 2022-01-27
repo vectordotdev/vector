@@ -6,7 +6,7 @@ use vector_api_client::{
     Client, SubscriptionClient,
 };
 
-use super::state;
+use super::state::{self, ComponentOutput};
 use crate::config::ComponentKey;
 
 /// Components that have been added
@@ -26,6 +26,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
                     key,
                     kind: c.on.to_string(),
                     component_type: c.component_type,
+                    outputs: vec![],
                     received_events_total: 0,
                     received_events_throughput_sec: 0,
                     sent_events_total: 0,
@@ -284,6 +285,12 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         key,
                         kind: d.on.to_string(),
                         component_type: d.component_type,
+                        outputs: d
+                            .on
+                            .outputs()
+                            .into_iter()
+                            .map(ComponentOutput::from)
+                            .collect(),
                         received_events_total: d.on.received_events_total(),
                         received_events_throughput_sec: 0,
                         sent_events_total: d.on.sent_events_total(),

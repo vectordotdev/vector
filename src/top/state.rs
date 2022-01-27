@@ -27,10 +27,28 @@ pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
 
 #[derive(Debug, Clone)]
+pub struct ComponentOutput {
+    pub id: String,
+    pub sent_events_total: i64,
+    pub sent_events_throughput_sec: i64,
+}
+
+impl From<(String, i64)> for ComponentOutput {
+    fn from(component_query_data: (String, i64)) -> Self {
+        Self {
+            id: component_query_data.0,
+            sent_events_total: component_query_data.1,
+            sent_events_throughput_sec: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ComponentRow {
     pub key: ComponentKey,
     pub kind: String,
     pub component_type: String,
+    pub outputs: Vec<ComponentOutput>,
     pub processed_bytes_total: i64,
     pub processed_bytes_throughput_sec: i64,
     pub received_events_total: i64,
