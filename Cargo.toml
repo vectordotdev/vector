@@ -875,3 +875,10 @@ path = "benches/codecs/main.rs"
 harness = false
 test = false
 required-features = ["codecs-benches"]
+
+[[bench]]
+name = "splunk"
+path = "benches/splunk/main.rs"
+harness = false
+test = false
+required-features = []
