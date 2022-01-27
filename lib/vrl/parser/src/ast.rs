@@ -1088,11 +1088,9 @@ pub struct Abort {
 
 impl fmt::Display for Abort {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(message) = self.message.as_ref() {
-            write!(f, "abort: {}", message)
-        } else {
-            write!(f, "abort")
-        }
+        f.write_str(self.message.as_ref()
+            .map(|m| format!("abort: {}", m))
+            .unwrap_or_else(|| "abort".to_owned()))
     }
 }
 

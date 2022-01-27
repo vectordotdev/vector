@@ -57,11 +57,10 @@ impl Abort {
 
 impl Expression for Abort {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let message = if let Some(expr) = &self.message {
-            Some(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string())
-        } else {
-            None
-        };
+        let message = self
+            .message
+            .map(|expr| Ok(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string())
+            .transpose()?;
 
         Err(ExpressionError::Abort {
             span: self.span,
