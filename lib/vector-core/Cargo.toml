@@ -55,6 +55,7 @@ tracing-subscriber = { version = "0.3.5", default-features = false, features = [
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
+value = { package = "value", path = "../value"}
 
 [build-dependencies]
 prost-build = "0.9"

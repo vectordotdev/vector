@@ -8252,6 +8252,8 @@ dependencies = [
 name = "value"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
+ "chrono",
  "lookup",
 ]
 
@@ -8444,6 +8446,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
+ "value",
  "vector-api-client",
  "vector-datadog-filter",
  "vector-vrl-functions",
@@ -8562,6 +8565,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "value",
  "vrl",
 ]
 

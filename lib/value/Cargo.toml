@@ -8,4 +8,6 @@ readme = "README.md"
 publish = false
 
 [dependencies]
+chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 lookup = { path = "../lookup", default-features = false }
+bytes = "1.1.0"

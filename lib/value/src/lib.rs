@@ -5,7 +5,7 @@
     clippy::all,
     clippy::pedantic,
     future_incompatible,
-    missing_docs,
+    // missing_docs,
     nonstandard_style,
     rust_2018_compatibility,
     rust_2018_idioms,
@@ -24,4 +24,4 @@ pub mod kind;
 mod value;
 
 pub use kind::Kind;
-pub use value::Value2;
+pub use value::Value;
