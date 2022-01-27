@@ -123,7 +123,7 @@ components: sinks: loki: {
 			type: string: {
 				default: "drop"
 				enum: {
-					"drop":              "Drop the event, with a warning."
+					"drop":              "Drop the event."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
