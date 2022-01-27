@@ -23,32 +23,28 @@ impl Abort {
         message: Option<Node<Expr>>,
         state: &State,
     ) -> Result<Self, Box<dyn DiagnosticError>> {
-        if let Some(node) = message {
-            let (expr_span, expr) = node.take();
-            let type_def = expr.type_def(state);
+        let message = message
+            .map::<Result<_, Box<dyn DiagnosticError>>, _>(|node| {
+                let (expr_span, expr) = node.take();
+                let type_def = expr.type_def(state);
 
-            if type_def.is_fallible() {
-                Err(Box::new(Error {
-                    variant: ErrorVariant::FallibleExpr,
-                    expr_span,
-                }))
-            } else if !type_def.is_bytes() {
-                Err(Box::new(value::Error::Expected {
-                    got: type_def.kind(),
-                    expected: Kind::Bytes,
-                }))
-            } else {
-                Ok(Self {
-                    span,
-                    message: Some(Box::new(expr)),
-                })
-            }
-        } else {
-            Ok(Self {
-                span,
-                message: None,
+                if type_def.is_fallible() {
+                    Err(Box::new(Error {
+                        variant: ErrorVariant::FallibleExpr,
+                        expr_span,
+                    }))
+                } else if !type_def.is_bytes() {
+                    Err(Box::new(value::Error::Expected {
+                        got: type_def.kind(),
+                        expected: Kind::Bytes,
+                    }))
+                } else {
+                    Ok(Box::new(expr))
+                }
             })
-        }
+            .transpose()?;
+
+        Ok(Self { span, message })
     }
 
     pub fn noop(span: Span) -> Self {
