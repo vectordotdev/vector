@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
 
-use async_graphql::InputObject;
 use async_stream::stream;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
@@ -10,10 +9,8 @@ use super::{
     ProcessedEventsTotal, ReceivedEventsTotal, SentEventsTotal,
 };
 use crate::{
-    api::schema::filter::{self},
     config::ComponentKey,
     event::{Metric, MetricValue},
-    filter_check,
     metrics::Controller,
 };
 
@@ -46,25 +43,6 @@ fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metri
     let m = iter.next()?;
 
     Some(iter.fold(m, |mut m1, m2| if m1.update(&m2) { m1 } else { m2 }))
-}
-
-#[derive(Default, InputObject)]
-pub struct OutputsFilter {
-    output: Option<Vec<filter::StringFilter>>,
-    or: Option<Vec<Self>>,
-}
-
-impl filter::CustomFilter<&Metric> for OutputsFilter {
-    fn matches(&self, metric: &&Metric) -> bool {
-        filter_check!(self.output.as_ref().map(|f| f
-            .iter()
-            .all(|f| f.filter_value(&metric.tag_value("output").unwrap_or_default()))));
-        true
-    }
-
-    fn or(&self) -> Option<&Vec<Self>> {
-        self.or.as_ref()
-    }
 }
 
 pub trait MetricsFilter<'a> {
