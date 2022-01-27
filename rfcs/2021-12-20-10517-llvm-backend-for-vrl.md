@@ -671,12 +671,12 @@ proposition of Vector: best-in-class performance.
 
 By generating machine code via LLVM, we are no longer (largely) immune to memory
 violations. To reduce the error surface as much as possible, we employ industry
-practices like fuzz-testing VRL programs, static analysis via LLVM and rely on
-the Rust compiler for any non-trivial code fragments. That being said, memory
-safety is an illusion - with the difference that we are now exposing ourselves
-to being partly responsible for maintaining invariants instead of being able to
-defer to a third party for correctness. We still provide an inherently memory
-safe language to the user.
+practices such as fuzz-testing VRL programs, static analysis via LLVM and rely
+on the Rust compiler for any non-trivial code fragments. That being said, memory
+safety guarantees always rely on a small link of trust that can not be
+automatically verified - this time we are ourselves responsible for maintaining
+a small set of invariants instead of being able to defer to a third party for
+correctness. We still provide an inherently memory safe language to the user.
 
 Producing LLVM bitcode for Rust's `std` library is guarded behind the
 [`-Z build-std`](https://doc.rust-lang.org/cargo/reference/unstable.html#build-std)
