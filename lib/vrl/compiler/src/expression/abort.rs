@@ -1,11 +1,11 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticError, Label, Note};
 use parser::ast::Node;
 
 use crate::{
     expression::{ExpressionError, Resolved},
-    value::Kind,
+    value::{self, Kind},
     Context, Expression, Span, State, TypeDef,
 };
 
@@ -18,21 +18,25 @@ pub struct Abort {
 }
 
 impl Abort {
-    pub fn new(span: Span, message: Option<Node<Expr>>, state: &State) -> Result<Self, Error> {
+    pub fn new(
+        span: Span,
+        message: Option<Node<Expr>>,
+        state: &State,
+    ) -> Result<Self, Box<dyn DiagnosticError>> {
         if let Some(node) = message {
             let (expr_span, expr) = node.take();
             let type_def = expr.type_def(state);
 
             if type_def.is_fallible() {
-                Err(Error {
+                Err(Box::new(Error {
                     variant: ErrorVariant::FallibleExpr,
                     expr_span,
-                })
+                }))
             } else if !type_def.is_bytes() {
-                Err(Error {
-                    variant: ErrorVariant::NonString(type_def.kind()),
-                    expr_span,
-                })
+                Err(Box::new(value::Error::Expected {
+                    got: type_def.kind(),
+                    expected: Kind::Bytes,
+                }))
             } else {
                 Ok(Self {
                     span,
@@ -59,7 +63,10 @@ impl Expression for Abort {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let message = self
             .message
-            .map(|expr| Ok(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string())
+            .as_ref()
+            .map::<Result<_, ExpressionError>, _>(|expr| {
+                Ok(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string())
+            })
             .transpose()?;
 
         Err(ExpressionError::Abort {
@@ -89,8 +96,6 @@ pub struct Error {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
-    #[error("non-string abort message")]
-    NonString(Kind),
     #[error("unhandled fallible expression")]
     FallibleExpr,
 }
@@ -112,23 +117,12 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match self.variant {
-            NonString(_) => 300,
             FallibleExpr => 630,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
         match self.variant {
-            ErrorVariant::NonString(kind) => vec![
-                Label::primary(
-                    "abort only accepts an expression argument resolving to a string",
-                    self.expr_span,
-                ),
-                Label::context(
-                    format!("this expression resolves to {}", kind),
-                    self.expr_span,
-                ),
-            ],
             ErrorVariant::FallibleExpr => vec![
                 Label::primary(
                     "abort only accepts an infallible expression argument",
@@ -144,13 +138,6 @@ impl DiagnosticError for Error {
 
     fn notes(&self) -> Vec<Note> {
         match self.variant {
-            ErrorVariant::NonString(_) => vec![
-                Note::CoerceValue,
-                Note::SeeDocs(
-                    "type coercion".to_owned(),
-                    Urls::func_docs("#coerce-functions"),
-                ),
-            ],
             ErrorVariant::FallibleExpr => vec![Note::SeeErrorDocs],
         }
     }

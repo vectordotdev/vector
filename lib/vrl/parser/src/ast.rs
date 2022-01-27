@@ -1088,9 +1088,13 @@ pub struct Abort {
 
 impl fmt::Display for Abort {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message.as_ref()
-            .map(|m| format!("abort: {}", m))
-            .unwrap_or_else(|| "abort".to_owned()))
+        f.write_str(
+            &self
+                .message
+                .as_ref()
+                .map(|m| format!("abort: {}", m))
+                .unwrap_or_else(|| "abort".to_owned()),
+        )
     }
 }
 
