@@ -146,7 +146,7 @@ mod test {
 
         for _ in 0..100 {
             let permit = limiter.acquire().await;
-            permit.decoding_finished(0);
+            permit.decoding_finished(1);
             drop(permit);
         }
         let data = limiter.data.lock().unwrap();
