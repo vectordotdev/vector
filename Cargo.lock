@@ -8156,6 +8156,7 @@ dependencies = [
  "avro-rs",
  "aws-config",
  "aws-sdk-sqs",
+ "aws-smithy-client",
  "aws-types",
  "azure_core",
  "azure_storage",
