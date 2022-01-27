@@ -34,6 +34,7 @@ impl DriverResponse for KinesisResponse {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

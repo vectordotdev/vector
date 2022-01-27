@@ -20,7 +20,11 @@ use super::{
     ledger::Ledger,
     record::{try_as_record_archive, Record, RecordStatus},
 };
-use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
+use crate::{
+    encoding::{AsMetadata, Encodable},
+    internal_events::EventsCorrupted,
+    Bufferable,
+};
 
 #[derive(Debug)]
 struct DeletionMarker {
@@ -36,19 +40,29 @@ struct DelayedAck {
     amount: u64,
 }
 
-pub(super) struct ReadToken(usize, u64);
+pub(super) struct ReadToken {
+    record_id: u64,
+    record_len: usize,
+}
 
 impl ReadToken {
-    pub fn record_size(&self) -> usize {
-        self.0
+    pub fn new(record_id: u64, record_len: usize) -> Self {
+        Self {
+            record_id,
+            record_len,
+        }
     }
 
     pub fn record_id(&self) -> u64 {
-        self.1
+        self.record_id
     }
 
-    fn into_id(self) -> u64 {
-        self.1
+    pub fn record_len(&self) -> usize {
+        self.record_len
+    }
+
+    fn into_record_id(self) -> u64 {
+        self.record_id
     }
 }
 
@@ -95,7 +109,17 @@ where
     /// At this stage, the record can be assumed to have been written correctly, and read correctly
     /// from disk, as the checksum was also validated.
     #[snafu(display("failed to decoded record: {:?}", source))]
-    Decode { source: <T as DecodeBytes>::Error },
+    Decode {
+        source: <T as Encodable>::DecodeError,
+    },
+
+    /// The record is not compatible with this version of Vector.
+    ///
+    /// This can occur when records written to a buffer in previous versions of Vector are read by
+    /// newer versions of Vector where the encoding scheme, or record schema, used in the previous
+    /// version of Vector are no longer able to be decoded in this version of Vector.
+    #[snafu(display("record version not compatible: {}", reason))]
+    Incompatible { reason: String },
 
     /// The reader detected that a data file contains a partially-written record.
     ///
@@ -273,10 +297,10 @@ where
             RecordStatus::Corrupted { calculated, actual } => {
                 Err(ReaderError::Checksum { calculated, actual })
             }
-            RecordStatus::Valid(id) => {
+            RecordStatus::Valid { id, .. } => {
                 self.current_record_id = id;
                 // TODO: Another spot where our hardcoding of the length delimiter size in bytes is fragile.
-                Ok(Some(ReadToken(8 + buf.len(), id)))
+                Ok(Some(ReadToken::new(id, 8 + buf.len())))
             }
         }
     }
@@ -293,19 +317,36 @@ where
     /// `try_next_record`, and the `ReadToken` from _that_ call is used, this method will panic due
     /// to an out-of-order read.
     pub fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
-        let record_id = token.into_id();
-        assert!(
-            !(record_id != self.current_record_id),
-            "using expired read token"
+        let record_id = token.into_record_id();
+        assert_eq!(
+            self.current_record_id, record_id,
+            "using expired read token; this is a serious bug"
         );
 
         // SAFETY:
         // - `try_next_record` is the only method that can hand back a `ReadToken`
         // - we only get a `ReadToken` if there's a valid record in `self.aligned_buf`
         // - `try_next_record` does all the archive checks, checksum validation, etc
-        let archived_record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
+        let record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
 
-        T::decode(archived_record.payload()).context(DecodeSnafu)
+        // Try and convert the raw record metadata into the true metadata type used by `T`, and then
+        // also verify that `T` is able to decode records with the metadata used for this record in particular.
+        let metadata =
+            T::Metadata::from_u32(record.metadata()).ok_or(ReaderError::Incompatible {
+                reason: format!("invalid metadata for {}", std::any::type_name::<T>()),
+            })?;
+
+        if !T::can_decode(metadata) {
+            return Err(ReaderError::Incompatible {
+                reason: format!(
+                    "record metadata not supported (metadata: {:#036b})",
+                    record.metadata()
+                ),
+            });
+        }
+
+        // Now we can finally try decoding.
+        T::decode(metadata, record.payload()).context(DecodeSnafu)
     }
 }
 
@@ -898,18 +939,20 @@ where
 
         // We got a read token, so our record is present in the reader, and now we can actually read
         // it out and return a reference to it.
+        let record_id = token.record_id();
+        let record_len = token.record_len() as u64;
         if self.ready_to_read {
             trace!(
                 "read record ID {} with total size {}",
-                token.record_id(),
-                token.record_size()
+                record_id,
+                record_len
             );
         }
 
-        self.update_reader_last_record_id(token.record_id())
+        self.update_reader_last_record_id(record_id)
             .await
             .context(IoSnafu)?;
-        self.track_read(token.record_size() as u64);
+        self.track_read(record_len);
         let reader = self
             .reader
             .as_mut()

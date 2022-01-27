@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
+use futures::{future::try_join_all, FutureExt, Sink};
 use itertools::Itertools;
 use tokio::sync::{
     mpsc as tokio_mpsc,
@@ -143,14 +143,13 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
+fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
         let _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
-            .await
             .is_err()
         {
             debug!(message = "Couldn't disconnect sink.", ?sink_id);
@@ -208,7 +207,7 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output_id, mut control_tx) in outputs.iter() {
+                for (output_id,  control_tx) in outputs.iter() {
                     match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&output_id.to_string()))
@@ -229,7 +228,6 @@ async fn tap_handler(
                             // Attempt to connect the sink.
                             match control_tx
                                 .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
-                                .await
                             {
                                 Ok(_) => {
                                     debug!(
@@ -486,5 +484,133 @@ mod tests {
             EventNotification::new("transform".to_string(), EventNotificationType::Matched)
         );
         let _log = assert_log(transform_tap_events[1][0].clone());
+    }
+
+    #[tokio::test]
+    async fn integration_test_tap_non_default_output() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_remap_dropped_stream = create_events_stream(
+            topology.watch(),
+            vec!["transform.dropped".to_string()],
+            500,
+            100,
+        );
+
+        let transform_tap_events: Vec<_> =
+            transform_tap_remap_dropped_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new(
+                "transform.dropped".to_string(),
+                EventNotificationType::Matched
+            )
+        );
+        assert_eq!(
+            assert_log(transform_tap_events[1][0].clone())
+                .get_message()
+                .unwrap_or_default(),
+            "test2"
+        );
+    }
+
+    #[tokio::test]
+    async fn integration_test_tap_multiple_outputs() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in-test1",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 1,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test1".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_source(
+            "in-test2",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 1,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in*"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_all_outputs_stream =
+            create_events_stream(topology.watch(), vec!["transform*".to_string()], 500, 100);
+
+        let transform_tap_events: Vec<_> = transform_tap_all_outputs_stream.take(2).collect().await;
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new("transform*".to_string(), EventNotificationType::Matched)
+        );
+
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test1"));
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test2"));
     }
 }

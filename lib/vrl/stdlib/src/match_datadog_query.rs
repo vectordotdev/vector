@@ -302,6 +302,13 @@ impl Filter<Value> for VrlFilter {
                             Comparison::Gt => *lhs > *rhs,
                             Comparison::Gte => *lhs >= *rhs,
                         },
+                        // Integer value - Float boundary
+                        (Value::Integer(lhs), ComparisonValue::Float(rhs)) => match comparator {
+                            Comparison::Lt => (*lhs as f64) < *rhs,
+                            Comparison::Lte => *lhs as f64 <= *rhs,
+                            Comparison::Gt => *lhs as f64 > *rhs,
+                            Comparison::Gte => *lhs as f64 >= *rhs,
+                        },
                         // Floats.
                         (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
                             let lhs = lhs.into_inner();
@@ -310,6 +317,16 @@ impl Filter<Value> for VrlFilter {
                                 Comparison::Lte => lhs <= *rhs,
                                 Comparison::Gt => lhs > *rhs,
                                 Comparison::Gte => lhs >= *rhs,
+                            }
+                        }
+                        // Float value - Integer boundary
+                        (Value::Float(lhs), ComparisonValue::Integer(rhs)) => {
+                            let lhs = lhs.into_inner();
+                            match comparator {
+                                Comparison::Lt => lhs < *rhs as f64,
+                                Comparison::Lte => lhs <= *rhs as f64,
+                                Comparison::Gt => lhs > *rhs as f64,
+                                Comparison::Gte => lhs >= *rhs as f64,
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.
@@ -1915,6 +1932,30 @@ mod test {
         kitchen_sink_2 {
             args: func_args![value: value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        integer_range_float_value_match {
+            args: func_args![value: value!({"custom": {"level": 7.0}}), query: "@level:[7 TO 10]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        integer_range_float_value_no_match {
+            args: func_args![value: value!({"custom": {"level": 6.9}}), query: "@level:[7 TO 10]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        float_range_integer_value_match {
+            args: func_args![value: value!({"custom": {"level": 7}}), query: "@level:[7.0 TO 10.0]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        float_range_integer_value_no_match {
+            args: func_args![value: value!({"custom": {"level": 6}}), query: "@level:[7.0 TO 10.0]"],
+            want: Ok(false),
             tdef: type_def(),
         }
     ];

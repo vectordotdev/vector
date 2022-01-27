@@ -201,7 +201,7 @@ mod test {
         invalid_grok {
             args: func_args![ value: "foo",
                               patterns: vec!["%{NOG}"]],
-            want: Err("failed to parse grok expression '^%{NOG}$': The given pattern definition name \"NOG\" could not be found in the definition map"),
+            want: Err("failed to parse grok expression '\\A%{NOG}\\z': The given pattern definition name \"NOG\" could not be found in the definition map"),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all(),
             }),
@@ -339,7 +339,7 @@ mod test {
             ],
             want: Ok(Value::Object(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000.0,
+                "duration" => 202000000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",

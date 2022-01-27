@@ -10,8 +10,8 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
+        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted,
+        AwsEcsMetricsResponseError, HttpBytesReceived, HttpEventsReceived, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -131,6 +131,7 @@ async fn aws_ecs_metrics(
         let request = Request::get(&url)
             .body(Body::empty())
             .expect("error creating request");
+        let uri = request.uri().clone();
 
         let start = Instant::now();
         match client.request(request).await {
@@ -144,41 +145,56 @@ async fn aws_ecs_metrics(
 
                         let byte_size = body.len();
 
+                        emit!(&HttpBytesReceived {
+                            byte_size,
+                            protocol: "http",
+                            http_path: uri.path(),
+                        });
+
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
-                                emit!(&AwsEcsMetricsReceived {
+                                let count = metrics.len();
+                                emit!(&HttpEventsReceived {
                                     byte_size,
-                                    count: metrics.len(),
+                                    protocol: "http",
+                                    http_path: uri.path(),
+                                    count
                                 });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
-                                    error!(message = "Error sending metric.", %error);
+                                    emit!(&StreamClosedError { error, count });
                                     return Err(());
                                 }
                             }
                             Err(error) => {
                                 emit!(&AwsEcsMetricsParseError {
                                     error,
-                                    url: &url,
+                                    endpoint: &url,
                                     body: String::from_utf8_lossy(&body),
                                 });
                             }
                         }
                     }
                     Err(error) => {
-                        emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                        emit!(&AwsEcsMetricsHttpError {
+                            error,
+                            endpoint: &url
+                        });
                     }
                 }
             }
             Ok(response) => {
-                emit!(&AwsEcsMetricsErrorResponse {
+                emit!(&AwsEcsMetricsResponseError {
                     code: response.status(),
-                    url: &url,
+                    endpoint: &url,
                 });
             }
             Err(error) => {
-                emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                emit!(&AwsEcsMetricsHttpError {
+                    error,
+                    endpoint: &url
+                });
             }
         }
     }

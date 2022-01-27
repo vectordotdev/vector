@@ -72,6 +72,16 @@ lazy_static! {
             "component_sent_event_bytes_total",
         ],
     };
+    /// The component test specification for components with multiple outputs
+    pub static ref COMPONENT_MULTIPLE_OUTPUTS_TESTS: ComponentTests = ComponentTests {
+        events: &["EventsSent"],
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[
+        ],
+    };
 }
 
 impl ComponentTests {
@@ -119,7 +129,7 @@ struct ComponentTester {
 
 impl ComponentTester {
     fn new() -> Self {
-        let mut metrics: Vec<_> = Controller::get().unwrap().capture_metrics().collect();
+        let mut metrics = Controller::get().unwrap().capture_metrics();
 
         if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
             event_test_util::debug_print_events();
