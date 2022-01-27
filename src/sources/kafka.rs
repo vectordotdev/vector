@@ -28,7 +28,7 @@ use crate::{
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
-        BytesReceived, KafkaEventError, KafkaEventsReceived, KafkaOffsetUpdateError,
+        BytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
@@ -186,7 +186,7 @@ async fn kafka_source(
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(&KafkaEventError { error });
+                emit!(&KafkaReadError { error });
             }
             Ok(msg) => {
                 emit!(&BytesReceived {

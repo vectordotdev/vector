@@ -57,11 +57,11 @@ impl InternalEvent for KafkaOffsetUpdateError {
 }
 
 #[derive(Debug)]
-pub struct KafkaEventError {
+pub struct KafkaReadError {
     pub error: rdkafka::error::KafkaError,
 }
 
-impl InternalEvent for KafkaEventError {
+impl InternalEvent for KafkaReadError {
     fn emit_logs(&self) {
         error!(
             message = "Failed to read message.",
