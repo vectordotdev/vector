@@ -649,6 +649,34 @@ to
 We use the same strategy that is used in our Vector binary, which currently uses
 the default "unwind".
 
+### Testing Strategy
+
+Unit tests: Add tests for the code generation of each expression in isolation,
+making sure that the emitted LLVM IR passes static analysis and the generated
+code produces the expected result. This covers edge cases specific to each
+expression.
+
+Behavior tests: Make sure that the existing test corpus living in
+[`tests/behavior/transforms/remap.toml`](https://github.com/vectordotdev/vector/blob/master/tests/behavior/transforms/remap.toml)
+passes when using the LLVM based execution engine.
+
+Benchmark tests: Run micro-benchmarks that compare the runtime of VRL scripts in
+varying complexity for each execution mode. The LLVM based approach should
+conceptually always be the fastest. Should we discover a case where that doesn't
+hold, we can examine it closely to see where the other execution engines apply
+optimizations that we left out.
+
+Soak tests: Run end-to-end tests to observe the impact on overall performance in
+a pipeline. Again, the LLVM based approach should be fastest in every case. The
+overall speedup will also largely depend on how heavy the remap script is and if
+there exist other components that bottleneck the pipeline.
+
+Fuzz tests: Run VRL programs that integrate a combination of arbitrary
+expressions that are automatically generated. This can uncover faults in very
+fringe edge cases that only occur when specific expressions interact with each
+other. We can use the existing execution modes to cross-validate for
+correctness.
+
 ## Rationale
 
 As long as the single-core performance of VRL is the bottleneck of a topology,
@@ -695,7 +723,7 @@ While LLVM is a highly used framework within the industry, working with it
 requires rather specialized knowledge about compiler construction. However,
 there exists plenty of publicly accessible material for code generation using
 LLVM, some of which I linked to [above](#introduction-to-llvm). In addition,
-there should be great focus to document this part of the code base
+there should be great focus to document and test this part of the code base
 extraordinarily well.
 
 ## Alternatives
