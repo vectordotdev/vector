@@ -239,6 +239,10 @@ pub struct Context<'ctx> {
 }
 ```
 
+We will preserve the existing `resolve` methods for the time being since they
+provide a great reference for the current semantics of VRL and can serve as a
+target for automated correctness tests.
+
 By convention, each expression can call `context.result_ref()` to get an LLVM
 `PointerValue` with a pointer to where the
 [`Resolved`](https://github.com/vectordotdev/vector/blob/f1404bea186ba83c4426a32bbef3f633c17cf4d2/lib/vrl/compiler/src/expression.rs#L48)
