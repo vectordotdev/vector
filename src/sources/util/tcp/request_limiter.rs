@@ -1,9 +1,9 @@
+use crate::stats::EwmaDefault;
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-const EWMA_WEIGHT: f32 = 0.1;
-
+const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;
 
 pub struct RequestLimiterPermit {
@@ -41,26 +41,23 @@ impl Drop for RequestLimiterPermit {
 struct RequestLimiterData {
     event_limit_target: usize,
     total_permits: usize,
-    average_request_size: f32,
+    average_request_size: EwmaDefault,
     semaphore: Arc<Semaphore>,
     max_requests: usize,
 }
 
 impl RequestLimiterData {
     pub fn update_average(&mut self, num_events: usize) {
-        let num_events = num_events as f32;
-        self.average_request_size =
-            (EWMA_WEIGHT * num_events) + ((1.0 - EWMA_WEIGHT) * self.average_request_size);
+        if num_events > 0 {
+            self.average_request_size.update(num_events as f64);
+        }
     }
 
     pub fn target_requests_in_flight(&self) -> usize {
-        let target = (self.event_limit_target as f32) / self.average_request_size;
-        if target.is_nan() {
-            return MINIMUM_PERMITS;
-        }
+        let target = (self.event_limit_target as f64) / self.average_request_size.average();
         (target as usize)
-            .min(self.max_requests)
             .max(MINIMUM_PERMITS)
+            .min(self.max_requests)
     }
 
     pub fn increase_permits(&mut self) {
@@ -95,7 +92,7 @@ impl RequestLimiter {
             data: Arc::new(Mutex::new(RequestLimiterData {
                 event_limit_target,
                 total_permits: MINIMUM_PERMITS,
-                average_request_size: event_limit_target as f32,
+                average_request_size: EwmaDefault::new(EWMA_WEIGHT, event_limit_target as f64),
                 semaphore,
                 max_requests,
             })),

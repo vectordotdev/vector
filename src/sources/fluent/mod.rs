@@ -159,11 +159,11 @@ impl From<decode::Error> for DecodeError {
 }
 
 #[derive(Debug)]
-struct FluentDecoder {}
+struct FluentDecoder;
 
 impl FluentDecoder {
     const fn new() -> Self {
-        FluentDecoder {}
+        FluentDecoder
     }
 
     fn handle_message(
