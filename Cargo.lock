@@ -339,7 +339,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "waker-fn",
  "winapi 0.3.9",
 ]
@@ -2020,7 +2020,7 @@ checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "winapi 0.3.9",
 ]
 
@@ -3169,7 +3169,7 @@ dependencies = [
  "httpdate",
  "itoa 0.4.8",
  "pin-project-lite",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "tokio",
  "tower-service",
  "tracing 0.1.29",
@@ -4133,7 +4133,7 @@ dependencies = [
  "serde_with",
  "sha-1 0.9.8",
  "sha2 0.9.8",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "stringprep",
  "strsim 0.10.0",
  "take_mut",
@@ -6843,9 +6843,9 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f82496b90c36d70af5fcd482edaa2e0bd16fade569de1330405fecbbdac736b"
+checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi 0.3.9",
@@ -7449,7 +7449,7 @@ dependencies = [
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "tokio",
  "tokio-util",
 ]
@@ -8286,7 +8286,7 @@ dependencies = [
  "smpl_jwt",
  "snafu",
  "snap",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt",
