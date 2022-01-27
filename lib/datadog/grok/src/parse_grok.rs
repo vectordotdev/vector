@@ -267,7 +267,7 @@ mod tests {
             parse_grok_rules(&["%{unknown}".to_string()], btreemap! {})
                 .unwrap_err()
                 .to_string(),
-            r#"failed to parse grok expression '^%{unknown}$': The given pattern definition name "unknown" could not be found in the definition map"#
+            r#"failed to parse grok expression '\A%{unknown}\z': The given pattern definition name "unknown" could not be found in the definition map"#
         );
     }
 
@@ -563,6 +563,11 @@ mod tests {
             (
                 r#"%{data:field:array("\\t")}"#,
                 "[1\t2]",
+                Ok(Value::Array(vec!["1".into(), "2".into()])),
+            ),
+            (
+                r#"(?m)%{data:field:array("[]","\\n")}"#,
+                "[1\n2]",
                 Ok(Value::Array(vec!["1".into(), "2".into()])),
             ),
             (
@@ -890,6 +895,47 @@ mod tests {
                 "@parent" => btreemap! {
                     "$child" => "abc",
                     }
+                })),
+            ),
+        ]);
+    }
+
+    #[test]
+    fn parses_with_new_lines() {
+        test_full_grok(vec![
+            (
+                "(?m)%{data:field}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "field" => "a\nb"
+                })),
+            ),
+            (
+                "(?m)%{data:line1}\n%{data:line2}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "line1" => "a",
+                    "line2" => "b"
+                })),
+            ),
+            // no DOTALL mode by default
+            ("%{data:field}", "a\nb", Err(Error::NoMatch)),
+            // (?s) is not supported by the underlying regex engine(onig) - it uses (?m) instead, so we convert it silently
+            (
+                "(?s)%{data:field}",
+                "a\nb",
+                Ok(Value::from(btreemap! {
+                    "field" => "a\nb"
+                })),
+            ),
+            // disable DOTALL mode with (?-s)
+            ("(?s)(?-s)%{data:field}", "a\nb", Err(Error::NoMatch)),
+            // disable and then enable DOTALL mode
+            (
+                "(?-s)%{data:field} (?s)%{data:field}",
+                "abc d\ne",
+                Ok(Value::from(btreemap! {
+                    "field" => Value::Array(vec!["abc".into(), "d\ne".into()]),
                 })),
             ),
         ]);
