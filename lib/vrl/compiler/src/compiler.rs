@@ -399,7 +399,7 @@ impl<'a> Compiler<'a> {
             .map(|expr| Node::new(expr.span(), self.compile_expr(*expr)));
 
         Abort::new(span, message, self.state).unwrap_or_else(|err| {
-            self.errors.push(err);
+            self.errors.push(Box::new(err));
             Abort::noop(span)
         })
     }
