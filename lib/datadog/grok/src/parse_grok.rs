@@ -45,25 +45,17 @@ pub fn parse_grok(
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
     let mut parsed = Value::from(btreemap! {});
 
-    if grok_rule.pattern.is_match(source).unwrap_or(false) {
+    if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         // Extracted fields do not preserve the order(stored in a hashmap)
         // in which they've been seen in the source expression, which matters for arrays,
         // so we need to sort them first by keys(grok0, grok1, ...).
-        let captures = grok_rule
-            .pattern
-            .captures(source)
-            .expect("some captures")
-            .expect("sfsdf");
-        for name in grok_rule.pattern.capture_names().sorted() {
-            if name.is_none() {
-                continue;
-            }
-            let mut value = Some(Value::from(captures.name(name.unwrap()).unwrap().as_str()));
+        for (name, value) in matches.iter().sorted() {
+            let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
                 lookup: field,
                 filters,
-            }) = grok_rule.fields.get(name.unwrap())
+            }) = grok_rule.fields.get(name)
             {
                 filters.iter().for_each(|filter| {
                     if let Some(ref v) = value {
@@ -109,7 +101,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 parsed
                     .as_object_mut()
                     .expect("parsed value is not an object")
-                    .insert(name.unwrap().to_string(), value.into());
+                    .insert(name.to_string(), value.into());
             }
         }
 
@@ -130,19 +122,26 @@ mod tests {
     #[test]
     fn parses_simple_grok() {
         let rules = parse_grok_rules(
-            &["%{notSpace:timestamp} %{notSpace:level} %{notSpace:message}".to_string()],
+            &[
+                "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                    .to_string(),
+            ],
             btreemap! {},
         )
         .expect("couldn't parse rules");
-        let parsed =
-            parse_grok("2020-10-02T23:22:12.223222Z info Helloworld", &rules, false).unwrap();
+        let parsed = parse_grok(
+            "2020-10-02T23:22:12.223222Z info Hello world",
+            &rules,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(
             parsed,
             Value::from(btreemap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
-                "message" => "Helloworld"
+                "message" => "Hello world"
             })
         );
     }

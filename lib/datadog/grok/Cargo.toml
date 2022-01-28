@@ -13,6 +13,7 @@ once_cell = { version = "1.9", default-features = false }
 regex = { version = "1", default-features = false }
 itertools = { version = "0.10.3", default-features = false, features = ["use_alloc"] }
 serde_json = { version = "1.0.78", default-features = false }
+grok = { version = "1", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
