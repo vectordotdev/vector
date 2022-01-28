@@ -1,13 +1,12 @@
+use fancy_regex::Regex;
+use grok::Grok;
+use lazy_static::lazy_static;
+use lookup::LookupBuf;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     sync::Arc,
 };
-
-use grok::Grok;
-use lazy_static::lazy_static;
-use lookup::LookupBuf;
-use regex::Regex;
 use vrl_compiler::Value;
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct GrokRule {
     /// a compiled regex pattern
-    pub pattern: Arc<grok::Pattern>,
+    pub pattern: Arc<Regex>,
     /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
 }
@@ -44,12 +43,24 @@ pub struct GrokRuleParseContext {
     pub aliases: BTreeMap<String, String>,
     /// used to detect cycles in alias definitions
     pub alias_stack: Vec<String>,
+    pub grok: HashMap<String, String>,
 }
 
 impl GrokRuleParseContext {
     /// appends to the rule's regular expression
     fn append_regex(&mut self, regex: &str) {
         self.regex.push_str(regex);
+    }
+
+    fn append_grok_pattern(&mut self, name: &str) -> Result<(), Error> {
+        let option = self.grok.get(name).cloned();
+        if let Some(rule_def) = option {
+            parse_grok_rule(&rule_def, self)?;
+        } else {
+            self.append_regex("TODO");
+        }
+        Ok(())
+        // self.regex.push_str(x);
     }
 
     /// registers a given grok field under a given grok name(used in a regex)
@@ -70,6 +81,7 @@ impl GrokRuleParseContext {
             fields: HashMap::new(),
             aliases,
             alias_stack: vec![],
+            grok: initialize_grok(),
         }
     }
 
@@ -113,19 +125,19 @@ pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
-    let mut grok = initialize_grok();
-
-    patterns
+    Ok(patterns
         .iter()
         .filter(|&r| !r.is_empty())
         .map(|r| {
-            parse_pattern(
-                r,
-                &mut GrokRuleParseContext::new(aliases.clone()),
-                &mut grok,
-            )
+            parse_pattern(r, &mut GrokRuleParseContext::new(aliases.clone())).unwrap_or_else(|_| {
+                parse_pattern(
+                    "failed pattern replacement",
+                    &mut GrokRuleParseContext::new(aliases.clone()),
+                )
+                .expect("replacement wasn't parsed")
+            })
         })
-        .collect::<Result<Vec<GrokRule>, Error>>()
+        .collect::<Vec<GrokRule>>())
 }
 
 ///
@@ -165,11 +177,7 @@ fn parse_alias(
 /// - `pattern` - the definition of the pattern
 /// - `context` - the context required to parse the current grok rule
 /// - `grok` - an instance of Grok parser
-fn parse_pattern(
-    pattern: &str,
-    context: &mut GrokRuleParseContext,
-    grok: &mut Grok,
-) -> Result<GrokRule, Error> {
+fn parse_pattern(pattern: &str, context: &mut GrokRuleParseContext) -> Result<GrokRule, Error> {
     parse_grok_rule(pattern, context)?;
     let mut pattern = String::new();
     pattern.push('^');
@@ -178,8 +186,7 @@ fn parse_pattern(
 
     // compile pattern
     let pattern = Arc::new(
-        grok.compile(&pattern, true)
-            .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
+        Regex::new(&pattern).map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
     );
 
     Ok(GrokRule {
@@ -270,7 +277,7 @@ fn resolve_grok_pattern(
     match context.aliases.get(match_name).cloned() {
         Some(alias_def) => match &grok_alias {
             Some(grok_alias) => {
-                context.append_regex("(?<");
+                context.append_regex("(?P<");
                 context.append_regex(grok_alias);
                 context.append_regex(">");
                 parse_alias(match_name, &alias_def, context)?;
@@ -284,7 +291,7 @@ fn resolve_grok_pattern(
             // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
             match &grok_alias {
                 Some(grok_alias) => {
-                    context.append_regex("(?<");
+                    context.append_regex("(?P<");
                     context.append_regex(grok_alias);
                     context.append_regex(">");
                 }
@@ -297,13 +304,15 @@ fn resolve_grok_pattern(
         }
         None => {
             // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
-            context.append_regex("%{");
-            resolves_match_function(grok_alias.clone(), pattern, context)?;
-
             if let Some(grok_alias) = &grok_alias {
-                context.append_regex(&format!(":{}", grok_alias));
+                context.append_regex("(?P<");
+                context.append_regex(grok_alias);
+            } else {
+                context.append_regex("(?:");
             }
-            context.append_regex("}");
+            context.append_regex(">");
+            resolves_match_function(grok_alias.clone(), pattern, context)?;
+            context.append_regex(")");
         }
     }
 
@@ -334,28 +343,28 @@ fn resolves_match_function(
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::Integer);
             }
-            context.append_regex("integerStr");
+            context.append_grok_pattern("integerStr")?;
             Ok(())
         }
         "integerExt" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::IntegerExt);
             }
-            context.append_regex("integerExtStr");
+            context.append_grok_pattern("integerExtStr")?;
             Ok(())
         }
         "number" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::Number);
             }
-            context.append_regex("numberStr");
+            context.append_grok_pattern("numberStr")?;
             Ok(())
         }
         "numberExt" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::NumberExt);
             }
-            context.append_regex("numberExtStr");
+            context.append_grok_pattern("numberExtStr")?;
             Ok(())
         }
         "date" => {
@@ -367,7 +376,7 @@ fn resolves_match_function(
                             .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
                         let mut regext_opt = None;
                         if result.tz_captured {
-                            regext_opt = Some(Regex::new(&result.regex).map_err(|error| {
+                            regext_opt = Some(regex::Regex::new(&result.regex).map_err(|error| {
                                 error!(message = "Error compiling regex", regex = %result.regex, %error);
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
                             })?);
@@ -412,7 +421,7 @@ fn resolves_match_function(
         }
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => {
-            context.append_regex(grok_pattern_name);
+            context.append_grok_pattern(grok_pattern_name)?;
             Ok(())
         }
     }
@@ -444,12 +453,12 @@ mod tests {
 }
 
 include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
-fn initialize_grok() -> Grok {
-    let mut grok = grok::Grok::with_patterns();
-
-    // Insert Datadog grok patterns.
+fn initialize_grok() -> HashMap<String, String> {
+    // let mut grok = grok::Grok::with_patterns();
+    let mut res = HashMap::new();
+    // // Insert Datadog grok patterns.
     for &(key, value) in PATTERNS {
-        grok.insert_definition(String::from(key), String::from(value));
+        res.insert(String::from(key), String::from(value));
     }
-    grok
+    res
 }

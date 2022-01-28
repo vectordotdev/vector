@@ -25,7 +25,10 @@ fn read_grok_patterns() {
 
     fs::read_dir(Path::new("patterns"))
         .expect("can't read 'patterns' dir")
-        .filter_map(|path| File::open(path.expect("can't read 'patterns' dir").path()).ok())
+        .filter_map(|path| {
+            println!("{:?}", path);
+            File::open(path.expect("can't read 'patterns' dir").path()).ok()
+        })
         .flat_map(|f| BufReader::new(f).lines().filter_map(|l| l.ok()))
         .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
         .for_each(|line| {

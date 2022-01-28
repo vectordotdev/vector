@@ -27,6 +27,7 @@ chrono-tz = { version = "0.6.1", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
 nom = { version = "7.1.0", default-features = false }
 nom-regex = { version = "0.2.0", default-features = false }
+fancy-regex = "0.7.1"
 
 # Internal
 lookup = { path = "../../lookup" }
