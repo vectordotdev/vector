@@ -1,14 +1,14 @@
+use crate::{
+    grok_filter::apply_filter,
+    parse_grok_rules::{GrokField, GrokRule},
+};
 use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
 use vector_common::btreemap;
+use tracing::warn;
 use vrl_compiler::{Target, Value};
-
-use crate::{
-    grok_filter::apply_filter,
-    parse_grok_rules::{GrokField, GrokRule},
-};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
