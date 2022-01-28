@@ -71,6 +71,10 @@ pub enum OpCode {
     /// set by the ensuing primitive instruction.
     JumpIfNotErr,
 
+    /// If the error field of the VM is set advances the instruction pointer by the amount
+    /// set by the ensuing primitive instruction.
+    JumpIfErr,
+
     /// Unconditionally advances the instruction pointer by the amount set by the ensuing
     /// primitive instruction.
     Jump,
@@ -300,6 +304,13 @@ impl Vm {
                     // If the current state is not in error, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if state.error.is_none() {
+                        state.instruction_pointer += jump;
+                    }
+                }
+                OpCode::JumpIfErr => {
+                    // If the current state is in error, jump by the given amount.
+                    let jump = state.next_primitive()?;
+                    if state.error.is_some() {
                         state.instruction_pointer += jump;
                     }
                 }

@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     expression::{Expr, Resolved},
+    vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -47,9 +48,19 @@ impl Expression for Block {
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        let mut jumps = Vec::new();
+
         for expr in &self.inner {
             // Write each of the inner expressions
             expr.compile_to_vm(vm)?;
+
+            // If there is an error, we need to jump to the end of the block.
+            jumps.push(vm.emit_jump(OpCode::JumpIfErr));
+        }
+
+        // Update all the jumps to jump to the end of the block.
+        for jump in jumps {
+            vm.patch_jump(jump);
         }
 
         Ok(())
