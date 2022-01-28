@@ -1,6 +1,6 @@
 # result:
 #
-# error[E630]: unhandled fallible expression
+# error[E631]: unhandled fallible expression
 #   ┌─ :2:7
 #   │
 # 2 │ abort to_syslog_level(0)

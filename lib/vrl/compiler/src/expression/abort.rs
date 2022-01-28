@@ -111,7 +111,7 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match self.variant {
-            FallibleExpr => 630,
+            FallibleExpr => 631,
             NonString(_) => 300,
         }
     }
