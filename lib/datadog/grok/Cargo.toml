@@ -30,7 +30,7 @@ nom-regex = { version = "0.2.0", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }
-shared = { path = "../../shared" }
+vector_common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [build-dependencies]

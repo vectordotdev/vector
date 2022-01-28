@@ -8,8 +8,8 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
+vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 
 bitflags = "1"
 bytes = "1.1.0"
@@ -27,7 +27,7 @@ serde_json = { version = "1", default-features = false, features = ["std"] }
 [dev-dependencies]
 criterion = "0.3"
 indoc = "1"
-shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"

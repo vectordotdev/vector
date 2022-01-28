@@ -1,4 +1,4 @@
-use shared::conversion::Conversion;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -98,7 +98,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text {
@@ -112,7 +112,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text_with_tz {
@@ -126,7 +126,7 @@ mod tests {
                     .with_timezone(&Utc)
             )),
             tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
+            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];
 }

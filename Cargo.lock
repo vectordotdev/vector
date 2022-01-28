@@ -1863,11 +1863,11 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "snafu",
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
+ "vector_common",
  "vrl-compiler",
 ]
 
@@ -2129,7 +2129,7 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
- "shared",
+ "vector_common",
  "vrl",
 ]
 
@@ -5207,8 +5207,8 @@ dependencies = [
  "prost 0.9.0",
  "prost-build 0.9.0",
  "prost-types 0.9.0",
- "shared",
  "snafu",
+ "vector_common",
 ]
 
 [[package]]
@@ -6619,21 +6619,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "shared"
-version = "0.1.0"
-dependencies = [
- "bytes 1.1.0",
- "chrono",
- "chrono-tz",
- "derivative",
- "nom 7.1.0",
- "serde",
- "serde_json",
- "snafu",
- "tracing 0.1.29",
 ]
 
 [[package]]
@@ -8281,7 +8266,6 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "sha2 0.10.1",
- "shared",
  "smallvec",
  "smpl_jwt",
  "snafu",
@@ -8323,6 +8307,7 @@ dependencies = [
  "vector-datadog-filter",
  "vector-vrl-functions",
  "vector_buffers",
+ "vector_common",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8423,8 +8408,15 @@ dependencies = [
 name = "vector_common"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
+ "chrono",
+ "chrono-tz",
+ "derivative",
  "metrics",
+ "nom 7.1.0",
+ "serde",
  "serde_json",
+ "snafu",
  "tracing 0.1.29",
 ]
 
@@ -8477,7 +8469,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "snafu",
  "substring",
  "tokio",
@@ -8517,8 +8508,8 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float",
- "shared",
  "thiserror",
+ "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
  "vrl-parser",
@@ -8536,9 +8527,9 @@ dependencies = [
  "regex",
  "rustyline",
  "serde_json",
- "shared",
  "structopt",
  "thiserror",
+ "vector_common",
  "vrl",
  "vrl-stdlib",
  "webbrowser",
@@ -8561,9 +8552,9 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "thiserror",
  "tracing 0.1.29",
+ "vector_common",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -8622,7 +8613,6 @@ dependencies = [
  "sha-1 0.10.0",
  "sha2 0.9.8",
  "sha3",
- "shared",
  "strip-ansi-escapes",
  "syslog_loose",
  "tracing 0.1.29",
@@ -8630,6 +8620,7 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "vector_common",
  "vrl",
  "woothee",
 ]
@@ -8647,10 +8638,10 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "structopt",
  "tikv-jemallocator",
  "tracing-subscriber",
+ "vector_common",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",

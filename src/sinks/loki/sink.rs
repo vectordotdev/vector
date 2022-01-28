@@ -1,8 +1,8 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use futures::{stream::BoxStream, StreamExt};
-use shared::encode_logfmt;
 use snafu::Snafu;
+use vector_common::encode_logfmt;
 use vector_core::{
     buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},

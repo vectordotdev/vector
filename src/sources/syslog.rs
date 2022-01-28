@@ -309,7 +309,7 @@ fn enrich_syslog_event(
 #[cfg(test)]
 mod test {
     use chrono::prelude::*;
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::*;
     use crate::{codecs::decoding::Deserializer, config::log_schema, event::Event};
