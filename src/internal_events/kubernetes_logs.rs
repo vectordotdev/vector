@@ -4,13 +4,13 @@ use vector_core::internal_event::InternalEvent;
 use crate::event::Event;
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventReceived<'a> {
+pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: usize,
     pub pod_name: Option<&'a str>,
 }
 
-impl InternalEvent for KubernetesLogsEventReceived<'_> {
+impl InternalEvent for KubernetesLogsEventsReceived<'_> {
     fn emit_logs(&self) {
         trace!(
             message = "Received one event.",
@@ -22,6 +22,7 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
         match self.pod_name {
             Some(name) => {
                 counter!("component_received_events_total", 1, "pod_name" => name.to_owned());
+                counter!("component_received_event_bytes_total", self.byte_size as u64, "pod_name" => name.to_owned());
                 counter!("events_in_total", 1, "pod_name" => name.to_owned());
                 counter!(
                     "processed_bytes_total", self.byte_size as u64,
@@ -30,6 +31,10 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
             }
             None => {
                 counter!("component_received_events_total", 1);
+                counter!(
+                    "component_received_event_bytes_total",
+                    self.byte_size as u64
+                );
                 counter!("events_in_total", 1);
                 counter!("processed_bytes_total", self.byte_size as u64);
             }

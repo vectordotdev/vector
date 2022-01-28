@@ -25,7 +25,7 @@ use crate::{
     event::{Event, LogEvent},
     internal_events::{
         FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
+        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventsReceived,
     },
     kubernetes as k8s,
     kubernetes::hash_value::HashKey,
@@ -407,7 +407,7 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(&KubernetesLogsEventReceived {
+            emit!(&KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
