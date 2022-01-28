@@ -32,7 +32,9 @@ impl Error for EncodingError {
 /// will follow after them. `Flattens_boolean` values
 /// to only a key if true.
 ///
-/// Fails if V contains non String map keys.
+/// # Errors
+///
+/// Returns an `EncodingError` if the input contains non-`String` map keys.
 pub fn to_string<V: Serialize>(
     input: BTreeMap<String, V>,
     fields_order: &[String],
@@ -46,16 +48,15 @@ pub fn to_string<V: Serialize>(
 
     for field in fields_order.iter() {
         match (input.remove(field), flatten_boolean) {
-            (Some(Data::Boolean(false)), true) => (),
+            (Some(Data::Boolean(false)), true) | (None, _) => (),
             (Some(Data::Boolean(true)), true) => {
                 encode_string(&mut output, field);
-                output.write_str(field_delimiter).unwrap();
+                output.push_str(field_delimiter);
             }
             (Some(value), _) => {
                 encode_field(&mut output, field, &value.to_string(), key_value_delimiter);
-                output.write_str(field_delimiter).unwrap();
+                output.push_str(field_delimiter);
             }
-            (None, _) => (),
         };
     }
 
@@ -64,17 +65,17 @@ pub fn to_string<V: Serialize>(
             (Data::Boolean(false), true) => (),
             (Data::Boolean(true), true) => {
                 encode_string(&mut output, key);
-                output.write_str(field_delimiter).unwrap();
+                output.push_str(field_delimiter);
             }
             (_, _) => {
                 encode_field(&mut output, key, &value.to_string(), key_value_delimiter);
-                output.write_str(field_delimiter).unwrap();
+                output.push_str(field_delimiter);
             }
         };
     }
 
     if output.ends_with(field_delimiter) {
-        output.truncate(output.len() - field_delimiter.len())
+        output.truncate(output.len() - field_delimiter.len());
     }
 
     Ok(output)
@@ -93,7 +94,7 @@ fn flatten<'a>(
 
 fn encode_field<'a>(output: &mut String, key: &str, value: &str, key_value_delimiter: &'a str) {
     encode_string(output, key);
-    output.write_str(key_value_delimiter).unwrap();
+    output.push_str(key_value_delimiter);
     encode_string(output, value);
 }
 
@@ -106,15 +107,15 @@ fn encode_string(output: &mut String, str: &str) {
 
     for c in str.chars() {
         match c {
-            '\\' => output.write_str(r#"\\"#).unwrap(),
-            '"' => output.write_str(r#"\""#).unwrap(),
-            '\n' => output.write_str(r#"\\n"#).unwrap(),
-            _ => output.write_char(c).unwrap(),
+            '\\' => output.push_str(r#"\\"#),
+            '"' => output.push_str(r#"\""#),
+            '\n' => output.push_str(r#"\\n"#),
+            _ => output.push(c),
         }
     }
 
     if needs_quoting {
-        output.write_char('"').unwrap();
+        output.push('"');
     }
 }
 
@@ -191,6 +192,7 @@ impl<'a> KeyValueSerializer<'a> {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn process(self, data: Data) -> Result<(), EncodingError> {
         self.output.insert(self.key, data);
         Ok(())
@@ -545,7 +547,7 @@ mod tests {
             )
             .unwrap(),
             "lvl=info"
-        )
+        );
     }
 
     #[test]
@@ -563,7 +565,7 @@ mod tests {
             )
             .unwrap(),
             "log_id=12345 lvl=info"
-        )
+        );
     }
 
     #[test]
@@ -581,7 +583,7 @@ mod tests {
             )
             .unwrap(),
             r#"lvl=info msg="This is a log message""#
-        )
+        );
     }
 
     #[test]
@@ -601,7 +603,7 @@ mod tests {
             )
             .unwrap(),
             r#"beta lvl=info msg="This is a log message""#
-        )
+        );
     }
 
     #[test]
@@ -621,7 +623,7 @@ mod tests {
             )
             .unwrap(),
             r#"beta=true lvl=info msg="This is a log message" prod=false"#
-        )
+        );
     }
 
     #[test]
@@ -640,7 +642,7 @@ mod tests {
             )
             .unwrap(),
             r#"tag_a:val_a,tag_b:val_b,tag_c"#
-        )
+        );
     }
 
     #[test]
@@ -660,7 +662,7 @@ mod tests {
             )
             .unwrap(),
             r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#
-        )
+        );
     }
 
     #[test]
@@ -690,7 +692,7 @@ mod tests {
                 ).unwrap()
                 ,
                 "agent.id=1234 agent.name=vector event=log log.file.path=encode_key_value.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"
-            )
+            );
     }
 
     #[test]
@@ -709,7 +711,7 @@ mod tests {
             )
             .unwrap(),
             r#"lvl=info msg="This is a log message" log_id=12345"#
-        )
+        );
     }
 
     #[test]
@@ -738,7 +740,7 @@ mod tests {
             )
             .unwrap(),
             "event=log log.file.path=encode_key_value.rs agent.name=vector"
-        )
+        );
     }
 
     #[test]
@@ -758,6 +760,6 @@ mod tests {
             " ",
             true
         )
-        .is_err())
+        .is_err());
     }
 }

@@ -13,6 +13,7 @@ use super::datetime::{datetime_to_utc, TimeZone};
 #[cfg(test)]
 mod tests;
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Snafu)]
 pub enum ConversionError {
     #[snafu(display("Unknown conversion name {:?}", name))]
@@ -51,6 +52,11 @@ pub enum Error {
 }
 
 /// Helper function to parse a conversion map and check against a list of names
+///
+/// # Errors
+///
+/// See `fn Conversion::parse`.
+#[allow(clippy::implicit_hasher)]
 pub fn parse_check_conversion_map(
     types: &HashMap<String, String>,
     names: &[impl AsRef<str>],
@@ -74,6 +80,11 @@ pub fn parse_check_conversion_map(
 }
 
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
+///
+/// # Errors
+///
+/// See `fn Conversion::parse`.
+#[allow(clippy::implicit_hasher)]
 pub fn parse_conversion_map(
     types: &HashMap<String, String>,
     tz: TimeZone,
@@ -94,6 +105,10 @@ impl Conversion {
     ///  * `"bool"` or `"boolean"` => Boolean
     ///  * `"timestamp"` => Timestamp, guessed using a set of formats
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion name is unknown.
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
         let mut split = s.splitn(2, '|').map(str::trim);
@@ -119,6 +134,10 @@ impl Conversion {
     }
 
     /// Use this `Conversion` variant to turn the given `bytes` into a new `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors from the underlying conversion functions. See `enum Error`.
     pub fn convert<T>(&self, bytes: Bytes) -> Result<T, Error>
     where
         T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
@@ -145,14 +164,14 @@ impl Conversion {
                     .datetime_from_str(&s, format)
                     .context(TimestampParseSnafu { s })?;
 
-                datetime_to_utc(dt).into()
+                datetime_to_utc(&dt).into()
             }
             Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = DateTime::parse_from_str(&s, format)
                     .with_context(|_| TimestampParseSnafu { s })?;
 
-                datetime_to_utc(dt).into()
+                datetime_to_utc(&dt).into()
             }
         })
     }
@@ -169,7 +188,9 @@ impl Conversion {
 ///  * `"false"`, `"f"`, `"no"`, `"n"` (all case-insensitive), and `"0"`
 ///  all convert to `false`.
 ///
-/// Anything else results in a parse error.
+/// # Errors
+///
+/// Any input value besides those described above result in a parse error.
 fn parse_bool(s: &str) -> Result<bool, Error> {
     match s {
         "true" | "t" | "yes" | "y" => Ok(true),
@@ -227,6 +248,11 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
+///
+/// # Errors
+///
+/// Returns an error if the string could not be matched by one of the
+/// predefined timestamp formats.
 fn parse_timestamp(tz: TimeZone, s: &str) -> Result<DateTime<Utc>, Error> {
     for format in TIMESTAMP_LOCAL_FORMATS {
         if let Ok(result) = tz.datetime_from_str(s, format) {
@@ -239,14 +265,14 @@ fn parse_timestamp(tz: TimeZone, s: &str) -> Result<DateTime<Utc>, Error> {
         }
     }
     if let Ok(result) = DateTime::parse_from_rfc3339(s) {
-        return Ok(datetime_to_utc(result));
+        return Ok(datetime_to_utc(&result));
     }
     if let Ok(result) = DateTime::parse_from_rfc2822(s) {
-        return Ok(datetime_to_utc(result));
+        return Ok(datetime_to_utc(&result));
     }
     for format in TIMESTAMP_TZ_FORMATS {
         if let Ok(result) = DateTime::parse_from_str(s, format) {
-            return Ok(datetime_to_utc(result));
+            return Ok(datetime_to_utc(&result));
         }
     }
     Err(Error::AutoTimestampParse { s: s.into() })

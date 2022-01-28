@@ -9,6 +9,7 @@ macro_rules! btreemap {
         {
             let mut _map = ::std::collections::BTreeMap::new();
             $(
+                #[allow(clippy::let_underscore_drop)]
                 let _ = _map.insert($key.into(), $value.into());
             )*
             _map
@@ -22,7 +23,7 @@ mod tests {
     fn test_btreemap() {
         use std::collections::BTreeMap;
 
-        assert_eq!(btreemap! {}, BTreeMap::<(), ()>::new());
+        assert_eq!(btreemap! {}, BTreeMap::<usize, usize>::new());
 
         let mut map = BTreeMap::new();
         map.insert(1, "1");
