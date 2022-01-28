@@ -3,6 +3,8 @@
 
 #![deny(
     clippy::all,
+    clippy::cargo,
+    clippy::nursery,
     clippy::pedantic,
     future_incompatible,
     missing_docs,
@@ -19,6 +21,7 @@
     rustdoc::private_intra_doc_links,
     unused
 )]
+#![allow(clippy::cargo_common_metadata, unreachable_code, unused_variables)]
 
 pub mod kind;
 
