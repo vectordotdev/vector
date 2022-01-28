@@ -105,6 +105,7 @@ impl Function for ParseGroks {
     fn compile_argument(
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {

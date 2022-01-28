@@ -74,6 +74,7 @@ impl Function for MatchDatadogQuery {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {

@@ -67,6 +67,7 @@ pub trait Function: Sync + fmt::Debug {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
     ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {

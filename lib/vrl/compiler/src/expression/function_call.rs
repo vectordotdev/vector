@@ -379,6 +379,8 @@ impl Expression for FunctionCall {
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
+        let compile_ctx = FunctionCompileContext { span: self.span };
+
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
             let argument = argument.as_ref().map(|argument| argument.inner());
@@ -386,7 +388,7 @@ impl Expression for FunctionCall {
             // Call `compile_argument` for functions that need to perform any compile time processing
             // on the argument.
             match fun
-                .compile_argument(&args, keyword, argument)
+                .compile_argument(&args, &compile_ctx, keyword, argument)
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
