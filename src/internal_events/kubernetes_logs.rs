@@ -43,19 +43,27 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventAnnotationFailed<'a> {
+pub struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
 }
 
-impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
+impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Failed to annotate event with pod metadata.",
-            event = ?self.event
+            error_type = "event_annotation",
+            event = ?self.event,
+            stage = "processing",
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => "Failed to annotate event with pod metadata.",
+            "error_type" => "event_annotation",
+            "stage" => "processing",
+        );
         counter!("k8s_event_annotation_failures_total", 1);
     }
 }

@@ -24,7 +24,7 @@ use crate::{
     },
     event::{Event, LogEvent},
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationError,
         KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventsReceived,
     },
     kubernetes as k8s,
@@ -414,7 +414,7 @@ impl Source {
             });
 
             if file_info.is_none() {
-                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(&KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
