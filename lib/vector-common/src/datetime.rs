@@ -21,6 +21,7 @@ impl TimeZone {
         }
     }
 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "" | "local" => Some(Self::Local),
@@ -38,7 +39,7 @@ pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: DateTime<TZ>) -> DateTim
 pub mod ser_de {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-    use super::*;
+    use super::TimeZone;
 
     impl Serialize for TimeZone {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

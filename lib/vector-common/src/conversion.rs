@@ -57,7 +57,10 @@ pub fn parse_check_conversion_map(
     tz: TimeZone,
 ) -> Result<HashMap<String, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
+    let names = names
+        .iter()
+        .map(std::convert::AsRef::as_ref)
+        .collect::<HashSet<_>>();
     for name in types.keys() {
         if !names.contains(name.as_str()) {
             tracing::warn!(
@@ -93,14 +96,12 @@ impl Conversion {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
-        let mut split = s.splitn(2, '|').map(|segment| segment.trim());
+        let mut split = s.splitn(2, '|').map(str::trim);
         match (split.next(), split.next()) {
-            (Some("asis"), None) | (Some("bytes"), None) | (Some("string"), None) => {
-                Ok(Self::Bytes)
-            }
-            (Some("integer"), None) | (Some("int"), None) => Ok(Self::Integer),
+            (Some("asis" | "bytes" | "string"), None) => Ok(Self::Bytes),
+            (Some("integer" | "int"), None) => Ok(Self::Integer),
             (Some("float"), None) => Ok(Self::Float),
-            (Some("bool"), None) | (Some("boolean"), None) => Ok(Self::Boolean),
+            (Some("bool" | "boolean"), None) => Ok(Self::Boolean),
             (Some("timestamp"), None) => Ok(Self::Timestamp(tz)),
             (Some("timestamp"), Some(fmt)) => {
                 // DateTime<Utc> can only convert timestamps without
@@ -110,7 +111,7 @@ impl Conversion {
                 if format_has_zone(fmt) {
                     Ok(Self::TimestampTzFmt(fmt.into()))
                 } else {
-                    Ok(Self::TimestampFmt(fmt.into(), tz.to_owned()))
+                    Ok(Self::TimestampFmt(fmt.into(), tz))
                 }
             }
             _ => Err(ConversionError::UnknownConversion { name: s.into() }),

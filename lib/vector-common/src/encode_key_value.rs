@@ -3,7 +3,10 @@ use std::{
     fmt::{self, Write},
 };
 
-use serde::ser::*;
+use serde::ser::{
+    Error, Serialize, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
+    SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, Serializer,
+};
 
 #[derive(Debug, snafu::Snafu)]
 pub enum EncodingError {
@@ -26,7 +29,7 @@ impl Error for EncodingError {
 
 /// Encodes input to key value format with specified
 /// delimiters in field order where unspecified fields
-/// will follow after them. Flattens_boolean values
+/// will follow after them. `Flattens_boolean` values
 /// to only a key if true.
 ///
 /// Fails if V contains non String map keys.
@@ -56,7 +59,7 @@ pub fn to_string<V: Serialize>(
         };
     }
 
-    for (key, value) in input.iter() {
+    for (key, value) in &input {
         match (value, flatten_boolean) {
             (Data::Boolean(false), true) => (),
             (Data::Boolean(true), true) => {
@@ -211,15 +214,15 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::I64(v as i64))
+        self.process(Data::I64(i64::from(v)))
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::I64(v as i64))
+        self.process(Data::I64(i64::from(v)))
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::I64(v as i64))
+        self.process(Data::I64(i64::from(v)))
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
@@ -227,14 +230,14 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::U64(v as u64))
+        self.process(Data::U64(u64::from(v)))
     }
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::U64(v as u64))
+        self.process(Data::U64(u64::from(v)))
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        self.process(Data::U64(v as u64))
+        self.process(Data::U64(u64::from(v)))
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
@@ -522,7 +525,7 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use serde::*;
+    use serde::Serialize;
     use serde_json::{json, Value};
 
     use super::*;
