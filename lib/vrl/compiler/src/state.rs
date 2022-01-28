@@ -105,13 +105,11 @@ impl Runtime {
         self.variables.get_mut(ident)
     }
 
-    // TODO: don't want to make this public, rewrite closure support.
-    pub fn insert_variable(&mut self, ident: Ident, value: Value) {
+    pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
         self.variables.insert(ident, value);
     }
 
-    // TODO: don't want to make this public, rewrite closure support.
-    pub fn remove_variable(&mut self, ident: &Ident) {
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) {
         self.variables.remove(ident);
     }
 }

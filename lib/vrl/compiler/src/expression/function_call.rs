@@ -7,7 +7,9 @@ use std::{fmt, sync::Arc};
 use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
+use crate::type_def::KindInfo;
 use crate::{
+    expression,
     expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
     function::{ArgumentList, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
@@ -209,7 +211,8 @@ impl FunctionCall {
                 let ast::FunctionClosure { variables, block } = closure.into_inner();
 
                 let mut matched = false;
-
+                let mut found_type_def = None;
+                let mut input_expression = None;
                 for input in definition.inputs {
                     // Check type definition for linked parameter.
                     match list.arguments.get(input.parameter_keyword) {
@@ -221,11 +224,12 @@ impl FunctionCall {
                         None => continue,
                         Some(expr) => {
                             let type_def = expr.type_def(compiler.state);
-
                             // The type definition of the value does not match the expected closure
                             // type, continue to check if the closure eventually accepts this
                             // definition.
                             if type_def.kind() != input.kind {
+                                found_type_def = Some(type_def.kind.clone());
+                                input_expression = Some(expr);
                                 continue;
                             }
 
@@ -289,7 +293,13 @@ impl FunctionCall {
 
                 // None of the inputs matched the value type, this is a user error.
                 if !matched {
-                    todo!("invalid closure signature")
+                    return Err(Error::EnumerationTypeMismatch {
+                        call_span,
+                        found_kind: found_type_def.unwrap_or(KindInfo::Unknown),
+                        input_expression: input_expression
+                            .unwrap_or(&expression::Expr::Noop(Noop {}))
+                            .clone(),
+                    });
                 }
 
                 let block = compiler.compile_block(block);
@@ -706,6 +716,12 @@ pub enum Error {
         expected: usize,
         supplied: usize,
     },
+    #[error("type mismatch in enumeration function call")]
+    EnumerationTypeMismatch {
+        call_span: Span,
+        found_kind: KindInfo,
+        input_expression: expression::Expr,
+    },
 }
 
 impl DiagnosticError for Error {
@@ -725,6 +741,7 @@ impl DiagnosticError for Error {
             UnexpectedClosure { .. } => 109,
             MissingClosure { .. } => 110,
             ClosureArityMismatch { .. } => 120,
+            EnumerationTypeMismatch { .. } => 121,
         }
     }
 
@@ -878,9 +895,21 @@ impl DiagnosticError for Error {
                 format!("an error occurred updating the compiler state: {}", error),
                 call_span,
             )],
-            UnexpectedClosure { .. } => vec![],
-            MissingClosure { .. } => vec![], //TODO: actually create labels
-            ClosureArityMismatch { .. } => vec![],
+            UnexpectedClosure { call_span } => {
+                vec![Label::primary("Unexpected Closure", call_span), Label::context("This function does not accept a closure.", call_span)]
+            }
+            MissingClosure { call_span } => vec![Label::primary("This function expects a closure and one was not provided.", call_span)], 
+            ClosureArityMismatch { call_span, expected, supplied } => vec![Label::primary("This closure does not accept the required number of arguments.",call_span), Label::context(format!("{supplied} arguments were supplied, {expected} were expected."), call_span)],
+            EnumerationTypeMismatch {
+                call_span,
+                found_kind,
+                input_expression
+            } => vec![Label::primary(
+                format!(
+                    "This input value does not have a known enumerable type."
+                ),
+                call_span,
+            ), Label::context(format!("The expression {input_expression} has an inferred type of {found_kind:#?} where an Array or Object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
         }
     }
 
