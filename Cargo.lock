@@ -2951,7 +2951,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.20.0",
+ "nix 0.20.2",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -3033,7 +3033,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.20.0",
+ "nix 0.20.2",
  "widestring",
  "winapi 0.3.9",
 ]
@@ -4274,14 +4274,14 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa9b4819da1bc61c0ea48b63b7bc8604064dd43013e7cc325df098d49cd7c18a"
+version = "0.20.2"
+source = "git+https://github.com/vectordotdev/nix.git?branch=unpin-bitflags#25e6b8e827355adaae89a21fdbc1a5c1a6f559a2"
 dependencies = [
  "bitflags",
  "cc",
  "cfg-if 1.0.0",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -7909,7 +7909,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 

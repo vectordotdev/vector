@@ -351,6 +351,13 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+# Allow bitflags to be >= 1.3 for nix 0.20.2 This was restricted for nix 0.20.1
+# and 0.20.2 because it broke Rust builds < 1.46 but we have no need to support
+# Rust versions that old in `vectordotdev/vector` and it is blocking the upgrade
+# of `security-framework` as it bumps bitflags
+# https://github.com/vectordotdev/vector/pull/11090 Only heim depends on nix
+# 0.20. An alternative would be to fork heim and update its nix dependency.
+nix = { git = "https://github.com/vectordotdev/nix.git", branch = "unpin-bitflags" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
