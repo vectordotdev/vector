@@ -25,7 +25,7 @@ use crate::{
     },
     event::{Event, LogEvent},
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
@@ -402,6 +402,11 @@ impl Source {
         let events = events.flatten();
         let events = events.map(move |line| {
             let byte_size = line.text.len();
+            emit!(&BytesReceived {
+                byte_size,
+                protocol: "http",
+            });
+
             let mut event = create_event(
                 line.text,
                 &line.filename,
