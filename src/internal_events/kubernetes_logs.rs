@@ -113,19 +113,27 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsDockerFormatParseFailed<'a> {
+pub struct KubernetesLogsDockerFormatParseError<'a> {
     pub error: &'a dyn std::error::Error,
 }
 
-impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
+impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to parse log line in docker format.",
             error = %self.error,
+            error_type = "parser",
+            stage = "processing",
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "parser",
+            "stage" => "processing",
+        );
         counter!("k8s_docker_format_parse_failures_total", 1);
     }
 }
