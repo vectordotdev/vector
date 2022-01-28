@@ -201,7 +201,7 @@ mod test {
         invalid_grok {
             args: func_args![ value: "foo",
                               patterns: vec!["%{NOG}"]],
-            want: Err("failed to parse grok expression '^%{NOG}$': The given pattern definition name \"NOG\" could not be found in the definition map"),
+            want: Err("failed to parse grok expression '\\A%{NOG}\\z': The given pattern definition name \"NOG\" could not be found in the definition map"),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all(),
             }),

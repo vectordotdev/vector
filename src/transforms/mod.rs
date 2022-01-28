@@ -71,7 +71,7 @@ pub mod throttle;
 pub mod tokenizer;
 
 pub use vector_core::transform::{
-    FunctionTransform, SyncTransform, TaskTransform, Transform, TransformOutputs,
+    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
 
@@ -88,7 +88,7 @@ enum BuildError {
 mod test {
     use vector_core::transform::FunctionTransform;
 
-    use crate::event::Event;
+    use crate::{event::Event, transforms::OutputBuffer};
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///
@@ -102,9 +102,9 @@ mod test {
     // issue a unused warnings about the import above.
     #[allow(dead_code)]
     pub fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         ft.transform(&mut buf, event);
         assert!(buf.len() < 2);
-        buf.into_iter().next()
+        buf.first().cloned()
     }
 }

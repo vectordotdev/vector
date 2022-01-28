@@ -4,16 +4,17 @@ use bytes::{Buf, BufMut};
 
 use super::builder::TopologyBuilder;
 use crate::{
-    encoding::{DecodeBytes, EncodeBytes},
+    encoding::FixedEncodable,
     topology::channel::{BufferReceiver, BufferSender},
     Bufferable, WhenFull,
 };
 
-// Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
-impl EncodeBytes for u64 {
-    type Error = BasicError;
+// Silly implementation of `Encodable` to fulfill `Bufferable` for our test buffer code.
+impl FixedEncodable for u64 {
+    type EncodeError = BasicError;
+    type DecodeError = BasicError;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
@@ -21,12 +22,8 @@ impl EncodeBytes for u64 {
         buffer.put_u64(self);
         Ok(())
     }
-}
 
-impl DecodeBytes for u64 {
-    type Error = BasicError;
-
-    fn decode<B>(mut buffer: B) -> Result<u64, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<u64, Self::DecodeError>
     where
         B: Buf,
     {

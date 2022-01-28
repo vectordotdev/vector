@@ -10,7 +10,7 @@ use crate::{
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
 
@@ -116,7 +116,7 @@ impl MetricToLog {
 }
 
 impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
             .map(|log| log.into());

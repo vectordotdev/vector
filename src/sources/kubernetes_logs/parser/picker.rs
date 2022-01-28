@@ -4,7 +4,7 @@ use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
-    transforms::FunctionTransform,
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 #[derive(Clone, Debug)]
@@ -28,7 +28,7 @@ impl Picker {
 }
 
 impl FunctionTransform for Picker {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             PickerState::Init => {
                 let message = match event
@@ -106,7 +106,7 @@ mod tests {
         for message in cases {
             let input = Event::from(message);
             let mut picker = Picker::new(TimeZone::Local);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
@@ -129,7 +129,7 @@ mod tests {
 
         for input in cases {
             let mut picker = Picker::new(TimeZone::Local);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }

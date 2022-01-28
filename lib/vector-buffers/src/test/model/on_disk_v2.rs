@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 
 use super::Progress;
 use crate::{
+    encoding::Encodable,
     test::{
         common::Variant,
         model::{Message, Model},
     },
-    EncodeBytes, WhenFull,
+    WhenFull,
 };
 
 /// `OnDiskV2` is the `Model` for on-disk buffer for the pure Rust implementation (v2)
@@ -37,7 +38,7 @@ impl OnDiskV2 {
 
 impl Model for OnDiskV2 {
     fn send(&mut self, item: Message) -> Progress {
-        let byte_size = EncodeBytes::encoded_size(&item).unwrap();
+        let byte_size = Encodable::encoded_size(&item).unwrap();
         match self.when_full {
             WhenFull::DropNewest => {
                 if self.is_full() {
@@ -63,7 +64,7 @@ impl Model for OnDiskV2 {
 
     fn recv(&mut self) -> Option<Message> {
         self.inner.pop_front().map(|msg| {
-            let byte_size = EncodeBytes::encoded_size(&msg).unwrap();
+            let byte_size = Encodable::encoded_size(&msg).unwrap();
             self.current_bytes -= byte_size;
             msg
         })

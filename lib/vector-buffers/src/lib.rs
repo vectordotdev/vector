@@ -19,6 +19,7 @@ mod buffer_usage_data;
 
 pub mod config;
 pub use config::{BufferConfig, BufferType};
+use encoding::Encodable;
 
 pub mod encoding;
 
@@ -38,8 +39,6 @@ use std::fmt::Debug;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
-
-use crate::encoding::{DecodeBytes, EncodeBytes};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -73,12 +72,12 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + EncodeBytes + DecodeBytes + Debug + Send + Sync + Unpin + Sized + 'static
+    ByteSizeOf + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + EncodeBytes + DecodeBytes + Debug + Send + Sync + Unpin + Sized + 'static
+    T: ByteSizeOf + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }

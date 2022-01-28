@@ -20,7 +20,7 @@ parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for
 parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
 args = parser.parse_args()
 
-erratic_soaks = args.erratic_soaks.split(',')
+known_erratic_soaks = args.erratic_soaks.split(',')
 
 bytes_written = pd.concat(common.compute_throughput(
     common.open_captures(args.capture_dir,
@@ -32,7 +32,7 @@ bytes_written = pd.concat(common.compute_throughput(
 bytes_written = bytes_written[(bytes_written.fetch_index > args.warmup_seconds) &
                               (bytes_written.throughput > 0.0)]
 
-ttest_results = []
+results = []
 for exp in bytes_written.experiment.unique():
     baseline = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'baseline')]
     comparison = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'comparison')]
@@ -64,26 +64,27 @@ for exp in bytes_written.experiment.unique():
                                            comparison_stdev,
                                            len(comparison),
                                            equal_var=False)
-    ttest_results.append({'experiment': exp,
-                          'Δ mean': diff.mean(),
-                          'Δ mean %': percent_change,
-                          'baseline mean': baseline_mean,
-                          'comparison mean': comparison_mean,
-                          'p-value': res.pvalue,
-                          'erratic': exp in erratic_soaks
-                          })
-ttest_results = pd.DataFrame.from_records(ttest_results)
+    results.append({'experiment': exp,
+                    'Δ mean': diff.mean(),
+                    'Δ mean %': percent_change,
+                    'baseline mean': baseline_mean,
+                    'comparison mean': comparison_mean,
+                    'p-value': res.pvalue,
+                    'declared erratic': exp in known_erratic_soaks
+                    })
+results = pd.DataFrame.from_records(results)
 print("Table of test results:")
 print("")
 print("")
-print(ttest_results.to_markdown(index=False, tablefmt='github'))
+print(results.to_markdown(index=False, tablefmt='github'))
 
-p_value_violation = ttest_results['p-value'] < args.p_value
-changes = ttest_results[p_value_violation]
-changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
-changes = changes[changes['Δ mean %'] <  -args.mean_drift_percentage]
+p_value_violation = results['p-value'] < args.p_value
+drift_filter = results['Δ mean %'].abs() > args.mean_drift_percentage
+declared_erratic = results.experiment.isin(known_erratic_soaks)
+
+changes = results[p_value_violation & drift_filter & ~declared_erratic]
 print("")
-print("Table normalized to only show regressions, {} p-value threshold, {} drift threshold:".format(args.p_value, args.mean_drift_percentage))
+print(f"Table normalized to only show regressions, {args.p_value} p-value threshold, {args.mean_drift_percentage} drift threshold:")
 print("")
 print(changes.to_markdown(index=False, tablefmt='github'))
 
