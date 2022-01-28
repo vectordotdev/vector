@@ -265,7 +265,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
                 .seek(SeekFrom::Start(target_pos))
                 .await
                 .expect("seek should not fail");
-            assert_eq!(target_pos, pos);
+            assert_eq!(target_pos, pos);trace_span
             data_file
                 .write_all(&[0xd, 0xe, 0xa, 0xd, 0xb, 0xe, 0xe, 0xf])
                 .await

@@ -22,7 +22,9 @@ impl Target for Value {
     }
 }
 
-impl Value {
+trait VrlValueTarget {}
+
+impl VrlValueTarget for Value {
     /// Get a reference to a value from a given path.
     ///
     /// # Examples

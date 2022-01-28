@@ -3,46 +3,7 @@ use mlua::prelude::*;
 use super::util::{table_is_timestamp, table_to_timestamp, timestamp_to_table};
 use crate::event::Value;
 
-impl<'a> ToLua<'a> for Value {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
-        match self {
-            Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
-            Value::Integer(i) => Ok(LuaValue::Integer(i)),
-            Value::Float(f) => Ok(LuaValue::Number(f)),
-            Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
-            Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
-            Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
-            Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
-            Value::Null => lua.create_string("").map(LuaValue::String),
-        }
-    }
-}
-
-impl<'a> FromLua<'a> for Value {
-    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
-        match value {
-            LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
-            LuaValue::Integer(i) => Ok(Value::Integer(i)),
-            LuaValue::Number(f) => Ok(Value::Float(f)),
-            LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
-            LuaValue::Table(t) => {
-                if t.len()? > 0 {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Value::Array)
-                } else if table_is_timestamp(&t)? {
-                    table_to_timestamp(t).map(Value::Timestamp)
-                } else {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Value::Map)
-                }
-            }
-            other => Err(mlua::Error::FromLuaConversionError {
-                from: other.type_name(),
-                to: "Value",
-                message: Some("Unsupported Lua type".to_string()),
-            }),
-        }
-    }
-}
+//TODO: move these tests to lib/value
 
 #[cfg(test)]
 mod test {

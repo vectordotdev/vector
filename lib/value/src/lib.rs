@@ -1,11 +1,12 @@
 //! The `value` crate contains types shared across Vector libraries to support it's use of `Value`
 //! and the closely linked `Kind` in support of progressive type checking.
 
-#![deny(
+//TODO: switch to deny
+#![warn(
     clippy::all,
     clippy::pedantic,
     future_incompatible,
-    // missing_docs,
+    missing_docs,
     nonstandard_style,
     rust_2018_compatibility,
     rust_2018_idioms,
@@ -22,6 +23,12 @@
 
 pub mod kind;
 mod value;
+
+//TODO: use "lua" feature flag
+mod lua;
+
+//TODO: use "graphql" feature flag
+mod graphql;
 
 pub use kind::Kind;
 pub use value::Value;

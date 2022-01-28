@@ -9,8 +9,11 @@ use crate::{
     expression::{container, Container, Expr, Literal},
     Expression,
 };
+use value::Value;
 
-impl Value {
+pub trait VrlValueConvert {}
+
+impl VrlValueConvert for Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
     pub fn into_expression(self) -> Box<dyn Expression> {
         Box::new(self.into_expr())

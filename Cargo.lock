@@ -8252,9 +8252,15 @@ dependencies = [
 name = "value"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
  "bytes 1.1.0",
  "chrono",
  "lookup",
+ "mlua",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -8636,6 +8642,7 @@ dependencies = [
  "shared",
  "thiserror",
  "tracing 0.1.29",
+ "value",
  "vrl-diagnostic",
  "vrl-parser",
 ]
