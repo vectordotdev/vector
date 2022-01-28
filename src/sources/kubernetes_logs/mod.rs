@@ -25,7 +25,7 @@ use crate::{
     event::{Event, LogEvent},
     internal_events::{
         FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationError,
-        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventsReceived,
+        KubernetesLogsEventNamespaceAnnotationError, KubernetesLogsEventsReceived,
     },
     kubernetes as k8s,
     kubernetes::hash_value::HashKey,
@@ -422,7 +422,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(&KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
                 }
             }

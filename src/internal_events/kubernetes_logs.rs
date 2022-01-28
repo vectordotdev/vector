@@ -69,19 +69,27 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventNamespaceAnnotationFailed<'a> {
+pub struct KubernetesLogsEventNamespaceAnnotationError<'a> {
     pub event: &'a Event,
 }
 
-impl InternalEvent for KubernetesLogsEventNamespaceAnnotationFailed<'_> {
+impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Failed to annotate event with namespace metadata.",
-            event = ?self.event
+            error_type = "event_annotation",
+            event = ?self.event,
+            stage = "processing",
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => "Failed to annotate event with namespace metadata.",
+            "error_type" => "event_annotation",
+            "stage" => "processing",
+        );
         counter!("k8s_event_namespace_annotation_failures_total", 1);
     }
 }
