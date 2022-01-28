@@ -7,7 +7,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
@@ -66,15 +66,15 @@ async fn run(
             subscription.receiver,
         ))
         .filter_map(|log| future::ready(log.ok()))
+        .filter(|log| future::ready(!log.contains("internal")))
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        emit!(&EventsReceived {
+        emit!(&InternalLogsEventsReceived {
             byte_size: log.size_of(),
-            count: 1,
         });
         if let Ok(hostname) = &hostname {
             log.insert(host_key.clone(), hostname.to_owned());
