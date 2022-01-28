@@ -77,7 +77,7 @@ impl BufferTypeVisitor {
                 }
             }
         }
-        let kind = kind.unwrap_or(BufferTypeKind::MemoryV1);
+        let kind = kind.unwrap_or(BufferTypeKind::MemoryV2);
         let when_full = when_full.unwrap_or_default();
         match kind {
             BufferTypeKind::MemoryV1 => {
@@ -323,7 +323,7 @@ pub struct BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         Self {
-            stages: vec![BufferType::MemoryV1 {
+            stages: vec![BufferType::MemoryV2 {
                 max_events: memory_buffer_default_max_events(),
                 when_full: WhenFull::default(),
             }],
@@ -428,7 +428,7 @@ max_events: 42
             r#"
           max_events: 100
           "#,
-            BufferType::MemoryV1 {
+            BufferType::MemoryV2 {
                 max_events: 100,
                 when_full: WhenFull::Block,
             },
@@ -444,11 +444,11 @@ max_events: 42
             when_full: drop_newest
           "#,
             &[
-                BufferType::MemoryV1 {
+                BufferType::MemoryV2 {
                     max_events: 42,
                     when_full: WhenFull::Block,
                 },
-                BufferType::MemoryV1 {
+                BufferType::MemoryV2 {
                     max_events: 100,
                     when_full: WhenFull::DropNewest,
                 },
