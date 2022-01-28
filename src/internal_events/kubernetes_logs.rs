@@ -129,3 +129,31 @@ impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
         counter!("k8s_docker_format_parse_failures_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct KubernetesLifecycleError<E> {
+    pub message: &'static str,
+    pub error: E,
+}
+
+impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEvent
+    for KubernetesLifecycleError<E>
+{
+    fn emit_logs(&self) {
+        error!(
+            message = self.message,
+            error = %self.error,
+            error_type = "kubernetes_lifecycle",
+            stage = "processing",
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "kubernetes_lifecycle",
+            "stage" => "processing",
+        );
+    }
+}

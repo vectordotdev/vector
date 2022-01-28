@@ -13,6 +13,7 @@ use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
 };
+use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -24,8 +25,9 @@ use crate::{
     },
     event::{Event, LogEvent},
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationError,
-        KubernetesLogsEventNamespaceAnnotationError, KubernetesLogsEventsReceived,
+        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
+        KubernetesLogsEventsReceived, StreamClosedError,
     },
     kubernetes as k8s,
     kubernetes::hash_value::HashKey,
@@ -435,6 +437,7 @@ impl Source {
             parser.transform(&mut buf, event);
             futures::stream::iter(buf.into_events())
         });
+        let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_all(&mut stream);
@@ -445,9 +448,10 @@ impl Source {
             let fut =
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Reflector process exited with an error.", %error)
-                    }
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Reflector process exited with an error."
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -456,9 +460,10 @@ impl Source {
             let fut =
                 util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Namespace reflector process exited with an error.", %error)
-                    }
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Namespace reflector process exited with an error.",
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -467,7 +472,10 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => error!(message = "File server exited with an error.", %error),
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        message: "File server exited with an error.",
+                        error,
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -481,14 +489,14 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => error!(
-                        message = "Event processing loop exited with an error.",
-                        %error
-                    ),
-                    Err(error) => error!(
-                        message = "Event processing loop timed out during the shutdown.",
-                        %error
-                    ),
+                    Ok(Err(error)) => emit!(&StreamClosedError {
+                        error,
+                        count: events_count
+                    }),
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                    }),
                 };
             });
             slot.bind(Box::pin(fut));
