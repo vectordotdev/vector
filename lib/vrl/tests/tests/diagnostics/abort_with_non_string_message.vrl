@@ -1,0 +1,16 @@
+# result:
+#
+# error[E300]: non-string abort message
+#   ┌─ :2:7
+#   │
+# 2 │ abort .
+#   │       ^
+#   │       │
+#   │       abort only accepts an expression argument resolving to a string
+#   │       this expression resolves to "object"
+#   │
+#   = hint: coerce the value to the required type using a coercion function
+#   = see documentation about type coercion at https://functions.vrl.dev/#coerce-functions
+#   = see language documentation at https://vrl.dev
+
+abort .

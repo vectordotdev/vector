@@ -848,6 +848,44 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_branching_abort_with_message() {
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                abort "custom message here"
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn check_remap_branching_disabled() {
         let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
         let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
