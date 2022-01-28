@@ -514,3 +514,58 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
+
+    #[test]
+    fn buffers_output() {
+        let mut buf = OutputBuffer::default();
+        assert_eq!(buf.len(), 0);
+        assert_eq!(buf.0.len(), 0);
+
+        // Push adds a new element
+        buf.push(LogEvent::default().into());
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf.0.len(), 1);
+
+        // Push of the same type adds to the existing element
+        buf.push(LogEvent::default().into());
+        assert_eq!(buf.len(), 2);
+        assert_eq!(buf.0.len(), 1);
+
+        // Push of a different type adds a new element
+        buf.push(
+            Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .into(),
+        );
+        assert_eq!(buf.len(), 3);
+        assert_eq!(buf.0.len(), 2);
+
+        // And pushing again adds a new element
+        buf.push(LogEvent::default().into());
+        assert_eq!(buf.len(), 4);
+        assert_eq!(buf.0.len(), 3);
+
+        // Pop reverses the above
+        assert!(buf.pop().is_some());
+        assert_eq!(buf.len(), 3);
+        assert_eq!(buf.0.len(), 2);
+        assert!(buf.pop().is_some());
+        assert_eq!(buf.len(), 2);
+        assert_eq!(buf.0.len(), 1);
+        assert!(buf.pop().is_some());
+        assert_eq!(buf.len(), 1);
+        assert_eq!(buf.0.len(), 1);
+        assert!(buf.pop().is_some());
+        assert_eq!(buf.len(), 0);
+        assert_eq!(buf.0.len(), 0);
+        assert!(buf.pop().is_none());
+    }
+}
