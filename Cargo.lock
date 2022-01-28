@@ -1832,7 +1832,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "fancy-regex",
- "grok",
  "itertools",
  "lalrpop",
  "lalrpop-util",
