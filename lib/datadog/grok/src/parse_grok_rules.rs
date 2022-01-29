@@ -7,7 +7,6 @@ use crate::{
 };
 use lookup::LookupBuf;
 use once_cell::unsync::Lazy;
-use std::sync::Arc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -24,7 +23,7 @@ const GROK_PATTERN_RE: Lazy<fancy_regex::Regex> = Lazy::new(|| {
 #[derive(Clone, Debug)]
 pub struct GrokRule {
     /// a compiled regex pattern
-    pub pattern: Arc<crate::grok::Pattern>,
+    pub pattern: crate::grok::Pattern,
     /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
 }
@@ -190,7 +189,7 @@ fn parse_pattern(
         .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?;
 
     Ok(GrokRule {
-        pattern: Arc::new(pattern),
+        pattern,
         fields: context.fields.clone(),
     })
 }

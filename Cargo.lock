@@ -1839,7 +1839,6 @@ dependencies = [
  "nom 7.1.0",
  "nom-regex",
  "once_cell",
- "onig",
  "ordered-float",
  "peeking_take_while 1.0.0",
  "regex",

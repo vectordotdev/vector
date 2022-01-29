@@ -70,7 +70,7 @@ impl<'a> Iterator for MatchesIter<'a> {
 }
 
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Pattern {
     regex: Regex,
     names: BTreeMap<String, usize>,

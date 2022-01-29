@@ -23,7 +23,6 @@ peeking_take_while = { version = "1.0.0", default-features = false }
 nom = { version = "7.1.0", default-features = false }
 nom-regex = { version = "0.2.0", default-features = false }
 fancy-regex = { version = "0.7.1", default-features = false }
-onig = { version = "6.3" }
 
 # Internal
 lookup = { path = "../../lookup" }
