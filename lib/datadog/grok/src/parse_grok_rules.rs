@@ -1,10 +1,10 @@
+use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
     matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
-use grok::Grok;
 use lookup::LookupBuf;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
@@ -24,7 +24,7 @@ const GROK_PATTERN_RE: Lazy<fancy_regex::Regex> = Lazy::new(|| {
 #[derive(Clone, Debug)]
 pub struct GrokRule {
     /// a compiled regex pattern
-    pub pattern: Arc<grok::Pattern>,
+    pub pattern: Arc<crate::grok::Pattern>,
     /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
 }
@@ -117,7 +117,7 @@ pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
-    let mut grok = initialize_grok();
+    let mut grok = Grok::with_patterns();
 
     patterns
         .iter()
@@ -448,15 +448,4 @@ mod tests {
             GrokFilter::NullIf(v) if *v == r#"with "escaped" quotes"#
         ));
     }
-}
-
-include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
-fn initialize_grok() -> Grok {
-    let mut grok = grok::Grok::with_patterns();
-
-    // Insert Datadog grok patterns.
-    for &(key, value) in PATTERNS {
-        grok.insert_definition(String::from(key), String::from(value));
-    }
-    grok
 }

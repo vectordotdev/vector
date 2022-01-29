@@ -46,10 +46,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        // Extracted fields do not preserve the order(stored in a hashmap)
-        // in which they've been seen in the source expression, which matters for arrays,
-        // so we need to sort them first by keys(grok0, grok1, ...).
-        for (name, value) in matches.iter().sorted() {
+        for (name, value) in matches.iter() {
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
