@@ -240,7 +240,9 @@ governor = { version = "0.4.1", default-features = false, features = ["dashmap",
 grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.5", default-features = false }
-heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
+# depending on fork for bumped nix dependency
+# https://github.com/heim-rs/heim/pull/360
+heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.16", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
@@ -308,7 +310,7 @@ schannel = "0.1.19"
 windows-service = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.3.1"
+security-framework = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
