@@ -13,7 +13,7 @@ use crate::{
     },
     event::Event,
     internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
-    transforms::FunctionTransform,
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -77,7 +77,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
 }
 
 impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let log = event.as_log();
 
         let message = log
@@ -180,7 +180,7 @@ mod test {
         log.insert("keep", "field");
         let orig_metadata = event.metadata().clone();
 
-        let mut output: Vec<Event> = Vec::new();
+        let mut output = OutputBuffer::default();
 
         parser.transform(&mut output, event);
 
@@ -209,8 +209,9 @@ mod test {
                 },
             ]
         );
-        assert_eq!(output[0].metadata(), &orig_metadata);
-        assert_eq!(output[1].metadata(), &orig_metadata);
+        let mut output = output.into_events();
+        assert_eq!(output.next().unwrap().metadata(), &orig_metadata);
+        assert_eq!(output.next().unwrap().metadata(), &orig_metadata);
     }
 
     #[test]
@@ -239,10 +240,10 @@ mod test {
 "#,
         );
 
-        let mut output: Vec<Event> = Vec::new();
+        let mut output = OutputBuffer::default();
 
         parser.transform(&mut output, event);
 
-        assert_eq!(output, vec![]);
+        assert!(output.is_empty());
     }
 }

@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use azure_storage::blob::prelude::ContainerClient;
+use azure_storage_blobs::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use goauth::scopes::Scope;
@@ -196,10 +196,7 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                 )?;
                 let svc = self
-                    .build_azure_sink(
-                        Arc::<azure_storage::blob::prelude::ContainerClient>::clone(&client),
-                        cx,
-                    )
+                    .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
                     .map_err(|error| format!("{}", error))?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
@@ -274,7 +271,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_gcs_sink(
@@ -330,7 +327,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     fn build_azure_sink(
@@ -357,7 +354,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_partitioner() -> KeyPartitioner {

@@ -1,23 +1,21 @@
-ARG RUST_VERSION=1.57
-ARG DEBIAN_VERSION=bullseye
-
 #
 # VECTOR BUILDER
 #
-FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_VERSION} as builder
-RUN apt-get update && apt-get -y install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
-RUN git clone https://github.com/rui314/mold.git
-RUN cd mold && git checkout v0.9.6 && make -j$(nproc) && make install
+FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:0f819918e54ef60efcdff6478f7cea4f554a8879eee1326356146c19814eb7cc as builder
 WORKDIR vector
 COPY . .
-RUN /usr/bin/mold -run cargo build --release --bin vector
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/vector/target \
+    /usr/local/bin/mold -run cargo build --bin vector --release && \
+    cp target/release/vector .
 
 #
 # TARGET
 #
-FROM docker.io/debian:bullseye-slim
+FROM docker.io/debian:bullseye-slim@sha256:b0d53c872fd640c2af2608ba1e693cfc7dedea30abcd8f584b23d583ec6dadc7
 RUN apt-get update && apt-get -y install zlib1g
-COPY --from=builder /vector/target/release/vector /usr/bin/vector
+COPY --from=builder /vector/vector /usr/bin/vector
 VOLUME /var/lib/vector/
 
 # Smoke test

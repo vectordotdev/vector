@@ -36,7 +36,7 @@ fn benchmark_regex(c: &mut Criterion) {
 
         b.iter_batched(
             || {
-                (input.clone(), Vec::with_capacity(input.len()))
+                (input.clone(), transforms::OutputBuffer::with_capacity(input.len()))
             },
             |(events, mut output)| {
                 let event_count = events.len();

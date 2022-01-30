@@ -61,9 +61,9 @@ impl Partitioner for KeyPartitioner {
 }
 
 #[derive(Default)]
-struct RecordPartitionner;
+struct RecordPartitioner;
 
-impl Partitioner for RecordPartitionner {
+impl Partitioner for RecordPartitioner {
     type Item = LokiRecord;
     type Key = PartitionKey;
 
@@ -89,15 +89,6 @@ pub enum RequestBuildError {
 impl From<std::io::Error> for RequestBuildError {
     fn from(error: std::io::Error) -> RequestBuildError {
         RequestBuildError::Io { error }
-    }
-}
-
-impl Default for LokiRequestBuilder {
-    fn default() -> Self {
-        Self {
-            compression: Compression::None,
-            encoder: LokiBatchEncoder::default(),
-        }
     }
 }
 
@@ -142,8 +133,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         emit!(&LokiEventsProcessed {
             byte_size: payload.len(),
         });
+        let compression = self.compression();
 
         LokiRequest {
+            compression,
             batch_size,
             finalizers,
             payload,
@@ -297,9 +290,14 @@ pub struct LokiSink {
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
+        let compression = config.compression;
+
         Ok(Self {
             acker: cx.acker(),
-            request_builder: LokiRequestBuilder::default(),
+            request_builder: LokiRequestBuilder {
+                compression,
+                encoder: Default::default(),
+            },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
                 encoding: config.encoding,
@@ -327,7 +325,7 @@ impl LokiSink {
                 let res = filter.filter_record(record);
                 async { res }
             })
-            .batched_partitioned(RecordPartitionner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -345,7 +343,7 @@ impl LokiSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink for LokiSink {
+impl StreamSink<Event> for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

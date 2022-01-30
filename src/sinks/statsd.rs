@@ -129,7 +129,7 @@ impl SinkConfig for StatsdSinkConfig {
                     })
                 });
 
-                Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+                Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -467,7 +467,7 @@ mod test {
             }
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

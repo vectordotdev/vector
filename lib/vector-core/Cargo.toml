@@ -6,17 +6,16 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "3.0.21", default-features = false, optional = true }
+async-graphql = { version = "3.0.27", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.3", features = ["derive", "serde"] }
-buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-core_common = { path = "core-common", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
+enumflags2 = { version = "0.7.3", default-features = false }
 float_eq = { version = "0.7", default-features = false }
 futures = { version = "0.3.19", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.19", default-features = false, features = ["std"] }
@@ -29,7 +28,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
-mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.9", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
@@ -39,12 +38,12 @@ pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.133", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.74", default-features = false }
+serde = { version = "1.0.136", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.78", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.7.0", default-features = false }
 substring = { version = "1.4", default-features = false }
-tokio = { version = "1.15.0", default-features = false }
+tokio = { version = "1.16.1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
@@ -52,16 +51,17 @@ tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
+vector_buffers = { path = "../vector-buffers", default-features = false }
+vector_common = { path = "../vector-common", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]
 prost-build = "0.9"
 
 [dev-dependencies]
-core_common = { path = "core-common", default-features = false, features = ["test"] }
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
@@ -72,15 +72,16 @@ ndarray = "0.15.4"
 ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
-rand_distr = "0.4.2"
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+rand_distr = "0.4.3"
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
 api = ["async-graphql"]
 default = []
 lua = ["mlua", "tokio-stream"]
 vrl = ["vrl-core", "enrichment"]
-test = ["core_common/test"]
+test = ["vector_common/test"]
 
 [[bench]]
 name = "lookup"

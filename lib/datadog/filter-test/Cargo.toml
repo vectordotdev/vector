@@ -11,4 +11,4 @@ vector_core = { path = "../../vector-core" }
 datadog-search-syntax = { path = "../search-syntax" }
 datadog-filter = { path = "../filter" }
 
-serde_json = { version = "1.0.74", default-features = false }
+serde_json = { version = "1.0.78", default-features = false }

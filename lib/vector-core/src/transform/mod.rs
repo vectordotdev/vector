@@ -1,10 +1,12 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::{SinkExt, Stream};
+use futures::{stream, SinkExt, Stream, StreamExt};
+use shared::EventDataEq;
+use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 
 use crate::{
     config::Output,
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     fanout::{self, Fanout},
     ByteSizeOf,
 };
@@ -22,7 +24,7 @@ mod config;
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
     Synchronous(Box<dyn SyncTransform>),
-    Task(Box<dyn TaskTransform>),
+    Task(Box<dyn TaskTransform<EventArray>>),
 }
 
 impl Transform {
@@ -82,8 +84,23 @@ impl Transform {
     ///
     /// **Note:** You should prefer to implement [`FunctionTransform`] over this
     /// where possible.
-    pub fn task(v: impl TaskTransform + 'static) -> Self {
+    pub fn task(v: impl TaskTransform<EventArray> + 'static) -> Self {
         Transform::Task(Box::new(v))
+    }
+
+    /// Create a new task transform over individual `Event`s.
+    ///
+    /// These tasks are coordinated, and map a stream of some `U` to some other
+    /// `T`.
+    ///
+    /// **Note:** You should prefer to implement [`FunctionTransform`] over this
+    /// where possible.
+    ///
+    /// # Panics
+    ///
+    /// TODO
+    pub fn event_task(v: impl TaskTransform<Event> + 'static) -> Self {
+        Transform::Task(Box::new(WrapEventTask(v)))
     }
 
     /// Mutably borrow the inner transform as a task transform.
@@ -91,7 +108,7 @@ impl Transform {
     /// # Panics
     ///
     /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform> {
+    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform<EventArray>> {
         match self {
             Transform::Task(t) => t,
             _ => {
@@ -105,7 +122,7 @@ impl Transform {
     /// # Panics
     ///
     /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn into_task(self) -> Box<dyn TaskTransform> {
+    pub fn into_task(self) -> Box<dyn TaskTransform<EventArray>> {
         match self {
             Transform::Task(t) => t,
             _ => {
@@ -123,7 +140,7 @@ impl Transform {
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 ///   `TaskTransform` or vice versa.
 pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event);
 }
 
 dyn_clone::clone_trait_object!(FunctionTransform);
@@ -136,13 +153,27 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 /// `TaskTransform` or vice versa.
-pub trait TaskTransform: Send {
+pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = T> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = T> + Send>>;
+
+    /// Wrap the transform task to process and emit individual
+    /// events. This is used to simplify testing task transforms.
+    fn transform_events(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
-        Self: 'static;
+        T: From<Event>,
+        T::IntoIter: Send,
+    {
+        self.transform(task.map(Into::into).boxed())
+            .map(EventContainer::into_events)
+            .flat_map(stream::iter)
+            .boxed()
+    }
 }
 
 /// Broader than the simple [`FunctionTransform`], this trait allows transforms to write to
@@ -221,31 +252,36 @@ impl TransformOutputs {
 
     pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
         if let Some(primary) = self.primary_output.as_mut() {
-            send_inner(
-                buf.primary_buffer.as_mut().expect("mismatched outputs"),
-                primary,
-            )
-            .await;
+            let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
+            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
+            buf.primary_buffer
+                .as_mut()
+                .expect("mismatched outputs")
+                .send(primary)
+                .await;
+            emit(&EventsSent {
+                count,
+                byte_size,
+                output: Some(DEFAULT_OUTPUT),
+            });
         }
         for (key, buf) in &mut buf.named_buffers {
-            send_inner(
-                buf,
-                self.named_outputs.get_mut(key).expect("unknown output"),
-            )
-            .await;
+            let count = buf.len();
+            let byte_size = buf.size_of();
+            buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
+                .await;
+            emit(&EventsSent {
+                count,
+                byte_size,
+                output: Some(key.as_ref()),
+            });
         }
-    }
-}
-
-async fn send_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
-    for event in buf.drain(..) {
-        output.feed(event).await.expect("unit error");
     }
 }
 
 pub struct TransformOutputsBuf {
-    primary_buffer: Option<Vec<Event>>,
-    named_buffers: HashMap<String, Vec<Event>>,
+    primary_buffer: Option<OutputBuffer>,
+    named_buffers: HashMap<String, OutputBuffer>,
 }
 
 impl TransformOutputsBuf {
@@ -256,10 +292,10 @@ impl TransformOutputsBuf {
         for output in outputs_in {
             match output.port {
                 None => {
-                    primary_buffer = Some(Vec::with_capacity(capacity));
+                    primary_buffer = Some(OutputBuffer::with_capacity(capacity));
                 }
                 Some(name) => {
-                    named_buffers.insert(name.clone(), Vec::new());
+                    named_buffers.insert(name.clone(), OutputBuffer::default());
                 }
             }
         }
@@ -302,26 +338,26 @@ impl TransformOutputsBuf {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
-            .drain(..)
+            .drain()
     }
 
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
             .expect("unknown output")
-            .drain(..)
+            .drain()
     }
 
-    pub fn take_primary(&mut self) -> Vec<Event> {
+    pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
-    pub fn take_all_named(&mut self) -> HashMap<String, Vec<Event>> {
+    pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
 
     pub fn len(&self) -> usize {
-        self.primary_buffer.as_ref().map_or(0, Vec::len)
+        self.primary_buffer.as_ref().map_or(0, OutputBuffer::len)
             + self
                 .named_buffers
                 .iter()
@@ -342,5 +378,84 @@ impl ByteSizeOf for TransformOutputsBuf {
                 .iter()
                 .map(|(_, buf)| buf.size_of())
                 .sum::<usize>()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct OutputBuffer(Vec<Event>);
+
+impl OutputBuffer {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn push(&mut self, event: Event) {
+        self.0.push(event);
+    }
+
+    pub fn append(&mut self, events: &mut Vec<Event>) {
+        self.0.append(events);
+    }
+
+    pub fn extend(&mut self, events: impl Iterator<Item = Event>) {
+        self.0.extend(events);
+    }
+
+    pub fn pop(&mut self) -> Option<Event> {
+        self.0.pop()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn first(&self) -> Option<&Event> {
+        self.0.first()
+    }
+
+    fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
+        self.0.drain(..)
+    }
+
+    async fn send(&mut self, output: &mut Fanout) {
+        for event in self.0.drain(..) {
+            output.feed(event).await.expect("unit error");
+        }
+        output.flush().await.expect("unit error");
+    }
+
+    pub fn into_events(self) -> impl Iterator<Item = Event> {
+        self.0.into_iter()
+    }
+}
+
+impl ByteSizeOf for OutputBuffer {
+    fn allocated_bytes(&self) -> usize {
+        self.0.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl EventDataEq<Vec<Event>> for OutputBuffer {
+    fn event_data_eq(&self, other: &Vec<Event>) -> bool {
+        self.0.as_slice().event_data_eq(&other.as_slice())
+    }
+}
+
+struct WrapEventTask<T>(T);
+
+impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for WrapEventTask<T> {
+    fn transform(
+        self: Box<Self>,
+        stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
+        // This is an aweful lot of boxes
+        let stream = stream
+            .flat_map(|events| stream::iter(events.into_events()))
+            .boxed();
+        Box::new(self.0).transform(stream).map(Into::into).boxed()
     }
 }

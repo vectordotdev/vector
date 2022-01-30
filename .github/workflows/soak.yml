@@ -46,6 +46,8 @@ jobs:
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
+      coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
+      erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
     steps:
       - uses: actions/checkout@v2.3.5
         with:
@@ -91,14 +93,20 @@ jobs:
           export SOAK_CPUS="7"
           export SOAK_MEMORY="30g"
           export VECTOR_CPUS="4"
+          export COEFFICIENT_OF_VARIATION="0.3"
+          export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
+          echo "coefficient of variation limit: ${COEFFICIENT_OF_VARIATION}"
+          echo "list of erratic soaks: ${ERRATIC_SOAKS}"
 
           echo "::set-output name=SOAK_CPUS::${SOAK_CPUS}"
+          echo "::set-output name=COEFFICIENT_OF_VARIATION::${COEFFICIENT_OF_VARIATION}"
           echo "::set-output name=SOAK_MEMORY::${SOAK_MEMORY}"
           echo "::set-output name=VECTOR_CPUS::${VECTOR_CPUS}"
+          echo "::set-output name=ERRATIC_SOAKS::${ERRATIC_SOAKS}"
 
   compute-test-plan:
     name: Compute soak test plan
@@ -123,21 +131,10 @@ jobs:
             // Each field of this object has an array of elements that will be
             // cartesian producted across the others to generate the full list of
             // jobs to run. For example, the first job might have the values:
-            // { target: "fluent_remap_aws_firehose", replica: 1, variant: { name: "baseline", tag: "f0e229dab15e2cd554924d9db7731c8f8f030ec3-405f4a464db1ce386ba66ce7582a0d4e47c1d5d9"}
+            // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
               target: target,     // run each experiment
               replica: [1, 2, 3], // run three replicas of each experiment/variant
-              // run each experiment twice, once for the baseline, once for the comparison
-              variant: [
-                {
-                  name: "baseline",
-                  tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}",
-                },
-                {
-                  name: "comparison",
-                  tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}",
-                },
-              ],
             }
 
             // export this variable to be available to other github steps
@@ -147,20 +144,11 @@ jobs:
           MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
         run: echo "$MATRIX_CONTEXT"
 
-  build-image:
-    name: Build ${{ matrix.variant.name }} 'soak-vector' container
+  build-image-baseline:
+    name: Build baseline 'soak-vector' container
     if: ${{ github.actor != 'dependabot[bot]' }}
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
-    strategy:
-      matrix:
-        variant:
-          - name: baseline
-            tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}"
-            ref: "${{ needs.compute-soak-meta.outputs.baseline-sha }}"
-          - name: comparison
-            tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
-            ref: "${{ needs.compute-soak-meta.outputs.comparison-sha }}"
     steps:
       - uses: colpal/actions-clean@v1
 
@@ -168,8 +156,8 @@ jobs:
 
       - uses: actions/checkout@v2.3.5
         with:
-          ref: ${{ matrix.variant.ref }}
-          path: ${{ matrix.variant.name }}-vector
+          ref: ${{ needs.compute-soak-meta.outputs.baseline-sha }}
+          path: baseline-vector
 
       - name: Set up Docker Buildx
         id: buildx
@@ -191,23 +179,70 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ matrix.variant.tag }}
+          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        uses: docker/build-push-action@v2.8.0
         with:
-          context: ${{matrix.variant.name}}-vector/
+          context: baseline-vector/
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  soak:
-    name: Soak (${{ matrix.target }}) - ${{ matrix.variant.name }} - replica ${{ matrix.replica }}
+  build-image-comparison:
+    name: Build comparison 'soak-vector' container
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: [self-hosted, linux, x64, soak_builder]
+    needs: [compute-soak-meta]
+    steps:
+      - uses: colpal/actions-clean@v1
+
+      - uses: actions/checkout@v2.3.5
+
+      - uses: actions/checkout@v2.3.5
+        with:
+          ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
+          path: comparison-vector
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1.12.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        with:
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
+          images: ghcr.io/${{ github.repository }}/soak-vector
+          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
+
+      - name: Build and push 'soak-vector' image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: comparison-vector/
+          file: soaks/Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  soak-baseline:
+    name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-image]
+    needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
@@ -216,14 +251,14 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
-      - name: Run ${{ matrix.variant.name }} experiment
+      - name: Run baseline experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
-                                  --variant ${{ matrix.variant.name }} \
-                                  --tag ${{ matrix.variant.tag }} \
+                                  --variant "baseline" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
@@ -233,13 +268,131 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-${{ matrix.variant.name }}
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/${{ matrix.variant.name }}.captures
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
 
       - name: Clear up unused images
         run: |
           minikube delete --all --purge
           docker system prune --all --volumes --force
+
+  detect-erratic-baseline:
+    name: Erratic detection - baseline
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-20.04
+    needs:
+      - compute-soak-meta
+      - soak-baseline
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.1"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant baseline \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
+
+  soak-comparison:
+    name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: [self-hosted, linux, x64, soak]
+    needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
+    strategy:
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
+    steps:
+      - uses: colpal/actions-clean@v1
+
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - name: Run comparison experiment
+        run: |
+          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
+          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
+                                  --local-image "false" \
+                                  --variant "comparison" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
+                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
+                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
+                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
+                                  --warmup-seconds 30
+
+      - name: Upload timing captures
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+
+      - name: Clear up unused images
+        run: |
+          minikube delete --all --purge
+          docker system prune --all --volumes --force
+
+  detect-erratic-comparison:
+    name: Erratic detection - comparison
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-20.04
+    needs:
+      - compute-soak-meta
+      - soak-comparison
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.1"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant comparison \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   analyze-results:
     name: Soak analysis
@@ -247,7 +400,8 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak
+      - soak-baseline
+      - soak-comparison
 
     steps:
       - name: Set up Python3
@@ -279,6 +433,8 @@ jobs:
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                          --warmup-seconds 30 \
+                                         --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                         --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
@@ -300,7 +456,8 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak
+      - soak-baseline
+      - soak-comparison
 
     steps:
       - name: Set up Python3
@@ -329,6 +486,7 @@ jobs:
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
+                                         --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1
 
   plot-analysis:
@@ -337,7 +495,8 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak
+      - soak-baseline
+      - soak-comparison
 
     steps:
       - name: Set up Python3

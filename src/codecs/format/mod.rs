@@ -12,5 +12,5 @@ mod syslog;
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
 #[cfg(feature = "sources-syslog")]
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
-pub use json::{JsonDeserializer, JsonDeserializerConfig};
+pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonSerializer, JsonSerializerConfig};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};

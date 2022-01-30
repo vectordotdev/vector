@@ -40,7 +40,9 @@ impl SyncTransform for Route {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
-                emit!(&RouteEventDiscarded);
+                emit!(&RouteEventDiscarded {
+                    output: output_name.as_ref()
+                });
             }
         }
     }
@@ -125,7 +127,13 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
+    use indoc::indoc;
     use vector_core::transform::TransformOutputsBuf;
+
+    use crate::{
+        config::{build_unit_tests, ConfigBuilder},
+        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+    };
 
     use super::*;
 
@@ -255,5 +263,37 @@ mod test {
             }
             assert_eq!(events.len(), 0);
         }
+    }
+
+    #[tokio::test]
+    async fn route_metrics_with_output_tag() {
+        init_test();
+
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+            inputs = []
+            type = "route"
+            [transforms.foo.route.first]
+                type = "is_log"
+
+            [[tests]]
+            name = "metric output"
+
+            [tests.input]
+                insert_at = "foo"
+                value = "none"
+
+            [[tests.outputs]]
+                extract_from = "foo.first"
+                [[tests.outputs.conditions]]
+                type = "vrl"
+                source = "true"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
 }

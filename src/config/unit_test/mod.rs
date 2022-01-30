@@ -77,7 +77,9 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
     build_unit_tests(config_builder).await
 }
 
-async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests(
+    mut config_builder: ConfigBuilder,
+) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
     config_builder.sources = Default::default();
     config_builder.sinks = Default::default();
@@ -301,17 +303,31 @@ fn get_relevant_test_components(
     graph: &Graph,
 ) -> Result<HashSet<String>, Vec<String>> {
     let _ = graph.check_for_cycles().map_err(|error| vec![error])?;
-    Ok(sources
-        .iter()
-        .flat_map(|source| {
-            let paths = graph.paths_to_sink_from(source);
-            let mut components = HashSet::new();
+    let mut errors = Vec::new();
+    let mut components = HashSet::new();
+    for source in sources {
+        let paths = graph.paths_to_sink_from(source);
+        if paths.is_empty() {
+            errors.push(format!(
+                "Unable to complete topology between input target '{}' and output target(s)",
+                source
+                    .to_string()
+                    .rsplit_once("-source-")
+                    .unwrap_or(("", ""))
+                    .0
+            ));
+        } else {
             for path in paths {
                 components.extend(path.into_iter().map(|key| key.to_string()));
             }
-            components
-        })
-        .collect())
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(components)
+    } else {
+        Err(errors)
+    }
 }
 
 async fn build_unit_test(
@@ -346,14 +362,11 @@ async fn build_unit_test(
         &expanded_config.transforms,
         &expanded_config.sinks,
     );
-    let sources = config_builder.sources.keys().clone().collect::<Vec<_>>();
 
-    let mut valid_components = get_relevant_test_components(sources.as_ref(), &graph)?;
-    if valid_components.is_empty() {
-        return Err(vec![
-            "No path(s) found from inputs to outputs. Topology is disconnected.".to_string(),
-        ]);
-    }
+    let mut valid_components = get_relevant_test_components(
+        config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
+        &graph,
+    )?;
 
     // Preserve the original unexpanded transform(s) which are valid test insertion points
     let unexpanded_transforms = valid_components

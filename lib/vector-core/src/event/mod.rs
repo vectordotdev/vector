@@ -5,9 +5,16 @@ use std::{
     sync::Arc,
 };
 
-use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
+use enumflags2::{bitflags, BitFlags, FromBitsError};
+use prost::Message;
+use shared::EventDataEq;
+use snafu::Snafu;
+use vector_buffers::encoding::{AsMetadata, Encodable};
+
+use crate::ByteSizeOf;
+pub use array::{EventArray, EventContainer, LogArray, MetricArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -16,15 +23,12 @@ pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-use prost::{DecodeError, EncodeError, Message};
-use shared::EventDataEq;
 pub use util::log::{PathComponent, PathIter};
 pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
-use crate::ByteSizeOf;
-
+pub mod array;
 pub mod discriminant;
 pub mod error;
 mod finalization;
@@ -402,24 +406,109 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-impl EncodeBytes<Event> for Event {
-    type Error = EncodeError;
+#[derive(Debug, Snafu)]
+pub enum EncodeError {
+    #[snafu(display("the provided buffer was too small to fully encode this item"))]
+    BufferTooSmall,
+}
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
-    where
-        B: BufMut,
-    {
-        proto::EventWrapper::from(self).encode(buffer)
+#[derive(Debug, Snafu)]
+pub enum DecodeError {
+    #[snafu(display(
+        "the provided buffer could not be decoded as a valid Protocol Buffers payload"
+    ))]
+    InvalidProtobufPayload,
+}
+
+#[bitflags]
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum EventEncodableMetadataFlags {
+    // Protocol Buffers-based encoding based on the `Event`
+    // definition used for Vector gRPC communication.
+    ProtocolBuffers = 0b1,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EventEncodableMetadata(BitFlags<EventEncodableMetadataFlags>);
+
+impl EventEncodableMetadata {
+    fn contains(self, flag: EventEncodableMetadataFlags) -> bool {
+        self.0.contains(flag)
     }
 }
 
-impl DecodeBytes<Event> for Event {
-    type Error = DecodeError;
+impl From<EventEncodableMetadataFlags> for EventEncodableMetadata {
+    fn from(flag: EventEncodableMetadataFlags) -> Self {
+        Self(BitFlags::from(flag))
+    }
+}
 
-    fn decode<B>(buffer: B) -> Result<Event, Self::Error>
+impl From<BitFlags<EventEncodableMetadataFlags>> for EventEncodableMetadata {
+    fn from(flags: BitFlags<EventEncodableMetadataFlags>) -> Self {
+        Self(flags)
+    }
+}
+
+impl TryFrom<u32> for EventEncodableMetadata {
+    type Error = FromBitsError<EventEncodableMetadataFlags>;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        BitFlags::try_from(value).map(Self)
+    }
+}
+
+impl AsMetadata for EventEncodableMetadata {
+    fn into_u32(self) -> u32 {
+        self.0.bits()
+    }
+
+    fn from_u32(value: u32) -> Option<Self> {
+        EventEncodableMetadata::try_from(value).ok()
+    }
+}
+
+impl Encodable for Event {
+    type Metadata = EventEncodableMetadata;
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
+
+    fn get_metadata() -> Self::Metadata {
+        EventEncodableMetadataFlags::ProtocolBuffers.into()
+    }
+
+    fn can_decode(metadata: Self::Metadata) -> bool {
+        metadata.contains(EventEncodableMetadataFlags::ProtocolBuffers)
+    }
+
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
+    where
+        B: BufMut,
+    {
+        proto::EventWrapper::from(self)
+            .encode(buffer)
+            .map_err(|_| EncodeError::BufferTooSmall)
+    }
+
+    fn decode<B>(_metadata: Self::Metadata, buffer: B) -> Result<Event, Self::DecodeError>
     where
         B: Buf,
     {
-        proto::EventWrapper::decode(buffer).map(Into::into)
+        proto::EventWrapper::decode(buffer)
+            .map(Into::into)
+            .map_err(|_| DecodeError::InvalidProtobufPayload)
     }
+}
+
+/// Gets the only valid metadata value that should be given by the `Encodable` implementation of `Event`.
+///
+/// This is specifically used within a unit test to enforce that if we changed the `Encodable`
+/// implementation prior to the LevelDB-based disk buffer being removed entirely, unit tests would
+/// fail indicating that a PR/change was making a breaking change that it shouldn't be making.
+///
+/// REVIEWERS: Be aware, if this is being removed or changed, the only acceptable context is
+/// LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be explained.
+#[allow(dead_code)]
+pub(crate) fn allowed_event_encodable_metadata() -> EventEncodableMetadata {
+    EventEncodableMetadataFlags::ProtocolBuffers.into()
 }

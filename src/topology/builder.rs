@@ -35,7 +35,7 @@ use crate::{
         ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
@@ -154,14 +154,11 @@ pub async fn build_pieces(
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let rx = builder.add_output(output.clone());
 
-            let (mut fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new();
             let pump = async move {
-                while let Some(event) = rx.next().await {
-                    fanout.feed(event).await?;
-                }
-                fanout.flush().await?;
+                rx.map(Ok).forward(fanout).await?;
                 Ok(TaskOutput::Source)
             };
 
@@ -350,11 +347,12 @@ pub async fn build_pieces(
 
             sink.run(
                 rx.by_ref()
-                    .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
+                    .map(EventArray::from) // Convert the `Event` into an `EventArray`
+                    .filter(|events| ready(filter_events_type(events, input_type)))
+                    .inspect(|events| {
                         emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
+                            count: events.len(),
+                            byte_size: events.size_of(),
                         })
                     })
                     .take_until_if(tripwire),
@@ -455,6 +453,14 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     }
 }
 
+const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
+    match data_type {
+        DataType::Any => true,
+        DataType::Log => matches!(events, EventArray::Logs(_)),
+        DataType::Metric => matches!(events, EventArray::Metrics(_)),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct TransformNode {
     key: ComponentKey,
@@ -547,15 +553,8 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
-        // TODO: account for named outputs separately?
-        let count = outputs_buf.len();
-        // TODO: do we only want allocated_bytes for events themselves?
-        let byte_size = outputs_buf.size_of();
-
         self.timer.start_wait();
         self.outputs.send(outputs_buf).await;
-
-        emit!(&EventsSent { count, byte_size });
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
@@ -653,7 +652,7 @@ impl Runner {
 }
 
 fn build_task_transform(
-    t: Box<dyn TaskTransform>,
+    t: Box<dyn TaskTransform<EventArray>>,
     input_rx: BufferReceiver<Event>,
     input_type: DataType,
     typetag: &str,
@@ -664,20 +663,23 @@ fn build_task_transform(
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .inspect(|event| {
+        .map(EventArray::from)
+        .filter(move |events| ready(filter_events_type(events, input_type)))
+        .inspect(|events| {
             emit!(&EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
+                count: events.len(),
+                byte_size: events.size_of(),
             })
         });
     let transform = t
         .transform(Box::pin(filtered))
+        .flat_map(|events| futures::stream::iter(events.into_events()))
         .map(Ok)
         .forward(output.with(|event: Event| async {
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
+                output: None,
             });
             Ok(event)
         }))

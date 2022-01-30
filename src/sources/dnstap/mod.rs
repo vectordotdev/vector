@@ -7,7 +7,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseDataError},
+    internal_events::{BytesReceived, DnstapEventsReceived, DnstapParseError},
     Result,
 };
 
@@ -172,6 +172,10 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        emit!(&BytesReceived {
+            byte_size: frame.len(),
+            protocol: "protobuf",
+        });
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
@@ -187,20 +191,20 @@ impl FrameHandler for DnstapFrameHandler {
                 &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventReceived {
+            emit!(&DnstapEventsReceived {
                 byte_size: frame_size
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseDataError {
+                    emit!(&DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventReceived {
+                    emit!(&DnstapEventsReceived {
                         byte_size: frame_size
                     });
                     Some(event)
@@ -297,7 +301,7 @@ mod integration_tests {
                     break;
                 }
                 Err(e) => {
-                    println!("Error: {}", e.to_string());
+                    println!("Error: {}", e);
                     break;
                 }
             }

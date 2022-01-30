@@ -173,7 +173,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
@@ -444,6 +444,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::offset::TimeZone;
+    use futures::StreamExt;
     use rand::seq::SliceRandom;
 
     use super::*;
@@ -528,7 +529,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 
@@ -557,7 +558,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 }

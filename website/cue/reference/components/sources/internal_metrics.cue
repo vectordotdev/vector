@@ -454,7 +454,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		processed_events_total: {
 			description:       """
@@ -592,13 +592,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		datadog_logs_received_in_total: {
 			description:       "Number of Datadog logs received."
@@ -1199,6 +1199,10 @@ components: sources: internal_metrics: {
 				unix: "Unix domain socket"
 			}
 		}
+		_output: {
+			description: "The specific output of the component."
+			required:    false
+		}
 		_stage: {
 			description: "The stage within the component at which the error occurred."
 			required:    true
@@ -1224,5 +1228,12 @@ components: sources: internal_metrics: {
 				"oversized":    "The event was too large."
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

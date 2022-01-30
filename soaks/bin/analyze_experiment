@@ -16,9 +16,11 @@ parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='t
 parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
 parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
+parser.add_argument('--coefficient-of-variation-limit', type=float, default=0.1, help='the acceptable limit +/- for the ratio of stdev to mean, default 0.1')
+parser.add_argument('--report-erratic', type=bool, default=False, help='report on changes in erratic behavior')
 args = parser.parse_args()
 
-erratic_soaks = args.erratic_soaks.split(',')
+known_erratic_soaks = args.erratic_soaks.split(',')
 
 bytes_written = pd.concat(common.compute_throughput(
     common.open_captures(args.capture_dir,
@@ -30,20 +32,27 @@ bytes_written = pd.concat(common.compute_throughput(
 bytes_written = bytes_written[(bytes_written.fetch_index > args.warmup_seconds) &
                               (bytes_written.throughput > 0.0)]
 
-ttest_results = []
+results = []
 for exp in bytes_written.experiment.unique():
     baseline = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'baseline')]
     comparison = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'comparison')]
 
     baseline_mean = baseline.throughput.mean()
     baseline_stdev = baseline.throughput.std()
+    baseline_stderr = scipy.stats.sem(baseline.throughput)
     comparison_mean = comparison.throughput.mean()
     comparison_stdev = comparison.throughput.std()
+    comparison_stderr = scipy.stats.sem(comparison.throughput)
     diff =  comparison_mean - baseline_mean
     percent_change = round(((comparison_mean - baseline_mean) / baseline_mean) * 100, 2)
 
     baseline_outliers = common.total_outliers(baseline)
     comparison_outliers = common.total_outliers(comparison)
+
+    baseline_cov = scipy.stats.variation(baseline.throughput)
+    comparison_cov = scipy.stats.variation(comparison.throughput)
+    erratic = ((baseline_cov > args.coefficient_of_variation_limit) or
+               (comparison_cov > args.coefficient_of_variation_limit))
 
     # The t-test here is calculating whether the expected mean of our two
     # distributions is equal, or, put another way, whether the samples we have
@@ -62,20 +71,25 @@ for exp in bytes_written.experiment.unique():
                                            comparison_stdev,
                                            len(comparison),
                                            equal_var=False)
-    ttest_results.append({'experiment': exp,
-                          'Δ mean': diff.mean(),
-                          'Δ mean %': percent_change,
-                          'baseline mean': baseline_mean,
-                          'baseline stdev': baseline_stdev,
-                          'baseline outlier percentage': (baseline_outliers / len(baseline)) * 100,
-                          'comparison mean': comparison_mean,
-                          'comparison stdev': comparison_stdev,
-                          'comparison outlier percentage': (comparison_outliers / len(comparison)) * 100,
-                          'p-value': res.pvalue,
-                          'erratic': exp in erratic_soaks
-                          })
+    results.append({'experiment': exp,
+                    'Δ mean': diff.mean(),
+                    'Δ mean %': percent_change,
+                    'baseline mean': baseline_mean,
+                    'baseline stdev': baseline_stdev,
+                    'baseline stderr': baseline_stderr,
+                    'baseline outlier %': (baseline_outliers / len(baseline)) * 100,
+                    'baseline CoV': scipy.stats.variation(baseline.throughput),
+                    'comparison mean': comparison_mean,
+                    'comparison stdev': comparison_stdev,
+                    'comparison stderr': comparison_stderr,
+                    'comparison outlier %': (comparison_outliers / len(comparison)) * 100,
+                    'comparison CoV': scipy.stats.variation(comparison.throughput),
+                    'p-value': res.pvalue,
+                    'erratic': erratic,
+                    'declared erratic': exp in known_erratic_soaks
+                    })
 
-ttest_results = pd.DataFrame.from_records(ttest_results)
+results = pd.DataFrame.from_records(results)
 
 print(f'''
 # Soak Test Results
@@ -86,52 +100,98 @@ Total Vector CPUs: {args.vector_cpus}
 <details>
 <summary>Explanation</summary>
 <p>
-A soak test is an integrated performance test for vector in a repeatable rig, with varying configuration for vector.
-What follows is a statistical summary of a brief vector run for each configuration across SHAs given above.
-The goal of these tests are to determine, quickly, if vector performance is changed and to what degree by a pull request.
-Test units below are bytes/second/CPU, except for "skewness". The
-further "skewness" is from 0.0 the more indication that vector lacks
-consistency in behavior, making predictions of fitness in the field challenging.
+A soak test is an integrated performance test for vector in a repeatable rig,
+with varying configuration for vector.  What follows is a statistical summary of
+a brief vector run for each configuration across SHAs given above.  The goal of
+these tests are to determine, quickly, if vector performance is changed and to
+what degree by a pull request. Where appropriate units are scaled per-core.
 </p>
 
 <p>
-The abbreviated table below, if present, lists those experiments that have experienced a
+The table below, if present, lists those experiments that have experienced a
 statistically significant change in their throughput performance between
-baseline and comparision SHAs, with {(1.0 - args.p_value) * 100}% confidence. Negative values mean
-that baseline is faster, positive comparison. Results that do not exhibit more than a ±{args.mean_drift_percentage}%
-change in mean throughput are discarded. The abbreviated table will be omitted if no statistically
-interesting changes are observed.
+baseline and comparision SHAs, with {(1.0 - args.p_value) * 100}% confidence OR
+have been detected as newly erratic. Negative values mean that baseline is
+faster, positive comparison. Results that do not exhibit more than a
+±{args.mean_drift_percentage}% change in mean throughput are discarded. An
+experiment is erratic if its coefficient of variation is greater
+than {args.coefficient_of_variation_limit}. The abbreviated table will be
+omitted if no interesting changes are observed.
 </p>
 </details>
 ''')
 
-p_value_violation = ttest_results['p-value'] < args.p_value
-changes = ttest_results[p_value_violation].copy(deep=True)
-changes['confidence'] = changes['p-value'].apply(common.confidence)
+drift_filter = results['Δ mean %'].abs() > args.mean_drift_percentage
+declared_erratic = results.experiment.isin(known_erratic_soaks)
+p_value_violation = results['p-value'] < args.p_value
+erratic_violation = results.erratic == True
+
+changes = results[p_value_violation & drift_filter & ~declared_erratic].copy(deep=True)
+changes['Δ confidence'] = changes['p-value'].apply(common.confidence)
 changes = changes.drop(labels=['p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
-                               'baseline outlier percentage',
-                               'comparison outlier percentage',
-                               'comparison stdev', 'erratic'], axis=1)
-changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
-changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
+                               'baseline outlier %', 'baseline CoV',
+                               'comparison outlier %', 'comparison CoV', 'erratic',
+                               'comparison stdev', 'declared erratic'], axis=1)
+changes = changes.sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
-if len(changes) > 0:
+changes['baseline stderr'] = changes['baseline stderr'].apply(common.human_bytes)
+changes['comparison stderr'] = changes['comparison stderr'].apply(common.human_bytes)
+
+no_longer_erratic = results[~erratic_violation & declared_erratic].copy(deep=True)
+no_longer_erratic = no_longer_erratic.drop(labels=['p-value', 'baseline mean',
+                                                   'baseline stdev', 'comparison mean', 'Δ mean',
+                                                   'baseline outlier %', 'comparison outlier %',
+                                                   'comparison stdev', 'declared erratic'], axis=1)
+no_longer_erratic['baseline stderr'] = no_longer_erratic['baseline stderr'].apply(common.human_bytes)
+no_longer_erratic['comparison stderr'] = no_longer_erratic['comparison stderr'].apply(common.human_bytes)
+
+actually_erratic = results[erratic_violation & ~declared_erratic].copy(deep=True)
+actually_erratic = actually_erratic.drop(labels=['p-value', 'baseline mean',
+                                                 'baseline stdev', 'comparison mean', 'Δ mean',
+                                                 'baseline outlier %', 'comparison outlier %',
+                                                 'comparison stdev', 'declared erratic'], axis=1)
+actually_erratic['baseline stderr'] = actually_erratic['baseline stderr'].apply(common.human_bytes)
+actually_erratic['comparison stderr'] = actually_erratic['comparison stderr'].apply(common.human_bytes)
+
+detected_changes = len(changes) > 0
+detected_not_erratic = len(no_longer_erratic) > 0
+detected_actually_erratic = len(actually_erratic) > 0
+
+if detected_changes:
+    print(f"Changes in throughput with confidence ≥ {common.confidence(args.p_value)}:")
+    print()
     print(changes.to_markdown(index=False, tablefmt='github'))
+    print()
 else:
-    print("No statistically interesting changes with confidence {}.".format(common.confidence(args.p_value)))
+    print(f"No interesting changes with confidence ≥ {common.confidence(args.p_value)}:")
+    print()
+
+if args.report_erratic and detected_not_erratic:
+    print(f"Experiments that were declared erratic but were detected as no longer being so, cutoff {args.coefficient_of_variation_limit}:")
+    print()
+    print(no_longer_erratic.to_markdown(index=False, tablefmt='github'))
+    print()
+
+if args.report_erratic and detected_actually_erratic:
+    print(f"Experiments that were not declared erratic but were detected as being so, cutoff {args.coefficient_of_variation_limit}:")
+    print()
+    print(actually_erratic.to_markdown(index=False, tablefmt='github'))
+    print()
 
 print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
-ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
-ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(common.human_bytes)
-ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(common.human_bytes)
-ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(common.human_bytes)
-ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(common.human_bytes)
-ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(common.human_bytes)
-print(ttest_results.to_markdown(index=False, tablefmt='github'))
+results = results.sort_values('Δ mean %', ascending=False)
+results['Δ mean'] = results['Δ mean'].apply(common.human_bytes)
+results['baseline mean'] = results['baseline mean'].apply(common.human_bytes)
+results['baseline stdev'] = results['baseline stdev'].apply(common.human_bytes)
+results['baseline stderr'] = results['baseline stderr'].apply(common.human_bytes)
+results['comparison mean'] = results['comparison mean'].apply(common.human_bytes)
+results['comparison stdev'] = results['comparison stdev'].apply(common.human_bytes)
+results['comparison stderr'] = results['comparison stderr'].apply(common.human_bytes)
+print(results.to_markdown(index=False, tablefmt='github'))
 print("</details>")
 
 print("<details>")

@@ -6,7 +6,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
 
@@ -57,7 +57,7 @@ pub struct AnsiStripper {
 }
 
 impl FunctionTransform for AnsiStripper {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {

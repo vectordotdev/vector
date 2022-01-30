@@ -91,7 +91,7 @@ fn dedupe(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let dedupe =
-                        Transform::task(Dedupe::new(param.dedupe_config.clone())).into_task();
+                        Transform::event_task(Dedupe::new(param.dedupe_config.clone())).into_task();
                     (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {

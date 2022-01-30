@@ -11,7 +11,7 @@ use pulsar::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
@@ -107,7 +107,7 @@ impl SinkConfig for PulsarSinkConfig {
             .context(CreatePulsarSinkSnafu)?;
         let healthcheck = healthcheck(producer).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -400,7 +400,12 @@ mod integration_tests {
     use pulsar::SubType;
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+
+    fn pulsar_address() -> String {
+        std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
+    }
 
     #[tokio::test]
     async fn pulsar_happy() {
@@ -411,7 +416,7 @@ mod integration_tests {
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {
-            endpoint: "pulsar://127.0.0.1:6650".to_owned(),
+            endpoint: pulsar_address(),
             topic: topic.clone(),
             encoding: Encoding::Text.into(),
             auth: None,
@@ -438,7 +443,8 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
-        events.map(Ok).forward(sink).await.unwrap();
+        let sink = VectorSink::from_event_sink(sink);
+        sink.run(events).await.unwrap();
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),

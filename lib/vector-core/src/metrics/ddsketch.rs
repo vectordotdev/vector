@@ -3,11 +3,11 @@ use std::{
     mem,
 };
 
-use core_common::byte_size_of::ByteSizeOf;
 use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -1417,12 +1417,12 @@ mod tests {
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
-        if target < 0.0 || actual < 0.0 {
-            panic!(
-                "expected/actual values must be greater than 0.0; target={}, actual={}",
-                target, actual
-            );
-        }
+        assert!(
+            !(target < 0.0 || actual < 0.0),
+            "expected/actual values must be greater than 0.0; target={}, actual={}",
+            target,
+            actual
+        );
 
         if target == actual {
             0.0

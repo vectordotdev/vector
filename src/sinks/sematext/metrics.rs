@@ -173,7 +173,7 @@ impl SematextMetricsService {
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
@@ -278,7 +278,7 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::StreamExt;
     use indoc::indoc;
 
     use super::*;
@@ -406,7 +406,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run(stream::iter(events)).await.unwrap();
+        let _ = sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

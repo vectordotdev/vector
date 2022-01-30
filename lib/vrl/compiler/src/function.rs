@@ -396,7 +396,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid enum variant for argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
@@ -427,7 +427,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
         }

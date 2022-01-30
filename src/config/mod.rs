@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use vector_core::buffers::{Acker, BufferConfig, BufferType};
+use vector_buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
     config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
@@ -52,7 +52,7 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use unit_test::{build_unit_tests_main as build_unit_tests, UnitTestResult};
+pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 

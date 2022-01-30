@@ -11,7 +11,7 @@ use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt}
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use super::SinkBuildError;
 use crate::{
@@ -83,7 +83,7 @@ impl UdpSinkConfig {
         let connector = self.build_connector(cx.clone())?;
         let sink = UdpSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
         ))
     }
@@ -248,7 +248,7 @@ impl UdpSink {
 }
 
 #[async_trait]
-impl StreamSink for UdpSink {
+impl StreamSink<Event> for UdpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 

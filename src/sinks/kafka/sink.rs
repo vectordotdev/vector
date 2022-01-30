@@ -120,7 +120,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 }
 
 #[async_trait]
-impl StreamSink for KafkaSink {
+impl StreamSink<Event> for KafkaSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
