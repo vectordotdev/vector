@@ -51,7 +51,7 @@ impl Function for Object {
         Ok(Box::new(ObjectFn { value }))
     }
 
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         args: &mut VmArgumentList,

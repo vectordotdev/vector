@@ -1,8 +1,9 @@
-use diagnostic::{DiagnosticError, Label, Note};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
+
+use diagnostic::{DiagnosticError, Label, Note};
 
 use crate::{
     expression::{
@@ -18,7 +19,7 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 pub type CompiledArgument =
     Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
 
-pub trait Function: Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -75,7 +76,7 @@ pub trait Function: Sync + fmt::Debug {
     }
 
     /// This function is called by the VM.
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         _args: &mut VmArgumentList,

@@ -51,7 +51,7 @@ impl Function for Boolean {
         Ok(Box::new(BooleanFn { value }))
     }
 
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         args: &mut VmArgumentList,

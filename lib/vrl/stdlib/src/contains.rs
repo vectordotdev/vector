@@ -81,7 +81,7 @@ impl Function for Contains {
         ]
     }
 
-    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let substring = args.required("substring");
         let case_sensitive = args

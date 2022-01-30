@@ -1,3 +1,7 @@
+use std::{fmt, sync::Arc};
+
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+
 use crate::{
     expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{ArgumentList, FunctionCompileContext, Parameter},
@@ -6,8 +10,6 @@ use crate::{
     vm::OpCode,
     Context, Expression, Function, Resolved, Span, State, TypeDef,
 };
-use diagnostic::{DiagnosticError, Label, Note, Urls};
-use std::{fmt, sync::Arc};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -35,7 +37,7 @@ impl FunctionCall {
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-        funcs: &[Box<dyn Function + Send + Sync>],
+        funcs: &[Box<dyn Function>],
         state: &mut State,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
@@ -200,9 +202,9 @@ impl FunctionCall {
     /// catch these whilst creating the AST.
     fn resolve_arguments(
         &self,
-        function: &(dyn Function + Send + Sync),
+        function: &(dyn Function),
     ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
-        let params = function.parameters().iter().collect::<Vec<_>>();
+        let params = function.parameters().to_vec();
         let mut result = params
             .iter()
             .map(|param| (param.keyword, None))

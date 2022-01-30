@@ -114,7 +114,7 @@ impl Function for ParseRegex {
         }
     }
 
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         args: &mut VmArgumentList,

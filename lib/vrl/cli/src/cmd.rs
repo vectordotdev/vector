@@ -114,7 +114,9 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
-            let result = execute(&mut object, &program, &tz, stdlib::all()).map(|v| {
+            let state = state::Runtime::default();
+            let runtime = Runtime::new(state);
+            let result = execute(&mut object, &program, &tz, runtime, stdlib::all()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -150,10 +152,9 @@ fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
+    mut runtime: Runtime,
     _functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
     runtime
         .resolve(object, program, timezone)
         .map_err(Error::Runtime)
@@ -164,10 +165,9 @@ fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
+    runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
     let vm = runtime.compile(functions, program).unwrap();
     runtime
         .run_vm(&vm, object, timezone)

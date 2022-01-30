@@ -26,7 +26,7 @@ impl Function for Now {
         Ok(Box::new(NowFn))
     }
 
-    fn call(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
         Ok(Utc::now().into())
     }
 }

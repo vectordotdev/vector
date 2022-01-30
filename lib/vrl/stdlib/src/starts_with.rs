@@ -133,7 +133,7 @@ impl Function for StartsWith {
         }))
     }
 
-    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments

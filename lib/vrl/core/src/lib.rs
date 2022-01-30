@@ -13,7 +13,7 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    fns: &[Box<dyn Function + Send + Sync>],
+    fns: &[Box<dyn Function>],
     external_context: Option<Box<dyn Any>>,
 ) -> compiler::Result {
     let mut state = state::Compiler::new();
@@ -24,7 +24,7 @@ pub fn compile(
 
 pub fn compile_with_state(
     source: &str,
-    fns: &[Box<dyn Function + Send + Sync>],
+    fns: &[Box<dyn Function>],
     state: &mut state::Compiler,
 ) -> compiler::Result {
     let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;

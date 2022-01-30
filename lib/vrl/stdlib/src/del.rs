@@ -117,7 +117,7 @@ impl Function for Del {
         }
     }
 
-    fn call(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let query = args
             .required_any("target")
             .downcast_ref::<expression::Query>()

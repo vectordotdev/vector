@@ -6,6 +6,7 @@ use crate::{
     expression::{Expr, Noop, Resolved},
     parser::Node,
     value::Kind,
+    vm::OpCode,
     Context, Expression, Span, State, TypeDef,
 };
 
@@ -52,7 +53,7 @@ impl Expression for Not {
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
         self.inner.compile_to_vm(vm)?;
-        vm.write_opcode(crate::vm::OpCode::Not);
+        vm.write_opcode(OpCode::Not);
 
         Ok(())
     }

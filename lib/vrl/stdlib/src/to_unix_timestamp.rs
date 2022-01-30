@@ -101,7 +101,7 @@ impl Function for ToUnixTimestamp {
         }
     }
 
-    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let unit = args
             .optional_any("unit")

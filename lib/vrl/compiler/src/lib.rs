@@ -25,7 +25,7 @@ pub use value::Value;
 pub type Result = std::result::Result<Program, compiler::Errors>;
 
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
-pub fn compile(ast: parser::Program, fns: &[Box<dyn Function + Send + Sync>]) -> Result {
+pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
     let mut state = State::default();
     compile_with_state(ast, fns, &mut state)
 }
@@ -39,7 +39,7 @@ pub fn compile(ast: parser::Program, fns: &[Box<dyn Function + Send + Sync>]) ->
 /// the result of previous expressions.
 pub fn compile_with_state(
     ast: parser::Program,
-    fns: &[Box<dyn Function + Send + Sync>],
+    fns: &[Box<dyn Function>],
     state: &mut State,
 ) -> Result {
     compiler::Compiler::new(fns, state).compile(ast)

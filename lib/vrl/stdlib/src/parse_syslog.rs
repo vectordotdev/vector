@@ -53,7 +53,7 @@ impl Function for ParseSyslog {
         Ok(Box::new(ParseSyslogFn { value }))
     }
 
-    fn call(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let message = value.try_bytes_utf8_lossy()?;
 

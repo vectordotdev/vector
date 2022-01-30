@@ -158,7 +158,7 @@ impl Function for ToBool {
         Ok(Box::new(ToBoolFn { value }))
     }
 
-    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
 
         to_bool(value)

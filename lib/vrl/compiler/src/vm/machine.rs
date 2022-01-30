@@ -137,7 +137,7 @@ pub enum Instruction {
 
 #[derive(Debug, Default)]
 pub struct Vm {
-    fns: Vec<Box<dyn Function + Send + Sync>>,
+    fns: Vec<Box<dyn Function>>,
     pub(super) instructions: Vec<Instruction>,
     pub(super) values: Vec<Value>,
     targets: Vec<Variable>,
@@ -145,7 +145,7 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new(fns: Vec<Box<dyn Function + Send + Sync>>) -> Self {
+    pub fn new(fns: Vec<Box<dyn Function>>) -> Self {
         Self {
             fns,
             ..Default::default()
@@ -173,7 +173,7 @@ impl Vm {
         self.instructions[pos] = Instruction::Primitive(code);
     }
 
-    pub fn function(&self, function_id: usize) -> Option<&(dyn Function + Send + Sync)> {
+    pub fn function(&self, function_id: usize) -> Option<&(dyn Function)> {
         self.fns.get(function_id).map(|fun| fun.deref())
     }
 
@@ -441,7 +441,7 @@ impl Vm {
 
                     let result = argumentlist
                         .check_arguments()
-                        .and_then(|_| function.call(ctx, &mut argumentlist));
+                        .and_then(|_| function.call_by_vm(ctx, &mut argumentlist));
 
                     match result {
                         Ok(result) => state.stack.push(result),

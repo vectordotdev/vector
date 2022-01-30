@@ -1,3 +1,8 @@
+use std::{convert::TryFrom, fmt};
+
+use diagnostic::{DiagnosticError, Label, Note};
+use lookup::LookupBuf;
+
 use crate::{
     expression::{Expr, Literal, Resolved},
     parser::{
@@ -7,9 +12,6 @@ use crate::{
     vm::OpCode,
     Context, Expression, Span, State, TypeDef, Value,
 };
-use diagnostic::{DiagnosticError, Label, Note};
-use lookup::LookupBuf;
-use std::{convert::TryFrom, fmt};
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
@@ -243,7 +245,7 @@ impl Target {
         }
     }
 
-    pub fn insert(&self, value: Value, ctx: &mut Context) {
+    fn insert(&self, value: Value, ctx: &mut Context) {
         use Target::*;
 
         match self {

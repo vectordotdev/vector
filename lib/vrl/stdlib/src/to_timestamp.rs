@@ -135,7 +135,7 @@ impl Function for ToTimestamp {
         Ok(Box::new(ToTimestampFn { value }))
     }
 
-    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         to_timestamp(value)
     }

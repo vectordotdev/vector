@@ -63,7 +63,7 @@ impl Function for ParseUrl {
         ]
     }
 
-    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
         let string = value.try_bytes_utf8_lossy()?;
         let default_known_ports = arguments

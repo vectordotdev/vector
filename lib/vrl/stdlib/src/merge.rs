@@ -51,7 +51,7 @@ impl Function for Merge {
         Ok(Box::new(MergeFn { to, from, deep }))
     }
 
-    fn call(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
         let to = arguments.required("to");
         let mut to = to.try_object()?;
         let from = arguments.required("from");

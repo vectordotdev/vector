@@ -51,7 +51,7 @@ impl Function for Float {
         Ok(Box::new(FloatFn { value }))
     }
 
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         args: &mut VmArgumentList,

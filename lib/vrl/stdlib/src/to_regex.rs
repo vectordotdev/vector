@@ -44,7 +44,7 @@ impl Function for ToRegex {
         Ok(Box::new(ToRegexFn { value }))
     }
 
-    fn call(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
 
         to_regex(value)

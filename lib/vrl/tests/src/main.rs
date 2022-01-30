@@ -310,7 +310,7 @@ fn main() {
 #[cfg(feature = "vrl-vm")]
 fn run_vrl(
     mut runtime: Runtime,
-    functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
+    functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,

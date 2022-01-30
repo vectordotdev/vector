@@ -171,7 +171,7 @@ fn execute(
     object: &mut dyn Target,
     timezone: &TimeZone,
 ) -> Result<Value, String> {
-    let vm = runtime.compile(stdlib::all(), &program).unwrap();
+    let vm = runtime.compile(stdlib::all(), &program)?;
     runtime
         .run_vm(&vm, object, timezone)
         .map_err(|err| err.to_string())

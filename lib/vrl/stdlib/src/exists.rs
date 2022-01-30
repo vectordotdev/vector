@@ -57,7 +57,7 @@ impl Function for Exists {
         }
     }
 
-    fn call(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let field = args
             .required_any("field")
             .downcast_ref::<expression::Query>()

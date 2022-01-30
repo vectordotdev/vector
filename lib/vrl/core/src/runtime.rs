@@ -112,11 +112,7 @@ impl Runtime {
         Ok(values.pop().unwrap_or(Value::Null))
     }
 
-    pub fn compile(
-        &self,
-        fns: Vec<Box<dyn Function + Send + Sync>>,
-        program: &Program,
-    ) -> Result<Vm, String> {
+    pub fn compile(&self, fns: Vec<Box<dyn Function>>, program: &Program) -> Result<Vm, String> {
         let mut vm = Vm::new(fns);
 
         for expr in program.iter() {

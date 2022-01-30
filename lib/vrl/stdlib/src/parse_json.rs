@@ -89,7 +89,7 @@ impl Function for ParseJson {
         Ok(Box::new(ParseJsonFn { value }))
     }
 
-    fn call(
+    fn call_by_vm(
         &self,
         _ctx: &mut Context,
         args: &mut VmArgumentList,
