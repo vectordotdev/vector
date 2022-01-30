@@ -258,10 +258,9 @@ impl Vm {
                     let value = state.read_constant()?;
                     state.stack.push(value);
                 }
-                OpCode::Not => match state.stack.pop() {
-                    None => return Err("Notting nothing".into()),
-                    Some(Value::Boolean(value)) => state.stack.push(Value::Boolean(!value)),
-                    _ => return Err("Notting non boolean".into()),
+                OpCode::Not => match state.pop_stack()? {
+                    Value::Boolean(value) => state.stack.push(Value::Boolean(!value)),
+                    _ => return Err("Negating non boolean".into()),
                 },
                 OpCode::Add => binary_op(&mut state, Value::try_add)?,
                 OpCode::Subtract => binary_op(&mut state, Value::try_sub)?,
