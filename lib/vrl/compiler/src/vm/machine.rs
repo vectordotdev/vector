@@ -241,8 +241,13 @@ impl Vm {
                     // Aborts the process.
                     let start = state.next_primitive()?;
                     let end = state.next_primitive()?;
+                    let message = match state.pop_stack()? {
+                        Value::Null => None,
+                        value => Some(value.try_bytes_utf8_lossy()?.to_string()),
+                    };
                     return Err(ExpressionError::Abort {
                         span: Span::new(start, end),
+                        message,
                     });
                 }
                 OpCode::Return => {
