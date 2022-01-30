@@ -153,7 +153,7 @@ fn execute(
     program: &Program,
     timezone: &TimeZone,
     mut runtime: Runtime,
-    _functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
+    _functions: Vec<Box<dyn vrl::Function>>,
 ) -> Result<Value, Error> {
     runtime
         .resolve(object, program, timezone)
@@ -165,8 +165,8 @@ fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
-    runtime: Runtime,
-    functions: Vec<Box<dyn vrl::Function + Send + Sync>>,
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
 ) -> Result<Value, Error> {
     let vm = runtime.compile(functions, program).unwrap();
     runtime
