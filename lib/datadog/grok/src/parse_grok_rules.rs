@@ -14,9 +14,8 @@ use std::{
 use tracing::error;
 use vrl_compiler::Value;
 
-const GROK_PATTERN_RE: Lazy<fancy_regex::Regex> = Lazy::new(|| {
-    fancy_regex::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap()
-});
+const GROK_PATTERN_RE: Lazy<onig::Regex> =
+    Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());
 
 /// The result of parsing a grok rule with a final regular expression and the
 /// related field information, needed at runtime.
@@ -203,11 +202,7 @@ fn parse_pattern(
 /// - `context` - the context required to parse the current grok rule
 fn parse_grok_rule(rule: &str, context: &mut GrokRuleParseContext) -> Result<(), Error> {
     let mut regex_i = 0;
-    for re_match in GROK_PATTERN_RE.find_iter(rule) {
-        let re_match = re_match.unwrap(); // TODO should kick out a proper error
-        let start = re_match.start();
-        let end = re_match.end();
-
+    for (start, end) in GROK_PATTERN_RE.find_iter(rule) {
         context.append_regex(&rule[regex_i..start]);
         regex_i = end;
         let pattern = parse_grok_pattern(&rule[start..end])
