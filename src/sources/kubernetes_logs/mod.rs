@@ -31,7 +31,7 @@ use crate::{
     kubernetes::hash_value::HashKey,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
     SourceSender,
 };
 
@@ -431,9 +431,9 @@ impl Source {
             event
         });
         let events = events.flat_map(move |event| {
-            let mut buf = Vec::with_capacity(1);
+            let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
-            futures::stream::iter(buf)
+            futures::stream::iter(buf.into_events())
         });
 
         let mut stream = partial_events_merger.transform(Box::pin(events));

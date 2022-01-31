@@ -13,7 +13,7 @@ use crate::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
         RegexParserTargetExists,
     },
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 
@@ -245,7 +245,7 @@ impl RegexParser {
 }
 
 impl FunctionTransform for RegexParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
 
@@ -311,6 +311,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -334,7 +335,7 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().map(|event| event.into_log());
         if let Some(event) = &result {
