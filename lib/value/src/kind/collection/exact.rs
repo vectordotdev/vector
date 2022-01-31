@@ -193,15 +193,15 @@ impl From<Kind> for Exact {
 impl From<&Kind> for Exact {
     fn from(kind: &Kind) -> Self {
         Self {
-            bytes: kind.is_bytes(),
-            integer: kind.is_integer(),
-            float: kind.is_float(),
-            boolean: kind.is_boolean(),
-            timestamp: kind.is_timestamp(),
-            regex: kind.is_regex(),
-            null: kind.is_null(),
-            object: kind.is_object(),
-            array: kind.is_array(),
+            bytes: kind.contains_bytes(),
+            integer: kind.contains_integer(),
+            float: kind.contains_float(),
+            boolean: kind.contains_boolean(),
+            timestamp: kind.contains_timestamp(),
+            regex: kind.contains_regex(),
+            null: kind.contains_null(),
+            object: kind.contains_object(),
+            array: kind.contains_array(),
         }
     }
 }

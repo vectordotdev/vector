@@ -376,7 +376,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_bytes(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_bytes() && self.is_exact() {
+        if self.is_bytes() {
             return Err(EmptyKindError);
         }
 
@@ -393,7 +393,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_integer(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_integer() && self.is_exact() {
+        if self.is_integer() {
             return Err(EmptyKindError);
         }
 
@@ -410,7 +410,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_float(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_float() && self.is_exact() {
+        if self.is_float() {
             return Err(EmptyKindError);
         }
 
@@ -427,7 +427,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_boolean(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_boolean() && self.is_exact() {
+        if self.is_boolean() {
             return Err(EmptyKindError);
         }
 
@@ -444,7 +444,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_timestamp(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_timestamp() && self.is_exact() {
+        if self.is_timestamp() {
             return Err(EmptyKindError);
         }
 
@@ -461,7 +461,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_regex(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_regex() && self.is_exact() {
+        if self.is_regex() {
             return Err(EmptyKindError);
         }
 
@@ -478,7 +478,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_null(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_null() && self.is_exact() {
+        if self.is_null() {
             return Err(EmptyKindError);
         }
 
@@ -495,7 +495,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_array(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_array() && self.is_exact() {
+        if self.is_array() {
             return Err(EmptyKindError);
         }
 
@@ -512,7 +512,7 @@ impl Kind {
     /// chosen, because when applying progressive type checking, there should _always_ be at least
     /// one state for a given type, the "no state left for a type" variant is a programming error.
     pub fn remove_object(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_object() && self.is_exact() {
+        if self.is_object() {
             return Err(EmptyKindError);
         }
 

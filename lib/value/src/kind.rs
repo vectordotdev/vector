@@ -43,31 +43,31 @@ impl std::fmt::Display for Kind {
 
         let mut kinds = vec![];
 
-        if self.is_bytes() {
+        if self.contains_bytes() {
             kinds.push("string");
         }
-        if self.is_integer() {
+        if self.contains_integer() {
             kinds.push("integer");
         }
-        if self.is_float() {
+        if self.contains_float() {
             kinds.push("float");
         }
-        if self.is_boolean() {
+        if self.contains_boolean() {
             kinds.push("boolean");
         }
-        if self.is_timestamp() {
+        if self.contains_timestamp() {
             kinds.push("timestamp");
         }
-        if self.is_regex() {
+        if self.contains_regex() {
             kinds.push("regex");
         }
-        if self.is_null() {
+        if self.contains_null() {
             kinds.push("null");
         }
-        if self.is_array() {
+        if self.contains_array() {
             kinds.push("array");
         }
-        if self.is_object() {
+        if self.contains_object() {
             kinds.push("object");
         }
 
