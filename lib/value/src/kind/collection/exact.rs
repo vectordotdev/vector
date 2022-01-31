@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    ops::{BitAnd, BitOr, BitXor},
-};
+use std::{collections::BTreeMap, ops::BitOr};
 
 use crate::Kind;
 
@@ -95,42 +92,6 @@ impl BitOr for Exact {
             null: self.null | rhs.null,
             object: self.object | rhs.object,
             array: self.array | rhs.array,
-        }
-    }
-}
-
-impl BitXor for Exact {
-    type Output = Self;
-
-    fn bitxor(self, rhs: Self) -> Self::Output {
-        Self {
-            bytes: self.bytes ^ rhs.bytes,
-            integer: self.integer ^ rhs.integer,
-            float: self.float ^ rhs.float,
-            boolean: self.boolean ^ rhs.boolean,
-            timestamp: self.timestamp ^ rhs.timestamp,
-            regex: self.regex ^ rhs.regex,
-            null: self.null ^ rhs.null,
-            object: self.object ^ rhs.object,
-            array: self.array ^ rhs.array,
-        }
-    }
-}
-
-impl BitAnd for Exact {
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self {
-            bytes: self.bytes & rhs.bytes,
-            integer: self.integer & rhs.integer,
-            float: self.float & rhs.float,
-            boolean: self.boolean & rhs.boolean,
-            timestamp: self.timestamp & rhs.timestamp,
-            regex: self.regex & rhs.regex,
-            null: self.null & rhs.null,
-            object: self.object & rhs.object,
-            array: self.array & rhs.array,
         }
     }
 }

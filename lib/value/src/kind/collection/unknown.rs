@@ -97,6 +97,7 @@ impl Unknown {
     ///
     /// Meaning, if `self` is `Any`, then it's always a superset of `other`, otherwise its
     /// accumulative types need to be a superset of `other`.
+    #[must_use]
     pub(crate) fn is_superset(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (Inner::Infinite(infinite), _) if infinite.is_any() => true,

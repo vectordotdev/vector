@@ -24,6 +24,8 @@ pub use collection::{Collection, Field, Index};
 /// this library to expose.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Kind {
+    // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
+    // usage of the API easier to work with. There is no impact on the memory size of the type.
     bytes: Option<()>,
     integer: Option<()>,
     float: Option<()>,

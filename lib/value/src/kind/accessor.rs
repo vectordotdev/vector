@@ -473,7 +473,7 @@ mod tests {
                 TestCase {
                     kind: Kind::bytes(),
                     path: "foo".into(),
-                    want: Kind::empty().or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                    want: Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
                 },
             ),
             (
@@ -481,7 +481,7 @@ mod tests {
                 TestCase {
                     kind: Kind::boolean(),
                     path: LookupBuf::from_str("foo.bar").unwrap(),
-                    want: Kind::empty().or_object(BTreeMap::from([(
+                    want: Kind::object(BTreeMap::from([(
                         "foo".into(),
                         Kind::object(BTreeMap::from([("bar".into(), Kind::boolean())])),
                     )])),
@@ -492,7 +492,7 @@ mod tests {
                 TestCase {
                     kind: Kind::integer(),
                     path: LookupBuf::from_str("[2]").unwrap(),
-                    want: Kind::empty().or_array(BTreeMap::from([(2.into(), Kind::integer())])),
+                    want: Kind::array(BTreeMap::from([(2.into(), Kind::integer())])),
                 },
             ),
             (
@@ -508,7 +508,7 @@ mod tests {
                 TestCase {
                     kind: Kind::integer().or_bytes(),
                     path: LookupBuf::from_str(".foo.bar[1].baz").unwrap(),
-                    want: Kind::empty().or_object(BTreeMap::from([(
+                    want: Kind::object(BTreeMap::from([(
                         "foo".into(),
                         Kind::object(BTreeMap::from([(
                             "bar".into(),

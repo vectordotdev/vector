@@ -420,13 +420,13 @@ mod tests {
             (
                 "nested object match",
                 TestCase {
-                    this: Kind::empty().or_object(BTreeMap::from([(
+                    this: Kind::object(BTreeMap::from([(
                         "foo".into(),
-                        Kind::empty().or_object(BTreeMap::from([("bar".into(), Kind::any())])),
+                        Kind::object(BTreeMap::from([("bar".into(), Kind::any())])),
                     )])),
-                    other: Kind::empty().or_object(BTreeMap::from([(
+                    other: Kind::object(BTreeMap::from([(
                         "foo".into(),
-                        Kind::empty().or_object(BTreeMap::from([("bar".into(), Kind::bytes())])),
+                        Kind::object(BTreeMap::from([("bar".into(), Kind::bytes())])),
                     )])),
                     want: true,
                 },
@@ -434,13 +434,13 @@ mod tests {
             (
                 "nested object mismatch",
                 TestCase {
-                    this: Kind::empty().or_object(BTreeMap::from([(
+                    this: Kind::object(BTreeMap::from([(
                         "foo".into(),
-                        Kind::empty().or_object(BTreeMap::from([("bar".into(), Kind::bytes())])),
+                        Kind::object(BTreeMap::from([("bar".into(), Kind::bytes())])),
                     )])),
-                    other: Kind::empty().or_object(BTreeMap::from([(
+                    other: Kind::object(BTreeMap::from([(
                         "foo".into(),
-                        Kind::empty().or_object(BTreeMap::from([("bar".into(), Kind::integer())])),
+                        Kind::object(BTreeMap::from([("bar".into(), Kind::integer())])),
                     )])),
                     want: false,
                 },
@@ -448,13 +448,13 @@ mod tests {
             (
                 "nested array match",
                 TestCase {
-                    this: Kind::empty().or_array(BTreeMap::from([(
+                    this: Kind::array(BTreeMap::from([(
                         0.into(),
-                        Kind::empty().or_array(BTreeMap::from([(1.into(), Kind::any())])),
+                        Kind::array(BTreeMap::from([(1.into(), Kind::any())])),
                     )])),
-                    other: Kind::empty().or_array(BTreeMap::from([(
+                    other: Kind::array(BTreeMap::from([(
                         0.into(),
-                        Kind::empty().or_array(BTreeMap::from([(1.into(), Kind::bytes())])),
+                        Kind::array(BTreeMap::from([(1.into(), Kind::bytes())])),
                     )])),
                     want: true,
                 },
@@ -462,13 +462,13 @@ mod tests {
             (
                 "nested array mismatch",
                 TestCase {
-                    this: Kind::empty().or_array(BTreeMap::from([(
+                    this: Kind::array(BTreeMap::from([(
                         0.into(),
-                        Kind::empty().or_array(BTreeMap::from([(1.into(), Kind::bytes())])),
+                        Kind::array(BTreeMap::from([(1.into(), Kind::bytes())])),
                     )])),
-                    other: Kind::empty().or_array(BTreeMap::from([(
+                    other: Kind::array(BTreeMap::from([(
                         0.into(),
-                        Kind::empty().or_array(BTreeMap::from([(1.into(), Kind::integer())])),
+                        Kind::array(BTreeMap::from([(1.into(), Kind::integer())])),
                     )])),
                     want: false,
                 },

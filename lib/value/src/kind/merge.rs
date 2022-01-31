@@ -1,6 +1,6 @@
 //! All types related to merging one [`Kind`] into another.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::BitOr};
 
 use super::{Collection, Kind};
 
@@ -122,7 +122,7 @@ impl Indices {
     }
 }
 
-impl std::ops::BitOr for Kind {
+impl BitOr for Kind {
     type Output = Self;
 
     fn bitor(mut self, rhs: Self) -> Self::Output {

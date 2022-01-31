@@ -42,6 +42,7 @@ impl<T: Ord> Collection<T> {
     }
 
     /// Create a new collection with a defined "unknown fields" value, and no known fields.
+    #[must_use]
     pub fn from_unknown(unknown: impl Into<Option<Kind>>) -> Self {
         Self {
             known: BTreeMap::default(),
@@ -72,7 +73,7 @@ impl<T: Ord> Collection<T> {
     /// This returns `false` if at least _one_ field kind is known.
     #[must_use]
     pub fn is_any(&self) -> bool {
-        self.known.iter().all(|(_, k)| k.is_any())
+        self.known.values().all(|kind| kind.is_any())
             && self.unknown.as_ref().map_or(false, Unknown::is_any)
     }
 
@@ -200,7 +201,7 @@ impl<T: Ord> Collection<T> {
     /// For *known fields*:
     ///
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
-    ///   are used (depending on the configured [`Strategy`](merge::Strategy).
+    ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
     ///
     /// - If a field exists in one but not the other, the field is used.
     ///
@@ -361,7 +362,7 @@ mod tests {
             },
         ) in HashMap::from([
             (
-                "any merge",
+                "any merge (deep)",
                 TestCase {
                     this: Collection::any(),
                     other: Collection::any(),
@@ -373,7 +374,19 @@ mod tests {
                 },
             ),
             (
-                "json merge",
+                "any merge (shallow)",
+                TestCase {
+                    this: Collection::any(),
+                    other: Collection::any(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::any(),
+                },
+            ),
+            (
+                "json merge (deep)",
                 TestCase {
                     this: Collection::json(),
                     other: Collection::json(),
@@ -385,7 +398,19 @@ mod tests {
                 },
             ),
             (
-                "any w/ json merge",
+                "json merge (shallow)",
+                TestCase {
+                    this: Collection::json(),
+                    other: Collection::json(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::json(),
+                },
+            ),
+            (
+                "any w/ json merge (deep)",
                 TestCase {
                     this: Collection::any(),
                     other: Collection::json(),
@@ -397,7 +422,19 @@ mod tests {
                 },
             ),
             (
-                "merge same knowns",
+                "any w/ json merge (shallow)",
+                TestCase {
+                    this: Collection::any(),
+                    other: Collection::json(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::any(),
+                },
+            ),
+            (
+                "merge same knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
@@ -409,7 +446,19 @@ mod tests {
                 },
             ),
             (
-                "append different knowns",
+                "merge same knowns (shallow)",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
+                },
+            ),
+            (
+                "append different knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
@@ -424,7 +473,22 @@ mod tests {
                 },
             ),
             (
-                "merge/append same/different knowns",
+                "append different knowns (shallow)",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([
+                        ("foo", Kind::integer()),
+                        ("bar", Kind::bytes()),
+                    ])),
+                },
+            ),
+            (
+                "merge/append same/different knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([
@@ -442,12 +506,42 @@ mod tests {
                 },
             ),
             (
-                "merge unknowns",
+                "merge/append same/different knowns (shallow)",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([
+                        ("foo", Kind::bytes()),
+                        ("bar", Kind::boolean()),
+                    ])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([
+                        ("foo", Kind::bytes()),
+                        ("bar", Kind::boolean()),
+                    ])),
+                },
+            ),
+            (
+                "merge unknowns (deep)",
                 TestCase {
                     this: Collection::from_unknown(Kind::bytes()),
                     other: Collection::from_unknown(Kind::integer()),
                     strategy: merge::Strategy {
                         depth: merge::Depth::Deep,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from_unknown(Kind::bytes().or_integer()),
+                },
+            ),
+            (
+                "merge unknowns (shallow)",
+                TestCase {
+                    this: Collection::from_unknown(Kind::bytes()),
+                    other: Collection::from_unknown(Kind::integer()),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
                         indices: merge::Indices::Keep,
                     },
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
