@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
@@ -23,8 +24,8 @@ use crate::{
         Event,
     },
     internal_events::{
-        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
-        MongoDbMetricsRequestError,
+        BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
@@ -126,6 +127,7 @@ impl SourceConfig for MongoDbMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
+                let count = metrics.len();
                 emit!(&MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
@@ -137,7 +139,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                     .map(Event::Metric);
 
                 if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending mongodb metrics.", %error);
+                    emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -257,6 +259,7 @@ impl MongoDbMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
         emit!(&MongoDbMetricsEventsReceived {
+            byte_size: metrics.size_of(),
             count: metrics.len(),
             uri: &self.endpoint,
         });
@@ -277,6 +280,10 @@ impl MongoDbMetrics {
             .run_command(command, None)
             .await
             .map_err(CollectError::Mongo)?;
+        emit!(&BytesReceived {
+            byte_size: std::mem::size_of_val(&doc),
+            protocol: "tcp",
+        });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
         // asserts_total
