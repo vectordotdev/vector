@@ -810,14 +810,14 @@ mod tests {
             ),
             (
                 r#"%{data::keyvalue}"#,
-                r#"field=2.0f"#,
+                r#"field=2.0e"#,
                 Ok(Value::from(btreemap! {
-                    "field" => "2.0f"
-                    })),
+                "field" => "2.0e"
+                })),
             ),
             (
                 r#"%{data::keyvalue("=", "\\w.\\-_@:")}"#,
-                r#"IN=eth0 OUT= MAC"#,// no value
+                r#"IN=eth0 OUT= MAC"#, // no value
                 Ok(Value::from(btreemap! {
                     "IN" => "eth0"
                 })),
