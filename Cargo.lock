@@ -1640,43 +1640,18 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ebde6a9dd5e331cd6c6f48253254d117642c31653baa475e394657c59c1f7d"
-dependencies = [
- "bitflags",
- "crossterm_winapi 0.8.0",
- "libc",
- "mio 0.7.14",
- "parking_lot",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c85525306c4291d1b73ce93c8acf9c339f9b213aef6c1d85c3830cbf1c16325c"
 dependencies = [
  "bitflags",
- "crossterm_winapi 0.9.0",
+ "crossterm_winapi",
  "futures-core",
  "libc",
  "mio 0.7.14",
  "parking_lot",
  "signal-hook",
  "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a6966607622438301997d3dac0d2f6e9a90c68bb6bc1785ea98456ab93c0507"
-dependencies = [
  "winapi 0.3.9",
 ]
 
@@ -2960,7 +2935,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.23.1",
+ "nix",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -3042,7 +3017,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.23.1",
+ "nix",
  "widestring",
  "winapi 0.3.9",
 ]
@@ -3644,9 +3619,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.114"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
+checksum = "565dbd88872dbe4cc8a46e527f26483c1d1f7afa6b884a3bd6cd893d4f98da74"
 
 [[package]]
 name = "libflate"
@@ -4279,19 +4254,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
 dependencies = [
  "smallvec",
-]
-
-[[package]]
-name = "nix"
-version = "0.22.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 1.0.0",
- "libc",
- "memoffset",
 ]
 
 [[package]]
@@ -6226,9 +6188,9 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "9.0.0"
+version = "9.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "790487c3881a63489ae77126f57048b42d62d3b2bafbf37453ea19eedb6340d6"
+checksum = "db7826789c0e25614b03e5a54a0717a86f9ff6e6e5247f92b369472869320039"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -6237,7 +6199,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.22.3",
+ "nix",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -7840,13 +7802,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39c8ce4e27049eed97cfa363a5048b09d995e209994634a0efc26a14ab6c0c23"
+checksum = "23ed0a32c88b039b73f1b6c5acbd0554bfa5b6be94467375fd947c4de3a02271"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.20.0",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -8167,7 +8129,7 @@ dependencies = [
  "colored",
  "console-subscriber",
  "criterion",
- "crossterm 0.22.1",
+ "crossterm",
  "csv",
  "dashmap 5.0.0",
  "data-encoding",
@@ -8224,7 +8186,7 @@ dependencies = [
  "metrics-util",
  "mlua",
  "mongodb",
- "nix 0.23.1",
+ "nix",
  "nom 7.1.0",
  "notify",
  "num-format",
