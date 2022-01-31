@@ -157,11 +157,11 @@ async fn fork() {
     assert_eq!(input_lines, output_lines2);
 }
 
-// In cpu constrained environments at least two threads
+// In cpu constrained environments at least three threads
 // are needed to finish processing all the events before
 // sources are forcefully shutted down.
 // Although that's still not a guarantee.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn merge_and_fork() {
     trace_init();
 

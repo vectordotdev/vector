@@ -6,7 +6,7 @@ use super::{sink, source, state, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoTransformMetrics},
+        metrics::{self, outputs_by_component_key, IntoTransformMetrics, Output},
         sort,
     },
     config::{ComponentKey, OutputId},
@@ -18,6 +18,7 @@ pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
     pub inputs: Vec<OutputId>,
+    pub outputs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +30,9 @@ impl Transform {
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
+    }
+    pub fn get_outputs(&self) -> &[String] {
+        self.0.outputs.as_ref()
     }
 }
 
@@ -61,6 +65,11 @@ impl Transform {
     /// Transform type
     pub async fn component_type(&self) -> &str {
         &*self.get_component_type()
+    }
+
+    /// Transform output streams
+    pub async fn outputs(&self) -> Vec<Output> {
+        outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Source inputs
@@ -139,16 +148,19 @@ mod tests {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![],
+                outputs: vec![],
             }),
             Transform(Data {
                 component_key: ComponentKey::from("field_adder"),
                 component_type: "add_fields".to_string(),
                 inputs: vec![],
+                outputs: vec![],
             }),
             Transform(Data {
                 component_key: ComponentKey::from("append"),
                 component_type: "concat".to_string(),
                 inputs: vec![],
+                outputs: vec![],
             }),
         ]
     }
