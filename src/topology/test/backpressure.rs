@@ -286,7 +286,7 @@ mod test_source {
             let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
-                    let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
+                    let _result = cx.out.send_event(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::AcqRel);
                 }
                 Ok(())

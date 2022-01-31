@@ -405,7 +405,7 @@ async fn run_command(
                 &mut event,
             );
 
-            match out.send(event).await {
+            match out.send_event(event).await {
                 Ok(_) => {
                     processed_count += 1;
                 }

@@ -77,7 +77,7 @@ pub async fn firehose(
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
-                        if let Err(error) = out.send(event).await {
+                        if let Err(error) = out.send_event(event).await {
                             emit!(&StreamClosedError {
                                 error: error.clone(),
                                 count: 1
