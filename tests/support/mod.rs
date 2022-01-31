@@ -31,8 +31,9 @@ use vector::{
         TransformConfig, TransformContext,
     },
     event::{
+        into_event_stream,
         metric::{self, MetricData, MetricValue},
-        Event, Value,
+        Event, EventArray, Value,
     },
     schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
@@ -43,7 +44,7 @@ use vector::{
 };
 use vector_buffers::Acker;
 
-pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
+pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
@@ -52,7 +53,7 @@ pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) 
 pub fn sink_with_data(
     channel_size: usize,
     data: &str,
-) -> (impl Stream<Item = Event>, MockSinkConfig) {
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new_with_data(tx, true, data);
     (rx, sink)
@@ -60,7 +61,7 @@ pub fn sink_with_data(
 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
-) -> (impl Stream<Item = Event>, MockSinkConfig) {
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
@@ -123,7 +124,7 @@ pub fn create_directory() -> PathBuf {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
     #[serde(skip)]
-    receiver: Arc<Mutex<Option<ReceiverStream<Event>>>>,
+    receiver: Arc<Mutex<Option<ReceiverStream<EventArray>>>>,
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
@@ -133,7 +134,7 @@ pub struct MockSourceConfig {
 }
 
 impl MockSourceConfig {
-    pub fn new(receiver: ReceiverStream<Event>) -> Self {
+    pub fn new(receiver: ReceiverStream<EventArray>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -142,7 +143,7 @@ impl MockSourceConfig {
         }
     }
 
-    pub fn new_with_data(receiver: ReceiverStream<Event>, data: &str) -> Self {
+    pub fn new_with_data(receiver: ReceiverStream<EventArray>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -152,7 +153,7 @@ impl MockSourceConfig {
     }
 
     pub fn new_with_event_counter(
-        receiver: ReceiverStream<Event>,
+        receiver: ReceiverStream<EventArray>,
         event_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {
@@ -197,7 +198,8 @@ impl SourceConfig for MockSourceConfig {
                 if let Some(counter) = &event_counter {
                     counter.fetch_add(1, Ordering::Relaxed);
                 }
-            });
+            })
+            .flat_map(into_event_stream);
 
             match out.send_stream(&mut stream).await {
                 Ok(()) => {

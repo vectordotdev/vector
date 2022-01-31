@@ -11,7 +11,7 @@ use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
 pub use ::value::Value;
-pub use array::{EventArray, EventContainer, LogArray, MetricArray};
+pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -19,7 +19,7 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-pub use r#ref::EventRef;
+pub use r#ref::{EventMutRef, EventRef};
 pub use trace::TraceEvent;
 pub use util::log::{PathComponent, PathIter};
 #[cfg(feature = "vrl")]

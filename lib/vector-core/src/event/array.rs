@@ -4,11 +4,12 @@
 
 use std::{iter, slice, vec};
 
+use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 
-use super::{Event, EventDataEq, EventRef, LogEvent, Metric, TraceEvent};
+use super::{Event, EventDataEq, EventMutRef, EventRef, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -27,8 +28,17 @@ pub trait EventContainer: ByteSizeOf {
         self.len() == 0
     }
 
-    /// Turn this container into an iterator of events.
+    /// Turn this container into an iterator over `Event`.
     fn into_events(self) -> Self::IntoIter;
+}
+
+/// Turn a container into a futures stream over the contained `Event`
+/// type.  This would ideally be implemented as a default method on
+/// `trait EventContainer`, but the required feature (associated type
+/// defaults) is still unstable.
+/// See <https://github.com/rust-lang/rust/issues/29661>
+pub fn into_event_stream(container: impl EventContainer) -> impl Stream<Item = Event> + Unpin {
+    stream::iter(container.into_events())
 }
 
 impl EventContainer for Event {
@@ -124,14 +134,14 @@ pub enum EventArray {
 }
 
 impl EventArray {
-    /// Run the given update function over each `LogEvent` in this array.
+    /// Call the given update function over each `LogEvent` in this array.
     pub fn for_each_log(&mut self, update: impl FnMut(&mut LogEvent)) {
         if let Self::Logs(logs) = self {
             logs.iter_mut().for_each(update);
         }
     }
 
-    /// Run the given update function over each `Metric` in this array.
+    /// Call the given update function over each `Metric` in this array.
     pub fn for_each_metric(&mut self, update: impl FnMut(&mut Metric)) {
         if let Self::Metrics(metrics) = self {
             metrics.iter_mut().for_each(update);
@@ -142,6 +152,15 @@ impl EventArray {
     pub fn for_each_trace(&mut self, update: impl FnMut(&mut TraceEvent)) {
         if let Self::Traces(traces) = self {
             traces.iter_mut().for_each(update);
+        }
+    }
+
+    /// Call the given update function over each event in this array.
+    pub fn for_each_event(&mut self, mut update: impl FnMut(EventMutRef<'_>)) {
+        match self {
+            Self::Logs(array) => array.iter_mut().for_each(|log| update(log.into())),
+            Self::Metrics(array) => array.iter_mut().for_each(|metric| update(metric.into())),
+            Self::Traces(array) => array.iter_mut().for_each(|trace| update(trace.into())),
         }
     }
 

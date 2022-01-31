@@ -2,7 +2,7 @@ use std::fmt;
 
 use tokio::sync::mpsc;
 
-use crate::event::Event;
+use crate::event::{Event, EventArray};
 
 #[derive(Clone, Debug)]
 pub struct ClosedError;
@@ -17,6 +17,12 @@ impl std::error::Error for ClosedError {}
 
 impl From<mpsc::error::SendError<Event>> for ClosedError {
     fn from(_: mpsc::error::SendError<Event>) -> Self {
+        Self
+    }
+}
+
+impl From<mpsc::error::SendError<EventArray>> for ClosedError {
+    fn from(_: mpsc::error::SendError<EventArray>) -> Self {
         Self
     }
 }

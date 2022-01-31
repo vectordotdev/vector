@@ -7,10 +7,10 @@ use futures::{
 use pin_project::pin_project;
 use tokio::sync::mpsc;
 #[cfg(test)]
-use vector_core::event::EventStatus;
+use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
     config::Output,
-    event::Event,
+    event::{Event, EventArray},
     internal_event::{EventsSent, DEFAULT_OUTPUT},
     ByteSizeOf,
 };
@@ -39,7 +39,7 @@ impl Builder {
         }
     }
 
-    pub fn add_output(&mut self, output: Output) -> ReceiverStream<Event> {
+    pub fn add_output(&mut self, output: Output) -> ReceiverStream<EventArray> {
         match output.port {
             None => {
                 let (inner, rx) = Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned());
@@ -79,7 +79,7 @@ impl SourceSender {
         }
     }
 
-    pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
+    pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<EventArray>) {
         let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned());
         (
             Self {
@@ -91,8 +91,10 @@ impl SourceSender {
     }
 
     #[cfg(test)]
-    pub fn new_test() -> (Self, ReceiverStream<Event>) {
-        Self::new_with_buffer(100)
+    pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(100);
+        let recv = recv.flat_map(into_event_stream);
+        (pipe, recv)
     }
 
     #[cfg(test)]
@@ -101,11 +103,13 @@ impl SourceSender {
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
-        let recv = recv.map(move |mut event| {
-            let metadata = event.metadata_mut();
-            metadata.update_status(status);
-            metadata.update_sources();
-            event
+        let recv = recv.flat_map(move |mut events| {
+            events.for_each_event(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(status);
+                metadata.update_sources();
+            });
+            into_event_stream(events)
         });
         (pipe, recv)
     }
@@ -115,13 +119,15 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = Event> + Unpin {
+    ) -> impl Stream<Item = EventArray> + Unpin {
         let (inner, recv) = Inner::new_with_buffer(100, name.clone());
-        let recv = recv.map(move |mut event| {
-            let metadata = event.metadata_mut();
-            metadata.update_status(status);
-            metadata.update_sources();
-            event
+        let recv = recv.map(move |mut events| {
+            events.for_each_event(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(status);
+                metadata.update_sources();
+            });
+            events
         });
         self.named_inners.insert(name, inner);
         recv
@@ -182,12 +188,12 @@ impl SourceSender {
 
 #[derive(Debug, Clone)]
 struct Inner {
-    inner: mpsc::Sender<Event>,
+    inner: mpsc::Sender<EventArray>,
     output: String,
 }
 
 impl Inner {
-    fn new_with_buffer(n: usize, output: String) -> (Self, ReceiverStream<Event>) {
+    fn new_with_buffer(n: usize, output: String) -> (Self, ReceiverStream<EventArray>) {
         let (tx, rx) = mpsc::channel(n);
         let rx = tokio_stream::wrappers::ReceiverStream::new(rx);
         (Self { inner: tx, output }, ReceiverStream::new(rx))
@@ -195,7 +201,7 @@ impl Inner {
 
     async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
         let byte_size = event.size_of();
-        self.inner.send(event).await?;
+        self.inner.send(EventArray::from(event)).await?;
         emit!(&EventsSent {
             count: 1,
             byte_size,
@@ -226,7 +232,8 @@ impl Inner {
 
         for event in events.into_iter() {
             let event_size = event.size_of();
-            match self.inner.send(event.into()).await {
+            // FIXME: Merge the events into an array if possible
+            match self.inner.send(EventArray::from(event.into())).await {
                 Ok(()) => {
                     count += 1;
                     byte_size += event_size;
