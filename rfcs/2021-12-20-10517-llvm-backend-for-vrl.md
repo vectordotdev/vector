@@ -657,6 +657,8 @@ code produces the expected result. This covers edge cases specific to each
 expression.
 
 Behavior tests: Make sure that the existing test corpus living in
+[`lib/vrl/tests/tests`](https://github.com/vectordotdev/vector/blob/master/lib/vrl/tests/tests)
+and
 [`tests/behavior/transforms/remap.toml`](https://github.com/vectordotdev/vector/blob/master/tests/behavior/transforms/remap.toml)
 passes when using the LLVM based execution engine.
 
