@@ -238,10 +238,13 @@ pub enum Expr {
 
 impl<'a> Arbitrary<'a> for Expr {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Expr::Literal(Node::new(
-            Span::default(),
-            Literal::arbitrary(u)?,
-        )))
+        match u8::arbitrary(u)? % 2 {
+            0 => Ok(Expr::Literal(Node::new(
+                Span::default(),
+                Literal::arbitrary(u)?,
+            ))),
+            _ => Ok(Expr::Op(Node::new(Span::default(), Op::arbitrary(u)?))),
+        }
     }
 }
 
@@ -348,7 +351,7 @@ impl<'a> Arbitrary<'a> for Literal {
         let choice = usize::arbitrary(u)? % 3;
         Ok(match choice {
             0 => Literal::String(String::arbitrary(u)?),
-            1 => Literal::Integer(i64::arbitrary(u)?),
+            1 => Literal::Integer(i64::arbitrary(u)? % 100),
             _ => Literal::Boolean(bool::arbitrary(u)?),
         })
     }
@@ -678,6 +681,20 @@ impl fmt::Debug for Predicate {
 #[derive(Clone, PartialEq)]
 pub struct Op(pub Box<Node<Expr>>, pub Node<Opcode>, pub Box<Node<Expr>>);
 
+impl<'a> Arbitrary<'a> for Op {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let left = Expr::arbitrary(u)?;
+        let right = Expr::arbitrary(u)?;
+        let opcode = Opcode::arbitrary(u)?;
+
+        Ok(Op(
+            Box::new(Node::new(Span::default(), left)),
+            Node::new(Span::default(), opcode),
+            Box::new(Node::new(Span::default(), right)),
+        ))
+    }
+}
+
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {} {}", self.0, self.1, self.2)
@@ -690,7 +707,7 @@ impl fmt::Debug for Op {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Arbitrary, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Opcode {
     Mul,
     Div,
