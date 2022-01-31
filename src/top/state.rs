@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use tokio::sync::mpsc;
+use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;
 
@@ -62,6 +63,15 @@ pub struct ComponentRow {
     pub sent_events_total: i64,
     pub sent_events_throughput_sec: i64,
     pub errors: i64,
+}
+
+impl ComponentRow {
+    /// Note, we ignore `outputs` if it only contains [`DEFAULT_OUTPUT`] to avoid
+    /// redundancy with information shown in the overall component row
+    pub fn has_displayable_outputs(&self) -> bool {
+        self.outputs.len() > 1
+            || (self.outputs.len() == 1 && !self.outputs.contains_key(DEFAULT_OUTPUT))
+    }
 }
 
 /// Takes the receiver `EventRx` channel, and returns a `StateTx` state transmitter. This

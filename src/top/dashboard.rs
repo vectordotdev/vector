@@ -18,7 +18,6 @@ use tui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
-use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{events::capture_key_press, state};
 
@@ -170,7 +169,10 @@ impl<'a> Widgets<'a> {
         for (_, r) in state.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
-                "".to_string(),
+                (!r.has_displayable_outputs())
+                    .then(|| "--")
+                    .unwrap_or_default()
+                    .to_string(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];
@@ -201,9 +203,8 @@ impl<'a> Widgets<'a> {
             data.extend_from_slice(&formatted_metrics);
             items.push(Row::new(data).style(Style::default()));
 
-            // Add output rows. Note, we ignore outputs if it only contains
-            // [`DEFAULT_OUTPUT`] to avoid redundancy
-            if !(r.outputs.len() == 1 && r.outputs.contains_key(DEFAULT_OUTPUT)) {
+            // Add output rows
+            if r.has_displayable_outputs() {
                 for (id, output) in r.outputs.iter() {
                     let sent_events_metric = format_metric(
                         output.sent_events_total,
