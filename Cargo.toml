@@ -23,7 +23,7 @@ split-debuginfo = "unpacked" # Faster debug builds on macOS
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
 [profile.release]
-debug = false # Do not include debug symbols in the executable.
+debug = true # Do not include debug symbols in the executable.
 
 [profile.bench]
 debug = true
@@ -290,8 +290,11 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.26", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
+thingbuf = { git = "https://github.com/hawkw/thingbuf", default-features = false, features = ["std"], optional = true }
 tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+#tracking-allocator = { git = "https://github.com/tobz/tracking-allocator", branch = "tobz/tracing-subscriber-v0.3", default-features = false, features = ["tracing-compat"], optional = true }
+tracking-allocator = { path = "../tracking-allocator", default-features = false, features = ["tracing-compat"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
@@ -391,7 +394,8 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator"]
+allocation_tracking = ["tikv-jemallocator", "tracking-allocator", "thingbuf"]
+unix = ["tikv-jemallocator", "allocation_tracking"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]

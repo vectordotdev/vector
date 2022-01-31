@@ -7226,6 +7226,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0066c8d12af8b5acd21e00547c3797fde4e8677254a7ee429176ccebbe93dd80"
 
 [[package]]
+name = "thingbuf"
+version = "0.1.0"
+source = "git+https://github.com/hawkw/thingbuf#c444e50b8d2ca98745ae451100a4b01f84d054d5"
+dependencies = [
+ "parking_lot",
+ "pin-project 1.0.10",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7792,6 +7801,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracking-allocator"
+version = "0.1.2"
+dependencies = [
+ "tracing 0.1.29",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "trust-dns-proto"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8293,6 +8310,7 @@ dependencies = [
  "syslog",
  "syslog_loose",
  "tempfile",
+ "thingbuf",
  "tikv-jemallocator",
  "tokio",
  "tokio-openssl",
@@ -8313,6 +8331,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
+ "tracking-allocator",
  "trust-dns-proto",
  "tui",
  "twox-hash",

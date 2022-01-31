@@ -53,6 +53,9 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let subscriber = tracing_subscriber::registry::Registry::default()
         .with(tracing_subscriber::filter::EnvFilter::from(levels));
 
+    #[cfg(feature = "allocation_tracking")]
+    let subscriber = subscriber.with(tracking_allocator::AllocationLayer::new());
+
     // dev note: we attempted to refactor to reduce duplication but it was starting to seem like
     // the refactored code would be introducing more complexity than it was worth to remove this
     // bit of duplication as we started to create a generic struct to wrap the formatters that also

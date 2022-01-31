@@ -522,6 +522,18 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        #[cfg(feature = "allocation_tracking")]
+        {
+            let tags = &[
+                ("component_kind", "sink".to_string()),
+                ("component_id", task.id().to_string()),
+            ];
+            let allocation_token =
+                tracking_allocator::AllocationGroupToken::acquire_with_tags(tags);
+            allocation_token.attach_to_span(&span);
+        }
+
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
@@ -539,6 +551,18 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        #[cfg(feature = "allocation_tracking")]
+        {
+            let tags = &[
+                ("component_kind", "transform".to_string()),
+                ("component_id", task.id().to_string()),
+            ];
+            let allocation_token =
+                tracking_allocator::AllocationGroupToken::acquire_with_tags(tags);
+            allocation_token.attach_to_span(&span);
+        }
+
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
@@ -556,6 +580,18 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
+
+        #[cfg(feature = "allocation_tracking")]
+        {
+            let tags = &[
+                ("component_kind", "source".to_string()),
+                ("component_id", task.id().to_string()),
+            ];
+            let allocation_token =
+                tracking_allocator::AllocationGroupToken::acquire_with_tags(tags);
+            allocation_token.attach_to_span(&span);
+        }
+
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
