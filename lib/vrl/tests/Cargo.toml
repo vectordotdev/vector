@@ -27,5 +27,5 @@ tracing-subscriber = { version = "0.3.7", default-features = false, features = [
 tikv-jemallocator = { version = "0.4.1" }
 
 [features]
-default = [ "vrl-vm" ]
+default = []
 vrl-vm = []
