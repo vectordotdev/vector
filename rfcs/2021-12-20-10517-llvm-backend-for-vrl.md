@@ -679,6 +679,17 @@ fringe edge cases that only occur when specific expressions interact with each
 other. We can use the existing execution modes to cross-validate for
 correctness.
 
+Manual review: While static analysis tools and automated tests prevent a certain
+class of bugs, there's still many logic errors that can occur in `unsafe` code
+which can lead to memory corruption when invariants are violated. For one
+measure, we can save LLVM IR in textual form in
+[`lib/vrl/tests/tests/expressions`](https://github.com/vectordotdev/vector/blob/master/lib/vrl/tests/tests/expressions)
+such that manual verification of generated code can be incorporated into the
+pull review process. We might also add review guidelines that e.g. require
+adding a label `unsafe` to the pull request (ideally this can be automated), and
+requests reviewers to explicitly acknowledge that they have reviewed the unsafe
+blocks in question.
+
 ## Rationale
 
 As long as the single-core performance of VRL is the bottleneck of a topology,
