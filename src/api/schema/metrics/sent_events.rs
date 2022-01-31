@@ -6,6 +6,8 @@ use crate::{
     event::{Metric, MetricValue},
 };
 
+use super::{Output, OutputThroughput};
+
 pub struct SentEventsTotal(Metric);
 
 impl SentEventsTotal {
@@ -46,20 +48,29 @@ impl From<Metric> for SentEventsTotal {
 
 pub struct ComponentSentEventsTotal {
     component_key: ComponentKey,
+    outputs: Vec<Output>,
     metric: Metric,
 }
 
 impl ComponentSentEventsTotal {
     /// Returns a new `ComponentSentEventsTotal` struct, which is a GraphQL type. The
     /// component id is hoisted for clear field resolution in the resulting payload.
-    pub fn new(metric: Metric) -> Self {
+    pub fn new(metric: Metric, metric_by_outputs: Vec<Metric>) -> Self {
         let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
         let component_key = ComponentKey::from(component_key);
+        let outputs = metric_by_outputs
+            .iter()
+            .filter_map(|m| {
+                m.tag_value("output")
+                    .map(|output_name| Output::new(output_name, Some(m.clone())))
+            })
+            .collect::<Vec<_>>();
 
         Self {
             component_key,
+            outputs,
             metric,
         }
     }
@@ -76,19 +87,30 @@ impl ComponentSentEventsTotal {
     async fn metric(&self) -> SentEventsTotal {
         SentEventsTotal::new(self.metric.clone())
     }
+
+    /// Output streams with outgoing events metrics
+    async fn outputs(&self) -> &Vec<Output> {
+        &self.outputs
+    }
 }
 
 pub struct ComponentSentEventsThroughput {
     component_key: ComponentKey,
     throughput: i64,
+    outputs: Vec<OutputThroughput>,
 }
 
 impl ComponentSentEventsThroughput {
     /// Returns a new `ComponentSentEventsThroughput`, set to the provided id/throughput values
-    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
+    pub const fn new(
+        component_key: ComponentKey,
+        throughput: i64,
+        outputs: Vec<OutputThroughput>,
+    ) -> Self {
         Self {
             component_key,
             throughput,
+            outputs,
         }
     }
 }
@@ -100,8 +122,13 @@ impl ComponentSentEventsThroughput {
         self.component_key.id()
     }
 
-    /// Events processed throughput
+    /// Total events processed throughput
     async fn throughput(&self) -> i64 {
         self.throughput
+    }
+
+    /// Output streams with throughputs
+    async fn outputs(&self) -> &Vec<OutputThroughput> {
+        &self.outputs
     }
 }
