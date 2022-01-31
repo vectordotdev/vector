@@ -6,8 +6,8 @@ use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
-use vector_common::btreemap;
 use tracing::warn;
+use vector_common::btreemap;
 use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
