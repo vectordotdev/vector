@@ -2,7 +2,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 use futures_util::stream;
 use serde_json::Value as JsonValue;
-use shared::btreemap;
+use vector_common::btreemap;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
 
 use super::config::HecMetricsSinkConfig;

@@ -2,7 +2,7 @@ use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl_compiler::{Target, Value};
 
 use crate::{

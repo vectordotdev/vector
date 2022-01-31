@@ -2,7 +2,7 @@ use std::{error::Error, fmt};
 
 use compiler::ExpressionError;
 use lookup::LookupBuf;
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{state, Context, Program, Target, Value};
 
