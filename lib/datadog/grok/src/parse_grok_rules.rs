@@ -6,7 +6,7 @@ use crate::{
     parse_grok_pattern::parse_grok_pattern,
 };
 use lookup::LookupBuf;
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -14,7 +14,7 @@ use std::{
 use tracing::error;
 use vrl_compiler::Value;
 
-const GROK_PATTERN_RE: Lazy<onig::Regex> =
+static GROK_PATTERN_RE: Lazy<onig::Regex> =
     Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());
 
 /// The result of parsing a grok rule with a final regular expression and the

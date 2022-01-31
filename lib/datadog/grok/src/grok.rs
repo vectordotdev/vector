@@ -1,14 +1,17 @@
 // This file modified from
 // https://github.com/daschl/grok/blob/1c958207c7e60a776752f1343f82c25c3c704a34/src/lib.rs
 // under the terms of the Apache 2.0 license.
+//
+// There isn't a whole lot going on here. The underlying regex engine must have
+// backtracking and look-ahead and what _this_ bit of code does is include the
+// ability to 'alias' named capture groups, import some default patterns.
 
 include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
 
 use onig::{Captures, Regex};
 use std::collections::{btree_map, BTreeMap};
-use std::error::Error as StdError;
-use std::fmt;
 use std::sync::Arc;
+use thiserror::Error;
 
 const MAX_RECURSION: usize = 1024;
 
@@ -50,7 +53,7 @@ pub struct MatchesIter<'a> {
 impl<'a> Iterator for MatchesIter<'a> {
     type Item = (&'a str, &'a str);
 
-    // returns the name of the match group, the value matched
+    // Returns the name of the match group, the value matched.
     fn next(&mut self) -> Option<Self::Item> {
         // Okay, here's the trick. We allow the user to pass in an 'alias'. An
         // alias is a different name for the capture group name and one capture
@@ -69,6 +72,10 @@ impl<'a> Iterator for MatchesIter<'a> {
 /// The `Pattern` represents a compiled regex, ready to be matched against arbitrary text.
 #[derive(Clone, Debug)]
 pub struct Pattern {
+    // NOTE this Arc exists solely to satisfy Clone and provide a Sync + Send
+    // constraint for calling code in VRL. Theoretically we could remove this
+    // entirely and have it be the responsibilty of the caller to provide for
+    // Clone + Sync + Send.
     regex: Arc<Regex>,
     names: BTreeMap<String, usize>,
 }
@@ -146,7 +153,7 @@ impl Grok {
         while continue_iteration {
             continue_iteration = false;
             if iteration_left == 0 {
-                return Err(Error::RecursionTooDeep);
+                return Err(Error::RecursionTooDeep(MAX_RECURSION));
             }
             iteration_left -= 1;
 
@@ -227,67 +234,22 @@ impl Grok {
 }
 
 /// An error that occurred when using this library.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Error, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
     /// The recursion while compiling has exhausted the limit.
-    RecursionTooDeep,
+    #[error("Recursion while compiling reached the limit of {0}")]
+    RecursionTooDeep(usize),
     /// After compiling, the resulting compiled regex pattern is empty.
+    #[error("The given pattern \"{0}\" ended up compiling into an empty regex")]
     CompiledPatternIsEmpty(String),
     /// A corresponding pattern definition could not be found for the given name.
+    #[error("The given pattern definition name \"{0}\" could not be found in the definition map")]
     DefinitionNotFound(String),
     /// If the compilation for a specific regex in the underlying engine failed.
+    #[error("The given regex \"{0}\" failed compilation in the underlying engine")]
     RegexCompilationFailed(String),
     /// Something is messed up during the compilation phase.
+    #[error("Something unexpected happened during the compilation phase: \"{0}\"")]
     GenericCompilationFailure(String),
-}
-
-impl StdError for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::RecursionTooDeep => "compilation recursion reached the limit",
-            Error::CompiledPatternIsEmpty(_) => "compiled pattern is empty",
-            Error::DefinitionNotFound(_) => "pattern definition not found while compiling",
-            Error::RegexCompilationFailed(_) => "regex compilation in the engine failed",
-            Error::GenericCompilationFailure(_) => {
-                "something happened during the compilation phase"
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn StdError> {
-        None
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::RecursionTooDeep => write!(
-                f,
-                "Recursion while compiling reached the limit of {}",
-                MAX_RECURSION
-            ),
-            Error::CompiledPatternIsEmpty(ref p) => write!(
-                f,
-                "The given pattern \"{}\" ended up compiling into an empty regex",
-                p
-            ),
-            Error::DefinitionNotFound(ref d) => write!(
-                f,
-                "The given pattern definition name \"{}\" could not be found in the definition map",
-                d
-            ),
-            Error::RegexCompilationFailed(ref r) => write!(
-                f,
-                "The given regex \"{}\" failed compilation in the underlying engine",
-                r
-            ),
-            Error::GenericCompilationFailure(ref d) => write!(
-                f,
-                "Something unexpected happened during the compilation phase: \"{}\"",
-                d
-            ),
-        }
-    }
 }
