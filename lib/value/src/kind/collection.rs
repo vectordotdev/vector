@@ -73,7 +73,7 @@ impl<T: Ord> Collection<T> {
     /// This returns `false` if at least _one_ field kind is known.
     #[must_use]
     pub fn is_any(&self) -> bool {
-        self.known.values().all(|kind| kind.is_any())
+        self.known.values().all(Kind::is_any)
             && self.unknown.as_ref().map_or(false, Unknown::is_any)
     }
 
