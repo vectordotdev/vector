@@ -29,7 +29,7 @@ impl<'a> VmState<'a> {
     /// Returns an error if the current position is not an OpCode.
     /// This error should never occur for a correctly compiled program!
     pub(super) fn next_opcode(&mut self) -> Result<OpCode, ExpressionError> {
-        let byte = self.vm.instructions[self.instruction_pointer];
+        let byte = self.vm.instructions()[self.instruction_pointer];
         self.instruction_pointer += 1;
         match byte {
             Instruction::OpCode(opcode) => Ok(opcode),
@@ -41,7 +41,7 @@ impl<'a> VmState<'a> {
     /// Returns an error if the current position is not a primitve value.
     /// This error should never occur for a correctly compiled program!
     pub(super) fn next_primitive(&mut self) -> Result<usize, ExpressionError> {
-        let byte = self.vm.instructions[self.instruction_pointer];
+        let byte = self.vm.instructions()[self.instruction_pointer];
         self.instruction_pointer += 1;
         match byte {
             Instruction::Primitive(primitive) => Ok(primitive),
@@ -78,6 +78,6 @@ impl<'a> VmState<'a> {
 
     pub(super) fn read_constant(&mut self) -> Result<Value, ExpressionError> {
         let idx = self.next_primitive()?;
-        Ok(self.vm.values[idx].clone())
+        Ok(self.vm.values()[idx].clone())
     }
 }

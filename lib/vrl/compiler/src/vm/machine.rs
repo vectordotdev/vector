@@ -138,8 +138,8 @@ pub enum Instruction {
 #[derive(Debug, Default)]
 pub struct Vm {
     fns: Vec<Box<dyn Function>>,
-    pub(super) instructions: Vec<Instruction>,
-    pub(super) values: Vec<Value>,
+    instructions: Vec<Instruction>,
+    values: Vec<Value>,
     targets: Vec<Variable>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
 }
@@ -161,8 +161,12 @@ impl Vm {
         self.instructions.push(Instruction::OpCode(code));
     }
 
-    pub fn instructions(&self) -> &Vec<Instruction> {
-        &self.instructions
+    pub fn instructions(&self) -> &[Instruction] {
+        self.instructions.as_ref()
+    }
+
+    pub fn values(&self) -> &[Value] {
+        self.values.as_ref()
     }
 
     pub fn write_primitive(&mut self, code: usize) {
