@@ -27,14 +27,12 @@ impl Ewma {
 }
 
 /// Exponentially Weighted Moving Average that starts with a default average value
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub struct EwmaDefault {
     average: f64,
     alpha: f64,
 }
 
-#[allow(dead_code)]
 impl EwmaDefault {
     pub const fn new(alpha: f64, initial_value: f64) -> Self {
         Self {
