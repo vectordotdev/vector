@@ -65,8 +65,15 @@ async fn run(
         .chain(tokio_stream::wrappers::BroadcastStream::new(
             subscription.receiver,
         ))
-        .filter_map(|log| future::ready(log.ok()))
-        .filter(|log| future::ready(!log.contains("internal")))
+        .filter_map(|log| {
+            future::ready(log.ok().and_then(|l| {
+                if l.contains("internal") {
+                    None
+                } else {
+                    Some(l)
+                }
+            }))
+        })
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
