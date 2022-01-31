@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use super::{Collection, Kind};
 
 impl Kind {
-    /// Merge `other` into `self`, using the provided `MergeStrategy`.
+    /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
         self.bytes = self.bytes.or(other.bytes);
         self.integer = self.integer.or(other.integer);
@@ -82,13 +82,13 @@ pub enum Depth {
 impl Depth {
     /// Check if `shallow` strategy is enabled.
     #[must_use]
-    pub fn is_shallow(self) -> bool {
+    pub const fn is_shallow(self) -> bool {
         matches!(self, Self::Shallow)
     }
 
     /// Check if `deep` strategy is enabled.
     #[must_use]
-    pub fn is_deep(self) -> bool {
+    pub const fn is_deep(self) -> bool {
         matches!(self, Self::Deep)
     }
 }
@@ -111,13 +111,13 @@ pub enum Indices {
 impl Indices {
     /// Check if `keep` strategy is enabled.
     #[must_use]
-    pub fn is_keep(self) -> bool {
+    pub const fn is_keep(self) -> bool {
         matches!(self, Self::Keep)
     }
 
     /// Check if `append` strategy is enabled.
     #[must_use]
-    pub fn is_append(self) -> bool {
+    pub const fn is_append(self) -> bool {
         matches!(self, Self::Append)
     }
 }

@@ -5,7 +5,7 @@ impl Kind {
     ///
     /// This returns `None` if the type is not known to be an object.
     #[must_use]
-    pub fn as_object(&self) -> Option<&Collection<Field>> {
+    pub const fn as_object(&self) -> Option<&Collection<Field>> {
         self.object.as_ref()
     }
 
@@ -21,6 +21,7 @@ impl Kind {
     ///
     /// This returns `None` if the type is not known to be an object.
     #[must_use]
+    #[allow(clippy::missing_const_for_fn /* false positive */)]
     pub fn into_object(self) -> Option<Collection<Field>> {
         self.object
     }
@@ -29,7 +30,7 @@ impl Kind {
     ///
     /// This returns `None` if the type is not known to be an array.
     #[must_use]
-    pub fn as_array(&self) -> Option<&Collection<Index>> {
+    pub const fn as_array(&self) -> Option<&Collection<Index>> {
         self.array.as_ref()
     }
 
@@ -45,6 +46,7 @@ impl Kind {
     ///
     /// This returns `None` if the type is not known to be an array.
     #[must_use]
+    #[allow(clippy::missing_const_for_fn /* false positive */)]
     pub fn into_array(self) -> Option<Collection<Index>> {
         self.array
     }
@@ -65,13 +67,13 @@ impl Kind {
 
 impl From<Collection<Field>> for Kind {
     fn from(collection: Collection<Field>) -> Self {
-        Kind::object(collection)
+        Self::object(collection)
     }
 }
 
 impl From<Collection<Index>> for Kind {
     fn from(collection: Collection<Index>) -> Self {
-        Kind::array(collection)
+        Self::array(collection)
     }
 }
 

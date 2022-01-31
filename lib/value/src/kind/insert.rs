@@ -328,12 +328,12 @@ impl Kind {
                         InnerConflict::Replace => {
                             let index = usize::try_from(*index).map_err(|_| Error::InvalidIndex)?;
 
-                            *self_kind = Kind::array(BTreeMap::from([(
+                            *self_kind = Self::array(BTreeMap::from([(
                                 index.into(),
                                 create_inner_element(iter.peek()),
                             )]));
 
-                            *self_kind = Kind::array(BTreeMap::default());
+                            *self_kind = Self::array(BTreeMap::default());
                             get_inner_array(self_kind, index)
                         }
                         InnerConflict::Reject => return Err(Error::InnerConflict),

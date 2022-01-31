@@ -28,7 +28,7 @@ pub struct Exact {
 }
 
 impl Exact {
-    pub fn json() -> Self {
+    pub const fn json() -> Self {
         Self {
             bytes: true,
             integer: true,
@@ -46,39 +46,39 @@ impl Exact {
     ///
     /// Meaning, if `other` has a type set to `true`, then `self` needs to as well.
     pub fn is_superset(&self, other: &Self) -> bool {
-        if let (false, true) = (self.bytes, other.bytes) {
+        if (false, true) == (self.bytes, other.bytes) {
             return false;
         }
 
-        if let (false, true) = (self.integer, other.integer) {
+        if (false, true) == (self.integer, other.integer) {
             return false;
         }
 
-        if let (false, true) = (self.float, other.float) {
+        if (false, true) == (self.float, other.float) {
             return false;
         }
 
-        if let (false, true) = (self.boolean, other.boolean) {
+        if (false, true) == (self.boolean, other.boolean) {
             return false;
         }
 
-        if let (false, true) = (self.timestamp, other.timestamp) {
+        if (false, true) == (self.timestamp, other.timestamp) {
             return false;
         }
 
-        if let (false, true) = (self.regex, other.regex) {
+        if (false, true) == (self.regex, other.regex) {
             return false;
         }
 
-        if let (false, true) = (self.null, other.null) {
+        if (false, true) == (self.null, other.null) {
             return false;
         }
 
-        if let (false, true) = (self.object, other.object) {
+        if (false, true) == (self.object, other.object) {
             return false;
         }
 
-        if let (false, true) = (self.array, other.array) {
+        if (false, true) == (self.array, other.array) {
             return false;
         }
 
@@ -142,7 +142,7 @@ impl BitAnd for Exact {
 
 impl From<Exact> for Kind {
     fn from(exact: Exact) -> Self {
-        let mut kind = Kind::empty();
+        let mut kind = Self::empty();
 
         if exact.bytes {
             kind.add_bytes();

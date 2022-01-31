@@ -21,7 +21,12 @@
     rustdoc::private_intra_doc_links,
     unused
 )]
-#![allow(clippy::cargo_common_metadata, unreachable_code, unused_variables)]
+#![allow(
+    clippy::cargo_common_metadata,
+    clippy::single_match_else,
+    unreachable_code,
+    unused_variables
+)]
 
 pub mod kind;
 
