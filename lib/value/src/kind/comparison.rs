@@ -367,6 +367,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
+    use crate::kind::Collection;
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -397,9 +398,23 @@ mod tests {
             (
                 "any-like",
                 TestCase {
-                    this: Kind::any().or_object(BTreeMap::from([("foo".into(), Kind::any())])),
+                    this: Kind::any().or_object(Collection::from_parts(
+                        BTreeMap::from([("foo".into(), Kind::any())]),
+                        Kind::any(),
+                    )),
                     other: Kind::any(),
                     want: true,
+                },
+            ),
+            (
+                "no unknown vs unknown fields",
+                TestCase {
+                    // The object we create here has no "unknown" fields, e.g. it's a "closed"
+                    // object. The `other` object _does_ have unknown field types, and thus `this`
+                    // cannot be a superset of `other`.
+                    this: Kind::any().or_object(BTreeMap::from([("foo".into(), Kind::any())])),
+                    other: Kind::any(),
+                    want: false,
                 },
             ),
             (

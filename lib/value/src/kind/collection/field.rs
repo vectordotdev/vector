@@ -1,5 +1,5 @@
 /// A `field` type that can be used in `Collection<Field>`
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Field(lookup::FieldBuf);
 
 impl Field {

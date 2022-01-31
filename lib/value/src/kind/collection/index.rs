@@ -1,5 +1,5 @@
 /// An `index` type that can be used in `Collection<Index>`
-#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Index(usize);
 
 impl From<usize> for Index {
@@ -26,7 +26,7 @@ impl From<&Index> for usize {
     }
 }
 
-impl<T: Into<Index>> std::ops::Add<T> for Index {
+impl<T: Into<Self>> std::ops::Add<T> for Index {
     type Output = Self;
 
     fn add(self, other: T) -> Self {
@@ -34,7 +34,7 @@ impl<T: Into<Index>> std::ops::Add<T> for Index {
     }
 }
 
-impl<T: Into<Index>> std::ops::Sub<T> for Index {
+impl<T: Into<Self>> std::ops::Sub<T> for Index {
     type Output = Self;
 
     fn sub(self, other: T) -> Self {

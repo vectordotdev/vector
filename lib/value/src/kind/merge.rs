@@ -141,9 +141,8 @@ impl std::ops::BitOr for Kind {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::kind::Collection;
-
     use super::*;
+    use crate::kind::Collection;
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -192,27 +191,27 @@ mod tests {
             (
                 "mixed unknown shallow",
                 TestCase {
-                    this: Kind::bytes().or_object(Collection::unknown(Kind::integer())),
-                    other: Kind::bytes().or_object(Collection::unknown(Kind::bytes())),
+                    this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
+                    other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         depth: Depth::Shallow,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
-                        .or_object(Collection::unknown(Kind::integer().or_bytes())),
+                        .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
                 },
             ),
             (
                 "mixed unknown deep",
                 TestCase {
-                    this: Kind::bytes().or_object(Collection::unknown(Kind::integer())),
-                    other: Kind::bytes().or_object(Collection::unknown(Kind::bytes())),
+                    this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
+                    other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         depth: Depth::Deep,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
-                        .or_object(Collection::unknown(Kind::integer().or_bytes())),
+                        .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
                 },
             ),
             (

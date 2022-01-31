@@ -18,11 +18,6 @@ pub struct Exact {
     pub(super) timestamp: bool,
     pub(super) regex: bool,
     pub(super) null: bool,
-
-    // We don't need to support nested objects, because `Exact` is only used for "unknown" fields.
-    // So it only applies to a single level. If we wanted to set a nested field, we would have
-    // a "known" field (e.g. `foo`) and then have that contain either `Unknown::Any` or
-    // `Unknown::Exact`.
     pub(super) object: bool,
     pub(super) array: bool,
 }
