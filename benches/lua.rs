@@ -185,7 +185,7 @@ fn bench_field_filter(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = bench_add_fields, bench_field_filter
 );

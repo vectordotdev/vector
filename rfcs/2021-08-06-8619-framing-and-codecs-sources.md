@@ -29,7 +29,7 @@ framing and decoding, such that each source may implement these in their own
 way. This has led to inconsistencies in available options and poses additional
 maintenance burden. Components have their own defaults, making
 behavior unpredictable and surprising users, e.g. as documented in
-[#3453](https://github.com/timberio/vector/issues/3453).
+[#3453](https://github.com/vectordotdev/vector/issues/3453).
 
 ## Internal Proposal
 
@@ -145,8 +145,8 @@ to the config.
 
 Introducing framing/decoding, a source's implementation may also be reused
 internally. One example would be the `syslog` source (see
-[#7046](https://github.com/timberio/vector/pull/7046)), or the upcoming `syslog`
-sink in [#7106](https://github.com/timberio/vector/issues/7106). Instead of
+[#7046](https://github.com/vectordotdev/vector/pull/7046)), or the upcoming `syslog`
+sink in [#7106](https://github.com/vectordotdev/vector/issues/7106). Instead of
 re-implementing socket-based connection handling, the `syslog` components could
 be replaced by the `socket` counterparts combined with `octet-framing`. This
 reduces a possible source of bugs and inconsistencies and therefore leads to

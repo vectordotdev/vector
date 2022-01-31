@@ -76,7 +76,7 @@ impl Kind {
     /// self.as_str())` here as that incurs an allocation cost and the `Display`
     /// of `Kind` is sometimes in the hot path.
     ///
-    /// See https://github.com/timberio/vector/pull/6878 for details.
+    /// See https://github.com/vectordotdev/vector/pull/6878 for details.
     pub(crate) fn quoted(self) -> &'static str {
         match self {
             Kind::Bytes => "\"string\"",

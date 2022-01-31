@@ -560,7 +560,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // https://github.com/timberio/vector/issues/3096
+    // https://github.com/vectordotdev/vector/issues/3096
     async fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
         let log = do_transform(
             "match1234 235.42 true",

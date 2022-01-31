@@ -1679,7 +1679,7 @@ mod tests {
     /// This test will fail once `warp` crate fixes support for
     /// custom connection listener, at that point this test can be
     /// modified to pass.
-    /// https://github.com/timberio/vector/issues/7097
+    /// https://github.com/vectordotdev/vector/issues/7097
     /// https://github.com/seanmonstar/warp/issues/830
     /// https://github.com/seanmonstar/warp/pull/713
     #[tokio::test]

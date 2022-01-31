@@ -67,7 +67,7 @@ impl FunctionTransform for Cri {
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Remove possible new_line tag
-    // for additional details, see https://github.com/timberio/vector/issues/8606
+    // for additional details, see https://github.com/vectordotdev/vector/issues/8606
     let _ = log.remove(NEW_LINE_TAG);
     // Detect if this is a partial event.
     let multiline_tag = log
