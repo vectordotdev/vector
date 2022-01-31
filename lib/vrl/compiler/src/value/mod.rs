@@ -5,7 +5,7 @@ pub mod kind;
 mod r#macro;
 // mod path;
 mod regex;
-mod serde;
+// mod serde;
 mod target;
 
 use std::{collections::BTreeMap, fmt};

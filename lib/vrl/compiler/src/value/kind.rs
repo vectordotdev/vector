@@ -238,7 +238,7 @@ impl From<&Value> for Kind {
             Value::Integer(_) => Kind::Integer,
             Value::Float(_) => Kind::Float,
             Value::Boolean(_) => Kind::Boolean,
-            Value::Object(_) => Kind::Object,
+            Value::Map(_) => Kind::Object,
             Value::Array(_) => Kind::Array,
             Value::Timestamp(_) => Kind::Timestamp,
             Value::Regex(_) => Kind::Regex,

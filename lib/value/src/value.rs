@@ -1,6 +1,11 @@
+mod convert;
+mod target;
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lookup::{Field, FieldBuf, Look, Lookup, LookupBuf, Segment, SegmentBuf};
+use regex::Regex;
+use serde::de::SeqAccess;
 use serde::{Deserialize, Serialize, Serializer};
 use snafu::Snafu;
 use std::collections::BTreeMap;
@@ -12,6 +17,7 @@ use tracing::Instrument;
 
 // --- TODO LIST ----
 //TODO: VRL uses standard `PartialEq`, but Vector has odd f64 eq requirements
+//TODO: index insert behavior is different for negative vs positive. Negative fills in holes, Positive silently fails
 
 #[derive(Debug, Snafu)]
 pub enum ValueError {
@@ -39,8 +45,8 @@ impl From<lookup::LookupError> for ValueError {
     }
 }
 
-//TODO: does Deserialize even work here?
-#[derive(Clone, Debug, Deserialize, PartialOrd)]
+//TODO: What is PartialOrd used for?
+#[derive(Clone, Debug /*, PartialOrd*/)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -50,9 +56,7 @@ pub enum Value {
     Timestamp(DateTime<Utc>),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
-
-    // TODO: figure out how to make Regex work
-    // Regex(Regex),
+    Regex(Regex),
     Null,
 }
 
@@ -86,14 +90,10 @@ impl Value {
     }
 
     /// Returns self as a mutable `BTreeMap<String, Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Map`.
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
         match self {
-            Value::Map(ref mut m) => m,
-            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+            Value::Map(ref mut m) => Some(m),
+            _ => None,
         }
     }
 
@@ -483,7 +483,7 @@ impl Value {
             | (Some(segment), Value::Integer(_))
             | (Some(segment), Value::Null) => {
                 trace!("Encountered descent into a primitive.");
-                Err(EventError::PrimitiveDescent {
+                Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
                     original_target: {
                         let mut l = LookupBuf::from(segment);
@@ -547,7 +547,7 @@ impl Value {
             }
 
             inner.insert(working_lookup, value).map_err(|mut e| {
-                if let EventError::PrimitiveDescent {
+                if let ValueError::PrimitiveDescent {
                     original_target,
                     primitive_at,
                     original_value: _,
@@ -578,7 +578,7 @@ impl Value {
                 Some(SegmentBuf::Index(next_len)) => {
                     let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                        if let EventError::PrimitiveDescent {
+                        if let ValueError::PrimitiveDescent {
                             original_target,
                             primitive_at,
                             original_value: _,
@@ -780,155 +780,119 @@ impl Serialize for Value {
         S: Serializer,
     {
         match &self {
+            Value::Bytes(x) => serializer.serialize_str(String::from_utf8_lossy(x).as_ref()),
+            Value::Timestamp(timestamp) => {
+                serializer.serialize_str(&timestamp_to_string(timestamp))
+            }
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
+            // Regex(v) => serializer.serialize_str(&v.to_string()),
             Value::Null => serializer.serialize_none(),
         }
     }
 }
 
-impl From<f32> for Value {
-    fn from(value: f32) -> Self {
-        Value::Float(f64::from(value))
-    }
-}
+impl<'de> Deserialize<'de> for Value {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
 
-impl From<f64> for Value {
-    fn from(value: f64) -> Self {
-        Value::Float(value)
-    }
-}
+        impl<'de> Visitor<'de> for ValueVisitor {
+            type Value = Value;
 
-impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Value::Bytes(Vec::from(s.as_bytes()).into())
-    }
-}
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("any valid JSON value")
+            }
 
-impl From<DateTime<Utc>> for Value {
-    fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
-    }
-}
+            #[inline]
+            fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
+                Ok(value.into())
+            }
 
-impl From<Bytes> for Value {
-    fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
-    }
-}
+            #[inline]
+            fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
+                Ok(value.into())
+            }
 
-impl From<String> for Value {
-    fn from(string: String) -> Self {
-        Value::Bytes(string.into())
-    }
-}
+            #[inline]
+            fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
+                Ok((value as i64).into())
+            }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Map(value)
-    }
-}
+            #[inline]
+            fn visit_f64<E>(self, value: f64) -> Result<Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Value::try_from(value).map_err(|_| {
+                    serde::de::Error::invalid_value(serde::de::Unexpected::Float(value), &self)
+                })
+            }
 
-impl<T: Into<Value>> From<Option<T>> for Value {
-    fn from(value: Option<T>) -> Self {
-        match value {
-            None => Value::Null,
-            Some(v) => v.into(),
-        }
-    }
-}
+            #[inline]
+            fn visit_str<E>(self, value: &str) -> Result<Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Value::Bytes(Bytes::copy_from_slice(value.as_bytes())))
+            }
 
-macro_rules! impl_valuekind_from_integer {
-    ($t:ty) => {
-        impl From<$t> for Value {
-            fn from(value: $t) -> Self {
-                Value::Integer(value as i64)
+            #[inline]
+            fn visit_string<E>(self, value: String) -> Result<Value, E> {
+                Ok(Value::Bytes(value.into()))
+            }
+
+            #[inline]
+            fn visit_none<E>(self) -> Result<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_some<D>(self, deserializer: D) -> Result<Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                Deserialize::deserialize(deserializer)
+            }
+
+            #[inline]
+            fn visit_unit<E>(self) -> Result<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_seq<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(value) = visitor.next_element()? {
+                    vec.push(value);
+                }
+
+                Ok(Value::Array(vec))
+            }
+
+            fn visit_map<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut map = BTreeMap::new();
+                while let Some((key, value)) = visitor.next_entry()? {
+                    map.insert(key, value);
+                }
+
+                Ok(Value::Object(map))
             }
         }
-    };
-}
 
-impl_valuekind_from_integer!(i64);
-impl_valuekind_from_integer!(i32);
-impl_valuekind_from_integer!(i16);
-impl_valuekind_from_integer!(i8);
-impl_valuekind_from_integer!(u32);
-impl_valuekind_from_integer!(u16);
-impl_valuekind_from_integer!(u8);
-impl_valuekind_from_integer!(isize);
-
-impl From<bool> for Value {
-    fn from(value: bool) -> Self {
-        Value::Boolean(value)
-    }
-}
-
-impl<T: Into<Value>> From<Vec<T>> for Value {
-    fn from(set: Vec<T>) -> Self {
-        set.into_iter()
-            .map(::std::convert::Into::into)
-            .collect::<Self>()
-    }
-}
-
-impl FromIterator<Value> for Value {
-    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        Value::Array(iter.into_iter().collect::<Vec<Value>>())
-    }
-}
-
-impl FromIterator<(String, Value)> for Value {
-    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
-    }
-}
-
-impl From<serde_json::Value> for Value {
-    fn from(json_value: serde_json::Value) -> Self {
-        match json_value {
-            serde_json::Value::Bool(b) => Value::Boolean(b),
-            serde_json::Value::Number(n) => {
-                let float_or_byte = || {
-                    n.as_f64()
-                        .map_or_else(|| Value::Bytes(n.to_string().into()), Value::Float)
-                };
-                n.as_i64().map_or_else(float_or_byte, Value::Integer)
-            }
-            serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
-            serde_json::Value::Object(obj) => Value::Map(
-                obj.into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect(),
-            ),
-            serde_json::Value::Array(arr) => {
-                Value::Array(arr.into_iter().map(Value::from).collect())
-            }
-            serde_json::Value::Null => Value::Null,
-        }
-    }
-}
-
-//TODO: switch to TryFrom impl
-impl TryInto<serde_json::Value> for Value {
-    type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
-        match self {
-            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
-            Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v)),
-            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
-            Value::Map(v) => Ok(serde_json::to_value(v)?),
-            Value::Array(v) => Ok(serde_json::to_value(v)?),
-            Value::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
-        }
+        deserializer.deserialize_any(ValueVisitor)
     }
 }
 
@@ -964,7 +928,7 @@ pub enum Value {
 */
 
 /*
-CONVERSIONS BETWEEN TYPES
+
 
 
 

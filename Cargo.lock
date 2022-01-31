@@ -8257,6 +8257,7 @@ dependencies = [
  "chrono",
  "lookup",
  "mlua",
+ "regex",
  "serde",
  "serde_json",
  "snafu",
