@@ -9,6 +9,7 @@ fuzz_target!(|data: Vec<parser::Program>| {
         let exprstr = format!("{:?}", expr);
         match vrl::compile(expr, &vec![]) {
             Ok(program) => {
+                println!("expr {:?}", exprstr);
                 let timezone = Default::default();
                 let mut runtime = core::Runtime::default();
 

@@ -351,7 +351,8 @@ impl<'a> Arbitrary<'a> for Literal {
         let choice = usize::arbitrary(u)? % 3;
         Ok(match choice {
             0 => Literal::String(String::arbitrary(u)?),
-            1 => Literal::Integer(i64::arbitrary(u)? % 100),
+            // TODO Limit the size of integers and keep them positive so both VRLs can handle it.
+            1 => Literal::Integer((i64::arbitrary(u)? % 100).abs()),
             _ => Literal::Boolean(bool::arbitrary(u)?),
         })
     }
