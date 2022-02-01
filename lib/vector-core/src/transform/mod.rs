@@ -1,8 +1,8 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{stream, SinkExt, Stream, StreamExt};
-use shared::EventDataEq;
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
+use vector_common::EventDataEq;
 
 use crate::{
     config::Output,

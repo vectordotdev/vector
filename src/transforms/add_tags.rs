@@ -97,7 +97,7 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{

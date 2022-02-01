@@ -1349,7 +1349,7 @@ impl From<Kind> for TypeDef {
 #[cfg(test)]
 mod tests {
     use lookup::{FieldBuf, SegmentBuf};
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::type_def;

@@ -9,9 +9,9 @@ use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 use enumflags2::{bitflags, BitFlags, FromBitsError};
 use prost::Message;
-use shared::EventDataEq;
 use snafu::Snafu;
 use vector_buffers::encoding::{AsMetadata, Encodable};
+use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};

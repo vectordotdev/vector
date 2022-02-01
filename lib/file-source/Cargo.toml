@@ -73,8 +73,8 @@ features = ["full"]
 [dev-dependencies]
 criterion = "0.3"
 quickcheck = "1"
-tempfile = "3.1.0"
-pretty_assertions = "1.0.0"
+tempfile = "3.3.0"
+pretty_assertions = "1.1.0"
 
 [[bench]]
 name = "buffer"

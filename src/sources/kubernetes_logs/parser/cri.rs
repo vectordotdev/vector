@@ -1,6 +1,6 @@
 use derivative::Derivative;
-use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
+use vector_common::TimeZone;
 
 use crate::{
     event::{self, Event, LogEvent, Value},

@@ -76,6 +76,6 @@ where
 
         let expected = expected.into_iter().map(Event::Log).collect::<Vec<_>>();
 
-        shared::assert_event_data_eq!(output, expected, "expected left, actual right");
+        vector_common::assert_event_data_eq!(output, expected, "expected left, actual right");
     }
 }

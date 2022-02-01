@@ -1,4 +1,4 @@
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use super::{cri::Cri, docker::Docker};
 use crate::{

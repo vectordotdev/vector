@@ -1,8 +1,8 @@
 use std::{fs::DirBuilder, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
