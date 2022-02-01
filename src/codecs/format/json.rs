@@ -132,7 +132,7 @@ mod tests {
     use crate::config::log_schema;
     use crate::event::Value;
     use bytes::BytesMut;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     #[test]
     fn deserialize_json() {

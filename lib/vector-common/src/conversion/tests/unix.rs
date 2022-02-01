@@ -51,7 +51,7 @@ fn timestamp_param_conversion() {
 }
 
 fn dateref() -> DateTime<Utc> {
-    Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
+    Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981_173_106, 0))
 }
 
 fn convert<T>(fmt: &str, value: &'static str) -> Result<T, Error>

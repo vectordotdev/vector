@@ -2,7 +2,7 @@ use bytes::BytesMut;
 use pretty_assertions::assert_eq;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 
 use super::*;
 use crate::config::log_schema;

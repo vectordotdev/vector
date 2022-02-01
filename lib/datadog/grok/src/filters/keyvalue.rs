@@ -1,6 +1,12 @@
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
 use bytes::Bytes;
 use lookup::{Lookup, LookupBuf};
 use nom::{
@@ -17,14 +23,8 @@ use nom::{
 use nom_regex::str::re_find;
 use ordered_float::NotNan;
 use regex::Regex;
+use tracing::warn;
 use vrl_compiler::{Target, Value};
-
-use crate::{
-    ast::{Function, FunctionArgument},
-    grok_filter::GrokFilter,
-    parse_grok::Error as GrokRuntimeError,
-    parse_grok_rules::Error as GrokStaticError,
-};
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     {
