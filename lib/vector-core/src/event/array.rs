@@ -4,14 +4,11 @@
 
 use std::{iter, slice, vec};
 
-use bytes::{Buf, BufMut};
-use prost::Message;
-use vector_buffers::encoding::FixedEncodable;
+#[cfg(test)]
+use quickcheck::{Arbitrary, Gen};
+use vector_buffers::EventCount;
 
-use super::{
-    proto, DecodeError, EncodeError, Event, EventCount, EventDataEq, EventRef, LogEvent, Metric,
-    TraceEvent,
-};
+use super::{Event, EventDataEq, EventRef, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -116,7 +113,7 @@ impl EventContainer for MetricArray {
 }
 
 /// An array of one of the `Event` variants exclusively.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
@@ -227,6 +224,37 @@ impl EventDataEq for EventArray {
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for EventArray {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let len = u8::arbitrary(g) as usize;
+        let choice: u8 = u8::arbitrary(g);
+        // Quickcheck can't derive Arbitrary for enums, see
+        // https://github.com/BurntSushi/quickcheck/issues/98
+        if choice % 2 == 0 {
+            let mut logs = Vec::new();
+            for _ in 0..len {
+                logs.push(LogEvent::arbitrary(g));
+            }
+            EventArray::Logs(logs)
+        } else {
+            let mut metrics = Vec::new();
+            for _ in 0..len {
+                metrics.push(Metric::arbitrary(g));
+            }
+            EventArray::Metrics(metrics)
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            EventArray::Logs(logs) => Box::new(logs.shrink().map(EventArray::Logs)),
+            EventArray::Metrics(metrics) => Box::new(metrics.shrink().map(EventArray::Metrics)),
+            EventArray::Traces(traces) => Box::new(traces.shrink().map(EventArray::Traces)),
+        }
+    }
+}
+
 /// The iterator type for `EventArray::iter_events`.
 #[derive(Debug)]
 pub enum EventArrayIter<'a> {
@@ -269,34 +297,5 @@ impl Iterator for EventArrayIntoIter {
             Self::Metrics(i) => i.next().map(Into::into),
             Self::Traces(i) => i.next().map(Event::Trace),
         }
-    }
-}
-
-impl FixedEncodable for EventArray {
-    type EncodeError = EncodeError;
-    type DecodeError = DecodeError;
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
-    where
-        B: BufMut,
-    {
-        proto::EventArray::from(self)
-            .encode(buffer)
-            .map_err(|_| EncodeError::BufferTooSmall)
-    }
-
-    fn decode<B>(buffer: B) -> Result<Self, Self::DecodeError>
-    where
-        B: Buf + Clone,
-    {
-        proto::EventArray::decode(buffer.clone())
-            .map(Into::into)
-            .or_else(|_| {
-                // Pre-event-array disk buffers will have single events
-                // stored in them, decode that single event and convert
-                // into a single-element array.
-                proto::EventWrapper::decode(buffer).map(|pe| EventArray::from(Event::from(pe)))
-            })
-            .map_err(|_| DecodeError::InvalidProtobufPayload)
     }
 }
