@@ -282,14 +282,18 @@ impl Vm {
                 OpCode::Less => binary_op(&mut state, Value::try_lt)?,
                 OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
                 OpCode::NotEqual => {
-                    let rhs = state.pop_stack()?;
-                    let lhs = state.pop_stack()?;
-                    state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    if state.error.is_none() {
+                        let rhs = state.pop_stack()?;
+                        let lhs = state.pop_stack()?;
+                        state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    }
                 }
                 OpCode::Equal => {
-                    let rhs = state.pop_stack()?;
-                    let lhs = state.pop_stack()?;
-                    state.stack.push(lhs.eq_lossy(&rhs).into());
+                    if state.error.is_none() {
+                        let rhs = state.pop_stack()?;
+                        let lhs = state.pop_stack()?;
+                        state.stack.push(lhs.eq_lossy(&rhs).into());
+                    }
                 }
                 OpCode::Pop => {
                     // Removes the top item from the stack.
