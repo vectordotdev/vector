@@ -453,7 +453,7 @@ mod tests {
     };
     use tokio_util::codec::Decoder;
     use vector_common::{assert_event_data_eq, btreemap};
-    use vector_core::event::{LogEvent, Value};
+    use vector_core::event::Value;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
