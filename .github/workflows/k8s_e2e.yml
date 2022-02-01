@@ -101,12 +101,17 @@ jobs:
             const minikube_version = [
               "v1.24.0",
             ]
+
+            // Aim to test against oldest supported k8s cloud-provider versions
+            // https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+            // https://cloud.google.com/kubernetes-engine/docs/release-notes
+            // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.19.2", is_essential: true },
-              { version: "v1.18.9" },
-              { version: "v1.17.12" },
-              { version: "v1.16.15" },
-              { version: "v1.15.12" },
+              { version: "v1.23.3", is_essential: true },
+              { version: "v1.22.5", is_essential: true },
+              { version: "v1.21.8", is_essential: true },
+              { version: "v1.20.14", is_essential: true },
+              { version: "v1.19.8" },
             ]
             const container_runtime = [
               "docker",
