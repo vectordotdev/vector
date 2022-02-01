@@ -24,6 +24,7 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
@@ -31,7 +32,10 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+    internal_events::{
+        EventsReceived, PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectError,
+        StreamClosedError,
+    },
 };
 
 macro_rules! tags {
@@ -156,6 +160,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
+                let count = metrics.len();
                 emit!(&PostgresqlMetricsCollectCompleted {
                     start,
                     end: Instant::now()
@@ -163,7 +168,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
                 let mut stream = stream::iter(metrics).flatten().map(Event::Metric);
                 if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending postgresql metrics.", %error);
+                    emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -464,7 +469,7 @@ impl PostgresqlMetrics {
         let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                emit!(&PostgresqlMetricsCollectFailed {
+                emit!(&PostgresqlMetricsCollectError {
                     error,
                     endpoint: self.tags.get("endpoint"),
                 });
@@ -492,6 +497,10 @@ impl PostgresqlMetrics {
         .await
         {
             Ok(metrics) => {
+                let (count, byte_size) = metrics.iter().fold((0, 0), |res, set| {
+                    (res.0 + set.len(), res.1 + set.size_of())
+                });
+                emit!(&EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
                 Ok(metrics.into_iter().flatten())
             }
