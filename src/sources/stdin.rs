@@ -12,7 +12,7 @@ use crate::{
     config::{
         log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
-    internal_events::StdinEventsReceived,
+    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -108,6 +108,10 @@ where
 
             stdin.consume(len);
 
+            emit!(&BytesReceived {
+                byte_size: len,
+                protocol: "none"
+            });
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
                 break;
@@ -161,7 +165,8 @@ where
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Unable to send event to out.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
                 Err(())
             }
         }
