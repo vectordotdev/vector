@@ -818,19 +818,9 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            //
-            // TODO: Validate this with a test that messes with a data file without having to reload
-            // the buffer, since reloading the buffer will recalculate our buffer size.
             if self.ledger.is_writer_done() {
                 let total_buffer_size = self.ledger.get_total_buffer_size();
-                let total_records = self.ledger.get_total_records();
-                trace!(
-                    "writer done, buffer_size={}, total_records={}",
-                    total_buffer_size,
-                    total_records
-                );
-
-                if total_buffer_size == 0 || total_records == 0 {
+                if total_buffer_size == 0 {
                     return Ok(None);
                 }
             }

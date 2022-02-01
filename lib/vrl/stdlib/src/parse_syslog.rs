@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Datelike, Utc};
-use shared::TimeZone;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -161,7 +161,7 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

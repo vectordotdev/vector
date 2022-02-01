@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{
     config::{

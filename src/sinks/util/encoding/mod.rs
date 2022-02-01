@@ -275,7 +275,7 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::config::log_schema;

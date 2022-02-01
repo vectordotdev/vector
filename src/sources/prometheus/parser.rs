@@ -141,7 +141,7 @@ mod test {
     use chrono::{TimeZone, Utc};
     use lazy_static::lazy_static;
     use pretty_assertions::assert_eq;
-    use shared::{assert_event_data_eq, btreemap};
+    use vector_common::{assert_event_data_eq, btreemap};
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

@@ -29,6 +29,7 @@ pub struct AwsCloudWatchLogsSubscriptionMessage {
 }
 
 impl AwsCloudWatchLogsSubscriptionMessageType {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => "CONTROL_MESSAGE",

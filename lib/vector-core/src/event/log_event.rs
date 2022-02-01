@@ -11,7 +11,7 @@ use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize, Serializer};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
@@ -852,6 +852,6 @@ mod test {
             log
         };
 
-        shared::assert_event_data_eq!(merged, expected);
+        vector_common::assert_event_data_eq!(merged, expected);
     }
 }

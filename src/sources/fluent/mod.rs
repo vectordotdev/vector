@@ -451,12 +451,12 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
-    use shared::{assert_event_data_eq, btreemap};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
+    use vector_common::{assert_event_data_eq, btreemap};
     use vector_core::event::{LogEvent, Value};
 
     use super::{message::FluentMessageOptions, *};

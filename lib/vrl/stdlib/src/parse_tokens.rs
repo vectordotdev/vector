@@ -1,4 +1,4 @@
-use shared::tokenize;
+use vector_common::tokenize;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

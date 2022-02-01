@@ -154,8 +154,8 @@ pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
 mod tests {
     use std::collections::BTreeSet;
 
-    use shared::{btreemap, TimeZone};
     use type_def::KindInfo;
+    use vector_common::{btreemap, TimeZone};
     use vrl::Index;
 
     use super::*;

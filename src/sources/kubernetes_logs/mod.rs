@@ -16,7 +16,7 @@ use file_source::{
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{
     config::{

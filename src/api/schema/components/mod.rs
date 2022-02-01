@@ -11,6 +11,7 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
     api::schema::{
@@ -264,6 +265,12 @@ pub fn update_config(config: &Config) {
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.
                 output_type: source.inner.outputs().pop().unwrap().ty,
+                outputs: source
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
+                    .collect(),
             })),
         );
     }
@@ -276,6 +283,12 @@ pub fn update_config(config: &Config) {
                 component_key: component_key.clone(),
                 component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
+                outputs: transform
+                    .inner
+                    .outputs()
+                    .into_iter()
+                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
+                    .collect(),
             })),
         );
     }
@@ -337,21 +350,25 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                outputs: vec![],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
@@ -491,26 +508,31 @@ mod tests {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
                 inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("e"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("d"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("g"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("f"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             })),
         ];
 
