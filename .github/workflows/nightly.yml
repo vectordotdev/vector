@@ -319,7 +319,7 @@ jobs:
     steps:
       - run: |
           yum update -y && \
-          yum install -y \
+          yum install --allowerasing -y \
           ca-certificates \
           curl \
           git \
