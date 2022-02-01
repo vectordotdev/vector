@@ -20,7 +20,8 @@ use crate::{
     config::{AcknowledgementsConfig, Resource, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+        ConnectionOpen, OpenGauge, StreamClosedError, TcpBytesReceived, TcpSendAckError,
+        TcpSocketConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -284,6 +285,7 @@ async fn handle_stream<T>(
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
                         let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+                        let count = events.len();
                         if let Some(batch) = batch {
                             for event in &mut events {
                                 event.add_batch_notifier(Arc::clone(&batch));
@@ -320,8 +322,8 @@ async fn handle_stream<T>(
                                     break;
                                 }
                             }
-                            Err(_) => {
-                                warn!("Failed to send event.");
+                            Err(error) => {
+                                emit!(&StreamClosedError { error, count });
                                 break;
                             }
                         }

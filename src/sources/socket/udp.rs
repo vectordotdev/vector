@@ -16,7 +16,7 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::StreamDecodingError, Source},
@@ -105,10 +105,11 @@ pub fn udp(
                     loop {
                         match stream.next().await {
                             Some(Ok((mut events, byte_size))) => {
+                                let count = events.len();
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Udp,
                                     byte_size,
-                                    count: events.len()
+                                    count,
                                 });
 
                                 let now = Utc::now();
@@ -124,7 +125,7 @@ pub fn udp(
                                 tokio::select!{
                                     result = out.send_all(stream::iter(events)) => {
                                         if let Err(error) = result {
-                                            error!(message = "Error sending event.", %error);
+                                            emit!(&StreamClosedError { error, count });
                                             return Ok(())
                                         }
                                     }
