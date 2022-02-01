@@ -318,14 +318,18 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          yum update -y && \
-          yum install --allowerasing -y \
+          yum update -y
+          yum install -y \
           ca-certificates \
-          curl \
           git \
           systemd \
           tar \
           make
+          # conflicts with curl-minimal on some distros and --allowerased is not
+          # supported on some distros
+          if ! command -v curl &> /dev/null ; then
+            yum install -y curl
+          fi
       - name: checkout
         uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
