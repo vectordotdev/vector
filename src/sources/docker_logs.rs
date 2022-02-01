@@ -24,10 +24,10 @@ use crate::{
         self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
     },
     internal_events::{
-        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
-        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
-        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
-        DockerLogsTimestampParseFailed,
+        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventsReceived,
+        DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventsReceived,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -442,12 +442,15 @@ impl DockerLogsSource {
                 value = self.events.next() => {
                     match value {
                         Some(Ok(mut event)) => {
+                            let byte_size = std::mem::size_of_val(&event);
+                            emit!(&BytesReceived { byte_size, protocol: "tcp" });
+
                             let action = event.action.unwrap();
                             let actor = event.actor.take().unwrap();
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(&DockerLogsContainerEventReceived { container_id: &id, action: &action });
+                            emit!(&DockerLogsContainerEventsReceived { container_id: &id, action: &action, byte_size });
 
                             let id = ContainerId::new(id);
 
@@ -534,12 +537,12 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(&DockerLogsTimestampParseFailed {
+                    Err(error) => emit!(&DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(&DockerLogsContainerMetadataFetchFailed {
+                Err(error) => emit!(&DockerLogsContainerMetadataFetchError {
                     error,
                     container_id: id.as_str()
                 }),
@@ -596,7 +599,7 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(&DockerLogsLoggingDriverUnsupported {
+                                emit!(&DockerLogsLoggingDriverUnsupportedError {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
@@ -635,7 +638,10 @@ impl EventStreamBuilder {
         let result = {
             let mut stream =
                 events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
-            self.out.send_all(&mut stream).await
+            self.out.send_all(&mut stream).await.map_err(|error| {
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
+            })
         };
 
         // End of stream
@@ -645,9 +651,7 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(crate::source_sender::ClosedError), _) => {
-                Err((info.id, ErrorPersistence::Permanent))
-            }
+            (Err(()), _) => Err((info.id, ErrorPersistence::Permanent)),
             (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
@@ -830,7 +834,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(&DockerLogsTimestampParseFailed {
+                emit!(&DockerLogsTimestampParseError {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -953,7 +957,7 @@ impl ContainerLogInfo {
         // other cases were handled earlier.
         let event = Event::Log(log_event);
 
-        emit!(&DockerLogsEventReceived {
+        emit!(&DockerLogsEventsReceived {
             byte_size,
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
