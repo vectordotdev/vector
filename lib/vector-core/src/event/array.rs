@@ -5,10 +5,13 @@
 use std::{iter, slice, vec};
 
 use bytes::{Buf, BufMut};
-use prost::{DecodeError, EncodeError, Message};
+use prost::Message;
 use vector_buffers::encoding::FixedEncodable;
 
-use super::{proto, Event, EventCount, EventDataEq, EventRef, LogEvent, Metric, TraceEvent};
+use super::{
+    proto, DecodeError, EncodeError, Event, EventCount, EventDataEq, EventRef, LogEvent, Metric,
+    TraceEvent,
+};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -277,13 +280,23 @@ impl FixedEncodable for EventArray {
     where
         B: BufMut,
     {
-        proto::EventArray::from(self).encode(buffer)
+        proto::EventArray::from(self)
+            .encode(buffer)
+            .map_err(|_| EncodeError::BufferTooSmall)
     }
 
     fn decode<B>(buffer: B) -> Result<Self, Self::DecodeError>
     where
-        B: Buf,
+        B: Buf + Clone,
     {
-        proto::EventArray::decode(buffer).map(Into::into)
+        proto::EventArray::decode(buffer.clone())
+            .map(Into::into)
+            .or_else(|_| {
+                // Pre-event-array disk buffers will have single events
+                // stored in them, decode that single event and convert
+                // into a single-element array.
+                proto::EventWrapper::decode(buffer).map(|pe| EventArray::from(Event::from(pe)))
+            })
+            .map_err(|_| DecodeError::InvalidProtobufPayload)
     }
 }
