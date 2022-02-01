@@ -2,8 +2,8 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
+use super::{BoxedDeserializer, Deserializer, DeserializerConfig};
 use crate::{
-    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, LogEvent},
 };
