@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str};
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
@@ -179,6 +179,6 @@ mod tests {
         expected.as_mut_log().insert("bool", true);
         expected.as_mut_log().insert("number", 1234);
 
-        shared::assert_event_data_eq!(log, expected.into_log());
+        vector_common::assert_event_data_eq!(log, expected.into_log());
     }
 }

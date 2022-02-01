@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use float_eq::FloatEq;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},

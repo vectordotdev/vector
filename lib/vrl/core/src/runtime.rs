@@ -3,8 +3,8 @@ use compiler::{
     ExpressionError, Function,
 };
 use lookup::LookupBuf;
-use shared::TimeZone;
 use std::{error::Error, fmt};
+use vector_common::TimeZone;
 
 use crate::{state, Context, Program, Target, Value};
 

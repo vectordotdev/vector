@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use chrono::prelude::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
-use shared::TimeZone;
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 lazy_static! {

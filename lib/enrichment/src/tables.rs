@@ -271,7 +271,7 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use vector_common::btreemap;
     use vrl_core::Value;
 
     use super::*;

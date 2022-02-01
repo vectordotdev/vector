@@ -6,10 +6,10 @@ edition = "2021"
 publish = false
 
 [dependencies]
-parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false }
 enrichment = { path = "../../enrichment" }
+parser = { package = "vrl-parser", path = "../parser" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+vector_common = { path = "../../vector-common", default-features = false }
 vrl = { path = "../core" }
 
 ansi_term = "0.12"

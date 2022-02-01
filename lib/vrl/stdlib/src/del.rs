@@ -186,7 +186,7 @@ impl fmt::Display for DelFn {
 
 #[cfg(test)]
 mod tests {
-    use shared::{btreemap, TimeZone};
+    use vector_common::{btreemap, TimeZone};
 
     use super::*;
 

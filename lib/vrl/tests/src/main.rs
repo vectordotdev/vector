@@ -9,8 +9,8 @@ use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use glob::glob;
-use shared::TimeZone;
 use structopt::StructOpt;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 use vrl_tests::{docs, Test};
 

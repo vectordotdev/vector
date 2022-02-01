@@ -1,4 +1,4 @@
-use shared::conversion::Conversion;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {

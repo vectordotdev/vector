@@ -277,7 +277,7 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use shared::TimeZone;
 use structopt::StructOpt;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[cfg(feature = "repl")]

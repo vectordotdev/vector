@@ -5,8 +5,8 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
@@ -294,7 +294,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::{formatdoc, indoc};
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{
