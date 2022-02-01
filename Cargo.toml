@@ -820,6 +820,7 @@ remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
 codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
+vrl-vm = []
 
 [[bench]]
 name = "default"

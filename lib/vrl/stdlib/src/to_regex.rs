@@ -1,6 +1,14 @@
 use tracing::warn;
 use vrl::prelude::*;
 
+fn to_regex(value: Value) -> std::result::Result<Value, ExpressionError> {
+    let string = value.try_bytes_utf8_lossy()?;
+    let regex = regex::Regex::new(string.as_ref())
+        .map_err(|err| format!("could not create regex: {}", err))
+        .map(Into::into)?;
+    Ok(regex)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToRegex;
 
@@ -35,6 +43,12 @@ impl Function for ToRegex {
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        to_regex(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -45,11 +59,7 @@ struct ToRegexFn {
 impl Expression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
-        let regex = regex::Regex::new(string.as_ref())
-            .map_err(|err| format!("could not create regex: {}", err))
-            .map(Into::into)?;
-        Ok(regex)
+        to_regex(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
