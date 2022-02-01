@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{StreamExt, TryFutureExt};
+use futures::{stream, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
@@ -15,7 +15,10 @@ use crate::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{
+        BytesReceived, StatsdEventsReceived, StatsdInvalidRecordError, StatsdSocketError,
+        StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -147,18 +150,22 @@ pub struct StatsdDeserializer;
 
 impl Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        emit!(&BytesReceived {
+            byte_size: bytes.len(),
+            protocol: "udp",
+        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(&StatsdEventReceived {
+                emit!(&StatsdEventsReceived {
                     byte_size: bytes.len()
                 });
                 Ok(smallvec![Event::Metric(metric)])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecord {
+                emit!(&StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -197,11 +204,9 @@ async fn statsd_udp(
     while let Some(frame) = stream.next().await {
         match frame {
             Ok(((events, _byte_size), _sock)) => {
-                for metric in events {
-                    if let Err(error) = out.send(metric).await {
-                        error!(message = "Error sending metric.", %error);
-                        break;
-                    }
+                let count = events.len();
+                if let Err(error) = out.send_all(stream::iter(events)).await {
+                    emit!(&StreamClosedError { error, count });
                 }
             }
             Err(error) => {
