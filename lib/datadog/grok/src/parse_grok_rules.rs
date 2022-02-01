@@ -40,7 +40,7 @@ pub struct GrokField {
 
 /// The context used to parse grok rules.
 #[derive(Debug, Clone)]
-pub struct GrokRuleParseContext {
+struct GrokRuleParseContext {
     /// a currently built regular expression
     pub regex: String,
     /// a map of capture names(grok0, grok1, ...) to field information.

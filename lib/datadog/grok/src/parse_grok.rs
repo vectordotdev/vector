@@ -48,7 +48,9 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     if let Some(ref captures) = grok_rule.pattern.captures(source) {
         // the first capture is always a whole expression - skip it
         for (name, idx) in &grok_rule.capture_indices {
-            let mut value = Some(Value::from(captures.at(*idx).expect("TODO")));
+            let mut value = Some(Value::from(
+                captures.at(*idx).expect("capture was not found"),
+            ));
 
             if let Some(GrokField {
                 lookup: field,
