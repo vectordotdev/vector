@@ -137,7 +137,7 @@ impl CompactOptions {
         match value {
             Value::Bytes(bytes) => self.string && bytes.len() == 0,
             Value::Null => self.null,
-            Value::Object(object) => self.object && object.is_empty(),
+            Value::Map(object) => self.object && object.is_empty(),
             Value::Array(array) => self.array && array.is_empty(),
             _ => false,
         }
@@ -179,7 +179,7 @@ impl Expression for CompactFn {
         };
 
         match self.value.resolve(ctx)? {
-            Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
+            Value::Map(object) => Ok(Value::from(compact_object(object, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
             value => Err(value::Error::Expected {
                 got: value.kind(),
@@ -204,7 +204,7 @@ impl Expression for CompactFn {
 fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     match value {
         Value::Array(array) if options.recursive => Value::from(compact_array(array, options)),
-        Value::Object(object) if options.recursive => Value::from(compact_object(object, options)),
+        Value::Map(object) if options.recursive => Value::from(compact_object(object, options)),
         _ => value,
     }
 }
@@ -281,10 +281,10 @@ mod test {
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Object(map!["field2": 2]), 2.into()],
+                vec![1.into(), Value::Map(map!["field2": 2]), 2.into()],
                 vec![
                     1.into(),
-                    Value::Object(map!["field1": Value::Null,
+                    Value::Map(map!["field1": Value::Null,
                                     "field2": 2]),
                     2.into(),
                 ],
@@ -329,12 +329,12 @@ mod test {
             ),
             (
                 map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key2": Value::from(3)]),
+                     "key2":Value::Map(map!["key2": Value::from(3)]),
                      "key3": Value::from(2),
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,
+                    "key2":Value::Map(map!["key1": Value::Null,
                                             "key2": Value::from(3),
                                             "key3": Value::Null]),
                     "key3": Value::from(2),
@@ -343,12 +343,12 @@ mod test {
             ),
             (
                 map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key1": Value::Null,]),
+                     "key2":Value::Map(map!["key1": Value::Null,]),
                      "key3": Value::from(2),
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
+                    "key2":Value::Map(map!["key1": Value::Null,]),
                     "key3": Value::from(2),
                 ],
                 CompactOptions {
@@ -362,7 +362,7 @@ mod test {
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
+                    "key2":Value::Map(map!["key1": Value::Null,]),
                     "key3": Value::from(2),
                 ],
                 Default::default(),

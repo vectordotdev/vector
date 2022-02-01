@@ -352,7 +352,7 @@ mod tests {
 
         match value {
             // Should serialize to a map.
-            Value::Object(map) => {
+            Value::Map(map) => {
                 // Check ordering.
                 assert!(map.keys().eq(expected_keys));
             }

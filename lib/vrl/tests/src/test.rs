@@ -75,7 +75,7 @@ impl Test {
 
         let mut error = None;
         let object = if object.is_empty() {
-            Value::Object(BTreeMap::default())
+            Value::Map(BTreeMap::default())
         } else {
             match serde_json::from_str::<'_, Value>(&object) {
                 Ok(value) => value,
@@ -101,7 +101,7 @@ impl Test {
     }
 
     pub fn from_example(func: &'static str, example: &Example) -> Self {
-        let object = Value::Object(BTreeMap::default());
+        let object = Value::Map(BTreeMap::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
             Err(err) => err.to_string(),

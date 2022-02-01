@@ -2,10 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 
+use crate::value::VrlValueArithmetic;
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
-    value, Context, Expression, State, TypeDef, Value,
+    Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Clone, PartialEq)]
@@ -117,8 +118,8 @@ impl Expression for Op {
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
+        use crate::value::Kind as K;
         use ast::Opcode::*;
-        use value::Kind as K;
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);

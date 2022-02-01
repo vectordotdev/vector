@@ -6,6 +6,12 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct VrlRegex(regex::Regex);
 
+impl VrlRegex {
+    pub fn into_inner(self) -> regex::Regex {
+        self.0
+    }
+}
+
 impl PartialEq for VrlRegex {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_str() == other.0.as_str()

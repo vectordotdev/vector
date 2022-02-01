@@ -123,12 +123,12 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
                 .collect();
             Value::Array(values)
         }
-        Value::Object(map) => {
+        Value::Map(map) => {
             let map = map
                 .into_iter()
                 .map(|(key, value)| (key, redact(value, filters, redactor)))
                 .collect();
-            Value::Object(map)
+            Value::Map(map)
         }
         _ => value,
     }
@@ -166,7 +166,7 @@ impl TryFrom<Value> for Filter {
 
     fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Object(object) => {
+            Value::Map(object) => {
                 let r#type = match object
                     .get("type")
                     .ok_or("filters specified as objects must have type parameter")?

@@ -16,8 +16,10 @@ pub use error::Error;
 pub use kind::Kind;
 use ordered_float::NotNan;
 
-pub use self::regex::Regex;
+pub use self::regex::VrlRegex;
 
+pub use arithmetic::VrlValueArithmetic;
+pub use convert::VrlValueConvert;
 pub use value::Value;
 
 // #[derive(Debug, Clone, Hash, PartialEq)]
@@ -45,7 +47,7 @@ pub use value::Value;
 //             serde_json::Value::Number(n) if n.is_f64() => n.as_f64().unwrap().into(),
 //             serde_json::Value::Number(n) => n.to_string().into(),
 //             serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
-//             serde_json::Value::Object(obj) => Value::Object(
+//             serde_json::Value::Object(obj) =>Value::Map(
 //                 obj.into_iter()
 //                     .map(|(key, value)| (key, Value::from(value)))
 //                     .collect(),

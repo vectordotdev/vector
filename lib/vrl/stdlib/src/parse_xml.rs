@@ -264,7 +264,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     };
 
     match node.node_type() {
-        NodeType::Root => Value::Object(recurse(node)),
+        NodeType::Root => Value::Map(recurse(node)),
 
         NodeType::Element => {
             let mut map = BTreeMap::new();
@@ -283,10 +283,10 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                 // If the map isn't empty, *always* recurse to expand default keys.
                 (_, false) => {
                     map.extend(recurse(node));
-                    Value::Object(map)
+                    Value::Map(map)
                 }
                 // If a text key should be used, always recurse.
-                (true, true) => Value::Object(recurse(node)),
+                (true, true) => Value::Map(recurse(node)),
                 // Otherwise, check the node count to determine what to do.
                 _ => match node.children().count() {
                     // For a single node, 'flatten' the object if necessary.
@@ -303,17 +303,17 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                             let mut map = BTreeMap::new();
                             map.insert(
                                 node.tag_name().name().to_string(),
-                                Value::Object(recurse(node)),
+                                Value::Map(recurse(node)),
                             );
 
-                            Value::Object(map)
+                            Value::Map(map)
                         } else {
                             // Otherwise, 'flatten' the object by continuing processing.
                             process_node(node, config)
                         }
                     }
                     // For 2+ nodes, expand.
-                    _ => Value::Object(recurse(node)),
+                    _ => Value::Map(recurse(node)),
                 },
             }
         }

@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 
-use super::{Error, Kind, Regex, Value};
+use super::{Error, Kind, Value};
 use crate::{
     expression::{container, Container, Expr, Literal},
     Expression,
@@ -13,7 +13,11 @@ use crate::{
 /// conversions that should be added to `Value` but rely on things outside of the `value` crate
 pub trait VrlValueConvert {
     fn try_bytes(self) -> Result<Bytes, Error>;
+    // TODO: rename to "try_coerce_string_lossy"
+    fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error>;
     fn try_float(self) -> Result<f64, Error>;
+    fn try_integer(self) -> Result<i64, Error>;
+    fn try_boolean(self) -> Result<bool, Error>;
     fn try_from_f64(f: f64) -> Result<Value, Error> {
         let float = NotNan::new(f).map_err(|_| Error::NanFloat)?;
         Ok(Value::Float(float))
@@ -32,12 +36,42 @@ impl VrlValueConvert for Value {
         }
     }
 
+    fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
+        match self.as_bytes2() {
+            Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
+            None => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Bytes,
+            }),
+        }
+    }
+
     fn try_float(self) -> Result<f64, Error> {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Float,
+            }),
+        }
+    }
+
+    fn try_integer(self) -> Result<i64, Error> {
+        match self {
+            Value::Integer(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Integer,
+            }),
+        }
+    }
+
+    fn try_boolean(self) -> Result<bool, Error> {
+        match self {
+            Value::Boolean(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Boolean,
             }),
         }
     }
@@ -63,15 +97,7 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 //
-//     pub fn try_integer(self) -> Result<i64, Error> {
-//         match self {
-//             Value::Integer(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Integer,
-//             }),
-//         }
-//     }
+
 // }
 
 // impl From<i8> for Value {
@@ -204,15 +230,7 @@ impl VrlValueConvert for Value {
 //
 
 //
-//     pub fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
-//         match self.as_bytes() {
-//             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
-//             None => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Bytes,
-//             }),
-//         }
-//     }
+
 //
 //     /// Converts the Value into a byte representation regardless of its original type.
 //     /// Object and Array are currently not supported, although technically there's no reason why it
@@ -227,7 +245,7 @@ impl VrlValueConvert for Value {
 //             } else {
 //                 Bytes::copy_from_slice(&[0_u8])
 //             }),
-//             Value::Object(_o) => Err("cannot convert object to bytes.".to_string()),
+//            Value::Map(_o) => Err("cannot convert object to bytes.".to_string()),
 //             Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
 //             Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
 //             Value::Regex(r) => Ok(r.to_string().into()),
@@ -286,15 +304,7 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 //
-//     pub fn try_boolean(self) -> Result<bool, Error> {
-//         match self {
-//             Value::Boolean(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Boolean,
-//             }),
-//         }
-//     }
+
 // }
 //
 // impl From<bool> for Value {
@@ -399,26 +409,26 @@ impl VrlValueConvert for Value {
 //
 // impl Value {
 //     pub fn is_object(&self) -> bool {
-//         matches!(self, Value::Object(_))
+//         matches!(self,Value::Map(_))
 //     }
 //
 //     pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
 //         match self {
-//             Value::Object(v) => Some(v),
+//            Value::Map(v) => Some(v),
 //             _ => None,
 //         }
 //     }
 //
 //     pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
 //         match self {
-//             Value::Object(v) => Some(v),
+//            Value::Map(v) => Some(v),
 //             _ => None,
 //         }
 //     }
 //
 //     pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
 //         match self {
-//             Value::Object(v) => Ok(v),
+//            Value::Map(v) => Ok(v),
 //             _ => Err(Error::Expected {
 //                 got: self.kind(),
 //                 expected: Kind::Object,
@@ -429,13 +439,13 @@ impl VrlValueConvert for Value {
 //
 // impl From<BTreeMap<String, Value>> for Value {
 //     fn from(value: BTreeMap<String, Value>) -> Self {
-//         Value::Object(value)
+//        Value::Map(value)
 //     }
 // }
 //
 // impl FromIterator<(String, Value)> for Value {
 //     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-//         Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
+//        Value::Map(iter.into_iter().collect::<BTreeMap<_, _>>())
 //     }
 // }
 //

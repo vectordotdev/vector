@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::value::VrlValueConvert;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{

@@ -97,7 +97,7 @@ impl FunctionTransform for JsonParser {
                     .ok()
             })
             .and_then(|value| {
-                if let Value::Object(object) = value {
+                if letValue::Map(object) = value {
                     Some(object)
                 } else {
                     None
@@ -116,7 +116,7 @@ impl FunctionTransform for JsonParser {
                             log.remove(&self.field);
                         }
 
-                        log.insert(&target_field, Value::Object(object));
+                        log.insert(&target_field, Value::Map(object));
                     }
                 }
                 None => {

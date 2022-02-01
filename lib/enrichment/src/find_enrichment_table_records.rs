@@ -144,7 +144,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
                 self.index,
             )?
             .into_iter()
-            .map(Value::Object)
+            .map(Value::Map)
             .collect();
 
         Ok(Value::Array(data))

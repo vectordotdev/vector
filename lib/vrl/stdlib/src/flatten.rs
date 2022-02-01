@@ -55,7 +55,7 @@ impl Expression for FlattenFn {
             Value::Array(arr) => Ok(Value::Array(
                 ArrayFlatten::new(arr.iter()).cloned().collect(),
             )),
-            Value::Object(map) => Ok(Value::Object(
+            Value::Map(map) => Ok(Value::Object(
                 MapFlatten::new(map.iter())
                     .map(|(k, v)| (k, v.clone()))
                     .collect(),
@@ -126,7 +126,7 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
 
         let next = self.values.next();
         match next {
-            Some((key, Value::Object(value))) => {
+            Some((key, Value::Map(value))) => {
                 self.inner = Some(Box::new(MapFlatten::new_from_parent(
                     self.new_key(key),
                     value.iter(),

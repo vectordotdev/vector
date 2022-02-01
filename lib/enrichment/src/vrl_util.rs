@@ -49,7 +49,7 @@ pub(crate) fn evaluate_condition<'a>(
     let value = value.resolve(ctx)?;
 
     Ok(match value {
-        Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
+        Value::Map(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {
                 field: key,
                 from: *map

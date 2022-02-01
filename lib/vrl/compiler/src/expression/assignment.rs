@@ -3,6 +3,7 @@ use std::{convert::TryFrom, fmt};
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
 
+use crate::value;
 use crate::{
     expression::{Expr, Literal, Resolved},
     parser::{
@@ -259,7 +260,7 @@ impl Target {
                     Some(stored) => stored.insert_by_path(path, value),
                     None => ctx
                         .state_mut()
-                        .insert_variable(ident.clone(), value!({}).insert(path, value)),
+                        .insert_variable(ident.clone(), value.at_path(path)),
                 }
             }
 

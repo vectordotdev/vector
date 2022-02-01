@@ -1,5 +1,6 @@
 use std::{error::Error, fmt};
 
+use compiler::value::VrlValueConvert;
 use compiler::ExpressionError;
 use lookup::LookupBuf;
 use shared::TimeZone;
@@ -72,7 +73,7 @@ impl Runtime {
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
         match target.get(&self.root_lookup) {
-            Ok(Some(Value::Object(_))) => {}
+            Ok(Some(Value::Map(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(
                     format!(

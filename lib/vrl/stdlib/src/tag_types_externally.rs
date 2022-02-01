@@ -97,7 +97,7 @@ fn tag_type_externally(value: Value) -> Value {
         value @ Value::Integer(_) => (Some("integer"), value),
         value @ Value::Float(_) => (Some("float"), value),
         value @ Value::Boolean(_) => (Some("boolean"), value),
-        Value::Object(object) => (
+        Value::Map(object) => (
             None,
             object
                 .into_iter()

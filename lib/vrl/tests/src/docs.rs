@@ -138,7 +138,7 @@ impl Test {
             Some(event) => {
                 serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
             }
-            None => Value::Object(BTreeMap::default()),
+            None => Value::Map(BTreeMap::default()),
         };
 
         if returns.is_some() && output.is_some() {

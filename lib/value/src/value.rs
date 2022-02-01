@@ -173,6 +173,27 @@ impl Value {
         }
     }
 
+    pub fn is_bytes(&self) -> bool {
+        match self {
+            Self::Bytes(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Self::Null => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        match self {
+            Self::Integer(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {
             Value::Map(map) => Some(map),
@@ -183,6 +204,14 @@ impl Value {
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
+            _ => None,
+        }
+    }
+
+    //TODO: rename to "as_bytes"
+    pub fn as_bytes2(&self) -> Option<&Bytes> {
+        match self {
+            Value::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
             _ => None,
         }
     }
@@ -202,6 +231,40 @@ impl Value {
             }
             Value::Null => Bytes::from("<null>"),
         }
+    }
+
+    /// Insert the current value into a given path.
+    ///
+    /// For example, given the path `.foo.bar` and value `true`, the return
+    /// value would be an object representing `{ "foo": { "bar": true } }`.
+    pub fn at_path(mut self, path: &LookupBuf) -> Self {
+        for segment in path.as_segments().iter().rev() {
+            match segment {
+                SegmentBuf::Field(FieldBuf { name, .. }) => {
+                    let mut map = BTreeMap::default();
+                    map.insert(name.as_str().to_owned(), self);
+                    self = Value::Map(map);
+                }
+                SegmentBuf::Coalesce(fields) => {
+                    let field = fields.last().unwrap();
+                    let mut map = BTreeMap::default();
+                    map.insert(field.as_str().to_owned(), self);
+                    self = Value::Map(map);
+                }
+                SegmentBuf::Index(index) => {
+                    let mut array = vec![];
+
+                    if *index > 0 {
+                        array.resize(*index as usize, Value::Null);
+                    }
+
+                    array.push(self);
+                    self = Value::Array(array);
+                }
+            }
+        }
+
+        self
     }
 
     /// Remove a value that exists at a given lookup.
@@ -1569,7 +1632,7 @@ pub enum Value {
 //     #[test]
 //     fn test_display_object() {
 //         assert_eq!(
-//             Value::Object(btreemap! {
+//            Value::Map(btreemap! {
 //                 "foo" => "bar"
 //             })
 //                 .to_string(),

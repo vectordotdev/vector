@@ -30,7 +30,7 @@ impl Expression for Object {
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
             .collect::<Result<BTreeMap<_, _>, _>>()
-            .map(Value::Object)
+            .map(Value::Map)
     }
 
     fn as_value(&self) -> Option<Value> {
@@ -38,7 +38,7 @@ impl Expression for Object {
             .iter()
             .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
             .collect::<Option<BTreeMap<_, _>>>()
-            .map(Value::Object)
+            .map(Value::Map)
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -830,7 +830,7 @@ fn resolve(&self, ctx: &mut Context) -> Result<Value, Error> {
     };
 
     let result = match self.value.resolve(ctx)? {
-        Value::Object(object) => {
+       Value::Map(object) => {
             let mut result = BTreeMap::default();
 
             for (key, value) in object.into_iter() {

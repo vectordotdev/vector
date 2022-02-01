@@ -5,8 +5,10 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
+use regex::Regex;
 
-use crate::{expression::Resolved, value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use crate::value::VrlRegex;
+use crate::{expression::Resolved, Context, Expression, Span, State, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -14,7 +16,7 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(Regex),
+    Regex(VrlRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
@@ -28,17 +30,14 @@ impl Literal {
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
             Boolean(v) => Value::Boolean(*v),
-            Regex(v) => Value::Regex(v.clone()),
+            Regex(v) => Value::Regex(v.clone().into_inner()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
         }
     }
-}
 
-impl TryFrom<Node<ast::Literal>> for Literal {
-    type Error = Error;
-
-    fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
+    //TODO: switch to TryFrom impl below
+    pub fn from_node(node: Node<ast::Literal>) -> Result<Self, Error> {
         use ast::Literal::*;
 
         let (span, lit) = node.take();
@@ -59,6 +58,32 @@ impl TryFrom<Node<ast::Literal>> for Literal {
         Ok(literal)
     }
 }
+
+//TODO: Why does this not compile?
+// impl TryFrom<Node<ast::Literal>> for Literal {
+//     type Error = Error;
+//
+//     fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
+//         use ast::Literal::*;
+//
+//         let (span, lit) = node.take();
+//
+//         let literal = match lit {
+//             String(v) => Literal::String(Bytes::from(v)),
+//             Integer(v) => Literal::Integer(v),
+//             Float(v) => Literal::Float(v),
+//             Boolean(v) => Literal::Boolean(v),
+//             Regex(v) => regex::Regex::new(&v)
+//                 .map_err(|err| (span, err))
+//                 .map(|r| Literal::Regex(r.into()))?,
+//             // TODO: support more formats (similar to Vector's `Convert` logic)
+//             Timestamp(v) => Literal::Timestamp(v.parse().map_err(|err| (span, err))?),
+//             Null => Literal::Null,
+//         };
+//
+//         Ok(literal)
+//     }
+// }
 
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
@@ -198,19 +223,18 @@ impl From<NotNan<f64>> for Literal {
     }
 }
 
-impl TryFrom<f64> for Literal {
-    type Error = Error;
-
-    fn try_from(v: f64) -> Result<Self, Self::Error> {
-        Ok(Literal::Float(NotNan::new(v).map_err(|_| Error {
-            span: Span::default(),
-            variant: ErrorVariant::NanFloat,
-        })?))
-    }
-}
+// impl TryFrom<f64> for Literal {
+//     type Error = Error;
+//
+//     fn try_from(v: f64) -> Result<Self, Self::Error> {
+//         Ok(Literal::Float(NotNan::new(v).map_err(|_| Error {
+//             span: Span::default(),
+//             variant: ErrorVariant::NanFloat,
+//         })?))
+//     }
+// }
 
 // Literal::Boolean ------------------------------------------------------------
-e
 impl From<bool> for Literal {
     fn from(v: bool) -> Self {
         Literal::Boolean(v)
@@ -221,13 +245,13 @@ impl From<bool> for Literal {
 
 impl From<Regex> for Literal {
     fn from(regex: Regex) -> Self {
-        Literal::Regex(regex)
+        Literal::Regex(regex.into())
     }
 }
 
-impl From<regex::Regex> for Literal {
-    fn from(regex: regex::Regex) -> Self {
-        Literal::Regex(regex.into())
+impl From<VrlRegex> for Literal {
+    fn from(regex: VrlRegex) -> Self {
+        Literal::Regex(regex)
     }
 }
 

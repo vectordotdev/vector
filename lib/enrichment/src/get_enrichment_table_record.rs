@@ -138,7 +138,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             self.index,
         )?;
 
-        Ok(Value::Object(data))
+        Ok(Value::Map(data))
     }
 
     fn update_state(

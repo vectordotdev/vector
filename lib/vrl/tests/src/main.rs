@@ -343,7 +343,7 @@ fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
         Value::Integer(v) => v.into(),
         Value::Float(v) => v.into_inner().into(),
         Value::Boolean(v) => v.into(),
-        Value::Object(v) => v
+        Value::Map(v) => v
             .into_iter()
             .map(|(k, v)| (k, vrl_value_to_json_value(v)))
             .collect::<serde_json::Value>(),

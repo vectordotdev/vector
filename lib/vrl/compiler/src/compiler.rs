@@ -102,14 +102,14 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_literal(&mut self, node: Node<ast::Literal>) -> Literal {
-        use literal::ErrorVariant::*;
+        use literal::ErrorVariant;
 
-        Literal::try_from(node).unwrap_or_else(|err| {
+        Literal::from_node(node).unwrap_or_else(|err| {
             let value = match &err.variant {
                 #[allow(clippy::trivial_regex)]
-                InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
-                InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
-                NanFloat => NotNan::new(0.0).unwrap().into(),
+                ErrorVariant::InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
+                ErrorVariant::InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
+                ErrorVariant::NanFloat => NotNan::new(0.0).unwrap().into(),
             };
 
             self.errors.push(Box::new(err));

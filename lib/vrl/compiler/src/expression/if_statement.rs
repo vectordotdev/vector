@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::value::VrlValueConvert;
+
 use crate::{
     expression::{Block, Expr, Literal, Predicate, Resolved},
     Context, Expression, State, TypeDef, Value,

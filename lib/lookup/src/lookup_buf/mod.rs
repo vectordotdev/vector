@@ -259,6 +259,12 @@ impl Look<'static> for LookupBuf {
     }
 }
 
+impl From<&LookupBuf> for LookupBuf {
+    fn from(x: &LookupBuf) -> Self {
+        x.clone()
+    }
+}
+
 impl FromStr for LookupBuf {
     type Err = LookupError;
 

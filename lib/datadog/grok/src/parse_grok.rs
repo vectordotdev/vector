@@ -16,6 +16,8 @@ pub enum Error {
     FailedToApplyFilter(String, String),
     #[error("value does not match any rule")]
     NoMatch,
+    #[error("value must not be NaN")]
+    NanFloat,
 }
 
 /// Parses a given source field value by applying the list of grok rules until the first match found.
@@ -69,8 +71,8 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 if let Some(value) = value {
                     match value {
                         // root-level maps must be merged
-                        Value::Object(map) if field.is_root() || field.segments[0].is_index() => {
-                            parsed.as_object_mut().expect("root is object").extend(map);
+                        Value::Map(map) if field.is_root() || field.segments[0].is_index() => {
+                            parsed.as_map_mut().expect("root is object").extend(map);
                         }
                         // anything else at the root leve must be ignored
                         _ if field.is_root() || field.segments[0].is_index() => {}
@@ -88,7 +90,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 // this must be a regex named capturing group (?<name>group),
                 // where name can only be alphanumeric - thus we do not need to parse field names(no nested fields)
                 parsed
-                    .as_object_mut()
+                    .as_map_mut()
                     .expect("parsed value is not an object")
                     .insert(name.to_string(), value.into());
             }

@@ -163,7 +163,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Value {
 
     match value {
         Value::Null => vrl::Value::Null,
-        Value::Object(v) => v
+        Value::Map(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))
             .collect::<BTreeMap<_, _>>()

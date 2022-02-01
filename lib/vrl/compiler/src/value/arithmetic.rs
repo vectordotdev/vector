@@ -2,8 +2,9 @@ use std::{collections::BTreeMap, convert::TryFrom};
 
 use super::convert::VrlValueConvert;
 use super::Error;
+use crate::value::Kind;
 use crate::ExpressionError;
-use value::Value;
+use ::value::Value;
 
 pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
@@ -23,7 +24,7 @@ pub trait VrlValueArithmetic: Sized {
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
     /// returned. The rhs is a closure that can return an error, and thus this
     /// method can return an error as well.
-    fn try_or(self, mut rhs: impl FnMut() -> Result<Self, ExpressionError>);
+    fn try_or(self, rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error>;
 
     /// Try to "AND" (`&&`) two values types.
     ///
@@ -58,7 +59,9 @@ impl VrlValueArithmetic for Value {
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::try_from_f64(lhv as f64 * rhs.try_float()?)?
+            }
             Value::Integer(lhv) => (lhv * rhs.as_int().ok_or_else(err)?).into(),
             Value::Float(lhv) => (lhv * rhs.as_float().ok_or_else(err)?).into(),
             Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
@@ -78,8 +81,8 @@ impl VrlValueArithmetic for Value {
         }
 
         let value = match self {
-            Value::Integer(lhv) => (lhv as f64 / rhv).into(),
-            Value::Float(lhv) => (lhv.into_inner() / rhv).into(),
+            Value::Integer(lhv) => Value::try_from_f64(lhv as f64 / rhv.into_inner())?,
+            Value::Float(lhv) => (lhv / rhv).into(),
             _ => return Err(err()),
         };
 
@@ -90,7 +93,9 @@ impl VrlValueArithmetic for Value {
         let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 + rhs.try_float()?).into(),
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::try_from_f64(lhv as f64 + rhs.try_float()?)?
+            }
             Value::Integer(lhv) => (lhv + rhs.as_int().ok_or_else(err)?).into(),
             Value::Float(lhv) => (lhv + rhs.as_float().ok_or_else(err)?).into(),
             Value::Bytes(_) if rhs.is_null() => self,
@@ -241,9 +246,9 @@ impl VrlValueArithmetic for Value {
         match self {
             Integer(lhv) => rhs
                 .as_float()
-                .map(|rhv| (*lvh as f64) == rhv)
+                .map(|rhv| (*lhv as f64) == rhv.into_inner())
                 .unwrap_or(false),
-            Float(lhv) => rhs.as_float().map(|rhv| lvh == rhv).unwrap_or(false),
+            Float(lhv) => rhs.as_float().map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
         }
     }
