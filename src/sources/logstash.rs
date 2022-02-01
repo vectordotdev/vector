@@ -1,8 +1,21 @@
+use std::{
+    collections::{BTreeMap, VecDeque},
+    convert::TryFrom,
+    io::{self, Read},
+};
+
+use bytes::{Buf, Bytes, BytesMut};
+use flate2::read::ZlibDecoder;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Decoder;
+
 use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
     serde::bool_or_struct,
@@ -10,17 +23,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     types,
 };
-use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::ZlibDecoder;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    convert::TryFrom,
-    io::{self, Read},
-};
-use tokio_util::codec::Decoder;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
@@ -30,6 +32,7 @@ pub struct LogstashConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -44,6 +47,7 @@ impl GenerateConfig for LogstashConfig {
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
+            connection_limit: None,
         })
         .unwrap()
     }
@@ -66,11 +70,12 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
+            self.connection_limit,
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -118,21 +123,32 @@ impl TcpSource for LogstashSource {
         }
     }
 
-    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
-        LogstashAcker::new(frame)
+    fn build_acker(&self, frames: &[Self::Item]) -> Self::Acker {
+        LogstashAcker::new(frames)
     }
 }
 
 struct LogstashAcker {
-    protocol: LogstashProtocolVersion,
     sequence_number: u32,
+    protocol_version: Option<LogstashProtocolVersion>,
 }
 
 impl LogstashAcker {
-    const fn new(frame: &LogstashEventFrame) -> Self {
+    fn new(frames: &[LogstashEventFrame]) -> Self {
+        let mut sequence_number = 0;
+        let mut protocol_version = None;
+
+        for frame in frames {
+            sequence_number = std::cmp::max(sequence_number, frame.sequence_number);
+            // We assume that it's valid to ack via any of the protocol versions that we've seen in
+            // a set of frames from a single stream, so here we just take the last. In reality, we
+            // do not expect stream with multiple protocol versions to occur.
+            protocol_version = Some(frame.protocol);
+        }
+
         Self {
-            protocol: frame.protocol,
-            sequence_number: frame.sequence_number,
+            sequence_number,
+            protocol_version,
         }
     }
 }
@@ -140,10 +156,10 @@ impl LogstashAcker {
 impl TcpSourceAcker for LogstashAcker {
     // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
     fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
-        match ack {
-            TcpSourceAck::Ack => {
+        match (ack, self.protocol_version) {
+            (TcpSourceAck::Ack, Some(protocol_version)) => {
                 let mut bytes: Vec<u8> = Vec::with_capacity(6);
-                bytes.push(self.protocol.into());
+                bytes.push(protocol_version.into());
                 bytes.push(LogstashFrameType::Ack.into());
                 bytes.extend(self.sequence_number.to_be_bytes().iter());
                 Some(Bytes::from(bytes))
@@ -452,7 +468,7 @@ impl Decoder for LogstashDecoder {
                     rest = right;
 
                     let fields_result: Result<BTreeMap<String, serde_json::Value>, _> =
-                        serde_json::from_slice(slice).context(JsonFrameFailedDecode {});
+                        serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {});
 
                     let remaining = rest.remaining();
                     let byte_size = src.remaining() - remaining;
@@ -498,7 +514,7 @@ impl Decoder for LogstashDecoder {
 
                         let res = ZlibDecoder::new(io::Cursor::new(slice))
                             .read_to_end(&mut buf)
-                            .context(DecompressionFailed)
+                            .context(DecompressionFailedSnafu)
                             .map(|_| BytesMut::from(&buf[..]));
 
                         let remaining = rest.remaining();
@@ -543,12 +559,16 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::test_util::{next_addr, spawn_collect_n, wait_for_tcp};
-    use crate::{event::EventStatus, Pipeline};
     use bytes::BufMut;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+    use crate::{
+        event::EventStatus,
+        test_util::{next_addr, spawn_collect_n, wait_for_tcp},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -566,7 +586,7 @@ mod test {
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let source = LogstashConfig {
             address: address.into(),
@@ -574,6 +594,7 @@ mod test {
             keepalive: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
+            connection_limit: None,
         }
         .build(SourceContext::new_test(sender))
         .await
@@ -638,60 +659,31 @@ mod test {
 
 #[cfg(all(test, feature = "logstash-integration-tests"))]
 mod integration_tests {
+    use std::time::Duration;
+
+    use futures::Stream;
+    use tokio::time::timeout;
+
     use super::*;
     use crate::{
         config::SourceContext,
-        docker::Container,
         event::EventStatus,
-        test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
+        test_util::{collect_n, trace_init, wait_for_tcp},
         tls::TlsOptions,
-        Pipeline,
+        SourceSender,
     };
-    use futures::Stream;
-    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
-    use tokio::time::timeout;
 
-    const BEATS_IMAGE: &str = "docker.elastic.co/beats/heartbeat";
-    const BEATS_TAG: &str = "7.12.1";
-
-    const LOGSTASH_IMAGE: &str = "docker.elastic.co/logstash/logstash";
-    const LOGSTASH_TAG: &str = "7.13.1";
+    fn heartbeat_address() -> String {
+        std::env::var("HEARTBEAT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into())
+    }
 
     #[tokio::test]
     async fn beats_heartbeat() {
         trace_init();
 
-        let (out, address) = source(None).await;
+        let out = source(heartbeat_address(), None).await;
 
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("heartbeat.yml")).unwrap();
-        write!(
-            &mut file,
-            r#"
-heartbeat.monitors:
-- type: http
-  schedule: '@every 1s'
-  urls:
-    - https://google.com
-
-output.logstash:
-  hosts: ['host.docker.internal:{}']
-"#,
-            address.port()
-        )
-        .unwrap();
-
-        let events = Container::new(BEATS_IMAGE, BEATS_TAG)
-            .bind(
-                dir.path().join("heartbeat.yml").display(),
-                "/usr/share/heartbeat/heartbeat.yml",
-            )
-            // adding `-strict.perms=false to the default cmd as otherwise heartbeat was
-            // complaining about the file permissions when running in CI
-            // https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
-            .cmd("-environment=container")
-            .cmd("-strict.perms=false")
-            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
             .await
             .unwrap();
 
@@ -707,56 +699,28 @@ output.logstash:
         assert!(log.get("host").is_some());
     }
 
+    fn logstash_address() -> String {
+        std::env::var("LOGSTASH_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".into())
+    }
+
     #[tokio::test]
     async fn logstash() {
         trace_init();
 
-        let (out, address) = source(Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                key_file: Some("tests/data/host.docker.internal.key".into()),
-                ..Default::default()
-            },
-        }))
+        let out = source(
+            logstash_address(),
+            Some(TlsConfig {
+                enabled: Some(true),
+                options: TlsOptions {
+                    crt_file: Some("tests/data/host.docker.internal.crt".into()),
+                    key_file: Some("tests/data/host.docker.internal.key".into()),
+                    ..Default::default()
+                },
+            }),
+        )
         .await;
 
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("logstash.conf")).unwrap();
-        write!(
-            &mut file,
-            "{}",
-            r#"
-input {
-  generator {
-    count => 5
-    message => "Hello World"
-  }
-}
-output {
-  lumberjack {
-    hosts => "host.docker.internal"
-    ssl_certificate => "/tmp/logstash.crt"
-    port => PORT
-  }
-}
-"#
-            .replace("PORT", &address.port().to_string())
-        )
-        .unwrap();
-
-        let pwd = std::env::current_dir().unwrap();
-        let events = Container::new(LOGSTASH_IMAGE, LOGSTASH_TAG)
-            .bind("/dev/null", "/usr/share/logstash/config/logstash.yml") // tries to contact elasticsearch by default
-            .bind(
-                dir.path().join("logstash.conf").display(),
-                "/usr/share/logstash/pipeline/logstash.conf",
-            )
-            .bind(
-                pwd.join("tests/data/host.docker.internal.crt").display(),
-                "/tmp/logstash.crt",
-            )
-            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
             .await
             .unwrap();
 
@@ -771,9 +735,9 @@ output {
         assert!(log.get("host").is_some());
     }
 
-    async fn source(tls: Option<TlsConfig>) -> (impl Stream<Item = Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+    async fn source(address: String, tls: Option<TlsConfig>) -> impl Stream<Item = Event> {
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let address: std::net::SocketAddr = address.parse().unwrap();
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
@@ -781,6 +745,7 @@ output {
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
+                connection_limit: None,
             }
             .build(SourceContext::new_test(sender))
             .await
@@ -789,6 +754,6 @@ output {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        recv
     }
 }

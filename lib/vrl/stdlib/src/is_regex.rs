@@ -46,6 +46,10 @@ impl Function for IsRegex {
 
         Ok(Box::new(IsRegexFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_regex()))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -65,8 +69,9 @@ impl Expression for IsRegexFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         is_regex => IsRegex;

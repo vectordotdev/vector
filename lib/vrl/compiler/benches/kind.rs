@@ -1,5 +1,6 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::fmt;
+
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use vrl_compiler::value::Kind;
 
 struct Parameters {

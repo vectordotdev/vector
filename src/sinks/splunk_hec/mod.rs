@@ -4,8 +4,7 @@ pub mod common;
 pub mod logs;
 pub mod metrics;
 
-use self::logs::config::HecLogsSinkConfig;
-use self::metrics::config::HecMetricsSinkConfig;
+use self::{logs::config::HecLogsSinkConfig, metrics::config::HecMetricsSinkConfig};
 
 // legacy
 inventory::submit! {

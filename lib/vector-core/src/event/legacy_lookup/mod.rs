@@ -2,27 +2,29 @@ mod segment;
 #[cfg(test)]
 mod test;
 
+use core::fmt;
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Formatter},
+    ops::{Index, IndexMut, RangeFrom, RangeFull, RangeTo, RangeToInclusive},
+    slice::Iter,
+    str,
+    str::FromStr,
+};
+
+use indexmap::map::IndexMap;
+use pest::{iterators::Pair, Parser};
+pub use segment::Segment;
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use toml::Value as TomlValue;
+
 use crate::{
     event::Value,
     mapping::parser::{MappingParser, Rule},
 };
-use pest::{iterators::Pair, Parser};
-use std::{
-    convert::TryFrom,
-    ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
-    slice::Iter,
-    str,
-};
-use toml::Value as TomlValue;
-
-use core::fmt;
-use indexmap::map::IndexMap;
-pub use segment::Segment;
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::ops::{Index, IndexMut};
-use std::str::FromStr;
 
 /// Lookups are pre-validated event lookup paths.
 ///

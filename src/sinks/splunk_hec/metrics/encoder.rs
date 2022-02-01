@@ -1,12 +1,12 @@
-use serde::Serialize;
 use std::{collections::BTreeMap, io, iter};
 
+use serde::Serialize;
+
+use super::sink::HecProcessedEvent;
 use crate::{
     internal_events::SplunkEventEncodeError,
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
-
-use super::sink::HecProcessedEvent;
 
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(untagged)]

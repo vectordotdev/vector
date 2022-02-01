@@ -1,8 +1,10 @@
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
+use std::io;
+
 use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use std::io;
 use tokio_util::codec::{LinesCodec, LinesCodecError};
+
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 
 /// Config used to build a `OctetCountingDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -285,9 +287,10 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
 mod tests {
     #![allow(clippy::print_stdout)]
 
-    use super::*;
     use bytes::BufMut;
     use tokio_util::codec::Decoder;
+
+    use super::*;
 
     #[test]
     fn non_octet_decode_works_with_multiple_frames() {

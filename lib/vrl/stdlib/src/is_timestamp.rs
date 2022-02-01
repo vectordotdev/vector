@@ -46,6 +46,10 @@ impl Function for IsTimestamp {
 
         Ok(Box::new(IsTimestampFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_timestamp()))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -65,8 +69,9 @@ impl Expression for IsTimestampFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
+
+    use super::*;
 
     test_function![
         is_timestamp => IsTimestamp;

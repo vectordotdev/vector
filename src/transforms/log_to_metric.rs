@@ -1,22 +1,24 @@
+use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{Event, Value},
+    event::{
+        metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        Event, Value,
+    },
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
         LogToMetricTemplateParseError, TemplateRenderingFailed,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::num::ParseFloatError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -134,8 +136,8 @@ impl TransformConfig for LogToMetricConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -380,7 +382,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(config, &event) {
                 Ok(metric) => {
@@ -415,14 +417,17 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, DateTime, Utc};
+
     use super::*;
-    use crate::transforms::test::transform_one;
     use crate::{
         config::log_schema,
-        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        event::Event,
+        event::{
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
+            Event,
+        },
+        transforms::test::transform_one,
     };
-    use chrono::{offset::TimeZone, DateTime, Utc};
 
     #[test]
     fn generate_config() {
@@ -723,7 +728,7 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(
@@ -778,7 +783,7 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(

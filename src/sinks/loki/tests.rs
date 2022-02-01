@@ -1,13 +1,14 @@
-use super::config::LokiConfig;
-use super::healthcheck::healthcheck;
-use super::sink::LokiSink;
-use crate::config::ProxyConfig;
-use crate::event::Event;
-use crate::http::HttpClient;
-use crate::sinks::util::test::{build_test_server, load_sink};
-use crate::test_util;
-use crate::tls::TlsSettings;
 use futures::StreamExt;
+
+use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
+use crate::{
+    config::ProxyConfig,
+    event::Event,
+    http::HttpClient,
+    sinks::util::test::{build_test_server, load_sink},
+    test_util,
+    tls::TlsSettings,
+};
 
 #[test]
 fn generate_config() {

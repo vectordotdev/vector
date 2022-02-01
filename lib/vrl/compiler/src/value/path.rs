@@ -1,6 +1,8 @@
-use super::Value;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use super::Value;
 
 impl Value {
     /// Insert the current value into a given path.

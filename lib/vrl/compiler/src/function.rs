@@ -1,16 +1,25 @@
-use crate::expression::{
-    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
 };
-use crate::parser::Node;
-use crate::value::Kind;
-use crate::{Span, Value};
+
 use diagnostic::{DiagnosticError, Label, Note};
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
+
+use crate::{
+    expression::{
+        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+    },
+    parser::Node,
+    value::Kind,
+    vm::VmArgumentList,
+    Context, ExpressionError, Span, Value,
+};
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type CompiledArgument =
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
 
-pub trait Function: Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -52,6 +61,31 @@ pub trait Function: Sync + fmt::Debug {
     /// and argument type definition.
     fn parameters(&self) -> &'static [Parameter] {
         &[]
+    }
+
+    /// Implement this function if you need to manipulate and store any function parameters
+    /// at compile time.
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        _name: &str,
+        _expr: Option<&Expr>,
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+        Ok(None)
+    }
+
+    /// This function is called by the VM.
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        _args: &mut VmArgumentList,
+    ) -> Result<Value, ExpressionError> {
+        Err(ExpressionError::Error {
+            message: "unimplemented".to_string(),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        })
     }
 }
 
@@ -362,7 +396,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid enum variant for argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
@@ -393,7 +427,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
         }

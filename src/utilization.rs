@@ -1,15 +1,17 @@
-use crate::stats;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+
 use futures::{Stream, StreamExt};
 use futures_util::ready;
 use metrics::gauge;
 use pin_project::pin_project;
-use std::{pin::Pin, task::Context};
-use std::{
-    task::Poll,
-    time::{Duration, Instant},
-};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::stats;
 
 #[pin_project]
 pub struct Utilization<S> {

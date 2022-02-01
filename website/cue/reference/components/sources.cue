@@ -100,7 +100,7 @@ components: sources: [Name=string]: {
 								delimiter: {
 									description: "The character used to separate frames."
 									required:    true
-									type: string: {
+									type: ascii_char: {
 										examples: ["\n", "\t"]
 									}
 								}

@@ -1,14 +1,15 @@
+use bytes::Bytes;
+use chrono::{DateTime, Datelike, Utc};
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+
 use crate::{
     codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, Value},
     internal_events::SyslogConvertUtf8Error,
 };
-use bytes::Bytes;
-use chrono::{DateTime, Datelike, Utc};
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
-use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

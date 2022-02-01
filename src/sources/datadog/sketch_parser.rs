@@ -1,14 +1,14 @@
+use std::{collections::BTreeMap, sync::Arc};
+
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use prost::Message;
+use vector_core::{config::log_schema, metrics::AgentDDSketch};
+
 use crate::{
     event::{metric::MetricValue, Event, Metric, MetricKind},
     Result,
 };
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use prost::Message;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use vector_core::config::log_schema;
-use vector_core::metrics::AgentDDSketch;
 
 mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));

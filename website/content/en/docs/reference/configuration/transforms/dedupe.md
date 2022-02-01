@@ -1,6 +1,6 @@
 ---
 title: Dedupe events
-description: Deduplicate events passing through a topology, i.e. eliminate any events with duplicated content within a specified time window
+description: Deduplicate logs passing through a topology
 short: Dedupe
 kind: transform
 layout: component

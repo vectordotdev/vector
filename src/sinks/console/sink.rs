@@ -1,15 +1,20 @@
-use crate::event::Event;
-use crate::internal_events::ConsoleEventProcessed;
-use crate::sinks::util::encoding::{Encoder, EncodingConfig, StandardEncodings};
-use crate::sinks::util::StreamSink;
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-use tokio::io;
-use tokio::io::AsyncWriteExt;
-use vector_core::buffers::Acker;
-use vector_core::internal_event::{BytesSent, EventsSent};
-use vector_core::ByteSizeOf;
+use futures::{stream::BoxStream, StreamExt};
+use tokio::{io, io::AsyncWriteExt};
+use vector_core::{
+    buffers::Acker,
+    internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
+};
+
+use crate::{
+    event::Event,
+    internal_events::ConsoleEventProcessed,
+    sinks::util::{
+        encoding::{Encoder, EncodingConfig, StandardEncodings},
+        StreamSink,
+    },
+};
 
 pub struct WriterSink<T> {
     pub acker: Acker,
@@ -18,7 +23,7 @@ pub struct WriterSink<T> {
 }
 
 #[async_trait]
-impl<T> StreamSink for WriterSink<T>
+impl<T> StreamSink<Event> for WriterSink<T>
 where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
@@ -40,7 +45,8 @@ where
                 });
                 emit!(&EventsSent {
                     byte_size: event_byte_size,
-                    count: 1
+                    count: 1,
+                    output: None,
                 });
                 emit!(&BytesSent {
                     byte_size: buf.len(),
@@ -58,12 +64,17 @@ fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> O
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::event::{Event, Value};
-    use crate::sinks::util::encoding::StandardEncodings;
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{
+        event::{
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
+            Event, Value,
+        },
+        sinks::util::encoding::StandardEncodings,
+    };
 
     #[test]
     fn encodes_raw_logs() {

@@ -1,13 +1,14 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+use std::{
+    collections::{BTreeMap, HashSet},
+    future::ready,
+    path::PathBuf,
+    time::Instant,
 };
+
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt,
+    stream, FutureExt, StreamExt,
 };
 use openssl::{
     error::ErrorStack,
@@ -16,12 +17,6 @@ use openssl::{
 use postgres_openssl::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, HashSet},
-    future::ready,
-    path::PathBuf,
-    time::Instant,
-};
 use tokio::time;
 use tokio_postgres::{
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},
@@ -29,6 +24,15 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+};
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
@@ -128,7 +132,7 @@ impl_generate_config_from_default!(PostgresqlMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
             self.include_databases.clone().unwrap_or_default(),
             self.exclude_databases.clone().unwrap_or_default(),
@@ -145,10 +149,6 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
         .await?;
 
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending postgresql metrics.", %error));
-
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -161,16 +161,19 @@ impl SourceConfig for PostgresqlMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
-                out.send_all(&mut stream).await?;
+                let mut stream = stream::iter(metrics).flatten().map(Event::Metric);
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending postgresql metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -210,19 +213,18 @@ impl PostgresqlClient {
         let client = match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
-                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailedSnafu)?;
                 builder
                     .set_ca_file(tls_config.ca_file.clone())
-                    .context(TlsFailed)?;
+                    .context(TlsFailedSnafu)?;
                 let connector = MakeTlsConnector::new(builder.build());
 
                 let (client, connection) =
-                    self.config
-                        .connect(connector)
-                        .await
-                        .with_context(|| ConnectionFailed {
+                    self.config.connect(connector).await.with_context(|_| {
+                        ConnectionFailedSnafu {
                             endpoint: config_to_endpoint(&self.config),
-                        })?;
+                        }
+                    })?;
                 tokio::spawn(connection);
                 client
             }
@@ -231,7 +233,7 @@ impl PostgresqlClient {
                     self.config
                         .connect(NoTls)
                         .await
-                        .with_context(|| ConnectionFailed {
+                        .with_context(|_| ConnectionFailedSnafu {
                             endpoint: config_to_endpoint(&self.config),
                         })?;
                 tokio::spawn(connection);
@@ -244,12 +246,12 @@ impl PostgresqlClient {
             let version_row = client
                 .query_one("SELECT version()", &[])
                 .await
-                .with_context(|| SelectVersionFailed {
+                .with_context(|_| SelectVersionFailedSnafu {
                     endpoint: config_to_endpoint(&self.config),
                 })?;
             let version = version_row
                 .try_get::<&str, &str>("version")
-                .with_context(|| SelectVersionFailed {
+                .with_context(|_| SelectVersionFailedSnafu {
                     endpoint: config_to_endpoint(&self.config),
                 })?;
             debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
@@ -259,13 +261,13 @@ impl PostgresqlClient {
         let row = client
             .query_one("SHOW server_version_num", &[])
             .await
-            .with_context(|| SelectVersionFailed {
+            .with_context(|_| SelectVersionFailedSnafu {
                 endpoint: config_to_endpoint(&self.config),
             })?;
 
         let version = row
             .try_get::<&str, &str>("server_version_num")
-            .with_context(|| SelectVersionFailed {
+            .with_context(|_| SelectVersionFailedSnafu {
                 endpoint: config_to_endpoint(&self.config),
             })?;
 
@@ -429,7 +431,7 @@ impl PostgresqlMetrics {
         namespace: Option<String>,
         tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
-        let config: Config = endpoint.parse().context(InvalidEndpoint)?;
+        let config: Config = endpoint.parse().context(InvalidEndpointSnafu)?;
 
         let hosts = config.get_hosts();
         let host = match hosts.len() {
@@ -506,7 +508,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_database(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(20 * rows.len());
         for row in rows.iter() {
@@ -641,7 +643,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_database_conflicts(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(5 * rows.len());
         for row in rows.iter() {
@@ -683,7 +685,7 @@ impl PostgresqlMetrics {
             .datname_filter
             .pg_stat_bgwriter(client)
             .await
-            .context(QueryError)?;
+            .context(QuerySnafu)?;
 
         Ok(vec![
             self.create_metric(
@@ -871,7 +873,29 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, tls, Pipeline};
+    use crate::{test_util::trace_init, tls, SourceSender};
+    use std::path::PathBuf;
+
+    fn pg_host() -> String {
+        std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
+    }
+
+    fn pg_socket() -> PathBuf {
+        std::env::var("PG_SOCKET")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                let current_dir = std::env::current_dir().unwrap();
+                current_dir
+                    .join("tests")
+                    .join("data")
+                    .join("postgresql-local-socket")
+            })
+    }
+
+    fn pg_url() -> String {
+        std::env::var("PG_URL")
+            .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
+    }
 
     async fn test_postgresql_metrics(
         endpoint: String,
@@ -889,7 +913,7 @@ mod integration_tests {
             Host::Unix(path) => path.to_string_lossy().to_string(),
         };
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             PostgresqlMetricsConfig {
@@ -958,22 +982,14 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_host() {
-        test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
-            None,
-            None,
-            None,
-        )
-        .await;
+        test_postgresql_metrics(pg_url(), None, None, None).await;
     }
 
     #[tokio::test]
     async fn test_local() {
-        let current_dir = std::env::current_dir().unwrap();
-        let socket = current_dir.join("tests/data/postgresql-local-socket");
         let endpoint = format!(
             "postgresql:///postgres?host={}&user=vector&password=vector",
-            socket.to_str().unwrap()
+            pg_socket().to_str().unwrap()
         );
         test_postgresql_metrics(endpoint, None, None, None).await;
     }
@@ -981,7 +997,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_ssl() {
         test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres?sslmode=require".to_owned(),
+            format!("{}?sslmode=require", pg_url()),
             Some(PostgresqlMetricsTlsConfig {
                 ca_file: tls::TEST_PEM_CA_PATH.into(),
             }),
@@ -994,7 +1010,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_include_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
             None,
@@ -1013,7 +1029,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_host_exclude_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             None,
             Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
@@ -1031,19 +1047,13 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_host_exclude_databases_empty() {
-        test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
-            None,
-            None,
-            Some(vec!["".to_owned()]),
-        )
-        .await;
+        test_postgresql_metrics(pg_url(), None, None, Some(vec!["".to_owned()])).await;
     }
 
     #[tokio::test]
     async fn test_host_include_databases_and_exclude_databases() {
         let events = test_postgresql_metrics(
-            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            pg_url(),
             None,
             Some(vec!["template\\d+".to_owned()]),
             Some(vec!["template0".to_owned()]),

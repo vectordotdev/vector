@@ -1,9 +1,24 @@
+use std::{
+    fmt::Display,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
-    event::Event,
+    event::{
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+        Event,
+    },
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
         buffer::metrics::compress_distribution,
@@ -13,18 +28,6 @@ use crate::{
         BatchConfig, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
-use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Display,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::{Service, ServiceBuilder};
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -126,7 +129,7 @@ impl SinkConfig for StatsdSinkConfig {
                     })
                 });
 
-                Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+                Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -252,15 +255,15 @@ impl Service<Vec<u8>> for StatsdSvc {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    use super::*;
+    use crate::{event::Metric, test_util::*};
 
     #[test]
     fn generate_config() {
@@ -316,7 +319,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -346,7 +349,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -361,7 +364,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -390,7 +393,7 @@ mod test {
         let event = Event::Metric(metric1);
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1_compressed, metric2);
+        vector_common::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -407,7 +410,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]
@@ -464,7 +467,7 @@ mod test {
             }
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

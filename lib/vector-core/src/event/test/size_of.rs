@@ -1,8 +1,9 @@
-use super::*;
-use crate::event::test::common::Name;
-use crate::ByteSizeOf;
-use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::mem;
+
+use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+
+use super::*;
+use crate::{event::test::common::Name, ByteSizeOf};
 
 #[test]
 fn at_least_wrapper_size() {

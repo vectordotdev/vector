@@ -5,11 +5,11 @@ pub mod tables;
 #[cfg(test)]
 mod test_util;
 mod vrl_util;
-use dyn_clone::DynClone;
 use std::collections::BTreeMap;
-use vrl_core::Value;
 
+use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
+use vrl_core::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -77,9 +77,7 @@ dyn_clone::clone_trait_object!(Table);
 
 pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
     vec![
-        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord)
-            as Box<dyn vrl_core::Function>,
-        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords)
-            as Box<dyn vrl_core::Function>,
+        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
+        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords) as _,
     ]
 }

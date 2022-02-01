@@ -1,14 +1,13 @@
 use std::io;
 
+use serde::{Deserialize, Serialize};
 use vector_core::{config::log_schema, event::LogEvent};
 
+use super::sink::HecProcessedEvent;
 use crate::{
     internal_events::SplunkEventEncodeError,
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
-use serde::{Deserialize, Serialize};
-
-use super::sink::HecProcessedEvent;
 
 #[derive(Serialize, Debug)]
 pub enum HecEvent {

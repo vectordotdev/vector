@@ -1,5 +1,6 @@
-use ordered_float::NotNan;
 use std::{iter::Peekable, str::CharIndices};
+
+use ordered_float::NotNan;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;

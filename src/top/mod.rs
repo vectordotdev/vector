@@ -4,10 +4,9 @@ mod events;
 mod metrics;
 mod state;
 
+pub use cmd::cmd;
 use structopt::StructOpt;
 use url::Url;
-
-pub use cmd::cmd;
 
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]

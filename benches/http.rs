@@ -1,10 +1,11 @@
+use std::net::SocketAddr;
+
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::TryFutureExt;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
 };
-use std::net::SocketAddr;
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,

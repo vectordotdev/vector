@@ -1,10 +1,10 @@
-use super::query_value::QueryValue;
-use super::Function;
+use bytes::BytesMut;
+
+use super::{query_value::QueryValue, Function};
 use crate::{
     event::{Event, Value},
     mapping::Result,
 };
-use bytes::BytesMut;
 
 #[derive(Debug, Clone)]
 pub(in crate::mapping) enum Operator {

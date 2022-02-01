@@ -1,6 +1,8 @@
-use crate::log_util;
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
+
+use crate::log_util;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
@@ -171,9 +173,10 @@ fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
-    use shared::btreemap;
+    use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         parse_common_log => ParseApacheLog;
@@ -195,7 +198,7 @@ mod tests {
                 "size" => 2326,
             }),
             tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         combined_line_valid {
@@ -217,7 +220,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         combined_line_missing_fields_valid {
@@ -237,7 +240,7 @@ mod tests {
                 "size" => 84170,
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_valid {
@@ -255,7 +258,7 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_ip_v6 {
@@ -273,7 +276,7 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_thread_id {
@@ -293,7 +296,7 @@ mod tests {
 
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::Named(chrono_tz::Tz::UTC),
+            tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         log_line_valid_empty {
@@ -302,7 +305,7 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_empty_variant {
@@ -311,14 +314,14 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_with_local_timestamp_format {
             args: func_args![value: format!("[{}] - - - -",
                                             Utc.ymd(2000, 10, 10).and_hms(20,55,36)
                                               .with_timezone(&Local)
-                                              .format("%a %b %d %H:%M:%S %Y").to_string()
+                                              .format("%a %b %d %H:%M:%S %Y")
                                             ),
                              timestamp_format: "%a %b %d %H:%M:%S %Y",
                              format: "error",
@@ -327,7 +330,7 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_with_timezone {
@@ -340,7 +343,7 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
+            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
         log_line_invalid {
@@ -349,7 +352,7 @@ mod tests {
             ],
             want: Err("failed parsing common log line"),
             tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_invalid_timestamp {
@@ -358,7 +361,7 @@ mod tests {
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tz: vector_common::TimeZone::default(),
         }
     ];
 }

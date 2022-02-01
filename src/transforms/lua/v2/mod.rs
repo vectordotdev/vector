@@ -1,14 +1,16 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+pub use vector_core::event::lua;
+use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
+
 use crate::{
-    config::{self, DataType, CONFIG_PATHS},
+    config::{self, DataType, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::Transform,
 };
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::path::PathBuf;
-pub use vector_core::event::lua;
-use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -88,15 +90,15 @@ struct TimerConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self).map(Transform::task)
+        Lua::new(self).map(Transform::event_task)
     }
 
     pub const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub const fn transform_type(&self) -> &'static str {
@@ -155,30 +157,30 @@ impl Lua {
         }
 
         if let Some(source) = &config.source {
-            lua.load(source).eval().context(InvalidSource)?;
+            lua.load(source).eval().context(InvalidSourceSnafu)?;
         }
 
         let hook_init_code = config.hooks.init.as_ref();
         let hook_init = hook_init_code
             .map(|code| make_registry_value(&lua, code))
             .transpose()
-            .context(InvalidHooksInit)?;
+            .context(InvalidHooksInitSnafu)?;
 
         let hook_process =
-            make_registry_value(&lua, &config.hooks.process).context(InvalidHooksProcess)?;
+            make_registry_value(&lua, &config.hooks.process).context(InvalidHooksProcessSnafu)?;
 
         let hook_shutdown_code = config.hooks.shutdown.as_ref();
         let hook_shutdown = hook_shutdown_code
             .map(|code| make_registry_value(&lua, code))
             .transpose()
-            .context(InvalidHooksShutdown)?;
+            .context(InvalidHooksShutdownSnafu)?;
 
         for (id, timer) in config.timers.iter().enumerate() {
             let handler_key = lua
                 .load(&timer.handler)
                 .eval::<mlua::Function>()
                 .and_then(|f| lua.create_registry_value(f))
-                .context(InvalidTimerHandler)?;
+                .context(InvalidTimerHandlerSnafu)?;
 
             let timer = Timer {
                 id: id as u32,
@@ -231,7 +233,7 @@ impl Lua {
             let _ = self
                 .lua
                 .gc_collect()
-                .context(RuntimeErrorGc)
+                .context(RuntimeErrorGcSnafu)
                 .map_err(|error| error!(%error, rate_limit = 30));
             self.invocations_after_gc = 0;
         }
@@ -263,7 +265,7 @@ impl RuntimeTransform for Lua {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
                     .call((event, wrap_emit_fn(scope, emit_fn)?))
             })
-            .context(RuntimeErrorHooksProcess)
+            .context(RuntimeErrorHooksProcessSnafu)
             .map_err(|e| emit!(&LuaBuildError { error: e }));
 
         self.attempt_gc();
@@ -283,7 +285,7 @@ impl RuntimeTransform for Lua {
                     None => Ok(()),
                 }
             })
-            .context(RuntimeErrorHooksInit)
+            .context(RuntimeErrorHooksInitSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -303,7 +305,7 @@ impl RuntimeTransform for Lua {
                     None => Ok(()),
                 }
             })
-            .context(RuntimeErrorHooksShutdown)
+            .context(RuntimeErrorHooksShutdownSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -320,7 +322,7 @@ impl RuntimeTransform for Lua {
                 lua.registry_value::<mlua::Function>(handler_key)?
                     .call(wrap_emit_fn(scope, emit_fn)?)
             })
-            .context(RuntimeErrorTimerHandler)
+            .context(RuntimeErrorTimerHandlerSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -341,6 +343,8 @@ fn format_error(error: &mlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    use futures::{stream, StreamExt};
+
     use super::*;
     use crate::{
         event::{
@@ -350,7 +354,6 @@ mod tests {
         test_util::trace_init,
         transforms::TaskTransform,
     };
-    use futures::{stream, StreamExt};
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -698,8 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn lua_load_file() -> crate::Result<()> {
-        use std::fs::File;
-        use std::io::Write;
+        use std::{fs::File, io::Write};
         trace_init();
 
         let dir = tempfile::tempdir().unwrap();

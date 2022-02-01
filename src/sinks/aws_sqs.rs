@@ -1,5 +1,24 @@
-use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
+use std::{
+    convert::{TryFrom, TryInto},
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use rusoto_core::RusotoError;
+use rusoto_sqs::{
+    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
+    SendMessageResult, Sqs, SqsClient,
+};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::Service;
+use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 use crate::{
+    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
@@ -13,24 +32,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
-    SendMessageResult, Sqs, SqsClient,
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    convert::{TryFrom, TryInto},
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::Service;
-use tracing_futures::Instrument;
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -116,7 +117,10 @@ impl SinkConfig for SqsSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
+        Ok((
+            super::VectorSink::from_event_sink(sink),
+            healthcheck.boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -137,7 +141,7 @@ impl SqsSinkConfig {
             })
             .await
             .map(|_| ())
-            .context(GetQueueAttributes)
+            .context(GetQueueAttributesSnafu)
             .map_err(Into::into)
     }
 
@@ -170,7 +174,7 @@ impl SqsSink {
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
-            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplate)?),
+            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplateSnafu)?),
             (Some(_), false) => return Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
@@ -334,9 +338,10 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::event::LogEvent;
-    use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
@@ -385,12 +390,19 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    use std::collections::HashMap;
+
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
-    use std::collections::HashMap;
     use tokio::time::{sleep, Duration};
+
+    use super::*;
+    use crate::sinks::VectorSink;
+    use crate::test_util::{random_lines_with_stream, random_string};
+
+    fn sqs_address() -> String {
+        std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     #[tokio::test]
     async fn sqs_send_message_batch() {
@@ -398,7 +410,7 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4566".into(),
+            endpoint: sqs_address(),
         };
 
         let queue_name = gen_queue_name();
@@ -409,7 +421,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+            region: RegionOrEndpoint::with_endpoint(sqs_address().as_str()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             message_deduplication_id: None,
@@ -420,10 +432,11 @@ mod integration_tests {
 
         config.clone().healthcheck(client.clone()).await.unwrap();
 
-        let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = VectorSink::from_event_sink(sink);
 
         let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-        sink.send_all(&mut events.map(Ok)).await.unwrap();
+        sink.run(events).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;
 

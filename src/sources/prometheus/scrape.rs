@@ -1,8 +1,20 @@
+use std::{
+    future::ready,
+    time::{Duration, Instant},
+};
+
+use futures::{stream, FutureExt, StreamExt, TryFutureExt};
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio_stream::wrappers::IntervalStream;
+
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    http::Auth,
-    http::HttpClient,
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
+    http::{Auth, HttpClient},
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -10,17 +22,8 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Pipeline,
+    SourceSender,
 };
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
-use tokio_stream::wrappers::IntervalStream;
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
 // gave up trying to format, but reported no error
@@ -85,7 +88,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
+            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
@@ -102,8 +105,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -147,8 +150,8 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -186,12 +189,10 @@ fn prometheus(
     proxy: ProxyConfig,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> sources::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
-    Box::pin(
-        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+    Box::pin(async move {
+        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -313,7 +314,7 @@ fn prometheus(
                                                     }
                                                 }
                                             }
-                                            Ok(event)
+                                            event
                                         }))
                                     }
                                     Err(error) => {
@@ -361,13 +362,31 @@ fn prometheus(
                     .flatten()
             })
             .flatten()
-            .forward(out)
-            .inspect(|_| info!("Finished sending.")),
-    )
+            .boxed();
+
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Error sending metric.", %error);
+                Err(())
+            }
+        }
+    })
 }
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        Body, Client, Response, Server,
+    };
+    use pretty_assertions::assert_eq;
+    use tokio::time::{sleep, Duration};
+    use warp::Filter;
+
     use super::*;
     use crate::{
         config,
@@ -375,13 +394,6 @@ mod test {
         test_util::{self, next_addr, start_topology},
         Error,
     };
-    use hyper::{
-        service::{make_service_fn, service_fn},
-        {Body, Client, Response, Server},
-    };
-    use pretty_assertions::assert_eq;
-    use tokio::time::{sleep, Duration};
-    use warp::Filter;
 
     #[test]
     fn generate_config() {
@@ -410,7 +422,7 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
@@ -460,7 +472,7 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
@@ -566,7 +578,8 @@ mod test {
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
-                flush_period_secs: 1,
+                distributions_as_summaries: false,
+                flush_period_secs: Duration::from_secs(1),
             },
         );
 
@@ -621,13 +634,14 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::SourceContext,
         event::{MetricKind, MetricValue},
-        test_util, Pipeline,
+        test_util, SourceSender,
     };
-    use tokio::time::Duration;
 
     #[tokio::test]
     async fn scrapes_metrics() {
@@ -641,7 +655,7 @@ mod integration_tests {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

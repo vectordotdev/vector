@@ -1,9 +1,12 @@
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    transforms::{FunctionTransform, Transform},
-};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
+    event::Event,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -37,8 +40,8 @@ impl TransformConfig for RemoveTagsConfig {
         DataType::Metric
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -53,7 +56,7 @@ impl RemoveTags {
 }
 
 impl FunctionTransform for RemoveTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let metric = event.as_mut_metric();
 
         for tag in &self.tags {
@@ -69,10 +72,13 @@ impl FunctionTransform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::transforms::test::transform_one;
-    use shared::btreemap;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue},
+        transforms::test::transform_one,
+    };
 
     #[test]
     fn generate_config() {

@@ -1,14 +1,15 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use vector_common::TimeZone;
+
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
     internal_events::CoercerConversionFailed,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -40,8 +41,8 @@ impl TransformConfig for CoercerConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -65,7 +66,7 @@ impl Coercer {
 }
 
 impl FunctionTransform for Coercer {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut log = event.into_log();
 
         if self.drop_unspecified {
@@ -104,12 +105,14 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::CoercerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -142,7 +145,7 @@ mod tests {
         .await
         .unwrap();
         let coercer = coercer.as_function();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         coercer.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(&metadata, result.metadata());
@@ -176,6 +179,6 @@ mod tests {
         expected.as_mut_log().insert("bool", true);
         expected.as_mut_log().insert("number", 1234);
 
-        shared::assert_event_data_eq!(log, expected.into_log());
+        vector_common::assert_event_data_eq!(log, expected.into_log());
     }
 }

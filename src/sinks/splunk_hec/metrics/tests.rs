@@ -1,3 +1,14 @@
+use std::{collections::BTreeSet, sync::Arc};
+
+use chrono::{DateTime, Utc};
+use futures_util::StreamExt;
+use serde_json::{json, Value as JsonValue};
+use vector_common::btreemap;
+use vector_core::{
+    event::{Event, Metric, MetricKind, MetricValue},
+    ByteSizeOf,
+};
+
 use super::sink::{process_metric, HecProcessedEvent};
 use crate::{
     config::{SinkConfig, SinkContext},
@@ -7,15 +18,6 @@ use crate::{
     },
     template::Template,
     test_util::next_addr,
-};
-use chrono::{DateTime, Utc};
-use futures_util::{stream, StreamExt};
-use serde_json::{json, Value as JsonValue};
-use shared::btreemap;
-use std::{collections::BTreeSet, sync::Arc};
-use vector_core::{
-    event::{Event, Metric, MetricKind, MetricValue},
-    ByteSizeOf,
 };
 
 fn get_counter() -> Metric {
@@ -344,7 +346,7 @@ async fn splunk_passthrough_token() {
         Event::from(get_counter()),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)

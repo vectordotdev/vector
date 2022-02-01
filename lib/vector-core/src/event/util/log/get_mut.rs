@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
+
+use super::{PathComponent, PathIter, Value};
 
 /// Returns a mutable reference to field value specified by the given path.
 pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Option<&'a mut Value> {
@@ -42,9 +43,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn get_mut_simple() {

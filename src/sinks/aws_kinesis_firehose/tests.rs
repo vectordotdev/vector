@@ -1,15 +1,20 @@
 #![cfg(test)]
 
 use super::*;
-use crate::aws::RegionOrEndpoint;
-use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::aws_kinesis_firehose::config::{
-    KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
+use crate::{
+    aws::RegionOrEndpoint,
+    config::{SinkConfig, SinkContext},
+    sinks::{
+        aws_kinesis_firehose::config::{
+            KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
+        },
+        util::{
+            batch::BatchError,
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, Compression,
+        },
+    },
 };
-use crate::sinks::util::batch::BatchError;
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::{BatchConfig, Compression};
 
 #[test]
 fn generate_config() {

@@ -1,6 +1,6 @@
-use crate::grammar::{unescape, DEFAULT_FIELD};
-
 use regex::Regex;
+
+use crate::grammar::{unescape, DEFAULT_FIELD};
 
 /// This enum represents value comparisons that Queries might perform
 #[derive(Debug, Copy, Clone)]

@@ -1,17 +1,18 @@
+use std::sync::Arc;
+
+use futures::{future, FutureExt};
+use serde::{Deserialize, Serialize};
+use stream_cancel::{Trigger, Tripwire};
+use tokio::sync::Mutex;
+
 use crate::{
-    config::{Config, DataType, SourceConfig, SourceContext},
+    config::{Config, DataType, Output, SourceConfig, SourceContext},
     sinks::blackhole::BlackholeConfig,
-    sources::stdin::StdinConfig,
-    sources::Source,
+    sources::{stdin::StdinConfig, Source},
     test_util::{start_topology, trace_init},
     transforms::json_parser::JsonParserConfig,
     Error,
 };
-use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use stream_cancel::{Trigger, Tripwire};
-use tokio::sync::Mutex;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
@@ -52,8 +53,8 @@ impl SourceConfig for MockSourceConfig {
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {

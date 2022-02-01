@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
@@ -6,7 +8,6 @@ use nom::{
     sequence::{delimited, preceded},
     IResult,
 };
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

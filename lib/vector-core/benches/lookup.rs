@@ -1,7 +1,7 @@
+use std::{convert::TryFrom, fs, io::Read, path::Path};
+
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use indexmap::map::IndexMap;
-use std::convert::TryFrom;
-use std::{fs, io::Read, path::Path};
 use vector_core::event::Lookup;
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";

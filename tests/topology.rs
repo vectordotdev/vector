@@ -1,10 +1,5 @@
 mod support;
 
-use crate::support::{
-    sink, sink_failing_healthcheck, sink_with_data, source, source_with_data, transform,
-    MockSourceConfig,
-};
-use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
     iter,
@@ -13,8 +8,21 @@ use std::{
         Arc,
     },
 };
+
+use futures::{future, stream, StreamExt};
 use tokio::time::{sleep, Duration};
-use vector::{config::Config, event::Event, test_util::start_topology, topology};
+use vector::{
+    config::{Config, SinkOuter},
+    event::Event,
+    test_util::start_topology,
+    topology,
+};
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
+
+use crate::support::{
+    sink, sink_failing_healthcheck, sink_with_data, source, source_with_data, transform,
+    MockSourceConfig,
+};
 
 fn basic_config() -> Config {
     let mut config = Config::builder();
@@ -43,7 +51,7 @@ async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let (in1, rx) = vector::Pipeline::new_with_buffer(1000, vec![]);
+    let (mut in1, rx) = vector::SourceSender::new_with_buffer(1000);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
     let transform1 = transform(" transformed", 0.0);
@@ -57,10 +65,8 @@ async fn topology_shutdown_while_active() {
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let pump_handle = tokio::spawn(async move {
-        futures::stream::repeat(Event::from("test"))
-            .map(Ok)
-            .forward(in1)
-            .await
+        let mut stream = futures::stream::repeat(Event::from("test"));
+        in1.send_all(&mut stream).await
     });
 
     // Wait until at least 100 events have been seen by the source so we know the pump is running
@@ -415,7 +421,7 @@ async fn topology_swap_transform() {
 #[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
-    let (in1, source1) = source();
+    let (mut in1, source1) = source();
     let transform1v1 = transform(" transformed", 0.0);
     let (out1, sink1) = sink(10);
 
@@ -435,11 +441,10 @@ async fn topology_swap_transform_is_atomic() {
             None
         }
     };
-    let input = stream::iter(iter::from_fn(events));
-    let input = input
-        .map(Ok)
-        .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
-        .map(|_| ());
+    let mut input = stream::iter(iter::from_fn(events));
+    let input = async move {
+        in1.send_all(&mut input).await.unwrap();
+    };
     let output = out1.for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
         future::ready(())
@@ -580,4 +585,60 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
     let mut config = config.build().unwrap();
     config.healthchecks.require_healthy = true;
     assert!(!topology.reload_config_and_respawn(config).await.unwrap());
+}
+
+#[tokio::test]
+async fn topology_disk_buffer_flushes_on_idle() {
+    let tmpdir = tempfile::tempdir().expect("no tmpdir");
+    let event = Event::from("foo");
+
+    let (mut in1, source1) = source();
+    let transform1 = transform("", 0.0);
+    let (mut out1, sink1) = sink(10);
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform1);
+    let mut sink1_outer = SinkOuter::new(
+        // read from both the source and the transform
+        vec![String::from("in1"), String::from("t1")],
+        Box::new(sink1),
+    );
+    sink1_outer.buffer = BufferConfig {
+        stages: vec![BufferType::DiskV1 {
+            max_size: 1024,
+            when_full: WhenFull::DropNewest,
+        }],
+    };
+    config.add_sink_outer("out1", sink1_outer);
+
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    in1.send(event).await.unwrap();
+
+    // ensure that we get the first copy of the event within a reasonably short amount of time
+    // (either from the source or the transform)
+    let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
+        .await
+        .expect("timeout 1")
+        .map(into_message)
+        .expect("no output");
+    assert_eq!("foo", res);
+
+    // ensure that we get the second copy of the event
+    let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
+        .await
+        .expect("timeout 2")
+        .map(into_message)
+        .expect("no output");
+    assert_eq!("foo", res);
+
+    // stop the topology only after we've received both copies of the event, to ensure it wasn't
+    // shutdown that flushed them
+    topology.stop().await;
+
+    // make sure there are no unexpected stragglers
+    let rest = out1.collect::<Vec<_>>().await;
+    assert_eq!(rest, vec![]);
 }

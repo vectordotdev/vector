@@ -1,15 +1,17 @@
-use crate::{
-    event::{PathComponent, PathIter},
-    serde::skip_serializing_if_default,
-    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
 };
+
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Serialize,
 };
-use std::{
-    fmt::{self, Debug},
-    marker::PhantomData,
+
+use crate::{
+    event::{PathComponent, PathIter},
+    serde::skip_serializing_if_default,
+    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.

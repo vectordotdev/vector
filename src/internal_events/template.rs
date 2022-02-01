@@ -1,6 +1,7 @@
-use crate::template::TemplateRenderingError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use crate::template::TemplateRenderingError;
 
 pub struct TemplateRenderingFailed<'a> {
     pub field: Option<&'a str>,

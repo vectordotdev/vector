@@ -7,13 +7,17 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{self, Controller};
-use crate::sinks::VectorSink;
+use std::env;
+
 use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
-use std::env;
 use vector_core::event_test_util;
+
+use crate::{
+    event::{Event, EventArray, Metric, MetricValue},
+    metrics::{self, Controller},
+    sinks::VectorSink,
+};
 
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
@@ -68,6 +72,16 @@ lazy_static! {
             "component_sent_event_bytes_total",
         ],
     };
+    /// The component test specification for components with multiple outputs
+    pub static ref COMPONENT_MULTIPLE_OUTPUTS_TESTS: ComponentTests = ComponentTests {
+        events: &["EventsSent"],
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[
+        ],
+    };
 }
 
 impl ComponentTests {
@@ -115,7 +129,7 @@ struct ComponentTester {
 
 impl ComponentTester {
     fn new() -> Self {
-        let mut metrics: Vec<_> = Controller::get().unwrap().capture_metrics().collect();
+        let mut metrics = Controller::get().unwrap().capture_metrics();
 
         if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
             event_test_util::debug_print_events();
@@ -157,9 +171,20 @@ impl ComponentTester {
 /// Convenience wrapper for running sink tests
 pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
 where
+    S: Stream<Item = EventArray> + Send,
+{
+    init_test();
+    sink.run(events).await.expect("Running sink failed");
+    SINK_TESTS.assert(tags);
+}
+
+/// Convenience wrapper for running sink tests with a stream of `Event`
+pub async fn run_sink_events<S>(sink: VectorSink, events: S, tags: &[&str])
+where
     S: Stream<Item = Event> + Send,
 {
     init_test();
+    let events = events.map(Into::into);
     sink.run(events).await.expect("Running sink failed");
     SINK_TESTS.assert(tags);
 }
@@ -167,7 +192,7 @@ where
 /// Convenience wrapper for running a sink with a single event
 pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
     init_test();
-    run_sink(sink, stream::once(std::future::ready(event)), tags).await
+    run_sink(sink, stream::once(std::future::ready(event.into())), tags).await
 }
 
 /// Convenience wrapper for running sinks with `send_all`
@@ -180,11 +205,12 @@ where
 }
 
 /// Convenience wrapper for running sinks with a stream of events
-pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
+pub async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
+    let mut events = events.map(|result| result.map(|event| event.into()));
     match sink {
         VectorSink::Sink(mut sink) => {
             sink.send_all(&mut events)

@@ -1,7 +1,9 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use std::fmt;
+
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
-use std::fmt;
+
+use crate::{vm, Context, Span, State, TypeDef, Value};
 
 mod abort;
 mod array;
@@ -28,8 +30,7 @@ pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
-pub use container::Container;
-pub use container::Variant;
+pub use container::{Container, Variant};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -40,8 +41,7 @@ pub use not::Not;
 pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
-pub use query::Query;
-pub use query::Target;
+pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
 
@@ -54,6 +54,11 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
+
+    /// Compile the expression to bytecode that can be interpreted by the VM.
+    fn compile_to_vm(&self, _vm: &mut vm::Vm) -> Result<(), String> {
+        Ok(())
+    }
 
     /// Resolve an expression to a value without any context, if possible.
     ///
@@ -178,6 +183,25 @@ impl Expression for Expr {
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
             Abort(v) => v.type_def(state),
+        }
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        use Expr::*;
+
+        // Pass the call on to the contained expression.
+        match self {
+            Literal(v) => v.compile_to_vm(vm),
+            Container(v) => v.compile_to_vm(vm),
+            IfStatement(v) => v.compile_to_vm(vm),
+            Op(v) => v.compile_to_vm(vm),
+            Assignment(v) => v.compile_to_vm(vm),
+            Query(v) => v.compile_to_vm(vm),
+            FunctionCall(v) => v.compile_to_vm(vm),
+            Variable(v) => v.compile_to_vm(vm),
+            Noop(v) => v.compile_to_vm(vm),
+            Unary(v) => v.compile_to_vm(vm),
+            Abort(v) => v.compile_to_vm(vm),
         }
     }
 }
@@ -313,6 +337,7 @@ impl DiagnosticError for Error {
 pub enum ExpressionError {
     Abort {
         span: Span,
+        message: Option<String>,
     },
     Error {
         message: String,
@@ -342,7 +367,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort { .. } => "aborted".to_owned(),
+            Abort { message, .. } => message.clone().unwrap_or_else(|| "aborted".to_owned()),
             Error { message, .. } => message.clone(),
         }
     }
@@ -351,7 +376,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort { span } => {
+            Abort { span, .. } => {
                 vec![Label::primary("aborted", span)]
             }
             Error { labels, .. } => labels.clone(),

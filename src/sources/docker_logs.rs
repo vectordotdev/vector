@@ -1,19 +1,7 @@
-use super::util::MultilineConfig;
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    docker::{docker, DockerTlsConfig},
-    event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, PathComponent, PathIter, Value},
-    internal_events::{
-        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
-        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
-        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
-        DockerLogsTimestampParseFailed,
-    },
-    line_agg::{self, LineAgg},
-    shutdown::ShutdownSignal,
-    Pipeline,
+use std::{
+    collections::HashMap, convert::TryFrom, future::ready, pin::Pin, sync::Arc, time::Duration,
 };
+
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
     errors::Error as DockerError,
@@ -26,15 +14,25 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{
-    future::ready,
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
-    {collections::HashMap, convert::TryFrom},
-};
-
 use tokio::sync::mpsc;
+
+use super::util::MultilineConfig;
+use crate::{
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    docker::{docker, DockerTlsConfig},
+    event::{
+        self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
+    },
+    internal_events::{
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
+        DockerLogsTimestampParseFailed,
+    },
+    line_agg::{self, LineAgg},
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -164,8 +162,8 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -188,8 +186,8 @@ impl SourceConfig for DockerCompatConfig {
         self.config.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.config.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.config.outputs()
     }
 
     fn source_type(&self) -> &'static str {
@@ -299,7 +297,7 @@ struct DockerLogsSource {
 impl DockerLogsSource {
     fn new(
         config: DockerLogsConfig,
-        out: Pipeline,
+        out: SourceSender,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
@@ -509,7 +507,7 @@ struct EventStreamBuilder {
     hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
-    out: Pipeline,
+    out: SourceSender,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// Self and event streams will end on this.
@@ -561,7 +559,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(mut self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -634,11 +632,11 @@ impl EventStreamBuilder {
 
         let host_key = self.host_key.clone();
         let hostname = self.hostname.clone();
-        let result = events_stream
-            .map(move |event| add_hostname(event, &host_key, &hostname))
-            .map(Ok)
-            .forward(self.out.clone())
-            .await;
+        let result = {
+            let mut stream =
+                events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
+            self.out.send_all(&mut stream).await
+        };
 
         // End of stream
         emit!(&DockerLogsContainerUnwatch {
@@ -647,7 +645,9 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(crate::pipeline::ClosedError), _) => Err((info.id, ErrorPersistence::Permanent)),
+            (Err(crate::source_sender::ClosedError), _) => {
+                Err((info.id, ErrorPersistence::Permanent))
+            }
             (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
@@ -1030,7 +1030,7 @@ mod tests {
 
     #[test]
     fn exclude_self() {
-        let (tx, _rx) = Pipeline::new_test();
+        let (tx, _rx) = SourceSender::new_test();
         let mut source =
             DockerLogsSource::new(DockerLogsConfig::default(), tx, ShutdownSignal::noop()).unwrap();
         source.hostname = Some("451062c59603".to_owned());
@@ -1046,11 +1046,6 @@ mod tests {
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        test_util::{collect_n, collect_ready, trace_init},
-        Pipeline,
-    };
     use bollard::{
         container::{
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
@@ -1058,13 +1053,20 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
+    use futures::{stream::TryStreamExt, FutureExt};
+
+    use super::*;
+    use crate::{
+        source_sender::ReceiverStream,
+        test_util::{collect_n, collect_ready, trace_init},
+        SourceSender,
+    };
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> mpsc::Receiver<Event> {
+    ) -> ReceiverStream<Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -1072,8 +1074,8 @@ mod integration_tests {
         })
     }
 
-    fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
-        let (sender, recv) = Pipeline::new_test();
+    fn source_with_config(config: DockerLogsConfig) -> ReceiverStream<Event> {
+        let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
                 .build(SourceContext::new_test(sender))
@@ -1294,7 +1296,7 @@ mod integration_tests {
         id
     }
 
-    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
+    fn is_empty<T>(mut rx: ReceiverStream<T>) -> bool {
         rx.next().now_or_never().is_none()
     }
 

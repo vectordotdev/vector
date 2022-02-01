@@ -1,13 +1,15 @@
-use crate::event::{EventFinalizers, Finalizable, LogEvent};
-use crate::sinks::util::encoding::{as_tracked_write, Encoder, VisitLogMut};
-use std::io::Write;
+use std::{io, io::Write};
 
-use crate::sinks::elasticsearch::BulkAction;
-
-use crate::internal_events::ElasticSearchEventEncoded;
-
-use std::io;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    event::{EventFinalizers, Finalizable, LogEvent},
+    internal_events::ElasticSearchEventEncoded,
+    sinks::{
+        elasticsearch::BulkAction,
+        util::encoding::{as_tracked_write, Encoder, VisitLogMut},
+    },
+};
 
 pub struct ProcessedEvent {
     pub index: String,

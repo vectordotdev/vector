@@ -1,3 +1,7 @@
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use syslog::{Facility, Formatter3164, LogFormat, Severity};
+
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -11,10 +15,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-
-use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -140,8 +140,9 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::convert::TryFrom;
+
+    use super::*;
 
     #[test]
     fn generate_config() {

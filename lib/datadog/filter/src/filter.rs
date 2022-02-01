@@ -1,7 +1,9 @@
-use super::{Matcher, Run};
+use std::fmt::Debug;
+
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
 use dyn_clone::{clone_trait_object, DynClone};
-use std::fmt::Debug;
+
+use super::{Matcher, Run};
 
 /// A `Filter` is a generic type that contains methods that are invoked by the `build_filter`
 /// function. Each method returns a heap-allocated `Matcher<V>` (typically a closure) containing

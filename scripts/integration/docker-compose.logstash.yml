@@ -1,0 +1,54 @@
+services:
+  beats-heartbeat:
+    image: docker.elastic.co/beats/heartbeat:7.12.1
+    # adding `-strict.perms=false to the default cmd as otherwise heartbeat was
+    # complaining about the file permissions when running in CI
+    # https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
+    command: -environment=container -strict.perms=false
+    network_mode: host
+    volumes:
+      - ${PWD}/tests/data/logstash/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.13.1
+    network_mode: host
+    volumes:
+      - /dev/null:/usr/share/logstash/pipeline/logstash.yml
+      - ${PWD}/tests/data/host.docker.internal.crt:/tmp/logstash.crt
+      - ${PWD}/tests/data/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "logstash-integration-tests"
+      - "--lib"
+      - "::logstash::integration_tests::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - HEARTBEAT_ADDRESS=0.0.0.0:8080
+      - LOGSTASH_ADDRESS=0.0.0.0:8081
+    depends_on:
+      - beats-heartbeat
+      - logstash
+    network_mode: host
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

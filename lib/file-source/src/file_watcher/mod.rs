@@ -1,16 +1,18 @@
-use crate::buffer::read_until_with_max_size;
-use crate::metadata_ext::PortableFileExt;
-use crate::{FilePosition, ReadFrom};
-use bytes::{Bytes, BytesMut};
-use chrono::{DateTime, Utc};
-use flate2::bufread::MultiGzDecoder;
 use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
     time::{Duration, Instant},
 };
+
+use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
+
+use crate::{
+    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
+};
 #[cfg(test)]
 mod tests;
 
