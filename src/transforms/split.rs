@@ -2,7 +2,7 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},

@@ -1,14 +1,14 @@
-use itertools::{
-    FoldWhile::{Continue, Done},
-    Itertools,
-};
-use shared::btreemap;
-use vrl_compiler::{Target, Value};
-
 use crate::{
     grok_filter::apply_filter,
     parse_grok_rules::{GrokField, GrokRule},
 };
+use itertools::{
+    FoldWhile::{Continue, Done},
+    Itertools,
+};
+use tracing::warn;
+use vector_common::btreemap;
+use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -46,10 +46,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        // Extracted fields do not preserve the order(stored in a hashmap)
-        // in which they've been seen in the source expression, which matters for arrays,
-        // so we need to sort them first by keys(grok0, grok1, ...).
-        for (name, value) in matches.iter().sorted() {
+        for (name, value) in matches.iter() {
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
@@ -544,7 +541,7 @@ mod tests {
         assert_eq!(
             parse_grok_rules(
                 &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
-                btreemap! {}
+                btreemap! {},
             )
             .unwrap_err()
             .to_string(),
@@ -807,8 +804,22 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
             (
+                r#"%{data::keyvalue(":")}"#,
+                r#"kafka_cluster_status:8ca7b736f0aa43e5"#,
+                Ok(Value::from(btreemap! {
+                    "kafka_cluster_status" => "8ca7b736f0aa43e5"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue}"#,
+                r#"field=2.0e"#,
+                Ok(Value::from(btreemap! {
+                "field" => "2.0e"
+                })),
+            ),
+            (
                 r#"%{data::keyvalue("=", "\\w.\\-_@:")}"#,
-                r#"IN=eth0 OUT= MAC"#,// no value
+                r#"IN=eth0 OUT= MAC"#, // no value
                 Ok(Value::from(btreemap! {
                     "IN" => "eth0"
                 })),

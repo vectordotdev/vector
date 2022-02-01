@@ -140,7 +140,7 @@ mod test {
         ));
 
         let event = Lua::new().load(lua_event).eval::<Event>().unwrap();
-        shared::assert_event_data_eq!(event, expected);
+        vector_common::assert_event_data_eq!(event, expected);
     }
 
     #[test]

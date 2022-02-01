@@ -72,7 +72,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 
 #[cfg(test)]
 mod tests {
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::*;
 

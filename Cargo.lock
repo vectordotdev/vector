@@ -243,9 +243,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.27"
+version = "3.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce1b92ce50a9e7a9a4d571e0988715d40468361ec66a5013d7d9e890f46ce5ba"
+checksum = "df52aa188679abf175ab59d3c54e0a7373589b011fafaf00588289ddd134206b"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -274,9 +274,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "3.0.27"
+version = "3.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c98da5e8c6bbb70d43db36d27b76cc19e84e3029980b734a81b679fb6dae0a00"
+checksum = "cd9091f1c8b60d90b50b40e3ed80b8669919a8191985d56e5dd284c699db309d"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -290,9 +290,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "3.0.27"
+version = "3.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c7a1025d329db8c7080337a32c8056ffb0c7c98e8ee8a7cc78260c55fb207d1"
+checksum = "dc69c47d51d96486efe8526d9dcf54156bd606f730b71c5ab5a7827a60f7b209"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "3.0.27"
+version = "3.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8da25b10dd085879d6227967bc6932bea8fed95735873ac82fa2ec65b2cc89ba"
+checksum = "317ac4364bf6f22b52f2c7c71d9c2d89bf7465898d213a317736ce83c0d74070"
 dependencies = [
  "bytes 1.1.0",
  "indexmap",
@@ -315,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.27"
+version = "3.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25d6ea60fd461c2bfe90b88928487f9ef1973db9fa4fcb6a0095a1eb16ccd310"
+checksum = "6bf1d0d75a3ff29baab13c05df32d057cf9c4f26cdeb7e761431fee149cbc3f8"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -1831,27 +1831,23 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "chrono-tz",
- "derivative",
- "grok",
  "itertools",
  "lalrpop",
  "lalrpop-util",
- "lazy_static",
  "lookup",
  "nom 7.1.0",
  "nom-regex",
+ "once_cell",
  "onig",
  "ordered-float",
  "peeking_take_while 1.0.0",
- "percent-encoding",
  "regex",
  "serde",
  "serde_json",
- "shared",
- "snafu",
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
+ "vector_common",
  "vrl-compiler",
 ]
 
@@ -2113,7 +2109,7 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
- "shared",
+ "vector_common",
  "vrl",
 ]
 
@@ -4533,6 +4529,9 @@ name = "once_cell"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+dependencies = [
+ "parking_lot 0.11.2",
+]
 
 [[package]]
 name = "onig"
@@ -5188,8 +5187,8 @@ dependencies = [
  "prost 0.9.0",
  "prost-build 0.9.0",
  "prost-types 0.9.0",
- "shared",
  "snafu",
+ "vector_common",
 ]
 
 [[package]]
@@ -6105,9 +6104,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.20.0"
+version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0593ce4677e3800ddafb3de917e8397b1348e06e688128ade722d88fbe11ebf"
+checksum = "4214023b1223d02a4aad9f0bb9828317634a56530870a2eaf7200a99c0c10f68"
 dependencies = [
  "arrayvec 0.7.2",
  "num-traits",
@@ -6600,21 +6599,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "shared"
-version = "0.1.0"
-dependencies = [
- "bytes 1.1.0",
- "chrono",
- "chrono-tz",
- "derivative",
- "nom 7.1.0",
- "serde",
- "serde_json",
- "snafu",
- "tracing 0.1.29",
 ]
 
 [[package]]
@@ -8269,7 +8253,6 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "sha2 0.10.1",
- "shared",
  "smallvec",
  "smpl_jwt",
  "snafu",
@@ -8311,6 +8294,7 @@ dependencies = [
  "vector-datadog-filter",
  "vector-vrl-functions",
  "vector_buffers",
+ "vector_common",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8411,8 +8395,15 @@ dependencies = [
 name = "vector_common"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
+ "chrono",
+ "chrono-tz",
+ "derivative",
  "metrics",
+ "nom 7.1.0",
+ "serde",
  "serde_json",
+ "snafu",
  "tracing 0.1.29",
 ]
 
@@ -8465,7 +8456,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "snafu",
  "substring",
  "tokio",
@@ -8505,8 +8495,8 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float",
- "shared",
  "thiserror",
+ "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
  "vrl-parser",
@@ -8524,9 +8514,9 @@ dependencies = [
  "regex",
  "rustyline",
  "serde_json",
- "shared",
  "structopt",
  "thiserror",
+ "vector_common",
  "vrl",
  "vrl-stdlib",
  "webbrowser",
@@ -8549,9 +8539,9 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "thiserror",
  "tracing 0.1.29",
+ "vector_common",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -8610,7 +8600,6 @@ dependencies = [
  "sha-1 0.10.0",
  "sha2 0.9.8",
  "sha3",
- "shared",
  "strip-ansi-escapes",
  "syslog_loose",
  "tracing 0.1.29",
@@ -8618,6 +8607,7 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "vector_common",
  "vrl",
  "woothee",
 ]
@@ -8635,10 +8625,10 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "shared",
  "structopt",
  "tikv-jemallocator",
  "tracing-subscriber",
+ "vector_common",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",

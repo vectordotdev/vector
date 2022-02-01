@@ -1,7 +1,7 @@
 use std::iter;
 
 use serde::{Deserialize, Serialize};
-use shared::aws_cloudwatch_logs_subscription::{
+use vector_common::aws_cloudwatch_logs_subscription::{
     AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
 };
 
@@ -184,7 +184,7 @@ mod test {
 
         parser.transform(&mut output, event);
 
-        shared::assert_event_data_eq!(
+        vector_common::assert_event_data_eq!(
             output,
             vec![
                 log_event! {
