@@ -238,7 +238,7 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::event::{Event, MetricKind, MetricValue};

@@ -1,6 +1,6 @@
 use std::{convert::TryInto, io, sync::Arc};
 
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -693,7 +693,7 @@ mod integration_tests {
             let response = match request.await {
                 Ok(_) => Ok(()),
                 Err(reason) => match reason.downcast_ref::<HttpError>() {
-                    Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                    Some(HttpError::StatusCode { status, .. }) => match *status {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },

@@ -167,9 +167,9 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 * Properties
   * `count` - The count of Vector events.
   * `byte_size` - The cumulative in-memory byte size of all events sent.
-  * `output` - For components with multiple outputs, the name of the output that
-    events were sent to. For example, the `remap` transform has an additional
-    `dropped` output.
+  * `output` - For components that can use multiple outputs, the name of the
+    output that events were sent to. For events sent to the default output, this
+    value MUST be `_default`.
 * Metrics
   * MUST increment the `component_sent_events_total` counter by the defined value with the
     defined properties as metric tags.

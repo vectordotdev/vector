@@ -2,9 +2,11 @@ use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -120,6 +122,9 @@ async fn run(
         let pid = std::process::id().to_string();
 
         let metrics = controller.capture_metrics();
+        let count = metrics.len();
+        let byte_size = metrics.size_of();
+        emit!(&EventsReceived { count, byte_size });
 
         let mut stream = stream::iter(metrics).map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
@@ -148,7 +153,7 @@ async fn run(
         });
 
         if let Err(error) = out.send_all(&mut stream).await {
-            error!(message = "Error sending internal metrics.", %error);
+            emit!(&StreamClosedError { error, count });
             return Err(());
         }
     }
@@ -200,6 +205,7 @@ mod tests {
 
         let output = controller
             .capture_metrics()
+            .into_iter()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 

@@ -1,12 +1,3 @@
-data "template_file" "soak-observer" {
-  template = file("${path.module}/observer.yaml.tpl")
-  vars = {
-    experiment_name    = var.experiment_name
-    experiment_variant = var.variant
-    vector_id          = var.vector_image
-  }
-}
-
 resource "kubernetes_config_map" "observer" {
   metadata {
     name      = "observer"
@@ -14,7 +5,11 @@ resource "kubernetes_config_map" "observer" {
   }
 
   data = {
-    "observer.yaml" = data.template_file.soak-observer.rendered
+    "observer.yaml" = templatefile("${path.module}/observer.yaml.tpl", {
+      experiment_name    = var.experiment_name
+      experiment_variant = var.variant
+      vector_id          = var.vector_image
+    })
   }
 }
 
@@ -47,7 +42,7 @@ resource "kubernetes_deployment" "observer" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-7b2b0d0d6bcaafcd83b3fe636d92d5242d7b550b"
+          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-3cb06fedb1863956cd2d423c87f6fee13a1f8f40"
           name              = "observer"
           args              = ["--config-path", "/etc/vector/soak/observer.yaml"]
 

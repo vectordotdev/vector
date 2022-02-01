@@ -5,9 +5,18 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use vrl::{diagnostic::Formatter, prelude::ExpressionError, Program, Runtime, Terminate};
+use vector_common::TimeZone;
+use vrl::{
+    diagnostic::{Formatter, Note},
+    prelude::{DiagnosticError, ExpressionError},
+    Program, Runtime, Terminate,
+};
+
+#[cfg(feature = "vrl-vm")]
+use std::sync::Arc;
+#[cfg(feature = "vrl-vm")]
+use vrl::Vm;
 
 use crate::{
     config::{
@@ -79,6 +88,9 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
+
+    #[cfg(feature = "vrl-vm")]
+    vm: Arc<Vm>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -113,14 +125,21 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
+        let runtime = Runtime::default();
+
+        #[cfg(feature = "vrl-vm")]
+        let vm = Arc::new(runtime.compile(functions, &program)?);
+
         Ok(Remap {
             component_key: context.key.clone(),
             program,
-            runtime: Runtime::default(),
+            runtime,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm,
         })
     }
 
@@ -132,12 +151,19 @@ impl Remap {
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
             Event::Log(ref mut log) => {
+                let message = error
+                    .notes()
+                    .iter()
+                    .filter(|note| matches!(note, Note::UserErrorMessage(_)))
+                    .last()
+                    .map(|note| note.to_string())
+                    .unwrap_or_else(|| error.to_string());
                 log.insert(
                     log_schema().metadata_key(),
                     serde_json::json!({
                         "dropped": {
                             "reason": reason,
-                            "message": error.to_string(),
+                            "message": message,
                             "component_id": self.component_key,
                             "component_type": "remap",
                             "component_kind": "transform",
@@ -160,6 +186,18 @@ impl Remap {
             }
         }
     }
+
+    #[cfg(feature = "vrl-vm")]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        self.runtime.run_vm(&self.vm, target, &self.timezone)
+    }
+
+    #[cfg(not(feature = "vrl-vm"))]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        let result = self.runtime.resolve(target, &self.program, &self.timezone);
+        self.runtime.clear();
+        result
+    }
 }
 
 impl Clone for Remap {
@@ -172,6 +210,8 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm: Arc::clone(&self.vm),
         }
     }
 }
@@ -199,11 +239,7 @@ impl SyncTransform for Remap {
         };
 
         let mut target: VrlTarget = event.into();
-
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
+        let result = self.run_vrl(&mut target);
 
         match result {
             Ok(_) => {
@@ -258,12 +294,17 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::{formatdoc, indoc};
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
+    use crate::{
+        config::{build_unit_tests, ConfigBuilder},
+        event::{
+            metric::{MetricKind, MetricValue},
+            LogEvent, Metric, Value,
+        },
+        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -409,12 +450,14 @@ mod tests {
 
         let out = collect_outputs(&mut tform, event);
         assert_eq!(2, out.primary.len());
-        let result = out.primary;
+        let mut result = out.primary.into_events();
 
-        assert_eq!(get_field_string(&result[0], "message"), "foo");
-        assert_eq!(get_field_string(&result[1], "message"), "bar");
-        assert_eq!(result[0].metadata(), &metadata);
-        assert_eq!(result[1].metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "foo");
+        assert_eq!(r.metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "bar");
+        assert_eq!(r.metadata(), &metadata);
     }
 
     #[test]
@@ -767,6 +810,107 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_branching_assert_with_message() {
+        let error_trigger_assert_custom_message =
+            Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let error_trigger_default_assert_message =
+            Event::try_from(serde_json::json!({"hello": 0})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                assert_eq!(.hello, 0, "custom message here")
+                assert_eq!(.hello, 1)
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output =
+            transform_one_fallible(&mut tform, error_trigger_default_assert_message).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 0.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"assert_eq\" at (45:66): assertion failed: 0 == 1",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn check_remap_branching_abort_with_message() {
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                abort "custom message here"
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn check_remap_branching_disabled() {
         let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
         let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
@@ -817,9 +961,42 @@ mod tests {
         assert!(out.named[DROPPED].is_empty());
     }
 
+    #[tokio::test]
+    async fn check_remap_branching_metrics_with_output() {
+        init_test();
+
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+            inputs = []
+            type = "remap"
+            drop_on_abort = true
+            reroute_dropped = true
+            source = "abort"
+
+            [[tests]]
+            name = "metric output"
+
+            [tests.input]
+                insert_at = "foo"
+                value = "none"
+
+            [[tests.outputs]]
+                extract_from = "foo.dropped"
+                [[tests.outputs.conditions]]
+                type = "vrl"
+                source = "true"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+    }
+
     struct CollectedOuput {
-        primary: Vec<Event>,
-        named: HashMap<String, Vec<Event>>,
+        primary: OutputBuffer,
+        named: HashMap<String, OutputBuffer>,
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {

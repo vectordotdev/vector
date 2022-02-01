@@ -63,6 +63,13 @@ impl Expression for Predicate {
 
         type_def.with_fallibility(fallible)
     }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
+        for inner in &self.inner {
+            inner.compile_to_vm(vm)?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Predicate {

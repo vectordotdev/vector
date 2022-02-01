@@ -197,6 +197,7 @@ impl DriverResponse for ElasticSearchResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

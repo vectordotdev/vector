@@ -56,7 +56,7 @@ impl Default for MergeConfig {
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(Merge::from(self.clone())))
+        Ok(Transform::event_task(Merge::from(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -145,7 +145,7 @@ impl From<MergeConfig> for Merge {
     }
 }
 
-impl TaskTransform for Merge {
+impl TaskTransform<Event> for Merge {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,

@@ -75,17 +75,17 @@ where
     // because we might otherwise introduce old data that could mess up observability pipelines.
     //
     // For new users starting out cleanly with 0.19.0 or higher, there's no change in behavior.
-    let buffer_id = format!("{}_id", name);
+    let buffer_id = get_new_style_buffer_dir_name(name);
     let path = data_dir.join(buffer_id);
     let path_exists = check_data_dir_exists(&path)?;
 
-    let old_buffer_id = format!("{}_buffer", name);
+    let old_buffer_id = get_old_style_buffer_dir_name(name);
     let old_path = data_dir.join(old_buffer_id);
     let old_path_exists = check_data_dir_exists(&old_path)?;
 
     if old_path_exists {
         if path_exists {
-            let sidelined_buffer_id = format!("{}_buffer_old", name);
+            let sidelined_buffer_id = get_sidelined_old_style_buffer_dir_name(name);
             let sidelined_path = data_dir.join(sidelined_buffer_id);
 
             // Both old style and new style paths exist.  We check if the old style path has any data,
@@ -180,4 +180,46 @@ where
                 Ok(())
             }
         })
+}
+
+fn get_old_style_buffer_dir_name(base: &str) -> String {
+    format!("{}_buffer", base)
+}
+
+fn get_new_style_buffer_dir_name(base: &str) -> String {
+    format!("{}_id", base)
+}
+
+fn get_sidelined_old_style_buffer_dir_name(base: &str) -> String {
+    format!("{}_buffer_old", base)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        get_new_style_buffer_dir_name, get_old_style_buffer_dir_name,
+        get_sidelined_old_style_buffer_dir_name,
+    };
+
+    #[test]
+    fn buffer_dir_names() {
+        // I realize that this test might seem silly -- we're just checking that it generates a
+        // string in a certain way -- but ironically, this test existing prior to #10379 may have
+        // saved us from needing the wall of code that's prresent at the top of the file.
+        //
+        // Here, we're simply testing that the "old" style name is suffixed with `_buffer` and that
+        // the "new" style name is suffxed with `_id` to match the current behavior.  To ensure that
+        // what we're testing is actually what's being used to generate buffer directory names,
+        // we've slightly refactored the aforementioned wall of code to use these functions.
+        let old_result = get_old_style_buffer_dir_name("foo");
+        let new_result = get_new_style_buffer_dir_name("foo");
+        let sidelined_old_result = get_sidelined_old_style_buffer_dir_name("foo");
+
+        assert_eq!("foo_buffer", old_result);
+        assert_eq!("foo_id", new_result);
+        assert_eq!("foo_buffer_old", sidelined_old_result);
+        assert_ne!(old_result, new_result);
+        assert_ne!(new_result, sidelined_old_result);
+        assert_ne!(old_result, sidelined_old_result);
+    }
 }

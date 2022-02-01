@@ -69,7 +69,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     {
         println!("Running tests");
     }
-    match config::build_unit_tests(&paths).await {
+    match config::build_unit_tests_main(&paths).await {
         Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]

@@ -64,27 +64,7 @@ where
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
     ) -> Result<HttpClient<B>, HttpError> {
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
-
-        let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings).context(BuildTlsConnectorSnafu)?;
-        let mut https =
-            HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
-
-        let settings = settings.tls().cloned();
-        https.set_callback(move |c, _uri| {
-            if let Some(settings) = &settings {
-                settings.apply_connect_configuration(c);
-            }
-
-            Ok(())
-        });
-
-        let mut proxy = ProxyConnector::new(https).unwrap();
-        proxy_config
-            .configure(&mut proxy)
-            .context(MakeProxyConnectorSnafu)?;
+        let proxy = build_proxy_connector(tls_settings.into(), proxy_config)?;
         let client = client_builder.build(proxy);
 
         let version = crate::get_version();
@@ -142,6 +122,32 @@ where
 
         Box::pin(fut)
     }
+}
+
+pub fn build_proxy_connector(
+    tls_settings: MaybeTlsSettings,
+    proxy_config: &ProxyConfig,
+) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+
+    let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
+    let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
+
+    let settings = tls_settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c);
+        }
+
+        Ok(())
+    });
+
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config
+        .configure(&mut proxy)
+        .context(MakeProxyConnectorSnafu)?;
+    Ok(proxy)
 }
 
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {

@@ -30,7 +30,7 @@ enum V2 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV2 {
-    version: V2,
+    version: Option<V2>,
     #[serde(flatten)]
     config: v2::VectorConfig,
 }
@@ -51,7 +51,7 @@ impl GenerateConfig for VectorConfig {
         let config =
             toml::Value::try_into::<v2::VectorConfig>(v2::VectorConfig::generate_config()).unwrap();
         toml::Value::try_from(VectorConfigV2 {
-            version: V2::V2,
+            version: Some(V2::V2),
             config,
         })
         .unwrap()

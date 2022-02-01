@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -27,7 +27,10 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
-    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
+    internal_events::{
+        BytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        StreamClosedError,
+    },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -183,11 +186,12 @@ async fn kafka_source(
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(&KafkaEventFailed { error });
+                emit!(&KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(&KafkaEventReceived {
-                    byte_size: msg.payload_len()
+                emit!(&BytesReceived {
+                    byte_size: std::mem::size_of_val(&msg),
+                    protocol: "tcp",
                 });
 
                 let payload = match msg.payload() {
@@ -234,10 +238,15 @@ async fn kafka_source(
                 let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
                 let mut stream = FramedRead::new(payload, decoder.clone());
+                let (count, _) = stream.size_hint();
                 let mut stream = stream! {
                     loop {
                         match stream.next().await {
-                            Some(Ok((events, _))) => {
+                            Some(Ok((events, byte_size))) => {
+                                emit!(&KafkaEventsReceived {
+                                    count: events.len(),
+                                    byte_size,
+                                });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
                                         log.insert(schema.source_type_key(), Bytes::from("kafka"));
@@ -270,7 +279,9 @@ async fn kafka_source(
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
-                            Err(err) => error!(message = "Error sending to sink.", error = %err),
+                            Err(error) => {
+                                emit!(&StreamClosedError { error, count });
+                            }
                             Ok(_) => {
                                 // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
                                 // here, when `stream` is dropped and runs the destructor [...]".
@@ -280,12 +291,14 @@ async fn kafka_source(
                         }
                     }
                     None => match out.send_all(&mut stream).await {
-                        Err(err) => error!(message = "Error sending to sink.", error = %err),
+                        Err(error) => {
+                            emit!(&StreamClosedError { error, count });
+                        }
                         Ok(_) => {
-                            if let Err(err) =
+                            if let Err(error) =
                                 consumer.store_offset(msg.topic(), msg.partition(), msg.offset())
                             {
-                                emit!(&KafkaOffsetUpdateFailed { error: err });
+                                emit!(&KafkaOffsetUpdateError { error });
                             }
                         }
                     },
@@ -317,7 +330,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
     move |entry| {
         if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-            emit!(&KafkaOffsetUpdateFailed { error });
+            emit!(&KafkaOffsetUpdateError { error });
         }
     }
 }
