@@ -19,9 +19,9 @@ pub enum EventType {
     ReceivedEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
     ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
-    // Identified overall metric + metric broken out by output
+    // Identified overall metric + output-specific metrics
     SentEventsTotals(Vec<SentEventsMetric>),
-    /// Interval in ms + identified overall metric + metric broken out by output
+    /// Interval in ms + identified overall metric + output-specific metrics
     SentEventsThroughputs(i64, Vec<SentEventsMetric>),
     ProcessedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
