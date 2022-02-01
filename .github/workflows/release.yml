@@ -284,7 +284,14 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+        container:
+          - "quay.io/centos/centos:stream8"
+          - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
+          - "amazonlinux:2"
+          - "fedora:34"
+          - "fedora:35"
+          - "fedora:36"
     container:
       image: ${{ matrix.container }}
     steps:
