@@ -33,7 +33,7 @@ use crate::{
         ledger::Ledger,
         record::{Record, RecordStatus},
     },
-    encoding::EncodeBytes,
+    encoding::{AsMetadata, Encodable},
     Bufferable,
 };
 
@@ -65,7 +65,9 @@ where
     /// For common encoders, failure to write all of the bytes of the input will be the most common
     /// error, and in fact, some some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
-    FailedToEncode { source: <T as EncodeBytes>::Error },
+    FailedToEncode {
+        source: <T as Encodable>::EncodeError,
+    },
 
     /// The writer failed to serialize the record.
     ///
@@ -169,7 +171,8 @@ where
             });
         }
 
-        let record = Record::with_checksum(id, &self.encode_buf, &self.checksummer);
+        let metadata = T::get_metadata().into_u32();
+        let record = Record::with_checksum(id, metadata, &self.encode_buf, &self.checksummer);
 
         // Now serialize the record, which puts it into its archived form.  This is what powers our
         // ability to do zero-copy deserialization from disk.
@@ -356,7 +359,7 @@ where
             data_file_mmap.as_ref(),
             &Hasher::new(),
         ) {
-            RecordStatus::Valid(id) => {
+            RecordStatus::Valid { id, .. } => {
                 // Since we have a valid record, checksum and all, see if the writer record ID
                 // in the ledger lines up with the record ID we have here.
                 let ledger_next = self.ledger.state().get_next_writer_record_id();

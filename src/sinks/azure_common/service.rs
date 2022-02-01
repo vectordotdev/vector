@@ -5,7 +5,7 @@ use std::{
 };
 
 use azure_core::HttpError;
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing_futures::Instrument;
@@ -53,8 +53,8 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .execute()
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
-                        Some(HttpError::UnexpectedStatusCode { received, .. }) => {
-                            emit!(&AzureBlobErrorResponse { code: *received })
+                        Some(HttpError::StatusCode { status, .. }) => {
+                            emit!(&AzureBlobErrorResponse { code: *status })
                         }
                         _ => emit!(&AzureBlobHttpError {
                             error: reason.to_string()

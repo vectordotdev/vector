@@ -17,7 +17,7 @@ use tokio::{select, sync::oneshot, task, time};
 use tracing::{debug, info, Span};
 use tracing_subscriber::EnvFilter;
 use vector_buffers::{
-    encoding::{DecodeBytes, EncodeBytes},
+    encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
@@ -48,10 +48,11 @@ impl ByteSizeOf for VariableMessage {
     }
 }
 
-impl EncodeBytes for VariableMessage {
-    type Error = EncodeError;
+impl FixedEncodable for VariableMessage {
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
@@ -65,12 +66,8 @@ impl EncodeBytes for VariableMessage {
     fn encoded_size(&self) -> Option<usize> {
         Some(8 + 8 + self.payload.len())
     }
-}
 
-impl DecodeBytes for VariableMessage {
-    type Error = DecodeError;
-
-    fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
     where
         B: Buf,
         Self: Sized,

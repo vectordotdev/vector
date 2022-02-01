@@ -1,12 +1,11 @@
-use std::fmt::Formatter;
-
+use crate::parse_grok::Error as GrokRuntimeError;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
 use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
 use regex::Regex;
+use std::fmt::Formatter;
+use tracing::error;
 use vrl_compiler::Value;
-
-use crate::parse_grok::Error as GrokRuntimeError;
 
 /// converts Joda time format to strptime format
 pub fn convert_time_format(format: &str) -> std::result::Result<String, String> {

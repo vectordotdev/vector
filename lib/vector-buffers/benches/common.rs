@@ -7,7 +7,7 @@ use metrics_util::{layers::Layer, DebuggingRecorder};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
-    encoding::{DecodeBytes, EncodeBytes},
+    encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
@@ -59,10 +59,11 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-impl<const N: usize> EncodeBytes for Message<N> {
-    type Error = EncodeError;
+impl<const N: usize> FixedEncodable for Message<N> {
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
@@ -74,12 +75,8 @@ impl<const N: usize> EncodeBytes for Message<N> {
         }
         Ok(())
     }
-}
 
-impl<const N: usize> DecodeBytes for Message<N> {
-    type Error = DecodeError;
-
-    fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
     where
         B: Buf,
         Self: Sized,

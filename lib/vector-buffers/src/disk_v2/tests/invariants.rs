@@ -387,7 +387,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // Now we do three writes, which will have u64::MAX, 0, and 1 as the IDs.  This ensures
             // that the data file will have at least three records, and a range of IDs that cross
             // the wrapping threshold.
-            let first_record_size = 80;
+            let first_record_size = 64;
             let first_bytes_written = writer
                 .write_record(SizedRecord(first_record_size))
                 .await
@@ -395,7 +395,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
             assert_eq!(0, ledger.state().get_next_writer_record_id());
 
-            let second_record_size = 82;
+            let second_record_size = 66;
             let second_bytes_written = writer
                 .write_record(SizedRecord(second_record_size))
                 .await
@@ -403,7 +403,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
             assert_eq!(1, ledger.state().get_next_writer_record_id());
 
-            let third_record_size = 84;
+            let third_record_size = 68;
             let third_bytes_written = writer
                 .write_record(SizedRecord(third_record_size))
                 .await
@@ -417,7 +417,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
 
             // Now our third write should have exceeded the data file, so this next write should hit
             // a new data file:
-            let fourth_record_size = 86;
+            let fourth_record_size = 70;
             let fourth_bytes_written = writer
                 .write_record(SizedRecord(fourth_record_size))
                 .await

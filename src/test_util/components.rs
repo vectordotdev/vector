@@ -129,7 +129,7 @@ struct ComponentTester {
 
 impl ComponentTester {
     fn new() -> Self {
-        let mut metrics: Vec<_> = Controller::get().unwrap().capture_metrics().collect();
+        let mut metrics = Controller::get().unwrap().capture_metrics();
 
         if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
             event_test_util::debug_print_events();

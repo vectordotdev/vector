@@ -19,7 +19,7 @@ use crate::{
     },
     template::Template,
     tls::TlsOptions,
-    transforms::metric_to_log::MetricToLogConfig,
+    transforms::{metric_to_log::MetricToLogConfig, OutputBuffer},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -127,12 +127,12 @@ impl StreamSink<EventArray> for HumioMetricsSink {
         let mut transform = self.transform;
         self.inner
             .run(input.map(move |events| {
-                let mut buf = Vec::with_capacity(events.len());
+                let mut buf = OutputBuffer::with_capacity(events.len());
                 for event in events.into_events() {
                     transform.as_function().transform(&mut buf, event);
                 }
                 // Awkward but necessary for the `EventArray` type
-                let events = buf.into_iter().map(Event::into_log).collect::<Vec<_>>();
+                let events = buf.into_events().map(Event::into_log).collect::<Vec<_>>();
                 events.into()
             }))
             .await

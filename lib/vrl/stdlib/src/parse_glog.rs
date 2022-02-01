@@ -149,7 +149,7 @@ fn type_def() -> BTreeMap<&'static str, Kind> {
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

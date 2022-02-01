@@ -194,7 +194,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        shared::assert_event_data_eq!(events, output);
+        vector_common::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {

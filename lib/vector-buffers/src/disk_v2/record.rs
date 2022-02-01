@@ -14,8 +14,8 @@ use super::ser::{try_as_archive, DeserializeError};
 pub enum RecordStatus {
     /// The record was able to be read from the buffer, and the checksum is valid.
     ///
-    /// Contains the record ID for the given record.
-    Valid(u64),
+    /// Contains the ID for the given record, as well as the metadata.
+    Valid { id: u64, metadata: u32 },
     /// The record was able to be read from the buffer, but the checksum was not valid.
     Corrupted { calculated: u32, actual: u32 },
     /// The record was not able to be read from the buffer due to an error during deserialization.
@@ -46,13 +46,19 @@ pub enum RecordStatus {
 pub struct Record<'a> {
     /// The checksum of the record.
     ///
-    /// The checksum is CRC32C(big_endian_bytes(id) + payload).
+    /// The checksum is CRC32C(BE(id) + BE(metadata) + payload), where BE(x) returns a byte slice of
+    /// the given integer in big endian format.
     pub(super) checksum: u32,
 
     /// The record ID.
     ///
     /// This is monotonic across records.
     id: u64,
+
+    /// The record metadata.
+    ///
+    /// Based on `Encodable::Metadata`.
+    pub(super) metadata: u32,
 
     /// The record payload.
     ///
@@ -87,6 +93,12 @@ where
                 inner: ErrorBox::new(e),
             }
         })?;
+        Archived::<u32>::check_bytes(addr_of!((*value).metadata), context).map_err(|e| {
+            StructCheckError {
+                field_name: "schema_metadata",
+                inner: ErrorBox::new(e),
+            }
+        })?;
         ArchivedBox::<[u8]>::check_bytes(addr_of!((*value).payload), context).map_err(|e| {
             StructCheckError {
                 field_name: "payload",
@@ -99,17 +111,23 @@ where
 
 impl<'a> Record<'a> {
     /// Creates a [`Record`] from the ID and payload, and calculates the checksum.
-    pub fn with_checksum(id: u64, payload: &'a [u8], checksummer: &Hasher) -> Self {
-        let checksum = generate_checksum(checksummer, id, payload);
+    pub fn with_checksum(id: u64, metadata: u32, payload: &'a [u8], checksummer: &Hasher) -> Self {
+        let checksum = generate_checksum(checksummer, id, metadata, payload);
         Self {
             checksum,
             id,
+            metadata,
             payload,
         }
     }
 }
 
 impl<'a> ArchivedRecord<'a> {
+    /// Gets the metadata of this record.
+    pub fn metadata(&self) -> u32 {
+        self.metadata
+    }
+
     /// Gets the payload of this record.
     pub fn payload(&self) -> &[u8] {
         &self.payload
@@ -117,9 +135,12 @@ impl<'a> ArchivedRecord<'a> {
 
     /// Verifies if the stored checksum of this record matches the record itself.
     pub fn verify_checksum(&self, checksummer: &Hasher) -> RecordStatus {
-        let calculated = generate_checksum(checksummer, self.id, &self.payload);
+        let calculated = generate_checksum(checksummer, self.id, self.metadata, &self.payload);
         if self.checksum == calculated {
-            RecordStatus::Valid(self.id)
+            RecordStatus::Valid {
+                id: self.id,
+                metadata: self.metadata,
+            }
         } else {
             RecordStatus::Corrupted {
                 calculated,
@@ -129,11 +150,12 @@ impl<'a> ArchivedRecord<'a> {
     }
 }
 
-fn generate_checksum(checksummer: &Hasher, id: u64, payload: &[u8]) -> u32 {
+fn generate_checksum(checksummer: &Hasher, id: u64, metadata: u32, payload: &[u8]) -> u32 {
     let mut checksummer = checksummer.clone();
     checksummer.reset();
 
     checksummer.update(&id.to_be_bytes()[..]);
+    checksummer.update(&metadata.to_be_bytes()[..]);
     checksummer.update(payload);
     checksummer.finalize()
 }

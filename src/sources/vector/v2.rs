@@ -203,7 +203,7 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::*;
     use crate::{
