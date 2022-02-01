@@ -187,6 +187,7 @@ impl Value {
         }
     }
 
+    //TODO: rename, this doesn't match the other "as_x" functions (maybe coerce_to_bytes?)
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
