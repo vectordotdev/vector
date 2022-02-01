@@ -1831,23 +1831,19 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "chrono-tz",
- "derivative",
- "grok",
  "itertools",
  "lalrpop",
  "lalrpop-util",
- "lazy_static",
  "lookup",
  "nom 7.1.0",
  "nom-regex",
+ "once_cell",
  "onig",
  "ordered-float",
  "peeking_take_while 1.0.0",
- "percent-encoding",
  "regex",
  "serde",
  "serde_json",
- "snafu",
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
@@ -4533,6 +4529,9 @@ name = "once_cell"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+dependencies = [
+ "parking_lot 0.11.2",
+]
 
 [[package]]
 name = "onig"
