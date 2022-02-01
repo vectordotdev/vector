@@ -2,6 +2,7 @@ mod errors;
 mod events_in;
 mod events_out;
 pub mod filter;
+mod output;
 mod processed_bytes;
 mod processed_events;
 mod received_events;
@@ -20,6 +21,7 @@ pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::{ComponentEventsInThroughput, ComponentEventsInTotal, EventsInTotal};
 pub use events_out::{ComponentEventsOutThroughput, ComponentEventsOutTotal, EventsOutTotal};
 pub use filter::*;
+pub use output::*;
 pub use processed_bytes::{
     ComponentProcessedBytesThroughput, ComponentProcessedBytesTotal, ProcessedBytesTotal,
 };
@@ -292,18 +294,13 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentSentEventsThroughput>> {
-        component_counter_throughputs(interval, &|m| m.name() == "component_sent_events_total").map(
-            |m| {
-                m.into_iter()
-                    .map(|(m, throughput)| {
-                        ComponentSentEventsThroughput::new(
-                            ComponentKey::from(m.tag_value("component_id").unwrap()),
-                            throughput as i64,
-                        )
-                    })
-                    .collect()
-            },
-        )
+        component_sent_events_total_throughputs_with_outputs(interval).map(|m| {
+            m.into_iter()
+                .map(|(key, total_throughput, outputs)| {
+                    ComponentSentEventsThroughput::new(key, total_throughput, outputs)
+                })
+                .collect()
+        })
     }
 
     /// Total outgoing component event metrics over `interval`
@@ -321,8 +318,11 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentSentEventsTotal>> {
-        component_counter_metrics(interval, &|m| m.name() == "component_sent_events_total")
-            .map(|m| m.into_iter().map(ComponentSentEventsTotal::new).collect())
+        component_sent_events_totals_metrics_with_outputs(interval).map(|ms| {
+            ms.into_iter()
+                .map(|(m, m_by_outputs)| ComponentSentEventsTotal::new(m, m_by_outputs))
+                .collect()
+        })
     }
 
     /// Byte processing metrics.
