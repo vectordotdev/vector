@@ -1,4 +1,4 @@
-use shared::conversion::Conversion;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

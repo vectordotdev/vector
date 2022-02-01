@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str};
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},

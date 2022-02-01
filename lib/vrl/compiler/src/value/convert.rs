@@ -179,7 +179,7 @@ impl TryFrom<&Value> for f64 {
     }
 }
 
-// TODO: this exists to satisfy the `shared::Convert` utility.
+// TODO: this exists to satisfy the `vector_common::Convert` utility.
 //
 // We'll have to fix that so that we can remove this impl.
 impl From<f64> for Value {
