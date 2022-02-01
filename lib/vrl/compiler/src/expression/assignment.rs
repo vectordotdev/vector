@@ -259,7 +259,7 @@ impl Target {
                     Some(stored) => stored.insert_by_path(path, value),
                     None => ctx
                         .state_mut()
-                        .insert_variable(ident.clone(), value.at_path(path)),
+                        .insert_variable(ident.clone(), value!({}).insert(path, value)),
                 }
             }
 

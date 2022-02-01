@@ -1,4 +1,5 @@
 use mlua::prelude::LuaValue;
+use ordered_float::NotNan;
 
 use crate::value::Value;
 
@@ -8,12 +9,16 @@ impl<'a> ToLua<'a> for Value {
         match self {
             Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
             Value::Integer(i) => Ok(LuaValue::Integer(i)),
-            Value::Float(f) => Ok(LuaValue::Number(f)),
+            Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
             Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
             Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Value::Null => lua.create_string("").map(LuaValue::String),
+            Value::Regex(regex) => {
+                let bytes = regex_to_bytes(&regex);
+                lua.create_string(bytes.as_ref()).map(LuaValue::String)
+            }
         }
     }
 }
@@ -23,7 +28,10 @@ impl<'a> FromLua<'a> for Value {
         match value {
             LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
-            LuaValue::Number(f) => Ok(Value::Float(f)),
+            LuaValue::Number(f) => {
+                //TODO: handle this better
+                Ok(Value::Float(NotNan::new(f).unwrap()))
+            }
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
             LuaValue::Table(t) => {
                 if t.len()? > 0 {
@@ -43,6 +51,7 @@ impl<'a> FromLua<'a> for Value {
     }
 }
 
+use crate::value::convert::regex_to_bytes;
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use mlua::prelude::*;
 

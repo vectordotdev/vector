@@ -9,47 +9,45 @@ use crate::{
     expression::{container, Container, Expr, Literal},
     Expression,
 };
-// use value::Value;
 
-//TODO: Move these to Expression
-// /// Convert a given [`Value`] into a [`Expression`] trait object.
-// pub fn into_expression(self) -> Box<dyn Expression> {
-//     Box::new(self.into_expr())
-// }
-//
-// /// Convert a given [`Value`] into an [`Expr`] enum variant.
-// ///
-// /// This is a non-public function because we want to avoid exposing internal
-// /// details about the expression variants.
-// pub(crate) fn into_expr(self) -> Expr {
-//     use Value::*;
-//
-//     match self {
-//         Bytes(v) => Literal::from(v).into(),
-//         Integer(v) => Literal::from(v).into(),
-//         Float(v) => Literal::from(v).into(),
-//         Boolean(v) => Literal::from(v).into(),
-//         Object(v) => {
-//             let object = crate::expression::Object::from(
-//                 v.into_iter()
-//                     .map(|(k, v)| (k, v.into_expr()))
-//                     .collect::<BTreeMap<_, _>>(),
-//             );
-//
-//             Container::new(container::Variant::from(object)).into()
-//         }
-//         Array(v) => {
-//             let array = crate::expression::Array::from(
-//                 v.into_iter().map(|v| v.into_expr()).collect::<Vec<_>>(),
-//             );
-//
-//             Container::new(container::Variant::from(array)).into()
-//         }
-//         Timestamp(v) => Literal::from(v).into(),
-//         Regex(v) => Literal::from(v).into(),
-//         Null => Literal::from(()).into(),
-//     }
-// }
+/// conversions that should be added to `Value` but rely on things outside of the `value` crate
+pub trait VrlValueConvert {
+    fn try_bytes(self) -> Result<Bytes, Error>;
+    fn try_float(self) -> Result<f64, Error>;
+    fn try_from_f64(f: f64) -> Result<Value, Error> {
+        let float = NotNan::new(f).map_err(|_| Error::NanFloat)?;
+        Ok(Value::Float(float))
+    }
+    fn kind(&self) -> Kind;
+}
+
+impl VrlValueConvert for Value {
+    fn try_bytes(self) -> Result<Bytes, Error> {
+        match self {
+            Value::Bytes(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Bytes,
+            }),
+        }
+    }
+
+    fn try_float(self) -> Result<f64, Error> {
+        match self {
+            Value::Float(v) => Ok(v.into_inner()),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Float,
+            }),
+        }
+    }
+
+    fn kind(&self) -> Kind {
+        Kind::from(self)
+    }
+}
+
+// use value::Value;
 
 // Value::Integer --------------------------------------------------------------
 
@@ -150,15 +148,7 @@ use crate::{
 //         }
 //     }
 //
-//     pub fn try_float(self) -> Result<f64, Error> {
-//         match self {
-//             Value::Float(v) => Ok(v.into_inner()),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Float,
-//             }),
-//         }
-//     }
+
 // }
 
 // impl From<NotNan<f64>> for Value {
@@ -212,15 +202,7 @@ use crate::{
 //         }
 //     }
 //
-//     pub fn try_bytes(self) -> Result<Bytes, Error> {
-//         match self {
-//             Value::Bytes(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Bytes,
-//             }),
-//         }
-//     }
+
 //
 //     pub fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
 //         match self.as_bytes() {

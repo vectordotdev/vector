@@ -14,6 +14,7 @@ bytes = "1.1.0"
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 snafu = { version = "0.6"}
 regex = "1"
+ordered-float = "2"
 
 # TODO: add "lua" feature flag
 mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = false }

@@ -210,7 +210,7 @@ impl TryFrom<f64> for Literal {
 }
 
 // Literal::Boolean ------------------------------------------------------------
-
+e
 impl From<bool> for Literal {
     fn from(v: bool) -> Self {
         Literal::Boolean(v)

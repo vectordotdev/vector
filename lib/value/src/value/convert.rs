@@ -4,6 +4,8 @@ use crate::value::timestamp_to_string;
 use crate::Value;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use ordered_float::NotNan;
+use regex::Regex;
 use std::collections::BTreeMap;
 
 impl Value {
@@ -48,14 +50,14 @@ impl FromIterator<Value> for Value {
     }
 }
 
-impl From<f32> for Value {
-    fn from(value: f32) -> Self {
-        Value::Float(f64::from(value))
+impl From<NotNan<f32>> for Value {
+    fn from(value: NotNan<f32>) -> Self {
+        Value::Float(NotNan::<f64>::from(value))
     }
 }
 
-impl From<f64> for Value {
-    fn from(value: f64) -> Self {
+impl From<NotNan<f64>> for Value {
+    fn from(value: NotNan<f64>) -> Self {
         Value::Float(value)
     }
 }
@@ -118,6 +120,12 @@ impl_valuekind_from_integer!(u16);
 impl_valuekind_from_integer!(u8);
 impl_valuekind_from_integer!(isize);
 
+impl From<Regex> for Value {
+    fn from(regex: Regex) -> Self {
+        Self::Regex(regex)
+    }
+}
+
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Value::Boolean(value)
@@ -137,7 +145,9 @@ impl From<serde_json::Value> for Value {
             serde_json::Value::Number(n) => {
                 let float_or_byte = || {
                     n.as_f64()
-                        .map_or_else(|| Value::Bytes(n.to_string().into()), Value::Float)
+                        // JSON doesn't support "NaN"
+                        .map(|f| Value::Float(NotNan::new(f).unwrap()))
+                        .unwrap_or_else(|| Value::Bytes(n.to_string().into()))
                 };
                 n.as_i64().map_or_else(float_or_byte, Value::Integer)
             }
@@ -155,20 +165,32 @@ impl From<serde_json::Value> for Value {
     }
 }
 
-//TODO: switch to TryFrom impl
-impl TryInto<serde_json::Value> for Value {
+impl TryFrom<f64> for Value {
+    type Error = ();
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Ok(Value::Float(NotNan::new(value).map_err(|_| ())?))
+    }
+}
+
+impl TryFrom<Value> for serde_json::Value {
     type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
-        match self {
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
             Value::Boolean(v) => Ok(serde_json::Value::from(v)),
             Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v)),
+            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
             Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
+            Value::Regex(regex) => Ok(serde_json::Value::from(regex.to_string())),
             Value::Map(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
             Value::Null => Ok(serde_json::Value::Null),
             Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
         }
     }
+}
+
+pub fn regex_to_bytes(regex: &Regex) -> Bytes {
+    Bytes::copy_from_slice(regex.to_string().as_bytes())
 }

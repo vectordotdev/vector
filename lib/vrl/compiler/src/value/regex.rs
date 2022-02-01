@@ -4,21 +4,21 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Regex(regex::Regex);
+pub struct VrlRegex(regex::Regex);
 
-impl PartialEq for Regex {
+impl PartialEq for VrlRegex {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_str() == other.0.as_str()
     }
 }
 
-impl Hash for Regex {
+impl Hash for VrlRegex {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.as_str().hash(state)
     }
 }
 
-impl Deref for Regex {
+impl Deref for VrlRegex {
     type Target = regex::Regex;
 
     fn deref(&self) -> &Self::Target {
@@ -26,7 +26,7 @@ impl Deref for Regex {
     }
 }
 
-impl From<regex::Regex> for Regex {
+impl From<regex::Regex> for VrlRegex {
     fn from(regex: regex::Regex) -> Self {
         Self(regex)
     }

@@ -10,7 +10,7 @@ macro_rules! value {
     });
 
     ({}) => ({
-        $crate::Value::Object(::std::collections::BTreeMap::default())
+        $crate::Value::Map(::std::collections::BTreeMap::default())
     });
 
     ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({

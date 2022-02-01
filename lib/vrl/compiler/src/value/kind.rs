@@ -3,6 +3,7 @@
 use std::{fmt, ops::Deref};
 
 use chrono::{TimeZone, Utc};
+use ordered_float::NotNan;
 use regex::Regex;
 
 use super::Value;
@@ -139,7 +140,7 @@ impl Kind {
         match self {
             Kind::Bytes => value!(""),
             Kind::Integer => value!(0),
-            Kind::Float => value!(0.0),
+            Kind::Float => value!(NotNan::new(0.0).unwrap()),
             Kind::Boolean => value!(false),
             Kind::Object => value!({}),
             Kind::Array => value!([]),

@@ -1,15 +1,18 @@
-mod convert;
-mod target;
+pub mod convert;
+pub mod target;
 
+use crate::value::convert::regex_to_bytes;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
+use core::fmt;
 use lookup::{Field, FieldBuf, Look, Lookup, LookupBuf, Segment, SegmentBuf};
+use ordered_float::NotNan;
 use regex::Regex;
-use serde::de::SeqAccess;
+use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use snafu::Snafu;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 use tracing::instrument;
 use tracing::trace;
 use tracing::trace_span;
@@ -50,14 +53,53 @@ impl From<lookup::LookupError> for ValueError {
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
-    // TODO: Maybe use NotNan<f64>
-    Float(f64),
+    Float(NotNan<f64>),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
+    /// In the context of Vector, this is treated the same as Bytes. It means something more in VRL
     Regex(Regex),
     Null,
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Bytes(val) => write!(
+                f,
+                r#""{}""#,
+                String::from_utf8_lossy(val)
+                    .replace(r#"\"#, r#"\\"#)
+                    .replace(r#"""#, r#"\""#)
+                    .replace("\n", r#"\n"#)
+            ),
+            Value::Integer(val) => write!(f, "{}", val),
+            Value::Float(val) => write!(f, "{}", val),
+            Value::Boolean(val) => write!(f, "{}", val),
+            Value::Map(map) => {
+                let joined = map
+                    .iter()
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{{ {} }}", joined)
+            }
+            Value::Array(array) => {
+                let joined = array
+                    .iter()
+                    .map(|val| format!("{}", val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", joined)
+            }
+            Value::Timestamp(val) => {
+                write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            }
+            Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
+            Value::Null => write!(f, "null"),
+        }
+    }
 }
 
 impl Value {
@@ -65,7 +107,7 @@ impl Value {
     pub fn to_string_lossy(&self) -> String {
         match self {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            // Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
+            Value::Regex(regex) => regex.to_string(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
@@ -79,6 +121,8 @@ impl Value {
     pub fn kind_str(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",
+            // Regex intentionally pretends to be "Bytes"
+            Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
@@ -108,6 +152,27 @@ impl Value {
         }
     }
 
+    pub fn as_float(&self) -> Option<NotNan<f64>> {
+        match self {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            Value::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Self::Float(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {
             Value::Map(map) => Some(map),
@@ -125,6 +190,7 @@ impl Value {
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Regex(regex) => regex_to_bytes(regex),
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
@@ -181,6 +247,7 @@ impl Value {
             // This is just not allowed!
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -314,6 +381,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_) => false,
@@ -426,6 +494,7 @@ impl Value {
             // This is just not allowed!
             (Some(_s), Value::Boolean(_))
             | (Some(_s), Value::Bytes(_))
+            | (Some(_s), Value::Regex(_))
             | (Some(_s), Value::Timestamp(_))
             | (Some(_s), Value::Float(_))
             | (Some(_s), Value::Integer(_))
@@ -478,6 +547,7 @@ impl Value {
             // if the type is one of the following, the field is modified to be a map.
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -781,11 +851,12 @@ impl Serialize for Value {
     {
         match &self {
             Value::Bytes(x) => serializer.serialize_str(String::from_utf8_lossy(x).as_ref()),
+            Value::Regex(regex) => serializer.serialize_str(&regex.to_string()),
             Value::Timestamp(timestamp) => {
                 serializer.serialize_str(&timestamp_to_string(timestamp))
             }
             Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(*f),
+            Value::Float(f) => serializer.serialize_f64(f.into_inner()),
             Value::Boolean(b) => serializer.serialize_bool(*b),
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
@@ -888,7 +959,7 @@ impl<'de> Deserialize<'de> for Value {
                     map.insert(key, value);
                 }
 
-                Ok(Value::Object(map))
+                Ok(Value::Map(map))
             }
         }
 
@@ -928,6 +999,7 @@ pub enum Value {
 */
 
 /*
+
 
 
 
