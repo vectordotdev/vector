@@ -16,8 +16,8 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
-        PrometheusParseError, PrometheusRequestCompleted,
+        BytesReceived, PrometheusEventsReceived, PrometheusHttpError, PrometheusHttpResponseError,
+        PrometheusParseError, PrometheusRequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -236,6 +236,10 @@ fn prometheus(
                     .and_then(|response| async move {
                         let (header, body) = response.into_parts();
                         let body = hyper::body::to_bytes(body).await?;
+                        emit!(&BytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http"
+                        });
                         Ok((header, body))
                     })
                     .into_stream()
@@ -255,7 +259,7 @@ fn prometheus(
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
-                                        emit!(&PrometheusEventReceived {
+                                        emit!(&PrometheusEventsReceived {
                                             byte_size,
                                             count: events.len(),
                                             uri: url.clone()
@@ -370,7 +374,8 @@ fn prometheus(
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
                 Err(())
             }
         }
