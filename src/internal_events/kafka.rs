@@ -1,51 +1,84 @@
-// ## skip check-events ##
-
 use metrics::{counter, gauge};
+
 use vector_core::{internal_event::InternalEvent, update_counter};
 
 #[derive(Debug)]
-pub struct KafkaEventReceived {
+pub struct KafkaEventsReceived {
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for KafkaEventReceived {
+impl InternalEvent for KafkaEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", internal_log_rate_secs = 10);
+        trace!(
+            message = "Received events.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
+        counter!("component_received_events_total", self.count as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
+        // deprecated
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
 #[derive(Debug)]
-pub struct KafkaOffsetUpdateFailed {
+pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
 }
 
-impl InternalEvent for KafkaOffsetUpdateFailed {
+impl InternalEvent for KafkaOffsetUpdateError {
     fn emit_logs(&self) {
-        error!(message = "Unable to update consumer offset.", error = ?self.error);
+        error!(
+            message = "Unable to update consumer offset.",
+            error = %self.error,
+            error_type = "kafka_offset_update",
+            stage = "sending",
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "kafka_offset_update",
+            "stage" => "sending",
+        );
+        // deprecated
         counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct KafkaEventFailed {
+pub struct KafkaReadError {
     pub error: rdkafka::error::KafkaError,
 }
 
-impl InternalEvent for KafkaEventFailed {
+impl InternalEvent for KafkaReadError {
     fn emit_logs(&self) {
-        error!(message = "Failed to read message.", error = ?self.error);
+        error!(
+            message = "Failed to read message.",
+            error = %self.error,
+            error_type = "kafka_read",
+            stage = "receiving",
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "kafka_read",
+            "stage" => "receiving",
+        );
+        // deprecated
         counter!("events_failed_total", 1);
     }
 }

@@ -57,7 +57,7 @@ fn reduce(c: &mut Criterion) {
             b.to_async(tokio::runtime::Runtime::new().unwrap())
                 .iter_batched(
                     || {
-                        let reduce = Transform::task(
+                        let reduce = Transform::event_task(
                             Reduce::new(&param.reduce_config, &Default::default()).unwrap(),
                         )
                         .into_task();

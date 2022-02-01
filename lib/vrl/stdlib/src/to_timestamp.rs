@@ -1,5 +1,5 @@
 use chrono::{TimeZone as _, Utc};
-use shared::{conversion::Conversion, TimeZone};
+use vector_common::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -160,7 +160,7 @@ impl Expression for ToTimestampFn {
 mod tests {
     use std::collections::BTreeMap;
 
-    use shared::TimeZone;
+    use vector_common::TimeZone;
     use vrl::prelude::expression::Literal;
 
     use super::*;

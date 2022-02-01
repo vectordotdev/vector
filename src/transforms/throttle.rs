@@ -34,7 +34,7 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::task)
+        Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
     }
 
     fn input_type(&self) -> DataType {
@@ -98,10 +98,10 @@ where
     }
 }
 
-impl<C, I> TaskTransform for Throttle<C, I>
+impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send,
-    I: clock::Reference + Send,
+    C: clock::Clock<Instant = I> + Send + 'static,
+    I: clock::Reference + Send + 'static,
 {
     fn transform(
         self: Box<Self>,
@@ -209,13 +209,13 @@ window_secs = 5
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future
@@ -275,13 +275,13 @@ exists(.special)
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future
@@ -348,13 +348,13 @@ key_field = "{{ bucket }}"
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future

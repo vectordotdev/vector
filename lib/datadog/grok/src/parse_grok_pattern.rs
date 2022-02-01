@@ -121,4 +121,22 @@ mod tests {
             "invalid escape literal '\\:'"
         );
     }
+
+    #[test]
+    fn escaped_new_line() {
+        let input = r#"%{data::array("\\n")}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(
+            parsed.destination,
+            Some(Destination {
+                path: LookupBuf::root(),
+                filter_fn: Some(Function {
+                    name: "array".to_string(),
+                    args: Some(vec![FunctionArgument::Arg("\n".into())]),
+                })
+            })
+        );
+    }
 }

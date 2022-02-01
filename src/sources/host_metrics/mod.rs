@@ -10,10 +10,10 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-#[cfg(unix)]
-use shared::btreemap;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+#[cfg(unix)]
+use vector_common::btreemap;
 use vector_core::ByteSizeOf;
 
 use crate::{

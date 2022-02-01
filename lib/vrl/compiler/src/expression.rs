@@ -313,6 +313,7 @@ impl DiagnosticError for Error {
 pub enum ExpressionError {
     Abort {
         span: Span,
+        message: Option<String>,
     },
     Error {
         message: String,
@@ -342,7 +343,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort { .. } => "aborted".to_owned(),
+            Abort { message, .. } => message.clone().unwrap_or_else(|| "aborted".to_owned()),
             Error { message, .. } => message.clone(),
         }
     }
@@ -351,7 +352,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort { span } => {
+            Abort { span, .. } => {
                 vec![Label::primary("aborted", span)]
             }
             Error { labels, .. } => labels.clone(),

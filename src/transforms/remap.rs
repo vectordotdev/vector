@@ -5,8 +5,8 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
@@ -269,7 +269,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::{formatdoc, indoc};
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{
@@ -279,6 +279,7 @@ mod tests {
             LogEvent, Metric, Value,
         },
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -424,12 +425,14 @@ mod tests {
 
         let out = collect_outputs(&mut tform, event);
         assert_eq!(2, out.primary.len());
-        let result = out.primary;
+        let mut result = out.primary.into_events();
 
-        assert_eq!(get_field_string(&result[0], "message"), "foo");
-        assert_eq!(get_field_string(&result[1], "message"), "bar");
-        assert_eq!(result[0].metadata(), &metadata);
-        assert_eq!(result[1].metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "foo");
+        assert_eq!(r.metadata(), &metadata);
+        let r = result.next().unwrap();
+        assert_eq!(get_field_string(&r, "message"), "bar");
+        assert_eq!(r.metadata(), &metadata);
     }
 
     #[test]
@@ -845,6 +848,44 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_branching_abort_with_message() {
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                abort "custom message here"
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "custom message here",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn check_remap_branching_disabled() {
         let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
         let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
@@ -929,8 +970,8 @@ mod tests {
     }
 
     struct CollectedOuput {
-        primary: Vec<Event>,
-        named: HashMap<String, Vec<Event>>,
+        primary: OutputBuffer,
+        named: HashMap<String, OutputBuffer>,
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {

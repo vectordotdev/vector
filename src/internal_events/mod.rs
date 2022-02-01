@@ -219,6 +219,7 @@ pub(crate) use self::grok_parser::*;
     feature = "sinks-http",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
+    feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]

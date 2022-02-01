@@ -25,7 +25,7 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     time::{interval_at, Instant},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 fn default_config_path() -> String {
@@ -294,7 +294,7 @@ impl TargetWorker {
                     }
                 }
                 Err(e) => {
-                    debug!(
+                    error!(
                         "Did not receive a response from {} with error: {}",
                         self.target_id, e
                     );

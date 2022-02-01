@@ -14,13 +14,23 @@ pub enum TimeZone {
 
 /// This is a wrapper trait to allow `TimeZone` types to be passed generically.
 impl TimeZone {
+    /// Parse a date/time string into `DateTime<Utc>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns parse errors from the underlying time parsing functions.
     pub fn datetime_from_str(&self, s: &str, format: &str) -> Result<DateTime<Utc>, ParseError> {
         match self {
-            Self::Local => Local.datetime_from_str(s, format).map(datetime_to_utc),
-            Self::Named(tz) => tz.datetime_from_str(s, format).map(datetime_to_utc),
+            Self::Local => Local
+                .datetime_from_str(s, format)
+                .map(|dt| datetime_to_utc(&dt)),
+            Self::Named(tz) => tz
+                .datetime_from_str(s, format)
+                .map(|dt| datetime_to_utc(&dt)),
         }
     }
 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "" | "local" => Some(Self::Local),
@@ -30,7 +40,7 @@ impl TimeZone {
 }
 
 /// Convert a timestamp with a non-UTC time zone into UTC
-pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: DateTime<TZ>) -> DateTime<Utc> {
+pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: &DateTime<TZ>) -> DateTime<Utc> {
     Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
 }
 
@@ -38,7 +48,7 @@ pub(super) fn datetime_to_utc<TZ: chrono::TimeZone>(ts: DateTime<TZ>) -> DateTim
 pub mod ser_de {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-    use super::*;
+    use super::TimeZone;
 
     impl Serialize for TimeZone {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

@@ -1,32 +1,34 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-    sync::Arc,
-};
-
-use grok::Grok;
-use lazy_static::lazy_static;
-use lookup::LookupBuf;
-use regex::Regex;
-use vrl_compiler::Value;
-
+use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
     matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
+use lookup::LookupBuf;
+use once_cell::sync::Lazy;
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+};
+use tracing::error;
+use vrl_compiler::Value;
 
-/// The result of parsing a grok rule with a final regular expression and the related field information, needed at runtime.
-#[derive(Debug, Clone)]
+static GROK_PATTERN_RE: Lazy<onig::Regex> =
+    Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());
+
+/// The result of parsing a grok rule with a final regular expression and the
+/// related field information, needed at runtime.
+#[derive(Clone, Debug)]
 pub struct GrokRule {
     /// a compiled regex pattern
-    pub pattern: Arc<grok::Pattern>,
+    pub pattern: crate::grok::Pattern,
     /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
 }
 
-/// A grok field, that should be extracted, with its lookup path and post-processing filters to apply.
+/// A grok field, that should be extracted, with its lookup path and
+/// post-processing filters to apply.
 #[derive(Debug, Clone)]
 pub struct GrokField {
     pub lookup: LookupBuf,
@@ -113,7 +115,7 @@ pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
-    let mut grok = initialize_grok();
+    let mut grok = Grok::with_patterns();
 
     patterns
         .iter()
@@ -172,15 +174,18 @@ fn parse_pattern(
 ) -> Result<GrokRule, Error> {
     parse_grok_rule(pattern, context)?;
     let mut pattern = String::new();
-    pattern.push('^');
+    // \A, \z - parses from the beginning to the end of string, not line(until \n)
+    pattern.push_str(r#"\A"#);
     pattern.push_str(&context.regex);
-    pattern.push('$');
+    pattern.push_str(r#"\z"#);
+
+    // our regex engine(onig) uses (?m) mode modifier instead of (?s) to make the dot match all characters
+    pattern = pattern.replace("(?s)", "(?m)").replace("(?-s)", "(?-m)");
 
     // compile pattern
-    let pattern = Arc::new(
-        grok.compile(&pattern, true)
-            .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
-    );
+    let pattern = grok
+        .compile(&pattern, true)
+        .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?;
 
     Ok(GrokRule {
         pattern,
@@ -196,10 +201,6 @@ fn parse_pattern(
 /// - `aliases` - all aliases and their definitions
 /// - `context` - the context required to parse the current grok rule
 fn parse_grok_rule(rule: &str, context: &mut GrokRuleParseContext) -> Result<(), Error> {
-    lazy_static! {
-        static ref GROK_PATTERN_RE: onig::Regex =
-            onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap();
-    }
     let mut regex_i = 0;
     for (start, end) in GROK_PATTERN_RE.find_iter(rule) {
         context.append_regex(&rule[regex_i..start]);
@@ -367,7 +368,7 @@ fn resolves_match_function(
                             .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
                         let mut regext_opt = None;
                         if result.tz_captured {
-                            regext_opt = Some(Regex::new(&result.regex).map_err(|error| {
+                            regext_opt = Some(regex::Regex::new(&result.regex).map_err(|error| {
                                 error!(message = "Error compiling regex", regex = %result.regex, %error);
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
                             })?);
@@ -421,7 +422,7 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -441,15 +442,4 @@ mod tests {
             GrokFilter::NullIf(v) if *v == r#"with "escaped" quotes"#
         ));
     }
-}
-
-include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
-fn initialize_grok() -> Grok {
-    let mut grok = grok::Grok::with_patterns();
-
-    // Insert Datadog grok patterns.
-    for &(key, value) in PATTERNS {
-        grok.insert_definition(String::from(key), String::from(value));
-    }
-    grok
 }
