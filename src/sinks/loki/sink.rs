@@ -266,6 +266,9 @@ impl RecordFilter {
                         record.event.timestamp = *latest;
                         Some(record)
                     }
+                    OutOfOrderAction::Accept => {
+                        Some(record)
+                    }
                 }
             } else {
                 *latest = record.event.timestamp;

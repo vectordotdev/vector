@@ -1,7 +1,7 @@
 services:
 
   loki:
-    image: grafana/loki:${LOKI_VERSION:-2.1.0}
+    image: grafana/loki:${LOKI_VERSION:-2.4.1}
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
       - ${PWD}/tests/data:/etc/loki

@@ -333,6 +333,32 @@ async fn out_of_order_drop() {
 }
 
 #[tokio::test]
+async fn out_of_order_accept() {
+    let batch_size = 5;
+    let lines = random_lines(100).take(10).collect::<Vec<_>>();
+    let mut events = lines
+        .clone()
+        .into_iter()
+        .map(Event::from)
+        .collect::<Vec<_>>();
+
+    let base = chrono::Utc::now() - Duration::seconds(20);
+    for (i, event) in events.iter_mut().enumerate() {
+        let log = event.as_mut_log();
+        log.insert(
+            log_schema().timestamp_key(),
+            base + Duration::seconds(i as i64),
+        );
+    }
+    // first event of the second batch is out-of-order.
+    events[batch_size]
+        .as_mut_log()
+        .insert(log_schema().timestamp_key(), base);
+
+    test_out_of_order_events(OutOfOrderAction::Accept, batch_size, events, events).await;
+}
+
+#[tokio::test]
 async fn out_of_order_rewrite() {
     let batch_size = 5;
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
