@@ -10,9 +10,15 @@ badges:
   type: enhancement
 ---
 
-As the first major milestone in our work to improve the buffering support in Vector, we're excited
-to announce the beta release of a new disk buffer implementation, affectionately named "disk buffer
-v2".
+As the first major milestone in our work to improve buffering support in Vector, we're excited
+to announce the beta release of a new disk buffer implementation.  Vector's new disk buffer is
+faster, more consistent, and uses less resources. With 0.20.0, you can opt into these new disk
+buffers via a simple configuration update. We need your help to try it out and give us feedback as
+this new feature stabilises and becomes Vector's default disk buffer implementation.
+
+You can [skip below](#trying-out-the-new-disk-buffer-implementation-today) to see how to opt in, or
+continue reading to learn about the history of buffers in Vector, and about why we've decided to
+rewrite our disk buffer support.
 
 ## Buffering in Vector
 
@@ -24,6 +30,14 @@ buffer and Vector experiences an error that terminates the process, or the syste
 itself crashes, those buffered events would be permanently lost.  As an alternative to in-memory
 buffers, we provide disk buffers, which allow writing the events to disk, providing durability and
 persistence, regardless of issues with Vector and the host system.
+
+You may already be familiar with disk buffers if you have a sink configuration that looks like this:
+
+```toml
+[sinks.http]
+# ...
+buffer.type = "disk"
+```
 
 ## Current disk buffer implementation
 
@@ -44,7 +58,9 @@ disk buffer implementation for a planned stable release in 0.21.
 
 ## Trying out the new disk buffer implementation today
 
-Trying out the new disk buffer implementation is actually very easy, but comes with some caveats:
+With all of that said, we're interested in users trying out the new disk buffer implementation and
+letting us know how it goes.  Switching your configuration to use it is easy, but first, there are a
+few caveats you should know before using it:
 
 - this is a beta release, which means data loss can and may occur
 - existing buffer data is not automatically migrated
@@ -61,12 +77,12 @@ changing a single line:
 ```toml
 # From this:
 [sinks.http]
-...
+# ...
 buffer.type = "disk"
 
 # To this:
 [sinks.http]
-...
+# ...
 buffer.type = "disk_v2"
 ```
 
