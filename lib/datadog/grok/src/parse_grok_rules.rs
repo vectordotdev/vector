@@ -1,4 +1,3 @@
-use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
@@ -7,6 +6,8 @@ use crate::{
 };
 use lookup::LookupBuf;
 use once_cell::sync::Lazy;
+use onig::{EncodedChars, Regex};
+use std::sync::Arc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -22,9 +23,11 @@ static GROK_PATTERN_RE: Lazy<onig::Regex> =
 #[derive(Clone, Debug)]
 pub struct GrokRule {
     /// a compiled regex pattern
-    pub pattern: crate::grok::Pattern,
+    pub pattern: Arc<Regex>,
     /// a map of capture names(grok0, grok1, ...) to field information.
     pub fields: HashMap<String, GrokField>,
+    /// capture indices in the regex pattern
+    pub capture_indices: BTreeMap<String, usize>,
 }
 
 /// A grok field, that should be extracted, with its lookup path and
@@ -46,12 +49,25 @@ pub struct GrokRuleParseContext {
     pub aliases: BTreeMap<String, String>,
     /// used to detect cycles in alias definitions
     pub alias_stack: Vec<String>,
+    /// definitions of grok patterns
+    pub grok_patterns: HashMap<String, String>,
 }
 
 impl GrokRuleParseContext {
     /// appends to the rule's regular expression
     fn append_regex(&mut self, regex: &str) {
         self.regex.push_str(regex);
+    }
+
+    /// appends a regex corresponding to the given grok pattern
+    fn append_grok_pattern(&mut self, name: &str) -> Result<(), Error> {
+        match self.grok_patterns.get(name).cloned() {
+            Some(rule_def) => {
+                parse_grok_rule(&rule_def, self)?;
+                Ok(())
+            }
+            None => Err(Error::DefinitionNotFound(name.to_string())),
+        }
     }
 
     /// registers a given grok field under a given grok name(used in a regex)
@@ -66,12 +82,13 @@ impl GrokRuleParseContext {
             .and_modify(|v| v.filters.insert(0, filter));
     }
 
-    fn new(aliases: BTreeMap<String, String>) -> Self {
+    fn new(aliases: BTreeMap<String, String>, grok_patterns: HashMap<String, String>) -> Self {
         Self {
             regex: String::new(),
             fields: HashMap::new(),
             aliases,
             alias_stack: vec![],
+            grok_patterns,
         }
     }
 
@@ -91,6 +108,8 @@ pub enum Error {
     UnknownFilter(String),
     #[error("Circular dependency found in the alias '{}'", .0)]
     CircularDependencyInAliasDefinition(String),
+    #[error("The given pattern definition name \"{0}\" could not be found in the definition map")]
+    DefinitionNotFound(String),
 }
 
 ///
@@ -115,7 +134,7 @@ pub fn parse_grok_rules(
     patterns: &[String],
     aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
-    let mut grok = Grok::with_patterns();
+    let grok_patterns = read_grok_patterns();
 
     patterns
         .iter()
@@ -123,8 +142,7 @@ pub fn parse_grok_rules(
         .map(|r| {
             parse_pattern(
                 r,
-                &mut GrokRuleParseContext::new(aliases.clone()),
-                &mut grok,
+                &mut GrokRuleParseContext::new(aliases.clone(), grok_patterns.clone()),
             )
         })
         .collect::<Result<Vec<GrokRule>, Error>>()
@@ -167,11 +185,7 @@ fn parse_alias(
 /// - `pattern` - the definition of the pattern
 /// - `context` - the context required to parse the current grok rule
 /// - `grok` - an instance of Grok parser
-fn parse_pattern(
-    pattern: &str,
-    context: &mut GrokRuleParseContext,
-    grok: &mut Grok,
-) -> Result<GrokRule, Error> {
+fn parse_pattern(pattern: &str, context: &mut GrokRuleParseContext) -> Result<GrokRule, Error> {
     parse_grok_rule(pattern, context)?;
     let mut pattern = String::new();
     // \A, \z - parses from the beginning to the end of string, not line(until \n)
@@ -183,13 +197,23 @@ fn parse_pattern(
     pattern = pattern.replace("(?s)", "(?m)").replace("(?-s)", "(?-m)");
 
     // compile pattern
-    let pattern = grok
-        .compile(&pattern, true)
-        .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?;
+    let pattern = Arc::new(
+        Regex::new(&pattern).map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
+    );
+
+    // collect capture indices to apply at runtime
+    let mut capture_indices: BTreeMap<String, usize> = BTreeMap::new();
+    pattern.foreach_name(|name, index| {
+        if !name.is_empty() {
+            capture_indices.insert(name.to_string(), index[0] as usize);
+        }
+        true
+    });
 
     Ok(GrokRule {
         pattern,
         fields: context.fields.clone(),
+        capture_indices,
     })
 }
 
@@ -297,14 +321,15 @@ fn resolve_grok_pattern(
             context.append_regex(")");
         }
         None => {
-            // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
-            context.append_regex("%{");
-            resolves_match_function(grok_alias.clone(), pattern, context)?;
-
             if let Some(grok_alias) = &grok_alias {
-                context.append_regex(&format!(":{}", grok_alias));
+                context.append_regex("(?<");
+                context.append_regex(grok_alias);
+                context.append_regex(">");
+            } else {
+                context.append_regex("(?:");
             }
-            context.append_regex("}");
+            resolves_match_function(grok_alias.clone(), pattern, context)?;
+            context.append_regex(")");
         }
     }
 
@@ -335,28 +360,28 @@ fn resolves_match_function(
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::Integer);
             }
-            context.append_regex("integerStr");
+            context.append_grok_pattern("integerStr")?;
             Ok(())
         }
         "integerExt" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::IntegerExt);
             }
-            context.append_regex("integerExtStr");
+            context.append_grok_pattern("integerExtStr")?;
             Ok(())
         }
         "number" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::Number);
             }
-            context.append_regex("numberStr");
+            context.append_grok_pattern("numberStr")?;
             Ok(())
         }
         "numberExt" => {
             if let Some(grok_alias) = &grok_alias {
                 context.register_filter(grok_alias, GrokFilter::NumberExt);
             }
-            context.append_regex("numberExtStr");
+            context.append_grok_pattern("numberExtStr")?;
             Ok(())
         }
         "date" => {
@@ -413,7 +438,7 @@ fn resolves_match_function(
         }
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => {
-            context.append_regex(grok_pattern_name);
+            context.append_grok_pattern(grok_pattern_name)?;
             Ok(())
         }
     }
@@ -442,4 +467,14 @@ mod tests {
             GrokFilter::NullIf(v) if *v == r#"with "escaped" quotes"#
         ));
     }
+}
+
+include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
+fn read_grok_patterns() -> HashMap<String, String> {
+    let mut res = HashMap::new();
+    // Insert grok patterns.
+    for &(key, value) in PATTERNS {
+        res.insert(String::from(key), String::from(value));
+    }
+    res
 }

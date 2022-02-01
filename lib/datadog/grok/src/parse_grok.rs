@@ -45,9 +45,10 @@ pub fn parse_grok(
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
     let mut parsed = Value::from(btreemap! {});
 
-    if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (name, value) in matches.iter() {
-            let mut value = Some(Value::from(value));
+    if let Some(ref captures) = grok_rule.pattern.captures(source) {
+        // the first capture is always a whole expression - skip it
+        for (name, idx) in &grok_rule.capture_indices {
+            let mut value = Some(Value::from(captures.at(*idx).expect("TODO")));
 
             if let Some(GrokField {
                 lookup: field,
@@ -264,7 +265,7 @@ mod tests {
             parse_grok_rules(&["%{unknown}".to_string()], btreemap! {})
                 .unwrap_err()
                 .to_string(),
-            r#"failed to parse grok expression '\A%{unknown}\z': The given pattern definition name "unknown" could not be found in the definition map"#
+            r#"The given pattern definition name "unknown" could not be found in the definition map"#
         );
     }
 
