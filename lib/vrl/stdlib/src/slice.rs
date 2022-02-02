@@ -109,7 +109,7 @@ impl Expression for SliceFn {
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.vrl_kind(),
                 expected: Kind::Bytes | Kind::Array,
             }
             .into()),

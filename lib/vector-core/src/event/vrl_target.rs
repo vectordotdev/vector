@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
 use lookup::LookupBuf;
 use snafu::Snafu;
+use vrl_core::prelude::VrlValueConvert;
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;

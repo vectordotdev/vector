@@ -12,10 +12,7 @@ use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use toml::value::Value as TomlValue;
 
-use crate::{
-    event::{error::EventError, timestamp_to_string},
-    ByteSizeOf, Result,
-};
+use crate::{event::timestamp_to_string, ByteSizeOf, Result};
 
 pub use value::Value;
 
@@ -80,16 +77,7 @@ use crate::Error;
 //     }
 // }
 //
-// impl ByteSizeOf for Value {
-//     fn allocated_bytes(&self) -> usize {
-//         match self {
-//             Value::Bytes(bytes) => bytes.len(),
-//             Value::Map(map) => map.size_of(),
-//             Value::Array(arr) => arr.size_of(),
-//             _ => 0,
-//         }
-//     }
-// }
+
 //
 
 //
@@ -164,20 +152,7 @@ use crate::Error;
 //
 
 //
-//     /// Merges `incoming` value into self.
-//     ///
-//     /// Will concatenate `Bytes` and overwrite the rest value kinds.
-//     pub fn merge(&mut self, incoming: Value) {
-//         match (self, incoming) {
-//             (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
-//                 let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
-//                 bytes.extend_from_slice(&self_bytes[..]);
-//                 bytes.extend_from_slice(&incoming[..]);
-//                 *self_bytes = bytes.freeze();
-//             }
-//             (current, incoming) => *current = incoming,
-//         }
-//     }
+
 //
 
 //

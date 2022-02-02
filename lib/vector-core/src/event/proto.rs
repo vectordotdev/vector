@@ -325,7 +325,9 @@ fn decode_value(input: Value) -> Option<event::Value> {
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
         Some(value::Kind::Integer(value)) => Some(event::Value::Integer(value)),
-        Some(value::Kind::Float(value)) => Some(event::Value::Float(value)),
+        Some(value::Kind::Float(value)) => {
+            Some(event::Value::try_from(value).expect("Float must not be NaN"))
+        }
         Some(value::Kind::Boolean(value)) => Some(event::Value::Boolean(value)),
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),
@@ -370,7 +372,7 @@ fn encode_value(value: event::Value) -> Value {
                 nanos: ts.timestamp_subsec_nanos() as i32,
             })),
             event::Value::Integer(value) => Some(value::Kind::Integer(value)),
-            event::Value::Float(value) => Some(value::Kind::Float(value)),
+            event::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
             event::Value::Boolean(value) => Some(value::Kind::Boolean(value)),
             event::Value::Map(fields) => Some(value::Kind::Map(encode_map(fields))),
             event::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),

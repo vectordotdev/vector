@@ -72,7 +72,7 @@ impl Expression for RoundFn {
             Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.vrl_kind(),
                 expected: Kind::Float | Kind::Integer,
             }
             .into()),

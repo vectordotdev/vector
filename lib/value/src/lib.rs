@@ -31,4 +31,4 @@ mod lua;
 mod graphql;
 
 pub use kind::Kind;
-pub use value::Value;
+pub use value::{Value, ValueRegex};

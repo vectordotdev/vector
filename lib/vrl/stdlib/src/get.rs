@@ -121,7 +121,7 @@ impl Expression for GetFn {
                         value => {
                             return Err(format!(
                                 r#"path segment must be either "string" or "integer", not {}"#,
-                                value.kind()
+                                value.vrl_kind()
                             )
                             .into())
                         }
@@ -134,7 +134,7 @@ impl Expression for GetFn {
             }
             value => {
                 return Err(value::Error::Expected {
-                    got: value.kind(),
+                    got: value.vrl_kind(),
                     expected: Kind::Array,
                 }
                 .into())

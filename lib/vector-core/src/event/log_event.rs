@@ -158,7 +158,7 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
+            if let Some(val) = self.fields.unwrap_map_mut().remove(from_key.as_ref()) {
                 self.insert_flat(to_key, val);
             }
         }

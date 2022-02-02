@@ -80,9 +80,9 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
                         _ => {
-                            parsed.insert(field, value).unwrap_or_else(
-                                |error| warn!(message = "Error updating field value", field = %field, %error)
-                            );
+                            if let Err(error) = parsed.insert(field, value) {
+                                warn!(message = "Error updating field value", field = %field, %error);
+                            }
                         }
                     };
                 }

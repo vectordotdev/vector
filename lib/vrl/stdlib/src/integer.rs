@@ -54,7 +54,7 @@ impl Expression for IntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
             v @ Value::Integer(_) => Ok(v),
-            v => Err(format!(r#"expected "integer", got {}"#, v.kind()).into()),
+            v => Err(format!(r#"expected "integer", got {}"#, v.vrl_kind()).into()),
         }
     }
 

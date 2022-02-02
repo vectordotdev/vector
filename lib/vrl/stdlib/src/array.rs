@@ -54,7 +54,7 @@ impl Expression for ArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
             v @ Value::Array(_) => Ok(v),
-            v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
+            v => Err(format!(r#"expected "array", got {}"#, v.vrl_kind()).into()),
         }
     }
 

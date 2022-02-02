@@ -64,7 +64,7 @@ impl Expression for LengthFn {
             Object(v) => Ok(v.len().into()),
             Bytes(v) => Ok(v.len().into()),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.vrl_kind(),
                 expected: Kind::Array | Kind::Object | Kind::Bytes,
             }
             .into()),

@@ -1523,6 +1523,7 @@ dependencies = [
  "metrics",
  "serde_json",
  "tracing 0.1.29",
+ "value",
 ]
 
 [[package]]

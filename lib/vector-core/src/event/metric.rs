@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
+use vrl_core::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},

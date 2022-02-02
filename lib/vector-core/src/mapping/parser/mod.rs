@@ -412,9 +412,9 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             inner_quoted_string_escaped_from_pair(&pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
-        Rule::float => Box::new(Literal::from(Value::from(
-            pair.as_str().parse::<f64>().unwrap(),
-        ))),
+        Rule::float => Box::new(Literal::from(
+            Value::try_from(pair.as_str().parse::<f64>().unwrap()).unwrap(),
+        )),
         Rule::integer => Box::new(Literal::from(Value::from(
             pair.as_str().parse::<i64>().unwrap(),
         ))),

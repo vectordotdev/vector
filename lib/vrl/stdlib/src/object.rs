@@ -54,7 +54,7 @@ impl Expression for ObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
             v @ Value::Map(_) => Ok(v),
-            v => Err(format!(r#"expected "object", got {}"#, v.kind()).into()),
+            v => Err(format!(r#"expected "object", got {}"#, v.vrl_kind()).into()),
         }
     }
 

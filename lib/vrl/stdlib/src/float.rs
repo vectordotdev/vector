@@ -54,7 +54,7 @@ impl Expression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
             v @ Value::Float(_) => Ok(v),
-            v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
+            v => Err(format!(r#"expected "float", got {}"#, v.vrl_kind()).into()),
         }
     }
 

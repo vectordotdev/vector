@@ -63,7 +63,7 @@ impl Expression for FloorFn {
             Value::Float(f) => Ok(round_to_precision(*f, precision, f64::floor).into()),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.vrl_kind(),
                 expected: Kind::Float | Kind::Integer,
             }
             .into()),

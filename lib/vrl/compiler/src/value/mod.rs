@@ -4,7 +4,7 @@ mod error;
 pub mod kind;
 mod r#macro;
 // mod path;
-mod regex;
+// mod regex;
 // mod serde;
 mod target;
 
@@ -16,7 +16,7 @@ pub use error::Error;
 pub use kind::Kind;
 use ordered_float::NotNan;
 
-pub use self::regex::VrlRegex;
+// pub use self::regex::VrlRegex;
 
 pub use arithmetic::VrlValueArithmetic;
 pub use convert::VrlValueConvert;

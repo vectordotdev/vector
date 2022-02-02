@@ -122,7 +122,7 @@ impl_valuekind_from_integer!(isize);
 
 impl From<Regex> for Value {
     fn from(regex: Regex) -> Self {
-        Self::Regex(regex)
+        Self::Regex(regex.into())
     }
 }
 

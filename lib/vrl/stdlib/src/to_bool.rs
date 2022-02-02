@@ -163,7 +163,7 @@ impl Expression for ToBoolFn {
             Bytes(v) => Conversion::Boolean
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
-            v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),
+            v => Err(format!(r#"unable to coerce {} into "boolean""#, v.vrl_kind()).into()),
         }
     }
 

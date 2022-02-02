@@ -55,7 +55,7 @@ pub trait VrlValueArithmetic: Sized {
 
 impl VrlValueArithmetic for Value {
     fn try_mul(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Mul(self.kind(), rhs.kind());
+        let err = || Error::Mul(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
@@ -72,7 +72,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_div(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Div(self.kind(), rhs.kind());
+        let err = || Error::Div(self.vrl_kind(), rhs.vrl_kind());
 
         let rhv = rhs.as_float().ok_or_else(err)?;
 
@@ -90,7 +90,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_add(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Add(self.kind(), rhs.kind());
+        let err = || Error::Add(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -113,7 +113,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_sub(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Sub(self.kind(), rhs.kind());
+        let err = || Error::Sub(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -138,7 +138,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_and(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::And(self.kind(), rhs.kind());
+        let err = || Error::And(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Null => false.into(),
@@ -154,7 +154,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_rem(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Rem(self.kind(), rhs.kind());
+        let err = || Error::Rem(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -169,7 +169,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_gt(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Rem(self.kind(), rhs.kind());
+        let err = || Error::Rem(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 > rhs.try_float()?).into(),
@@ -183,7 +183,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_ge(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 >= rhs.try_float()?).into(),
@@ -197,7 +197,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_lt(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => ((lhv as f64) < rhs.try_float()?).into(),
@@ -211,7 +211,7 @@ impl VrlValueArithmetic for Value {
     }
 
     fn try_le(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.vrl_kind(), rhs.vrl_kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 <= rhs.try_float()?).into(),

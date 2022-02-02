@@ -18,11 +18,16 @@ pub trait VrlValueConvert {
     fn try_float(self) -> Result<f64, Error>;
     fn try_integer(self) -> Result<i64, Error>;
     fn try_boolean(self) -> Result<bool, Error>;
+    fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
+    fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
+    fn try_array(self) -> Result<Vec<Value>, Error>;
     fn try_from_f64(f: f64) -> Result<Value, Error> {
         let float = NotNan::new(f).map_err(|_| Error::NanFloat)?;
         Ok(Value::Float(float))
     }
-    fn kind(&self) -> Kind;
+    /// This was renamed from "kind" so it doesn't collide with the now existing "kind".
+    /// This should be fixed when this is unified with the `value/kind` type
+    fn vrl_kind(&self) -> Kind;
 }
 
 impl VrlValueConvert for Value {
@@ -30,7 +35,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Bytes(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind(),
+                got: self.vrl_kind(),
                 expected: Kind::Bytes,
             }),
         }
@@ -40,7 +45,7 @@ impl VrlValueConvert for Value {
         match self.as_bytes2() {
             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
-                got: self.kind(),
+                got: self.vrl_kind(),
                 expected: Kind::Bytes,
             }),
         }
@@ -50,7 +55,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
-                got: self.kind(),
+                got: self.vrl_kind(),
                 expected: Kind::Float,
             }),
         }
@@ -60,7 +65,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Integer(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind(),
+                got: self.vrl_kind(),
                 expected: Kind::Integer,
             }),
         }
@@ -70,13 +75,43 @@ impl VrlValueConvert for Value {
         match self {
             Value::Boolean(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind(),
+                got: self.vrl_kind(),
                 expected: Kind::Boolean,
             }),
         }
     }
 
-    fn kind(&self) -> Kind {
+    fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
+        match self {
+            Value::Timestamp(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.vrl_kind(),
+                expected: Kind::Timestamp,
+            }),
+        }
+    }
+
+    fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+        match self {
+            Value::Map(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.vrl_kind(),
+                expected: Kind::Object,
+            }),
+        }
+    }
+
+    fn try_array(self) -> Result<Vec<Value>, Error> {
+        match self {
+            Value::Array(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.vrl_kind(),
+                expected: Kind::Array,
+            }),
+        }
+    }
+
+    fn vrl_kind(&self) -> Kind {
         Kind::from(self)
     }
 }
@@ -393,16 +428,6 @@ impl VrlValueConvert for Value {
 // Value::Array ----------------------------------------------------------------
 
 // impl Value {
-// pub fn try_array(self) -> Result<Vec<Value>, Error> {
-//     match self {
-//         Value::Array(v) => Ok(v),
-//         _ => Err(Error::Expected {
-//             got: self.kind(),
-//             expected: Kind::Array,
-//         }),
-//     }
-// }
-// }
 
 //
 // // Value::Object ---------------------------------------------------------------
@@ -426,15 +451,7 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 //
-//     pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
-//         match self {
-//            Value::Map(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Object,
-//             }),
-//         }
-//     }
+
 // }
 //
 // impl From<BTreeMap<String, Value>> for Value {
@@ -463,15 +480,7 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 //
-//     pub fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
-//         match self {
-//             Value::Timestamp(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Timestamp,
-//             }),
-//         }
-//     }
+
 // }
 //
 // impl From<DateTime<Utc>> for Value {

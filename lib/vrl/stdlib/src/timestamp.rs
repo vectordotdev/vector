@@ -54,7 +54,7 @@ impl Expression for TimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
             v @ Value::Timestamp(_) => Ok(v),
-            v => Err(format!(r#"expected "timestamp", got {}"#, v.kind()).into()),
+            v => Err(format!(r#"expected "timestamp", got {}"#, v.vrl_kind()).into()),
         }
     }
 

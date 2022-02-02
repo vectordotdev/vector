@@ -1,13 +1,13 @@
 pub mod convert;
+mod regex;
 pub mod target;
 
 use crate::value::convert::regex_to_bytes;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use core::fmt;
 use lookup::{Field, FieldBuf, Look, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
-use regex::Regex;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use snafu::Snafu;
@@ -17,6 +17,8 @@ use tracing::instrument;
 use tracing::trace;
 use tracing::trace_span;
 use tracing::Instrument;
+
+pub use self::regex::ValueRegex;
 
 // --- TODO LIST ----
 //TODO: VRL uses standard `PartialEq`, but Vector has odd f64 eq requirements
@@ -49,7 +51,7 @@ impl From<lookup::LookupError> for ValueError {
 }
 
 //TODO: What is PartialOrd used for?
-#[derive(Clone, Debug /*, PartialOrd*/)]
+#[derive(Clone, Debug, PartialOrd, Eq)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -59,7 +61,7 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     /// In the context of Vector, this is treated the same as Bytes. It means something more in VRL
-    Regex(Regex),
+    Regex(ValueRegex),
     Null,
 }
 
@@ -118,7 +120,7 @@ impl Value {
         }
     }
 
-    pub fn kind_str(&self) -> &str {
+    pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",
             // Regex intentionally pretends to be "Bytes"
@@ -139,6 +141,16 @@ impl Value {
             Value::Map(ref mut m) => Some(m),
             _ => None,
         }
+    }
+
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
+    pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        self.as_map_mut()
+            .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
     }
 
     pub fn into_bytes(self) -> Bytes {
@@ -230,6 +242,21 @@ impl Value {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
             Value::Null => Bytes::from("<null>"),
+        }
+    }
+
+    /// Merges `incoming` value into self.
+    ///
+    /// Will concatenate `Bytes` and overwrite the rest value kinds.
+    pub fn merge(&mut self, incoming: Value) {
+        match (self, incoming) {
+            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+                let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
+                bytes.extend_from_slice(&self_bytes[..]);
+                bytes.extend_from_slice(&incoming[..]);
+                *self_bytes = bytes.freeze();
+            }
+            (current, incoming) => *current = incoming,
         }
     }
 

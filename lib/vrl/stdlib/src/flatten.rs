@@ -61,7 +61,7 @@ impl Expression for FlattenFn {
                     .collect(),
             )),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.vrl_kind(),
                 expected: Kind::Array | Kind::Object,
             }
             .into()),

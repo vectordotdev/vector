@@ -78,7 +78,7 @@ impl Runtime {
                 return Err(Terminate::Error(
                     format!(
                         "target must be a valid object, got {}: {}",
-                        value.kind(),
+                        value.vrl_kind(),
                         value
                     )
                     .into(),

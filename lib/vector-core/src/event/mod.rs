@@ -5,6 +5,7 @@ use std::{
     sync::Arc,
 };
 
+pub use ::value::Value;
 use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -19,7 +20,6 @@ pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
 pub use util::log::{PathComponent, PathIter};
-pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 

@@ -117,7 +117,7 @@ impl Expression for ToFloatFn {
             Bytes(v) => Conversion::Float
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
-            v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),
+            v => Err(format!(r#"unable to coerce {} into "float""#, v.vrl_kind()).into()),
         }
     }
 

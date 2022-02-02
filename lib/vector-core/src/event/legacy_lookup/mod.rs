@@ -118,7 +118,10 @@ impl Lookup {
         match value {
             TomlValue::String(s) => discoveries.insert(lookup, Value::from(s)),
             TomlValue::Integer(i) => discoveries.insert(lookup, Value::from(i)),
-            TomlValue::Float(f) => discoveries.insert(lookup, Value::from(f)),
+            TomlValue::Float(f) => discoveries.insert(
+                lookup,
+                Value::try_from(f).map_err(|_| "NaN value not allowed")?,
+            ),
             TomlValue::Boolean(b) => discoveries.insert(lookup, Value::from(b)),
             TomlValue::Datetime(dt) => {
                 let dt = dt.to_string();

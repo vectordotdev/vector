@@ -7,7 +7,8 @@ use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use regex::Regex;
 
-use crate::value::VrlRegex;
+use value::ValueRegex;
+
 use crate::{expression::Resolved, Context, Expression, Span, State, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,7 +17,7 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(VrlRegex),
+    Regex(ValueRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
@@ -30,7 +31,7 @@ impl Literal {
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
             Boolean(v) => Value::Boolean(*v),
-            Regex(v) => Value::Regex(v.clone().into_inner()),
+            Regex(v) => Value::Regex(v.clone()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
         }
@@ -249,8 +250,8 @@ impl From<Regex> for Literal {
     }
 }
 
-impl From<VrlRegex> for Literal {
-    fn from(regex: VrlRegex) -> Self {
+impl From<ValueRegex> for Literal {
+    fn from(regex: ValueRegex) -> Self {
         Literal::Regex(regex)
     }
 }
