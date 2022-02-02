@@ -184,11 +184,13 @@ pub enum RootExpr {
     Error(Error),
 }
 
+const DEPTH: isize = 4;
+
 impl<'a> Arbitrary<'a> for RootExpr {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(RootExpr::Expr(Node::new(
             Span::default(),
-            Expr::arbitrary_depth(u, 25)?,
+            Expr::arbitrary_depth(u, DEPTH)?,
         )))
     }
 }
@@ -238,10 +240,14 @@ pub enum Expr {
 
 impl<'a> ArbitraryDepth<'a> for Expr {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
-        match u8::arbitrary(u)? % 2 {
+        match u8::arbitrary(u)? % 3 {
             0 if depth > 0 => Ok(Expr::Op(Node::new(
                 Span::default(),
                 Op::arbitrary_depth(u, depth - 1)?,
+            ))),
+            1 if depth == DEPTH => Ok(Expr::Assignment(Node::new(
+                Span::default(),
+                Assignment::arbitrary_depth(u, depth - 1)?,
             ))),
             _ => Ok(Expr::Literal(Node::new(
                 Span::default(),
@@ -353,10 +359,10 @@ impl<'a> Arbitrary<'a> for Literal {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let choice = usize::arbitrary(u)? % 3;
         Ok(match choice {
-            0 => Literal::String(String::arbitrary(u)?),
+            //0 => Literal::String(String::arbitrary(u)?),
             // TODO Limit the size of integers and keep them positive so both VRLs can handle it.
-            1 => Literal::Integer((i64::arbitrary(u)? % 100).abs()),
-            _ => Literal::Boolean(bool::arbitrary(u)?),
+            _ => Literal::Integer((i64::arbitrary(u)? % 100).abs()),
+            //_ => Literal::Boolean(bool::arbitrary(u)?),
         })
     }
 }
@@ -837,7 +843,19 @@ pub enum Assignment {
     // }
 }
 
-#[derive(Clone, PartialEq)]
+impl<'a> ArbitraryDepth<'a> for Assignment {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let target = Node::new(Span::new(0, 5), AssignmentTarget::arbitrary(u)?);
+        let op = AssignmentOp::arbitrary(u)?;
+        let expr = Box::new(Node::new(
+            Span::new(7, 10),
+            Expr::arbitrary_depth(u, depth - 1)?,
+        ));
+        Ok(Assignment::Single { target, op, expr })
+    }
+}
+
+#[derive(Clone, PartialEq, Arbitrary)]
 pub enum AssignmentOp {
     Assign,
     Merge,
@@ -950,6 +968,20 @@ impl fmt::Debug for AssignmentTarget {
             External(Some(path)) => write!(f, "External({})", path),
             External(_) => f.write_str("External(.)"),
         }
+    }
+}
+
+impl<'a> Arbitrary<'a> for AssignmentTarget {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let path = match u8::arbitrary(u)? % 3 {
+            0 => "noog",
+            1 => "flork",
+            _ => "shning",
+        };
+
+        Ok(AssignmentTarget::External(Some(
+            LookupBuf::from_str(path).unwrap(),
+        )))
     }
 }
 
