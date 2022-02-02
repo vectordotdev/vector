@@ -213,11 +213,11 @@ where
         max_events: usize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let noop_usage_handle = BufferUsageHandle::noop();
+        let usage_handle = BufferUsageHandle::noop(when_full);
 
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
         let (sender, receiver, _) = memory_buffer
-            .into_buffer_parts(noop_usage_handle)
+            .into_buffer_parts(usage_handle.clone())
             .await
             .expect("should not fail to directly create a memory buffer");
 
@@ -227,6 +227,44 @@ where
         };
         let sender = BufferSender::new(sender, mode);
         let receiver = BufferReceiver::new(receiver);
+
+        (sender, receiver)
+    }
+
+    /// Creates a memory-only buffer topology with the given buffer usage handle.
+    ///
+    /// This is specifically required for the tests that occur under `buffers`, as we assert things
+    /// like channel capacity left, which cannot be done on in-memory v1 buffers as they use the
+    /// more abstract `Sink`-based adapters.
+    ///
+    /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
+    /// values, but cannot be configured to use overflow mode.  If overflow mode is selected, it
+    /// will be changed to blocking mode.
+    ///
+    /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
+    /// can simplifying needing to require callers to do all the boilerplate to create the builder,
+    /// create the stage, installing buffer usage metrics that aren't required, and so on.
+    #[cfg(test)]
+    pub async fn standalone_memory_test(
+        max_events: usize,
+        when_full: WhenFull,
+        usage_handle: BufferUsageHandle,
+    ) -> (BufferSender<T>, BufferReceiver<T>) {
+        let memory_buffer = Box::new(MemoryBuffer::new(max_events));
+        let (sender, receiver, _) = memory_buffer
+            .into_buffer_parts(usage_handle.clone())
+            .await
+            .expect("should not fail to directly create a memory buffer");
+
+        let mode = match when_full {
+            WhenFull::Overflow => WhenFull::Block,
+            m => m,
+        };
+        let mut sender = BufferSender::new(sender, mode);
+        let mut receiver = BufferReceiver::new(receiver);
+
+        sender.with_instrumentation(usage_handle.clone());
+        receiver.with_instrumentation(usage_handle);
 
         (sender, receiver)
     }

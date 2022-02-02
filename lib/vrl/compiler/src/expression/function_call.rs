@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
@@ -7,6 +7,7 @@ use crate::{
     function::{ArgumentList, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
     value::Kind,
+    vm::OpCode,
     Context, Expression, Function, Resolved, Span, State, TypeDef,
 };
 
@@ -21,14 +22,13 @@ pub struct FunctionCall {
     // TODO: have span store line/col details to further improve this.
     span: Span,
 
-    // Used for pretty-printing function call.
-    //
-    // This allows us to keep the arguments non-cloneable.
-    arguments_fmt: Vec<String>,
-    arguments_dbg: Vec<String>,
-
     // used for equality check
     ident: &'static str,
+
+    // The index of the function in the list of stdlib functions.
+    // Used by the VM to identify this function when called.
+    function_id: usize,
+    arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
 impl FunctionCall {
@@ -43,7 +43,11 @@ impl FunctionCall {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let function = match funcs.iter().find(|f| f.identifier() == ident.as_ref()) {
+        let (function_id, function) = match funcs
+            .iter()
+            .enumerate()
+            .find(|(_pos, f)| f.identifier() == ident.as_ref())
+        {
             Some(function) => function,
             None => {
                 let idents = funcs
@@ -82,19 +86,9 @@ impl FunctionCall {
         let mut index = 0;
         let mut list = ArgumentList::default();
 
-        let arguments_fmt = arguments
-            .iter()
-            .map(|arg| arg.to_string())
-            .collect::<Vec<_>>();
-
-        let arguments_dbg = arguments
-            .iter()
-            .map(|arg| format!("{:?}", arg))
-            .collect::<Vec<_>>();
-
         let mut maybe_fallible_arguments = false;
-        for node in arguments {
-            let (argument_span, argument) = node.take();
+        for node in &arguments {
+            let (argument_span, argument) = node.clone().take();
 
             let parameter = match argument.keyword() {
                 // positional argument
@@ -131,7 +125,10 @@ impl FunctionCall {
                 return Err(Error::InvalidArgumentKind {
                     function_ident: function.identifier(),
                     abort_on_error,
-                    arguments_fmt,
+                    arguments_fmt: arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
                     parameter: *parameter,
                     got: expr_kind,
                     argument,
@@ -193,10 +190,61 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments,
             span: call_span,
-            arguments_fmt,
-            arguments_dbg,
             ident: function.identifier(),
+            function_id,
+            arguments: Arc::new(arguments),
         })
+    }
+
+    /// Takes the arguments passed and resolves them into the order they are defined
+    /// in the function
+    /// The error path in this function should never really be hit as the compiler should
+    /// catch these whilst creating the AST.
+    fn resolve_arguments(
+        &self,
+        function: &(dyn Function),
+    ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
+        let params = function.parameters().to_vec();
+        let mut result = params
+            .iter()
+            .map(|param| (param.keyword, None))
+            .collect::<Vec<_>>();
+
+        let mut unnamed = Vec::new();
+
+        // Position all the named parameters, keeping track of all the unnamed for later.
+        for param in self.arguments.iter() {
+            match param.keyword() {
+                None => unnamed.push(param.clone().take().1),
+                Some(keyword) => {
+                    match params.iter().position(|param| param.keyword == keyword) {
+                        None => {
+                            // The parameter was not found in the list.
+                            return Err(format!("parameter {} not found.", keyword));
+                        }
+                        Some(pos) => {
+                            result[pos].1 = Some(param.clone().take().1);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Position all the remaining unnamed parameters
+        let mut pos = 0;
+        for param in unnamed {
+            while result[pos].1.is_some() {
+                pos += 1;
+            }
+
+            if pos > result.len() {
+                return Err("Too many parameters".to_string());
+            }
+
+            result[pos].1 = Some(param);
+        }
+
+        Ok(result)
     }
 
     pub fn noop() -> Self {
@@ -207,10 +255,24 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments: false,
             span: Span::default(),
-            arguments_fmt: vec![],
-            arguments_dbg: vec![],
             ident: "noop",
+            arguments: Arc::new(Vec::new()),
+            function_id: 0,
         }
+    }
+
+    pub fn arguments_fmt(&self) -> Vec<String> {
+        self.arguments
+            .iter()
+            .map(|arg| arg.inner().to_string())
+            .collect::<Vec<_>>()
+    }
+
+    pub fn arguments_dbg(&self) -> Vec<String> {
+        self.arguments
+            .iter()
+            .map(|arg| format!("{:?}", arg.inner()))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -311,6 +373,58 @@ impl Expression for FunctionCall {
 
         type_def
     }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Resolve the arguments so they are in the order defined in the function.
+        let args = match vm.function(self.function_id) {
+            Some(fun) => self.resolve_arguments(fun)?,
+            None => return Err(format!("Function {} not found.", self.function_id)),
+        };
+
+        let compile_ctx = FunctionCompileContext { span: self.span };
+
+        for (keyword, argument) in &args {
+            let fun = vm.function(self.function_id).unwrap();
+            let argument = argument.as_ref().map(|argument| argument.inner());
+
+            // Call `compile_argument` for functions that need to perform any compile time processing
+            // on the argument.
+            match fun
+                .compile_argument(&args, &compile_ctx, keyword, argument)
+                .map_err(|err| err.to_string())?
+            {
+                Some(stat) => {
+                    // The function has compiled this argument as a static.
+                    let stat = vm.add_static(stat);
+                    vm.write_opcode(OpCode::MoveStaticParameter);
+                    vm.write_primitive(stat);
+                }
+                None => match argument {
+                    Some(argument) => {
+                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
+                        // parameter stack to be passed into the function.
+                        argument.compile_to_vm(vm)?;
+                        vm.write_opcode(OpCode::MoveParameter);
+                    }
+                    None => {
+                        // The parameter hasn't been specified, so just move an empty parameter onto the
+                        // parameter stack.
+                        vm.write_opcode(OpCode::EmptyParameter);
+                    }
+                },
+            }
+        }
+
+        // Call the function with the given id.
+        vm.write_opcode(OpCode::Call);
+        vm.write_primitive(self.function_id);
+
+        // We need to write the spans for error reporting.
+        vm.write_primitive(self.span.start());
+        vm.write_primitive(self.span.end());
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for FunctionCall {
@@ -318,7 +432,8 @@ impl fmt::Display for FunctionCall {
         self.ident.fmt(f)?;
         f.write_str("(")?;
 
-        let mut iter = self.arguments_fmt.iter().peekable();
+        let arguments = self.arguments_fmt();
+        let mut iter = arguments.iter().peekable();
         while let Some(arg) = iter.next() {
             f.write_str(arg)?;
 
@@ -338,7 +453,8 @@ impl fmt::Debug for FunctionCall {
 
         f.write_str("(")?;
 
-        let mut iter = self.arguments_dbg.iter().peekable();
+        let arguments = self.arguments_dbg();
+        let mut iter = arguments.iter().peekable();
         while let Some(arg) = iter.next() {
             f.write_str(arg)?;
 
@@ -661,5 +777,183 @@ impl DiagnosticError for Error {
 
             _ => vec![],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        expression::{Expr, Literal},
+        value::kind,
+    };
+
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    struct Fn;
+
+    impl Expression for Fn {
+        fn resolve(&self, _ctx: &mut Context) -> Resolved {
+            todo!()
+        }
+
+        fn type_def(&self, _state: &crate::State) -> TypeDef {
+            TypeDef::new().infallible()
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestFn;
+
+    impl Function for TestFn {
+        fn identifier(&self) -> &'static str {
+            "test"
+        }
+
+        fn examples(&self) -> &'static [crate::function::Example] {
+            &[]
+        }
+
+        fn parameters(&self) -> &'static [Parameter] {
+            &[
+                Parameter {
+                    keyword: "one",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+                Parameter {
+                    keyword: "two",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+                Parameter {
+                    keyword: "three",
+                    kind: kind::INTEGER,
+                    required: false,
+                },
+            ]
+        }
+
+        fn compile(
+            &self,
+            _state: &crate::State,
+            _info: &FunctionCompileContext,
+            _arguments: ArgumentList,
+        ) -> crate::function::Compiled {
+            Ok(Box::new(Fn))
+        }
+    }
+
+    fn create_node<T>(inner: T) -> Node<T> {
+        Node::new(Span::new(0, 0), inner)
+    }
+
+    fn create_argument(ident: Option<&str>, value: i64) -> FunctionArgument {
+        FunctionArgument::new(
+            ident.map(|ident| create_node(Ident::new(ident))),
+            create_node(Expr::Literal(Literal::Integer(value))),
+        )
+    }
+
+    fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
+        FunctionCall::new(
+            Span::new(0, 0),
+            Node::new(Span::new(0, 0), Ident::new("test")),
+            false,
+            arguments,
+            &[Box::new(TestFn) as _],
+            &mut Default::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn resolve_arguments_simple() {
+        let call = create_function_call(vec![
+            create_node(create_argument(None, 1)),
+            create_node(create_argument(None, 2)),
+            create_node(create_argument(None, 3)),
+        ]);
+
+        let params = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(None, 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(None, 3))),
+        ];
+
+        assert_eq!(Ok(expected), params);
+    }
+
+    #[test]
+    fn resolve_arguments_named() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("one"), 1)),
+            create_node(create_argument(Some("two"), 2)),
+            create_node(create_argument(Some("three"), 3)),
+        ]);
+
+        let params = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(Some("two"), 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(Ok(expected), params);
+    }
+
+    #[test]
+    fn resolve_arguments_named_unordered() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(Some("two"), 2)),
+            create_node(create_argument(Some("one"), 1)),
+        ]);
+
+        let params = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(Some("two"), 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(Ok(expected), params);
+    }
+
+    #[test]
+    fn resolve_arguments_unnamed_unordered_one() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(None, 2)),
+            create_node(create_argument(Some("one"), 1)),
+        ]);
+
+        let params = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(Some("one"), 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(Ok(expected), params);
+    }
+
+    #[test]
+    fn resolve_arguments_unnamed_unordered_two() {
+        let call = create_function_call(vec![
+            create_node(create_argument(Some("three"), 3)),
+            create_node(create_argument(None, 1)),
+            create_node(create_argument(None, 2)),
+        ]);
+
+        let params = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
+            ("one", Some(create_argument(None, 1))),
+            ("two", Some(create_argument(None, 2))),
+            ("three", Some(create_argument(Some("three"), 3))),
+        ];
+
+        assert_eq!(Ok(expected), params);
     }
 }

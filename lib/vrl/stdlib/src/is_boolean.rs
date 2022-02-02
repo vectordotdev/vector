@@ -46,6 +46,10 @@ impl Function for IsBoolean {
 
         Ok(Box::new(IsBooleanFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_boolean()))
+    }
 }
 
 #[derive(Clone, Debug)]

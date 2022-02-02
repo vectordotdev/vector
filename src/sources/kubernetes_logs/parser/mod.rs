@@ -1,4 +1,4 @@
-use shared::TimeZone;
+use vector_common::TimeZone;
 
 mod cri;
 mod docker;

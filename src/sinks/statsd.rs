@@ -319,7 +319,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -349,7 +349,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -364,7 +364,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -393,7 +393,7 @@ mod test {
         let event = Event::Metric(metric1);
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1_compressed, metric2);
+        vector_common::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -410,7 +410,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]

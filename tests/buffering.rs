@@ -1,7 +1,6 @@
 #![cfg(feature = "leveldb")]
 
 use futures::{SinkExt, StreamExt};
-use shared::assert_event_data_eq;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -14,6 +13,7 @@ use vector::{
     },
     topology,
 };
+use vector_common::assert_event_data_eq;
 
 mod support;
 

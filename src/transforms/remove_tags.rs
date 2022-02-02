@@ -72,7 +72,7 @@ impl FunctionTransform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{

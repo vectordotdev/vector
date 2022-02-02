@@ -5,13 +5,18 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
     Program, Runtime, Terminate,
 };
+
+#[cfg(feature = "vrl-vm")]
+use std::sync::Arc;
+#[cfg(feature = "vrl-vm")]
+use vrl::Vm;
 
 use crate::{
     config::{
@@ -83,6 +88,9 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
+
+    #[cfg(feature = "vrl-vm")]
+    vm: Arc<Vm>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -117,14 +125,21 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
+        let runtime = Runtime::default();
+
+        #[cfg(feature = "vrl-vm")]
+        let vm = Arc::new(runtime.compile(functions, &program)?);
+
         Ok(Remap {
             component_key: context.key.clone(),
             program,
-            runtime: Runtime::default(),
+            runtime,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm,
         })
     }
 
@@ -171,6 +186,18 @@ impl Remap {
             }
         }
     }
+
+    #[cfg(feature = "vrl-vm")]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        self.runtime.run_vm(&self.vm, target, &self.timezone)
+    }
+
+    #[cfg(not(feature = "vrl-vm"))]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        let result = self.runtime.resolve(target, &self.program, &self.timezone);
+        self.runtime.clear();
+        result
+    }
 }
 
 impl Clone for Remap {
@@ -183,6 +210,8 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm: Arc::clone(&self.vm),
         }
     }
 }
@@ -210,11 +239,7 @@ impl SyncTransform for Remap {
         };
 
         let mut target: VrlTarget = event.into();
-
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
+        let result = self.run_vrl(&mut target);
 
         match result {
             Ok(_) => {
@@ -269,7 +294,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::{formatdoc, indoc};
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{
@@ -837,6 +862,44 @@ mod tests {
                 "dropped": {
                     "reason": "error",
                     "message": "function call error for \"assert_eq\" at (45:66): assertion failed: 0 == 1",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn check_remap_branching_abort_with_message() {
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                abort "custom message here"
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
+        };
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert!(!log.contains("foo"));
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "custom message here",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
