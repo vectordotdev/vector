@@ -53,9 +53,9 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
     #[serde(default = "default_framing_stream_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once

@@ -5,19 +5,20 @@ pub mod format;
 pub mod framing;
 
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, Deserializer,
-    DeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
+    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
+    JsonDeserializerConfig,
 };
 #[cfg(feature = "sources-syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, Framer, FramingConfig, FramingError, LengthDelimitedDecoder,
+    CharacterDelimitedDecoderConfig, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     OctetCountingDecoder, OctetCountingDecoderConfig,
 };
 
 use bytes::{Bytes, BytesMut};
+use format::Deserializer as _;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -65,19 +66,139 @@ impl StreamDecodingError for Error {
     }
 }
 
+/// Configuration for building a `Framer`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum FramingConfig {
+    /// Configures the `BytesDecoder`.
+    Bytes(BytesDecoderConfig),
+    /// Configures the `CharacterDelimitedDecoder`.
+    CharacterDelimited(CharacterDelimitedDecoderConfig),
+    /// Configures the `LengthDelimitedDecoder`.
+    LengthDelimited(LengthDelimitedDecoderConfig),
+    /// Configures the `NewlineDelimitedDecoder`.
+    NewlineDelimited(NewlineDelimitedDecoderConfig),
+    /// Configures the `OctetCountingDecoder`.
+    OctetCounting(OctetCountingDecoderConfig),
+}
+
+impl FramingConfig {
+    fn build(&self) -> Framer {
+        match self {
+            FramingConfig::Bytes(config) => Framer::Bytes(config.build()),
+            FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
+            FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
+            FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
+        }
+    }
+}
+
+/// Produce byte frames from a byte stream / byte message.
 #[derive(Debug, Clone)]
+pub enum Framer {
+    /// Uses a `BytesDecoder` for framing.
+    Bytes(BytesDecoder),
+    /// Uses a `CharacterDelimitedDecoder` for framing.
+    CharacterDelimited(CharacterDelimitedDecoder),
+    /// Uses a `LengthDelimitedDecoder` for framing.
+    LengthDelimited(LengthDelimitedDecoder),
+    /// Uses a `NewlineDelimitedDecoder` for framing.
+    NewlineDelimited(NewlineDelimitedDecoder),
+    /// Uses a `OctetCountingDecoder` for framing.
+    OctetCounting(OctetCountingDecoder),
+    /// Uses an opaque `Framer` implementation for framing.
+    Boxed(BoxedFramer),
+}
+
+impl tokio_util::codec::Decoder for Framer {
+    type Item = Bytes;
+    type Error = BoxedFramingError;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match self {
+            Framer::Bytes(framer) => framer.decode(src),
+            Framer::CharacterDelimited(framer) => framer.decode(src),
+            Framer::LengthDelimited(framer) => framer.decode(src),
+            Framer::NewlineDelimited(framer) => framer.decode(src),
+            Framer::OctetCounting(framer) => framer.decode(src),
+            Framer::Boxed(framer) => framer.decode(src),
+        }
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match self {
+            Framer::Bytes(framer) => framer.decode_eof(src),
+            Framer::CharacterDelimited(framer) => framer.decode_eof(src),
+            Framer::LengthDelimited(framer) => framer.decode_eof(src),
+            Framer::NewlineDelimited(framer) => framer.decode_eof(src),
+            Framer::OctetCounting(framer) => framer.decode_eof(src),
+            Framer::Boxed(framer) => framer.decode_eof(src),
+        }
+    }
+}
+
+/// Configuration for building a `Deserializer`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum DeserializerConfig {
+    /// Configures the `BytesDeserializer`.
+    Bytes(BytesDeserializerConfig),
+    /// Configures the `JsonDeserializer`.
+    Json(JsonDeserializerConfig),
+    #[cfg(feature = "sources-syslog")]
+    /// Configures the `SyslogDeserializer`.
+    Syslog(SyslogDeserializerConfig),
+}
+
+impl DeserializerConfig {
+    fn build(&self) -> Deserializer {
+        match self {
+            DeserializerConfig::Bytes(config) => Deserializer::Bytes(config.build()),
+            DeserializerConfig::Json(config) => Deserializer::Json(config.build()),
+            #[cfg(feature = "sources-syslog")]
+            DeserializerConfig::Syslog(config) => Deserializer::Syslog(config.build()),
+        }
+    }
+}
+
+/// Parse structured events from bytes.
+#[derive(Debug, Clone)]
+pub enum Deserializer {
+    /// Uses a `BytesDeserializer` for deserialization.
+    Bytes(BytesDeserializer),
+    /// Uses a `JsonDeserializer` for deserialization.
+    Json(JsonDeserializer),
+    #[cfg(feature = "sources-syslog")]
+    /// Uses a `SyslogDeserializer` for deserialization.
+    Syslog(SyslogDeserializer),
+    /// Uses an opaque `Deserializer` implementation for deserialization.
+    Boxed(BoxedDeserializer),
+}
+
+impl format::Deserializer for Deserializer {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        match self {
+            Deserializer::Bytes(deserializer) => deserializer.parse(bytes),
+            Deserializer::Json(deserializer) => deserializer.parse(bytes),
+            #[cfg(feature = "sources-syslog")]
+            Deserializer::Syslog(deserializer) => deserializer.parse(bytes),
+            Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
+        }
+    }
+}
+
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
+#[derive(Debug, Clone)]
 pub struct Decoder {
-    framer: BoxedFramer,
-    deserializer: BoxedDeserializer,
+    framer: Framer,
+    deserializer: Deserializer,
 }
 
 impl Default for Decoder {
     fn default() -> Self {
         Self {
-            framer: Box::new(NewlineDelimitedDecoder::new()),
-            deserializer: Box::new(BytesDeserializer::new()),
+            framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            deserializer: Deserializer::Bytes(BytesDeserializer::new()),
         }
     }
 }
@@ -86,7 +207,7 @@ impl Decoder {
     /// Creates a new `Decoder` with the specified `Framer` to produce byte
     /// frames from the byte stream / byte messages and `Deserializer` to parse
     /// structured events from a byte frame.
-    pub fn new(framer: BoxedFramer, deserializer: BoxedDeserializer) -> Self {
+    pub const fn new(framer: Framer, deserializer: Deserializer) -> Self {
         Self {
             framer,
             deserializer,
@@ -143,25 +264,25 @@ impl tokio_util::codec::Decoder for Decoder {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DecodingConfig {
     /// The framing config.
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     /// The decoding config.
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
-    pub fn new(framing: Box<dyn FramingConfig>, decoding: Box<dyn DeserializerConfig>) -> Self {
+    pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
         Self { framing, decoding }
     }
 
     /// Builds a `Decoder` from the provided configuration.
     pub fn build(&self) -> crate::Result<Decoder> {
         // Build the framer.
-        let framer: BoxedFramer = self.framing.build()?;
+        let framer = self.framing.build();
 
         // Build the deserializer.
-        let deserializer: BoxedDeserializer = self.decoding.build()?;
+        let deserializer = self.decoding.build();
 
         Ok(Decoder::new(framer, deserializer))
     }

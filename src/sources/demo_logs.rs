@@ -36,9 +36,9 @@ pub struct DemoLogsConfig {
     #[serde(flatten)]
     pub format: OutputFormat,
     #[derivative(Default(value = "default_framing_message_based()"))]
-    pub framing: Box<dyn FramingConfig>,
+    pub framing: FramingConfig,
     #[derivative(Default(value = "default_decoding()"))]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 const fn default_interval() -> f64 {

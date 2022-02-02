@@ -38,9 +38,9 @@ pub struct LogplexConfig {
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

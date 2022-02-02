@@ -15,7 +15,11 @@ use tokio_util::udp::UdpFramed;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    codecs::{self, BytesDecoder, OctetCountingDecoder, SyslogDeserializer},
+    codecs::{
+        self,
+        decoding::{Deserializer, Framer},
+        BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
+    },
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -138,8 +142,10 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Unix { path } => {
                 let decoder = Decoder::new(
-                    Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
-                    Box::new(SyslogDeserializer),
+                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
+                        self.max_length,
+                    )),
+                    Deserializer::Syslog(SyslogDeserializer),
                 );
 
                 Ok(build_unix_stream_source(
@@ -187,8 +193,8 @@ impl TcpSource for SyslogTcpSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Box::new(SyslogDeserializer),
+            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
+            Deserializer::Syslog(SyslogDeserializer),
         )
     }
 
@@ -228,7 +234,10 @@ pub fn udp(
 
         let mut stream = UdpFramed::new(
             socket,
-            codecs::Decoder::new(Box::new(BytesDecoder::new()), Box::new(SyslogDeserializer)),
+            codecs::Decoder::new(
+                Framer::Bytes(BytesDecoder::new()),
+                Deserializer::Syslog(SyslogDeserializer),
+            ),
         )
         .take_until(shutdown)
         .filter_map(|frame| {
@@ -312,7 +321,7 @@ mod test {
     use vector_common::assert_event_data_eq;
 
     use super::*;
-    use crate::{codecs::decoding::Deserializer, config::log_schema, event::Event};
+    use crate::{codecs::decoding::format::Deserializer, config::log_schema, event::Event};
 
     fn event_from_bytes(
         host_key: &str,

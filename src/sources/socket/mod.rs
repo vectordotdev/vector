@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
-    codecs::{decoding::DecodingConfig, NewlineDelimitedDecoderConfig},
+    codecs::{
+        decoding::{DecodingConfig, FramingConfig},
+        NewlineDelimitedDecoderConfig,
+    },
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -95,9 +98,9 @@ impl SourceConfig for SocketConfig {
 
                 let framing = match config.framing().as_ref() {
                     Some(framing) => framing.clone(),
-                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
-                        max_length,
-                    )),
+                    None => FramingConfig::NewlineDelimited(
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length),
+                    ),
                 };
 
                 let decoder = DecodingConfig::new(framing, config.decoding().clone()).build()?;
@@ -166,9 +169,9 @@ impl SourceConfig for SocketConfig {
 
                 let framing = match config.framing.as_ref() {
                     Some(framing) => framing.clone(),
-                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
-                        max_length,
-                    )),
+                    None => FramingConfig::NewlineDelimited(
+                        NewlineDelimitedDecoderConfig::new_with_max_length(max_length),
+                    ),
                 };
 
                 let decoder = DecodingConfig::new(framing, config.decoding.clone()).build()?;
@@ -241,7 +244,7 @@ mod test {
     #[cfg(unix)]
     use crate::source_sender::ReceiverStream;
     use crate::{
-        codecs::NewlineDelimitedDecoderConfig,
+        codecs::{decoding::FramingConfig, NewlineDelimitedDecoderConfig},
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -343,7 +346,7 @@ mod test {
 
         let mut config = TcpConfig::from_address(addr.into());
         config.set_max_length(None);
-        config.set_framing(Some(Box::new(
+        config.set_framing(Some(FramingConfig::NewlineDelimited(
             NewlineDelimitedDecoderConfig::new_with_max_length(10),
         )));
 
