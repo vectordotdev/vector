@@ -26,6 +26,10 @@ impl Expression for Group {
     fn type_def(&self, state: &State) -> TypeDef {
         self.inner.type_def(state)
     }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.inner.compile_to_vm(vm)
+    }
 }
 
 impl fmt::Display for Group {

@@ -213,6 +213,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 lookup = { path = "lib/lookup" }
 
 # External libs
+arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -329,7 +330,7 @@ criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.116"
 libz-sys = "1.1.3"
 matches = "0.1.9"
-pretty_assertions = "1.0.0"
+pretty_assertions = "1.1.0"
 reqwest = { version = "0.11.9", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.3.0"
@@ -820,6 +821,7 @@ remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
 codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
+vrl-vm = []
 
 [[bench]]
 name = "default"

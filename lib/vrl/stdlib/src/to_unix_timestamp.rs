@@ -1,6 +1,16 @@
 use std::str::FromStr;
 
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
+
+fn to_unix_timestamp(value: Value, unit: Unit) -> std::result::Result<Value, ExpressionError> {
+    let ts = value.try_timestamp()?;
+    let time = match unit {
+        Unit::Seconds => ts.timestamp(),
+        Unit::Milliseconds => ts.timestamp_millis(),
+        Unit::Nanoseconds => ts.timestamp_nanos(),
+    };
+    Ok(time.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToUnixTimestamp;
@@ -63,6 +73,43 @@ impl Function for ToUnixTimestamp {
 
         Ok(Box::new(ToUnixTimestampFn { value, unit }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("unit", Some(expr)) => match expr.as_value() {
+                None => Ok(None),
+                Some(value) => {
+                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
+                    Ok(Some(
+                        Unit::from_str(&s)
+                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
+                            .map_err(|_| Error::InvalidEnumVariant {
+                                keyword: "unit",
+                                value,
+                                variants: Unit::all_value(),
+                            })?,
+                    ))
+                }
+            },
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let unit = args
+            .optional_any("unit")
+            .map(|unit| *unit.downcast_ref::<Unit>().unwrap())
+            .unwrap_or_default();
+
+        to_unix_timestamp(value, unit)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,15 +169,10 @@ struct ToUnixTimestampFn {
 
 impl Expression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let value = self.value.resolve(ctx)?;
+        let unit = self.unit;
 
-        let time = match self.unit {
-            Unit::Seconds => ts.timestamp(),
-            Unit::Milliseconds => ts.timestamp_millis(),
-            Unit::Nanoseconds => ts.timestamp_nanos(),
-        };
-
-        Ok(time.into())
+        to_unix_timestamp(value, unit)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

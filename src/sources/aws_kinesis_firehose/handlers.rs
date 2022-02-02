@@ -3,7 +3,7 @@ use std::{io::Read, sync::Arc};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::event::BatchNotifier;
@@ -19,7 +19,8 @@ use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
+        StreamClosedError,
     },
     sources::util::StreamDecodingError,
     SourceSender,
@@ -41,12 +42,16 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
+        emit!(&BytesReceived {
+            byte_size: bytes.len(),
+            protocol: "http",
+        });
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {
             match stream.next().await {
                 Some(Ok((events, byte_size))) => {
-                    emit!(&AwsKinesisFirehoseEventsReceived {
+                    emit!(&EventsReceived {
                         count: events.len(),
                         byte_size
                     });
@@ -72,19 +77,17 @@ pub async fn firehose(
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
-                        out.send(event)
-                            .map_err(|error| {
-                                let error = RequestError::ShuttingDown {
-                                    request_id: request_id.clone(),
-                                    source: error,
-                                };
-                                // can only fail if receiving end disconnected, so we are shutting
-                                // down, probably not gracefully.
-                                error!(message = "Failed to forward events, downstream is closed.");
-                                error!(message = "Tried to send the following event.", %error);
-                                warp::reject::custom(error)
-                            })
-                            .await?;
+                        if let Err(error) = out.send(event).await {
+                            emit!(&StreamClosedError {
+                                error: error.clone(),
+                                count: 1
+                            });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                                source: error,
+                            };
+                            warp::reject::custom(error);
+                        }
                     }
 
                     drop(batch);
