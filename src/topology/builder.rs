@@ -27,6 +27,7 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
+    ready_events::ReadyEventsExt,
     schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -569,7 +570,7 @@ impl Runner {
         }
     }
 
-    fn on_events_received(&mut self, events: &[EventArray]) {
+    fn on_events_received(&mut self, events: &EventArray) {
         let stopped = self.timer.stop_wait();
         if stopped.duration_since(self.last_report).as_secs() >= 5 {
             self.timer.report();
@@ -578,7 +579,7 @@ impl Runner {
 
         emit!(&EventsReceived {
             count: events.len(),
-            byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
+            byte_size: events.size_of(),
         });
     }
 
@@ -598,7 +599,7 @@ impl Runner {
             .take()
             .expect("can't run runner twice")
             .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_chunks(INLINE_BATCH_SIZE);
+            .ready_events(INLINE_BATCH_SIZE);
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -621,7 +622,7 @@ impl Runner {
             .take()
             .expect("can't run runner twice")
             .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_chunks(CONCURRENT_BATCH_SIZE);
+            .ready_events(CONCURRENT_BATCH_SIZE);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;

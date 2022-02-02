@@ -6,8 +6,10 @@
 //! part contains config related items including config traits for
 //! each type of component.
 
-pub mod builder;
 pub(super) use vector_core::fanout;
+
+pub mod builder;
+pub(self) mod ready_events;
 mod running;
 mod schema;
 mod task;

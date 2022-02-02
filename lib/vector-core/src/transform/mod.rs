@@ -183,11 +183,9 @@ pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
 pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
 
-    fn transform_all(&mut self, events: Vec<EventArray>, output: &mut TransformOutputsBuf) {
-        for array in events {
-            for event in array.into_events() {
-                self.transform(event, output);
-            }
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        for event in events.into_events() {
+            self.transform(event, output);
         }
     }
 }
