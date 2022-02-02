@@ -495,11 +495,8 @@ impl IngestorProcess {
 
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
-                    Err(err) => {
-                        emit!(&StreamClosedError {
-                            error: err.to_string(),
-                            count,
-                        });
+                    Err(error) => {
+                        emit!(&StreamClosedError { error, count });
                         Some(crate::source_sender::ClosedError)
                     }
                 };
@@ -529,7 +526,7 @@ impl IngestorProcess {
                             BatchStatus::Rejected => {
                                 error!(
                                     message = "Sink reported events were rejected.",
-                                    internal_log_rate_secs = 5
+                                    internal_log_rate_secs = 5,
                                 );
                                 // Failed events cannot be retried, so continue to delete the SQS source message.
                                 Ok(())
