@@ -12,7 +12,7 @@ pub struct StdinEventsReceived {
 impl InternalEvent for StdinEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
         );
