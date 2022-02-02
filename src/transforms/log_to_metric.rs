@@ -735,7 +735,7 @@ mod tests {
         assert_eq!(
             output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "exception_total",
+                "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata.clone(),
@@ -745,7 +745,7 @@ mod tests {
         assert_eq!(
             output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "status",
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata,
