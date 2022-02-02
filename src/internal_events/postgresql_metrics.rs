@@ -30,8 +30,19 @@ impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
     fn emit_logs(&self) {
         let message = "PostgreSQL query error.";
         match self.endpoint {
-            Some(endpoint) => error!(message, error = %self.error, %endpoint),
-            None => error!(message, error = %self.error),
+            Some(endpoint) => error!(
+                message,
+                error = %self.error,
+                error_type = "request_error",
+                stage = "receiving",
+                endpoint = %endpoint,
+            ),
+            None => error!(
+                message,
+                error = %self.error,
+                error_type = "request_error",
+                stage = "receiving",
+            ),
         }
     }
 
