@@ -6742,6 +6742,7 @@ dependencies = [
  "chrono-tz",
  "derivative",
  "nom 7.1.0",
+ "ordered-float",
  "serde",
  "serde_json",
  "snafu",

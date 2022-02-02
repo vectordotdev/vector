@@ -140,7 +140,7 @@ impl Expression for SetFn {
         };
 
         let mut value = self.value.resolve(ctx)?;
-        value.insert(&path, self.data.resolve(ctx)?)?;
+        Target::insert(&mut value, &path, self.data.resolve(ctx)?)?;
 
         Ok(value)
     }

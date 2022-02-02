@@ -55,7 +55,7 @@ impl Expression for FlattenFn {
             Value::Array(arr) => Ok(Value::Array(
                 ArrayFlatten::new(arr.iter()).cloned().collect(),
             )),
-            Value::Map(map) => Ok(Value::Object(
+            Value::Map(map) => Ok(Value::Map(
                 MapFlatten::new(map.iter())
                     .map(|(k, v)| (k, v.clone()))
                     .collect(),

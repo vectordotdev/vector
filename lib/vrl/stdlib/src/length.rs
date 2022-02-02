@@ -61,7 +61,7 @@ impl Expression for LengthFn {
 
         match value {
             Array(v) => Ok(v.len().into()),
-            Object(v) => Ok(v.len().into()),
+            Map(v) => Ok(v.len().into()),
             Bytes(v) => Ok(v.len().into()),
             value => Err(value::Error::Expected {
                 got: value.vrl_kind(),

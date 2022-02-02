@@ -6,6 +6,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 impl Value {
@@ -119,6 +120,7 @@ impl_valuekind_from_integer!(u32);
 impl_valuekind_from_integer!(u16);
 impl_valuekind_from_integer!(u8);
 impl_valuekind_from_integer!(isize);
+impl_valuekind_from_integer!(usize);
 
 impl From<Regex> for Value {
     fn from(regex: Regex) -> Self {
@@ -135,6 +137,18 @@ impl From<bool> for Value {
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
         Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(v: &[u8]) -> Self {
+        Value::Bytes(Bytes::copy_from_slice(v))
+    }
+}
+
+impl From<Cow<'_, str>> for Value {
+    fn from(v: Cow<'_, str>) -> Self {
+        v.as_ref().into()
     }
 }
 
@@ -165,13 +179,20 @@ impl From<serde_json::Value> for Value {
     }
 }
 
-impl TryFrom<f64> for Value {
-    type Error = ();
-
-    fn try_from(value: f64) -> Result<Self, Self::Error> {
-        Ok(Value::Float(NotNan::new(value).map_err(|_| ())?))
+//TODO: This probably shouldn't exist, but would require a lot of refactoring
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::from(NotNan::new(value).unwrap())
     }
 }
+
+// impl TryFrom<f64> for Value {
+//     type Error = ();
+//
+//     fn try_from(value: f64) -> Result<Self, Self::Error> {
+//         Ok(Value::Float(NotNan::new(value).map_err(|_| ())?))
+//     }
+// }
 
 impl TryFrom<Value> for serde_json::Value {
     type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

@@ -55,7 +55,7 @@ struct IsObjectFn {
 
 impl Expression for IsObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_object()))
+        self.value.resolve(ctx).map(|v| value!(v.is_map()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

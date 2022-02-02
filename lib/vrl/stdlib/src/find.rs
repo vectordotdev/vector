@@ -1,4 +1,5 @@
-use vrl::{prelude::*, value::Regex};
+use regex::Regex;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
@@ -84,7 +85,7 @@ impl FindFn {
             Value::Bytes(bytes) => Ok(Self::find_bytes_in_bytes(value.try_bytes()?, bytes, offset)),
             Value::Regex(regex) => Ok(Self::find_regex_in_str(
                 &value.try_bytes_utf8_lossy()?,
-                regex,
+                regex.into_inner(),
                 offset,
             )),
             other => Err(value::Error::Expected {

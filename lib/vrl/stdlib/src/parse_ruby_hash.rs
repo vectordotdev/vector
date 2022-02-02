@@ -232,7 +232,7 @@ fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str
                     preceded(sp, char('}')),
                 )),
             ),
-            Value::Object,
+            Value::Map,
         ),
     )(input)
 }

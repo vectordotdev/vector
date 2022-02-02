@@ -6,6 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{DateTime, ParseError as ChronoParseError, TimeZone as _, Utc};
+use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 
 use super::datetime::{datetime_to_utc, TimeZone};
@@ -41,6 +42,8 @@ pub enum Error {
     IntParse { s: String, source: ParseIntError },
     #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
     FloatParse { s: String, source: ParseFloatError },
+    #[snafu(display("Invalid floating point number {:?}", s))]
+    NaNFloat { s: String },
     #[snafu(
         display("Invalid timestamp {:?}: {}", s, source),
         visibility(pub(super))
@@ -120,7 +123,7 @@ impl Conversion {
     /// Use this `Conversion` variant to turn the given `bytes` into a new `T`.
     pub fn convert<T>(&self, bytes: Bytes) -> Result<T, Error>
     where
-        T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
+        T: From<Bytes> + From<i64> + From<NotNan<f64>> + From<bool> + From<DateTime<Utc>>,
     {
         Ok(match self {
             Self::Bytes => bytes.into(),
@@ -130,7 +133,12 @@ impl Conversion {
             }
             Self::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<f64>().with_context(|| FloatParse { s })?.into()
+                let f64_value = s
+                    .parse::<f64>()
+                    .with_context(|| FloatParse { s: s.clone() })?;
+                NotNan::new(f64_value)
+                    .map_err(|_| Error::NaNFloat { s: s.to_string() })?
+                    .into()
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
             Self::Timestamp(tz) => parse_timestamp(*tz, &String::from_utf8_lossy(&bytes))?.into(),

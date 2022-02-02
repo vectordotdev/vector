@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterat
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
+use value::ValueRegex;
 
 use super::{Error, Kind, Value};
 use crate::{
@@ -21,6 +22,7 @@ pub trait VrlValueConvert {
     fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
     fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
     fn try_array(self) -> Result<Vec<Value>, Error>;
+    fn try_regex(self) -> Result<ValueRegex, Error>;
     fn try_from_f64(f: f64) -> Result<Value, Error> {
         let float = NotNan::new(f).map_err(|_| Error::NanFloat)?;
         Ok(Value::Float(float))
@@ -107,6 +109,16 @@ impl VrlValueConvert for Value {
             _ => Err(Error::Expected {
                 got: self.vrl_kind(),
                 expected: Kind::Array,
+            }),
+        }
+    }
+
+    fn try_regex(self) -> Result<ValueRegex, Error> {
+        match self {
+            Value::Regex(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.vrl_kind(),
+                expected: Kind::Regex,
             }),
         }
     }
@@ -362,15 +374,7 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 //
-//     pub fn try_regex(self) -> Result<Regex, Error> {
-//         match self {
-//             Value::Regex(v) => Ok(v),
-//             _ => Err(Error::Expected {
-//                 got: self.kind(),
-//                 expected: Kind::Regex,
-//             }),
-//         }
-//     }
+
 // }
 //
 // impl From<Regex> for Value {

@@ -19,7 +19,7 @@ ordered-float = "2"
 # TODO: add "lua" feature flag
 mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = false }
 
-# TODO: add graphql feature flag
+# TODO: add graphql feature flag (feature = "api")
 async-graphql = { version = "3.0.20", default-features = false, optional = false }
 
 # TODO: serde feature flag?

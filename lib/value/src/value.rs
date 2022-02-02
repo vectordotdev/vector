@@ -50,8 +50,7 @@ impl From<lookup::LookupError> for ValueError {
     }
 }
 
-//TODO: What is PartialOrd used for?
-#[derive(Clone, Debug, PartialOrd, Eq)]
+#[derive(Clone, Debug, PartialOrd, Eq, Hash)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -188,6 +187,34 @@ impl Value {
     pub fn is_bytes(&self) -> bool {
         match self {
             Self::Bytes(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_timestamp(&self) -> bool {
+        match self {
+            Self::Timestamp(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_regex(&self) -> bool {
+        match self {
+            Self::Regex(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        match self {
+            Self::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Self::Boolean(_) => true,
             _ => false,
         }
     }
