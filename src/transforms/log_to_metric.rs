@@ -731,8 +731,9 @@ mod tests {
         let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
+        let mut output = output.into_events();
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
                 "exception_total",
                 MetricKind::Incremental,
@@ -742,7 +743,7 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
                 "status",
                 MetricKind::Incremental,

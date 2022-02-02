@@ -105,6 +105,6 @@ mod test {
         let mut buf = OutputBuffer::with_capacity(1);
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
-        buf.pop()
+        buf.into_events().next()
     }
 }

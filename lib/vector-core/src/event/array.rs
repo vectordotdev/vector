@@ -145,15 +145,6 @@ impl EventArray {
         }
     }
 
-    /// Remove and return the last event in this array. This is used only in tests.
-    pub fn pop(&mut self) -> Option<Event> {
-        match self {
-            Self::Logs(array) => array.pop().map(Event::from),
-            Self::Metrics(array) => array.pop().map(Event::from),
-            Self::Traces(array) => array.pop().map(Event::from),
-        }
-    }
-
     /// Iterate over this array's events.
     pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
         match self {

@@ -427,15 +427,6 @@ impl OutputBuffer {
         }
     }
 
-    pub fn pop(&mut self) -> Option<Event> {
-        let result = self.0.last_mut().and_then(EventArray::pop);
-        // Make sure to clean up empty arrays
-        if self.0.last().map_or(false, EventArray::is_empty) {
-            self.0.pop();
-        }
-        result
-    }
-
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -552,20 +543,5 @@ mod test {
         buf.push(LogEvent::default().into());
         assert_eq!(buf.len(), 4);
         assert_eq!(buf.0.len(), 3);
-
-        // Pop reverses the above
-        assert!(buf.pop().is_some());
-        assert_eq!(buf.len(), 3);
-        assert_eq!(buf.0.len(), 2);
-        assert!(buf.pop().is_some());
-        assert_eq!(buf.len(), 2);
-        assert_eq!(buf.0.len(), 1);
-        assert!(buf.pop().is_some());
-        assert_eq!(buf.len(), 1);
-        assert_eq!(buf.0.len(), 1);
-        assert!(buf.pop().is_some());
-        assert_eq!(buf.len(), 0);
-        assert_eq!(buf.0.len(), 0);
-        assert!(buf.pop().is_none());
     }
 }

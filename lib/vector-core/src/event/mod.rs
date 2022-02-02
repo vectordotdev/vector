@@ -435,7 +435,7 @@ impl MaybeAsLogMut for Event {
 
 /// A wrapper for references to inner event types, where reconstituting
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EventRef<'a> {
     Log(&'a LogEvent),
     Metric(&'a Metric),
