@@ -106,9 +106,9 @@ pub fn udp(
 
                     let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
 
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((mut events, byte_size))) => {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((mut events, byte_size)) => {
                                 let count = events.len();
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Udp,
@@ -136,14 +136,13 @@ pub fn udp(
                                     _ = &mut shutdown => return Ok(()),
                                 }
                             }
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 // Error is logged by `crate::codecs::Decoder`, no
                                 // further handling is needed here.
                                 if !error.can_continue() {
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
                 }

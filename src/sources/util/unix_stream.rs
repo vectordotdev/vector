@@ -17,7 +17,8 @@ use crate::{
     codecs,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
+        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError,
+        UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
@@ -79,9 +80,9 @@ pub fn build_unix_stream_source(
                     let _open_token =
                         connection_open.open(|count| emit!(&ConnectionOpen { count }));
 
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((mut events, byte_size))) => {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((mut events, byte_size)) => {
                                 handle_events(&mut events, received_from.clone(), byte_size);
 
                                 let count = events.len();
@@ -89,7 +90,7 @@ pub fn build_unix_stream_source(
                                     emit!(&StreamClosedError { error, count });
                                 }
                             }
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 emit!(&UnixSocketError {
                                     error: &error,
                                     path: &listen_path
@@ -99,7 +100,6 @@ pub fn build_unix_stream_source(
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
 
