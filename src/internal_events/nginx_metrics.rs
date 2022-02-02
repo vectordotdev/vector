@@ -17,7 +17,7 @@ pub struct NginxMetricsEventsReceived<'a> {
 impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
     fn emit_logs(&self) {
         trace!(
-            message = "Events received",
+            message = "Events received.",
             byte_size = %self.byte_size,
             count = %self.count,
             uri = self.uri,
