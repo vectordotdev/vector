@@ -24,10 +24,16 @@ impl BufferUsageHandle {
     /// Creates a no-op [`BufferUsageHandle`] handle.
     ///
     /// No usage data is written or stored.
-    pub(crate) fn noop() -> Self {
+    pub(crate) fn noop(when_full: WhenFull) -> Self {
         BufferUsageHandle {
-            state: Arc::new(BufferUsageData::new(WhenFull::Block, 0)),
+            state: Arc::new(BufferUsageData::new(when_full, 0)),
         }
+    }
+
+    /// Gets a snapshot of the buffer usage data, representing an instantaneous view of the
+    /// different values.
+    pub fn snapshot(&self) -> BufferUsageSnapshot {
+        self.state.snapshot()
     }
 
     /// Sets the limits for this buffer component.
@@ -112,6 +118,32 @@ impl BufferUsageData {
             max_size_events: AtomicUsize::new(0),
         }
     }
+
+    fn snapshot(&self) -> BufferUsageSnapshot {
+        BufferUsageSnapshot {
+            received_event_count: self.received_event_count.load(Ordering::Relaxed),
+            received_byte_size: self.received_byte_size.load(Ordering::Relaxed),
+            sent_event_count: self.sent_event_count.load(Ordering::Relaxed),
+            sent_byte_size: self.sent_byte_size.load(Ordering::Relaxed),
+            dropped_event_count: self
+                .dropped_event_count
+                .as_ref()
+                .map(|inner| inner.load(Ordering::Relaxed)),
+            max_size_bytes: self.max_size_bytes.load(Ordering::Relaxed),
+            max_size_events: self.max_size_events.load(Ordering::Relaxed),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BufferUsageSnapshot {
+    pub received_event_count: u64,
+    pub received_byte_size: u64,
+    pub sent_event_count: u64,
+    pub sent_byte_size: u64,
+    pub dropped_event_count: Option<u64>,
+    pub max_size_bytes: u64,
+    pub max_size_events: usize,
 }
 
 pub struct BufferUsage {

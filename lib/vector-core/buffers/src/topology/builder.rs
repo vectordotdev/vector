@@ -213,11 +213,11 @@ where
         max_events: usize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let noop_usage_handle = BufferUsageHandle::noop();
+        let usage_handle = BufferUsageHandle::noop(when_full);
 
         let memory_buffer = Box::new(MemoryV1Buffer::new(max_events));
         let (sender, receiver, _) = memory_buffer
-            .into_buffer_parts(noop_usage_handle)
+            .into_buffer_parts(usage_handle.clone())
             .await
             .expect("should not fail to directly create a memory buffer");
 
@@ -248,14 +248,13 @@ where
     pub async fn memory_v2(
         max_events: usize,
         when_full: WhenFull,
+        usage_handle: BufferUsageHandle,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         use crate::variant::MemoryV2Buffer;
 
-        let noop_usage_handle = BufferUsageHandle::noop();
-
         let memory_buffer = Box::new(MemoryV2Buffer::new(max_events));
         let (sender, receiver, _) = memory_buffer
-            .into_buffer_parts(noop_usage_handle)
+            .into_buffer_parts(usage_handle.clone())
             .await
             .expect("should not fail to directly create a memory buffer");
 
@@ -263,8 +262,11 @@ where
             WhenFull::Overflow => WhenFull::Block,
             m => m,
         };
-        let sender = BufferSender::new(sender, mode);
-        let receiver = BufferReceiver::new(receiver);
+        let mut sender = BufferSender::new(sender, mode);
+        let mut receiver = BufferReceiver::new(receiver);
+
+        sender.with_instrumentation(usage_handle.clone());
+        receiver.with_instrumentation(usage_handle);
 
         (sender, receiver)
     }
