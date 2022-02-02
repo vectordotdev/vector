@@ -13,7 +13,7 @@ acyclic graph of sources, transforms, and sinks. In many ways, this logical
 representation of the config maps rather directly to the way that it is laid out
 and run internally.
 
-**logical graph diagram**
+![logical](https://user-images.githubusercontent.com/333505/152071180-daa5ea73-d588-4471-b34f-79ffb5e6c295.png)
 
 A reasonably accurate mental model of running the above configuration is that
 Vector spins up each component as a Tokio task and wires them together with
@@ -53,7 +53,7 @@ a `SourceContext` as an argument, one field of which is the `SourceSender` built
 above. The result of the build function is wrapped in some simple shutdown
 handling before being inserted into the topology.
 
-**built source diagram**
+**TODO: built source diagram**
 
 ### Transforms
 
@@ -95,7 +95,7 @@ simultaneously. Spawning new tasks allows Tokio's work-stealing scheduler to
 step in and spread the CPU work across multiple threads when there is a need and
 available capacity to do so.
 
-**built function style transform diagram**
+**TODO: built function style transform diagram**
 
 #### Task
 
@@ -112,7 +112,7 @@ passed to the `transform` method. This results in an output stream, which is
 then forwarded to the transform's `Fanout` instance (task transforms do not
 support multiple outputs).
 
-**built task style transform diagram**
+**TODO: built task style transform diagram**
 
 ### Sinks
 
@@ -145,7 +145,7 @@ Once the healthcheck and buffer are built, the sink itself is constructed via
 of the buffer (removing it from the in-case-of-error stash), filter and wrap the
 input stream with telemetry, and then pass it to `VectorSink::run`.
 
-**built sink diagram**
+**TODO: built sink diagram**
 
 ## Connecting components
 
