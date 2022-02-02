@@ -16,7 +16,9 @@ use crate::{
     async_read::VecAsyncReadExt,
     codecs,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
+    internal_events::{
+        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
+    },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
     SourceSender,
@@ -82,8 +84,9 @@ pub fn build_unix_stream_source(
                             Some(Ok((mut events, byte_size))) => {
                                 handle_events(&mut events, received_from.clone(), byte_size);
 
+                                let count = events.len();
                                 if let Err(error) = out.send_all(stream::iter(events)).await {
-                                    error!(message = "Error sending line.", %error);
+                                    emit!(&StreamClosedError { error, count });
                                 }
                             }
                             Some(Err(error)) => {

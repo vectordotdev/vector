@@ -9,7 +9,9 @@ use tracing::field;
 use crate::{
     codecs,
     event::Event,
-    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
+    internal_events::{
+        SocketMode, SocketReceiveError, StreamClosedError, UnixSocketFileDeleteError,
+    },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
     SourceSender,
@@ -84,8 +86,9 @@ async fn listen(
                         Some(Ok((mut events, byte_size))) => {
                             handle_events(&mut events, received_from.clone(), byte_size);
 
+                            let count = events.len();
                             if let Err(error) = out.send_all(stream::iter(events)).await {
-                                error!(message = "Error sending line.", %error);
+                                emit!(&StreamClosedError { error, count });
                                 return Err(());
                             }
                         },
