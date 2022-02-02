@@ -43,11 +43,9 @@ impl proto::Service for Service {
             .collect();
 
         let count = events.len();
+        let byte_size = events.size_of();
 
-        emit!(&EventsReceived {
-            count,
-            byte_size: events.size_of(),
-        });
+        emit!(&EventsReceived { count, byte_size });
 
         let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
 
