@@ -5,6 +5,7 @@ lalrpop_mod!(
     parser
 );
 
+mod arbitrary_depth;
 pub mod ast;
 mod lex;
 

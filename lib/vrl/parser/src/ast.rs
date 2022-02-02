@@ -1,7 +1,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use diagnostic::Span;
 use lookup::LookupBuf;
-use ordered_float::{Float, NotNan};
+use ordered_float::NotNan;
 use std::{
     collections::BTreeMap,
     fmt,
@@ -11,7 +11,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::lex::Error;
+use crate::{arbitrary_depth::ArbitraryDepth, lex::Error};
 
 // -----------------------------------------------------------------------------
 // node
@@ -188,7 +188,7 @@ impl<'a> Arbitrary<'a> for RootExpr {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(RootExpr::Expr(Node::new(
             Span::default(),
-            Expr::arbitrary(u)?,
+            Expr::arbitrary_depth(u, 25)?,
         )))
     }
 }
@@ -236,14 +236,17 @@ pub enum Expr {
     Abort(Node<Abort>),
 }
 
-impl<'a> Arbitrary<'a> for Expr {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+impl<'a> ArbitraryDepth<'a> for Expr {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
         match u8::arbitrary(u)? % 2 {
-            0 => Ok(Expr::Literal(Node::new(
+            0 if depth > 0 => Ok(Expr::Op(Node::new(
+                Span::default(),
+                Op::arbitrary_depth(u, depth - 1)?,
+            ))),
+            _ => Ok(Expr::Literal(Node::new(
                 Span::default(),
                 Literal::arbitrary(u)?,
             ))),
-            _ => Ok(Expr::Op(Node::new(Span::default(), Op::arbitrary(u)?))),
         }
     }
 }
@@ -684,8 +687,22 @@ pub struct Op(pub Box<Node<Expr>>, pub Node<Opcode>, pub Box<Node<Expr>>);
 
 impl<'a> Arbitrary<'a> for Op {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let left = Expr::arbitrary(u)?;
-        let right = Expr::arbitrary(u)?;
+        let left = Expr::arbitrary_depth(u, 100)?;
+        let right = Expr::arbitrary_depth(u, 100)?;
+        let opcode = Opcode::arbitrary(u)?;
+
+        Ok(Op(
+            Box::new(Node::new(Span::default(), left)),
+            Node::new(Span::default(), opcode),
+            Box::new(Node::new(Span::default(), right)),
+        ))
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for Op {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let left = Expr::arbitrary_depth(u, depth - 1)?;
+        let right = Expr::arbitrary_depth(u, depth - 1)?;
         let opcode = Opcode::arbitrary(u)?;
 
         Ok(Op(
