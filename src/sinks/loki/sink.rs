@@ -317,8 +317,27 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let request_builder_concurrency_limit;
+        let service_concurrency_limit;
+
+        match self.out_of_order_action {
+            OutOfOrderAction::Drop => {
+                request_builder_concurrency_limit = NonZeroUsize::new(1);
+                service_concurrency_limit = 1;
+            }
+            OutOfOrderAction::RewriteTimestamp => {
+                request_builder_concurrency_limit = NonZeroUsize::new(1);
+                service_concurrency_limit = 1;
+            }
+            OutOfOrderAction::Accept => {
+                // Use concurrency only when loki accepts out-of-order events (v2.4.0=<)
+                request_builder_concurrency_limit = NonZeroUsize::new(50);
+                service_concurrency_limit = 50;
+            }
+        }
+
         let service = tower::ServiceBuilder::new()
-            .concurrency_limit(1)
+            .concurrency_limit(service_concurrency_limit)
             .service(self.service);
 
         let encoder = self.encoder.clone();
@@ -331,7 +350,7 @@ impl LokiSink {
                 async { res }
             })
             .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
-            .request_builder(NonZeroUsize::new(1), self.request_builder)
+            .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
