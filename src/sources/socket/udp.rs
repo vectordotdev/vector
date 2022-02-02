@@ -16,7 +16,9 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError},
+    internal_events::{
+        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+    },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::StreamDecodingError, Source},
@@ -97,6 +99,8 @@ pub fn udp(
                             error: &error
                         })
                     })?;
+
+                    emit!(&BytesReceived { byte_size, protocol: "udp" });
 
                     let payload = buf.split_to(byte_size);
 
