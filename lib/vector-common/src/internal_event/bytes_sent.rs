@@ -1,4 +1,5 @@
 use metrics::counter;
+use tracing::trace;
 
 use crate::internal_event::InternalEvent;
 
