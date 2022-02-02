@@ -68,6 +68,8 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             message = "MongoDb request error.",
             endpoint = %self.endpoint,
             error = ?self.error,
+            error_type = "request_failed",
+            stage = "receiving",
         );
     }
 
@@ -94,6 +96,8 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             message = "BSON document parse error.",
             endpoint = %self.endpoint,
             error = ?self.error,
+            error_type = "parser_failed",
+            stage = "receiving",
         );
     }
 
