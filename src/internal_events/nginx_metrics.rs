@@ -99,7 +99,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             endpoint = %self.endpoint,
             error = %self.error,
             error_type = "parse_failed",
-            stage = "receiving",
+            stage = "processing",
         );
     }
 
