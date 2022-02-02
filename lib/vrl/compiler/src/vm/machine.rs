@@ -261,7 +261,10 @@ impl Vm {
                 }
                 OpCode::Return => {
                     // Ends the process and returns the top item from the stack - or `Null` if the stack is empty.
-                    return Ok(state.stack.pop().unwrap_or(Value::Null));
+                    return match state.error {
+                        None => Ok(state.stack.pop().unwrap_or(Value::Null)),
+                        Some(err) => Err(err),
+                    };
                 }
                 OpCode::Constant => {
                     let value = state.read_constant()?;
