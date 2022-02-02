@@ -1404,29 +1404,6 @@ if .custom.network.client.ip == null {
 [[transforms.processing.logs.pipelines.vault.transforms]]
 type = "remap"
 source = '''
-if .custom.network.client.ip == null {
-  .custom.network.client.ip = "0.0.0.0"
-}
-'''
-
-[[transforms.processing.logs.pipelines.vault.transforms]]
-type = "geoip"
-database = "/etc/geoip/GeoLite2-City.mmdb"
-source = "custom.network.client.ip"
-target = "custom.network.client.geoip"
-
-[[transforms.processing.logs.pipelines.vault.transforms]]
-type = "remap"
-source = '''
-.custom.network.client.geoip.ipAddress = .custom.network.client.ip
-.custom.network.client.geoip.continent.code = del(.custom.network.client.geoip.continent_code)
-.custom.network.client.geoip.country.iso_code = del(.custom.network.client.geoip.country_code)
-.custom.network.client.geoip.city.name = del(.custom.network.client.geoip.city_name)
-'''
-
-[[transforms.processing.logs.pipelines.vault.transforms]]
-type = "remap"
-source = '''
 if .custom.http.method == null {
   if (source = .custom.request.operation; source != null) {
     .custom.http.method = source
@@ -2821,29 +2798,6 @@ del(.custom.data.ip)
 [[transforms.processing.logs.pipelines.auth0.transforms]]
 type = "remap"
 source = '''
-if .custom.network.client.ip == null {
-  .custom.network.client.ip = "0.0.0.0"
-}
-'''
-
-[[transforms.processing.logs.pipelines.auth0.transforms]]
-type = "geoip"
-database = "/etc/geoip/GeoLite2-City.mmdb"
-source = "custom.network.client.ip"
-target = "custom.network.client.geoip"
-
-[[transforms.processing.logs.pipelines.auth0.transforms]]
-type = "remap"
-source = '''
-.custom.network.client.geoip.ipAddress = .custom.network.client.ip
-.custom.network.client.geoip.continent.code = del(.custom.network.client.geoip.continent_code)
-.custom.network.client.geoip.country.iso_code = del(.custom.network.client.geoip.country_code)
-.custom.network.client.geoip.city.name = del(.custom.network.client.geoip.city_name)
-'''
-
-[[transforms.processing.logs.pipelines.auth0.transforms]]
-type = "remap"
-source = '''
 if .custom.http.useragent == null {
   if (source = .custom.data.user_agent; source != null) {
     .custom.http.useragent = source
@@ -4081,29 +4035,6 @@ if (details, err = parse_url(.custom.view.referrer); err == null) {
   details.queryString = del(details.query)
   .custom.view.referrer_details = details
 }
-'''
-
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
-type = "remap"
-source = '''
-if .custom.network.client.ip == null {
-  .custom.network.client.ip = "0.0.0.0"
-}
-'''
-
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
-type = "geoip"
-database = "/etc/geoip/GeoLite2-City.mmdb"
-source = "custom.network.client.ip"
-target = "custom.network.client.geoip"
-
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
-type = "remap"
-source = '''
-.custom.network.client.geoip.ipAddress = .custom.network.client.ip
-.custom.network.client.geoip.continent.code = del(.custom.network.client.geoip.continent_code)
-.custom.network.client.geoip.country.iso_code = del(.custom.network.client.geoip.country_code)
-.custom.network.client.geoip.city.name = del(.custom.network.client.geoip.city_name)
 '''
 
 ##
