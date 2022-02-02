@@ -27,7 +27,7 @@ mod value;
 //TODO: use "lua" feature flag
 mod lua;
 
-//TODO: use "graphql" feature flag
+//TODO: use "api" (graphql) feature flag
 mod graphql;
 
 pub use kind::Kind;

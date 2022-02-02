@@ -147,8 +147,8 @@ impl From<FluentValue> for Value {
                 // unwrap large numbers to string similar to how
                 // `From<serde_json::Value> for Value` handles it
                 .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
-            rmpv::Value::F32(f) => Value::Float(f.into()),
-            rmpv::Value::F64(f) => Value::Float(f),
+            rmpv::Value::F32(f) => Value::from(f as f64),
+            rmpv::Value::F64(f) => Value::from(f),
             rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
             rmpv::Value::Array(values) => Value::Array(

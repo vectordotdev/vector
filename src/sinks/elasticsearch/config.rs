@@ -244,7 +244,7 @@ impl DataStreamConfig {
             .as_map_mut()
             .entry("data_stream".into())
             .or_insert_with(|| Value::Map(BTreeMap::new()))
-            .as_map_mut();
+            .unwrap_map_mut();
         if let Some(dtype) = dtype {
             existing
                 .entry("type".into())

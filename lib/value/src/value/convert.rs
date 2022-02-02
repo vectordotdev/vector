@@ -9,6 +9,10 @@ use regex::Regex;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use toml::Value as TomlValue;
+
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 impl Value {
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
@@ -102,6 +106,18 @@ impl<T: Into<Value>> From<Option<T>> for Value {
     }
 }
 
+// TODO: this was copied from the VRL "Value".
+// TODO: this exists to satisfy the `vector_common::Convert` utility.
+//
+// We'll have to fix that so that we can remove this impl.
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        let v = if v.is_nan() { 0.0 } else { v };
+
+        Value::Float(NotNan::new(v).unwrap())
+    }
+}
+
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
         impl From<$t> for Value {
@@ -152,6 +168,31 @@ impl From<Cow<'_, str>> for Value {
     }
 }
 
+//TODO: use toml feature?
+impl TryFrom<TomlValue> for Value {
+    type Error = Error;
+
+    fn try_from(toml: TomlValue) -> Result<Self, Error> {
+        Ok(match toml {
+            TomlValue::String(s) => Self::from(s),
+            TomlValue::Integer(i) => Self::from(i),
+            TomlValue::Array(a) => Self::from(
+                a.into_iter()
+                    .map(Value::try_from)
+                    .collect::<Result<Vec<_>, Error>>()?,
+            ),
+            TomlValue::Table(t) => Self::from(
+                t.into_iter()
+                    .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
+                    .collect::<Result<BTreeMap<_, _>, Error>>()?,
+            ),
+            TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
+            TomlValue::Boolean(b) => Self::from(b),
+            TomlValue::Float(f) => Self::from(f),
+        })
+    }
+}
+
 impl From<serde_json::Value> for Value {
     fn from(json_value: serde_json::Value) -> Self {
         match json_value {
@@ -179,13 +220,6 @@ impl From<serde_json::Value> for Value {
     }
 }
 
-//TODO: This probably shouldn't exist, but would require a lot of refactoring
-impl From<f64> for Value {
-    fn from(value: f64) -> Self {
-        Value::from(NotNan::new(value).unwrap())
-    }
-}
-
 // impl TryFrom<f64> for Value {
 //     type Error = ();
 //
@@ -195,7 +229,7 @@ impl From<f64> for Value {
 // }
 
 impl TryFrom<Value> for serde_json::Value {
-    type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+    type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {

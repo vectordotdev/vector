@@ -8264,6 +8264,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "toml",
  "tracing 0.1.29",
 ]
 

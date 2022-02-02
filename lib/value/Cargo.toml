@@ -22,6 +22,9 @@ mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send
 # TODO: add graphql feature flag (feature = "api")
 async-graphql = { version = "3.0.20", default-features = false, optional = false }
 
+# TODO: add a toml feature flag
+toml = { version = "0.5.8", default-features = false }
+
 # TODO: serde feature flag?
 serde = { version = "1.0.133", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.74", default-features = false, features = ["raw_value"] }

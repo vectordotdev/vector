@@ -202,7 +202,7 @@ impl mlua::UserData for LuaEvent {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) => {
-                        this.inner.as_mut_log().insert(key, Value::Float(number));
+                        this.inner.as_mut_log().insert(key, Value::from(number));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));

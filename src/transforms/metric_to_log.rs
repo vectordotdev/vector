@@ -86,7 +86,7 @@ impl MetricToLog {
             .map_err(|error| emit!(&MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
-                Value::Map(object) => {
+                Value::Object(object) => {
                     // TODO: Avoid a clone here
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
