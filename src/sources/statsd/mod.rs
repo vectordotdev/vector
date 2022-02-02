@@ -16,8 +16,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        BytesReceived, StatsdEventsReceived, StatsdInvalidRecordError, StatsdSocketError,
-        StreamClosedError,
+        StatsdEventsReceived, StatsdInvalidRecordError, StatsdSocketError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -150,10 +149,6 @@ pub struct StatsdDeserializer;
 
 impl Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        emit!(&BytesReceived {
-            byte_size: bytes.len(),
-            protocol: "udp",
-        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
