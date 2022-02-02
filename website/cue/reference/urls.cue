@@ -538,6 +538,7 @@ urls: {
 	vector_metric:                                            "/docs/about/under-the-hood/architecture/data-model/metric"
 	vector_monitoring:                                        "/docs/administration/monitoring"
 	vector_msi_source_files:                                  "\(vector_repo)/tree/master/distribution/msi"
+	vector_new_relic_sink:                                    "/docs/reference/configuration/sinks/new_relic/"
 	vector_nightly_builds:                                    "https://packages.timber.io/vector/nightly/latest/"
 	vector_nix_package:                                       "\(github)/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix"
 	vector_packages_root:                                     "https://packages.timber.io"
