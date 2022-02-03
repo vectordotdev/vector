@@ -6,6 +6,7 @@ use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
@@ -123,11 +124,11 @@ where
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
         let mut stream = stream! {
-            loop {
-                match stream.next().await {
-                    Some(Ok((events, byte_size))) => {
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok((events, _byte_size)) => {
                         emit!(&StdinEventsReceived {
-                            byte_size,
+                            byte_size: events.size_of(),
                             count: events.len()
                         });
 
@@ -146,14 +147,13 @@ where
                             yield event;
                         }
                     }
-                    Some(Err(error)) => {
+                    Err(error) => {
                         // Error is logged by `crate::codecs::Decoder`, no
                         // further handling is needed here.
                         if !error.can_continue() {
                             break;
                         }
                     }
-                    None => break,
                 }
             }
         }
