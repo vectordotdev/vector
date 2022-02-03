@@ -24,8 +24,8 @@ use crate::{
         Event,
     },
     internal_events::{
-        BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
-        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
+        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
+        MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
@@ -280,10 +280,6 @@ impl MongoDbMetrics {
             .run_command(command, None)
             .await
             .map_err(CollectError::Mongo)?;
-        emit!(&BytesReceived {
-            byte_size: std::mem::size_of_val(&doc),
-            protocol: "tcp",
-        });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
         // asserts_total
