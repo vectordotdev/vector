@@ -253,12 +253,10 @@ mod tests {
         let (mut fanout, control) = Fanout::new();
         let pairs = build_sender_pairs(capacities).await;
 
-        let mut i = 0;
         let mut receivers = Vec::new();
-        for (sender, receiver) in pairs {
+        for (i, (sender, receiver)) in pairs.into_iter().enumerate() {
             fanout.add(ComponentKey::from(i.to_string()), Box::pin(sender));
             receivers.push(receiver);
-            i += 1;
         }
 
         (fanout, control, receivers)
@@ -354,34 +352,31 @@ mod tests {
     #[tokio::test]
     async fn fanout_notready() {
         let (mut fanout, _, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
-
-        let mut events = make_events(2);
-        let event1 = events.remove(0);
-        let event2 = events.remove(0);
+        let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
-        let mut send1 = spawn(async { fanout.send(event1.clone()).await });
-        let send1_result = assert_ready!(send1.poll());
-        assert!(send1_result.is_ok());
-        drop(send1);
+        let mut first_send = spawn(async { fanout.send(events[0].clone()).await });
+        let first_send_result = assert_ready!(first_send.poll());
+        assert!(first_send_result.is_ok());
+        drop(first_send);
 
         // Second send should return pending because sender B is now full:
-        let mut send2 = spawn(async { fanout.send(event2.clone()).await });
-        assert_pending!(send2.poll());
+        let mut second_send = spawn(async { fanout.send(events[1].clone()).await });
+        assert_pending!(second_send.poll());
 
         // Now read an item from each receiver to free up capacity for the second sender:
-        for receiver in receivers.iter_mut() {
-            assert_eq!(Some(event1.clone()), receiver.next().await);
+        for receiver in &mut receivers {
+            assert_eq!(Some(events[0].clone()), receiver.next().await);
         }
 
         // Now our second send should actually be able to complete:
-        let send2_result = assert_ready!(send2.poll());
-        assert!(send2_result.is_ok());
-        drop(send2);
+        let second_send_result = assert_ready!(second_send.poll());
+        assert!(second_send_result.is_ok());
+        drop(second_send);
 
         // And make sure the second item comes through:
-        for receiver in receivers.iter_mut() {
-            assert_eq!(Some(event2.clone()), receiver.next().await);
+        for receiver in &mut receivers {
+            assert_eq!(Some(events[1].clone()), receiver.next().await);
         }
     }
 
@@ -456,24 +451,21 @@ mod tests {
         // been polled for readiness.
         for sender_id in [0, 1, 2] {
             let (mut fanout, control, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
-
-            let mut events = make_events(2);
-            let event1 = events.remove(0);
-            let event2 = events.remove(0);
+            let events = make_events(2);
 
             // First send should immediately complete because all senders have capacity:
-            let mut send1 = spawn(async { fanout.send(event1.clone()).await });
-            let send1_result = assert_ready!(send1.poll());
-            assert!(send1_result.is_ok());
-            drop(send1);
+            let mut first_send = spawn(async { fanout.send(events[0].clone()).await });
+            let first_send_result = assert_ready!(first_send.poll());
+            assert!(first_send_result.is_ok());
+            drop(first_send);
 
             // Second send should return pending because sender B is now full:
-            let mut send2 = spawn(async { fanout.send(event2.clone()).await });
-            assert_pending!(send2.poll());
+            let mut second_send = spawn(async { fanout.send(events[1].clone()).await });
+            assert_pending!(second_send.poll());
 
             // Now read an item from each receiver to free up capacity:
-            for receiver in receivers.iter_mut() {
-                assert_eq!(Some(event1.clone()), receiver.next().await);
+            for receiver in &mut receivers {
+                assert_eq!(Some(events[0].clone()), receiver.next().await);
             }
 
             // Drop the given sender before polling again:
@@ -481,14 +473,14 @@ mod tests {
 
             // Now our second send should actually be able to complete.  We'll assert that whichever
             // sender we removed does not get the next event:
-            let send2_result = assert_ready!(send2.poll());
-            assert!(send2_result.is_ok());
-            drop(send2);
+            let second_send_result = assert_ready!(second_send.poll());
+            assert!(second_send_result.is_ok());
+            drop(second_send);
 
             let mut expected_next = [
-                Some(event2.clone()),
-                Some(event2.clone()),
-                Some(event2.clone()),
+                Some(events[1].clone()),
+                Some(events[1].clone()),
+                Some(events[1].clone()),
             ];
             expected_next[sender_id] = None;
 
