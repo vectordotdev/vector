@@ -15,6 +15,7 @@ use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
         self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
     },
     internal_events::{
-        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventsReceived,
+        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
         DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
@@ -405,31 +406,27 @@ impl DockerLogsSource {
             tokio::select! {
                 value = self.main_recv.recv() => {
                     match value {
-                        Some(message) => {
-                            match message {
-                                Ok(info) => {
-                                    let state = self
-                                        .containers
-                                        .get_mut(&info.id)
-                                        .expect("Every ContainerLogInfo has it's ContainerState");
-                                    if state.return_info(info) {
-                                        self.esb.restart(state);
-                                    }
-                                },
-                                Err((id,persistence)) => {
-                                    let state = self
-                                        .containers
-                                        .remove(&id)
-                                        .expect("Every started ContainerId has it's ContainerState");
-                                    match persistence{
-                                        ErrorPersistence::Transient => if state.is_running() {
-                                            let backoff= Some(self.backoff_duration);
-                                            self.containers.insert(id.clone(), self.esb.start(id, backoff));
-                                        }
-                                        // Forget the container since the error is permanent.
-                                        ErrorPersistence::Permanent => (),
-                                    }
+                        Some(Ok(info)) => {
+                            let state = self
+                                .containers
+                                .get_mut(&info.id)
+                                .expect("Every ContainerLogInfo has it's ContainerState");
+                            if state.return_info(info) {
+                                self.esb.restart(state);
+                            }
+                        },
+                        Some(Err((id,persistence))) => {
+                            let state = self
+                                .containers
+                                .remove(&id)
+                                .expect("Every started ContainerId has it's ContainerState");
+                            match persistence{
+                                ErrorPersistence::Transient => if state.is_running() {
+                                    let backoff= Some(self.backoff_duration);
+                                    self.containers.insert(id.clone(), self.esb.start(id, backoff));
                                 }
+                                // Forget the container since the error is permanent.
+                                ErrorPersistence::Permanent => (),
                             }
                         }
                         None => {
@@ -442,15 +439,12 @@ impl DockerLogsSource {
                 value = self.events.next() => {
                     match value {
                         Some(Ok(mut event)) => {
-                            let byte_size = std::mem::size_of_val(&event);
-                            emit!(&BytesReceived { byte_size, protocol: "tcp" });
-
                             let action = event.action.unwrap();
                             let actor = event.actor.take().unwrap();
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(&DockerLogsContainerEventsReceived { container_id: &id, action: &action, byte_size });
+                            emit!(&DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
                             let id = ContainerId::new(id);
 
@@ -798,7 +792,11 @@ impl ContainerLogInfo {
             LogOutput::StdIn { message: _ } => return None,
         };
 
-        let byte_size = bytes_message.len();
+        emit!(&BytesReceived {
+            byte_size: bytes_message.len(),
+            protocol: "http"
+        });
+
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -958,7 +956,7 @@ impl ContainerLogInfo {
         let event = Event::Log(log_event);
 
         emit!(&DockerLogsEventsReceived {
-            byte_size,
+            byte_size: event.size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });

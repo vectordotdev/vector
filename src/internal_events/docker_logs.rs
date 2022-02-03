@@ -44,35 +44,21 @@ impl<'a> InternalEvent for DockerLogsEventsReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerLogsContainerEventsReceived<'a> {
+pub struct DockerLogsContainerEventReceived<'a> {
     pub container_id: &'a str,
     pub action: &'a str,
-    pub byte_size: usize,
 }
 
-impl<'a> InternalEvent for DockerLogsContainerEventsReceived<'a> {
+impl<'a> InternalEvent for DockerLogsContainerEventReceived<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "Received events.",
+            message = "Received one container event.",
             container_id = %self.container_id,
             action = %self.action,
-            count = 1,
-            byte_size = self.byte_size,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "component_received_events_total", 1,
-            "container_id" => self.container_id.to_owned(),
-            "action" => self.action.to_owned(),
-        );
-        counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
-            "container_id" => self.container_id.to_owned(),
-            "action" => self.action.to_owned(),
-        );
-        // deprecated
         counter!("container_processed_events_total", 1);
     }
 }
