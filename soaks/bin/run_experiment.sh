@@ -3,7 +3,7 @@
 #set -o errexit # grep will exit 1 without a match, even with --count
 set -o pipefail
 set -o nounset
-set -o xtrace
+#set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOAK_ROOT="${__dir}/.."
