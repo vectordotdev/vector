@@ -17,7 +17,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::InvalidGrokPattern(err) => write!(f, "{}", err.to_string()),
+            Error::InvalidGrokPattern(err) => write!(f, "{}", err),
         }
     }
 }
@@ -33,7 +33,7 @@ impl DiagnosticError for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err.to_string()),
+                    format!("grok pattern error: {}", err),
                     Span::default(),
                 )]
             }
@@ -177,7 +177,7 @@ impl Expression for ParseGrokFn {
         let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
         let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules, remove_empty)
-            .map_err(|e| format!("unable to parse grok: {}", e.to_string()))?;
+            .map_err(|e| format!("unable to parse grok: {}", e))?;
 
         Ok(v)
     }
@@ -191,7 +191,7 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -201,7 +201,7 @@ mod test {
         invalid_grok {
             args: func_args![ value: "foo",
                               patterns: vec!["%{NOG}"]],
-            want: Err("failed to parse grok expression '^%{NOG}$': The given pattern definition name \"NOG\" could not be found in the definition map"),
+            want: Err("failed to parse grok expression '\\A%{NOG}\\z': The given pattern definition name \"NOG\" could not be found in the definition map"),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all(),
             }),
@@ -339,7 +339,7 @@ mod test {
             ],
             want: Ok(Value::Object(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000.0,
+                "duration" => 202000000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",

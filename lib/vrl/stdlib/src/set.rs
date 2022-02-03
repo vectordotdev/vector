@@ -1,5 +1,5 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

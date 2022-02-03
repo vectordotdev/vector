@@ -16,7 +16,7 @@ dashmap = { version = "5", default-features = false }
 criterion = "0.3"
 tracing = "0.1.29"
 mock_instant = { version = "0.2" }
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter"] }
 
 [[bench]]
 name = "limit"

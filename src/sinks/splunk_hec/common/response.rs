@@ -21,6 +21,7 @@ impl DriverResponse for HecResponse {
         EventsSent {
             count: self.events_count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

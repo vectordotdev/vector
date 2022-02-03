@@ -275,7 +275,7 @@ impl<'a> FromLua<'a> for Metric {
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::*;
 

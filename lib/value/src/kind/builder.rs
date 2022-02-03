@@ -16,7 +16,7 @@ impl Kind {
     /// example, the `remove_<state>` methods return an error if the to-be-removed state is the
     /// last state type present in `Kind`.
     #[must_use]
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -73,7 +73,7 @@ impl Kind {
     /// This state represents all types, _except_ ones that contain collection of types (e.g.
     /// objects and arrays).
     #[must_use]
-    pub fn primitive() -> Self {
+    pub const fn primitive() -> Self {
         Self {
             bytes: Some(()),
             integer: Some(()),
@@ -89,7 +89,7 @@ impl Kind {
 
     /// The "bytes" type state.
     #[must_use]
-    pub fn bytes() -> Self {
+    pub const fn bytes() -> Self {
         Self {
             bytes: Some(()),
             integer: None,
@@ -105,7 +105,7 @@ impl Kind {
 
     /// The "integer" type state.
     #[must_use]
-    pub fn integer() -> Self {
+    pub const fn integer() -> Self {
         Self {
             bytes: None,
             integer: Some(()),
@@ -121,7 +121,7 @@ impl Kind {
 
     /// The "float" type state.
     #[must_use]
-    pub fn float() -> Self {
+    pub const fn float() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -137,7 +137,7 @@ impl Kind {
 
     /// The "boolean" type state.
     #[must_use]
-    pub fn boolean() -> Self {
+    pub const fn boolean() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -153,7 +153,7 @@ impl Kind {
 
     /// The "timestamp" type state.
     #[must_use]
-    pub fn timestamp() -> Self {
+    pub const fn timestamp() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -169,7 +169,7 @@ impl Kind {
 
     /// The "regex" type state.
     #[must_use]
-    pub fn regex() -> Self {
+    pub const fn regex() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -185,7 +185,7 @@ impl Kind {
 
     /// The "null" type state.
     #[must_use]
-    pub fn null() -> Self {
+    pub const fn null() -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -201,7 +201,7 @@ impl Kind {
 
     /// The "array" type state.
     #[must_use]
-    pub fn array(map: impl Into<Collection<Index>>) -> Self {
+    pub fn array(collection: impl Into<Collection<Index>>) -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -210,14 +210,14 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
-            array: Some(map.into()),
+            array: Some(collection.into()),
             object: None,
         }
     }
 
     /// The "object" type state.
     #[must_use]
-    pub fn object(map: impl Into<Collection<Field>>) -> Self {
+    pub fn object(collection: impl Into<Collection<Field>>) -> Self {
         Self {
             bytes: None,
             integer: None,
@@ -227,7 +227,7 @@ impl Kind {
             regex: None,
             null: None,
             array: None,
-            object: Some(map.into()),
+            object: Some(collection.into()),
         }
     }
 }
@@ -236,64 +236,64 @@ impl Kind {
 impl Kind {
     /// Add the `bytes` state to the type.
     #[must_use]
-    pub fn or_bytes(mut self) -> Self {
+    pub const fn or_bytes(mut self) -> Self {
         self.bytes = Some(());
         self
     }
 
     /// Add the `integer` state to the type.
     #[must_use]
-    pub fn or_integer(mut self) -> Self {
+    pub const fn or_integer(mut self) -> Self {
         self.integer = Some(());
         self
     }
 
     /// Add the `float` state to the type.
     #[must_use]
-    pub fn or_float(mut self) -> Self {
+    pub const fn or_float(mut self) -> Self {
         self.float = Some(());
         self
     }
 
     /// Add the `boolean` state to the type.
     #[must_use]
-    pub fn or_boolean(mut self) -> Self {
+    pub const fn or_boolean(mut self) -> Self {
         self.boolean = Some(());
         self
     }
 
     /// Add the `timestamp` state to the type.
     #[must_use]
-    pub fn or_timestamp(mut self) -> Self {
+    pub const fn or_timestamp(mut self) -> Self {
         self.timestamp = Some(());
         self
     }
 
     /// Add the `regex` state to the type.
     #[must_use]
-    pub fn or_regex(mut self) -> Self {
+    pub const fn or_regex(mut self) -> Self {
         self.regex = Some(());
         self
     }
 
     /// Add the `null` state to the type.
     #[must_use]
-    pub fn or_null(mut self) -> Self {
+    pub const fn or_null(mut self) -> Self {
         self.null = Some(());
         self
     }
 
     /// Add the `array` state to the type.
     #[must_use]
-    pub fn or_array(mut self, map: impl Into<Collection<Index>>) -> Self {
-        self.array = Some(map.into());
+    pub fn or_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
+        self.array = Some(collection.into());
         self
     }
 
     /// Add the `object` state to the type.
     #[must_use]
-    pub fn or_object(mut self, map: impl Into<Collection<Field>>) -> Self {
-        self.object = Some(map.into());
+    pub fn or_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
+        self.object = Some(collection.into());
         self
     }
 }
@@ -352,15 +352,15 @@ impl Kind {
     /// Add the `array` state to the type.
     ///
     /// If the type already included this state, the function returns `false`.
-    pub fn add_array(&mut self, map: impl Into<Collection<Index>>) -> bool {
-        self.array.replace(map.into()).is_none()
+    pub fn add_array(&mut self, collection: impl Into<Collection<Index>>) -> bool {
+        self.array.replace(collection.into()).is_none()
     }
 
     /// Add the `object` state to the type.
     ///
     /// If the type already included this state, the function returns `false`.
-    pub fn add_object(&mut self, map: impl Into<Collection<Field>>) -> bool {
-        self.object.replace(map.into()).is_none()
+    pub fn add_object(&mut self, collection: impl Into<Collection<Field>>) -> bool {
+        self.object.replace(collection.into()).is_none()
     }
 }
 
@@ -372,11 +372,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_bytes(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_bytes() && self.is_exact() {
+        if self.is_bytes() {
             return Err(EmptyKindError);
         }
 
@@ -389,11 +390,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_integer(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_integer() && self.is_exact() {
+        if self.is_integer() {
             return Err(EmptyKindError);
         }
 
@@ -406,11 +408,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_float(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_float() && self.is_exact() {
+        if self.is_float() {
             return Err(EmptyKindError);
         }
 
@@ -423,11 +426,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_boolean(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_boolean() && self.is_exact() {
+        if self.is_boolean() {
             return Err(EmptyKindError);
         }
 
@@ -440,11 +444,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_timestamp(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_timestamp() && self.is_exact() {
+        if self.is_timestamp() {
             return Err(EmptyKindError);
         }
 
@@ -457,11 +462,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_regex(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_regex() && self.is_exact() {
+        if self.is_regex() {
             return Err(EmptyKindError);
         }
 
@@ -474,11 +480,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_null(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_null() && self.is_exact() {
+        if self.is_null() {
             return Err(EmptyKindError);
         }
 
@@ -491,11 +498,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_array(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_array() && self.is_exact() {
+        if self.is_array() {
             return Err(EmptyKindError);
         }
 
@@ -508,11 +516,12 @@ impl Kind {
     ///
     /// # Errors
     ///
-    /// If removing this state leaves an "empty" type, then the error variant is returned. This was
-    /// chosen, because when applying progressive type checking, there should _always_ be at least
-    /// one state for a given type, the "no state left for a type" variant is a programming error.
+    /// If removing this state would leave an "empty" type, then the error variant is returned.
+    /// This was chosen, because when applying progressive type checking, there should _always_ be
+    /// at least one state for a given type, the "no state left for a type" variant is
+    /// a programming error.
     pub fn remove_object(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_object() && self.is_exact() {
+        if self.is_object() {
             return Err(EmptyKindError);
         }
 

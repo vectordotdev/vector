@@ -13,7 +13,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::InvalidGrokPattern(err) => write!(f, "{}", err.to_string()),
+            Error::InvalidGrokPattern(err) => write!(f, "{}", err),
         }
     }
 }
@@ -29,7 +29,7 @@ impl DiagnosticError for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err.to_string()),
+                    format!("grok pattern error: {}", err),
                     Span::default(),
                 )]
             }
@@ -157,7 +157,7 @@ impl Expression for ParseGrokFn {
 
 #[cfg(test)]
 mod test {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

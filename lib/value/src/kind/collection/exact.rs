@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    ops::{BitAnd, BitOr, BitXor},
-};
+use std::{collections::BTreeMap, ops::BitOr};
 
 use crate::Kind;
 
@@ -18,17 +15,12 @@ pub struct Exact {
     pub(super) timestamp: bool,
     pub(super) regex: bool,
     pub(super) null: bool,
-
-    // We don't need to support nested objects, because `Exact` is only used for "unknown" fields.
-    // So it only applies to a single level. If we wanted to set a nested field, we would have
-    // a "known" field (e.g. `foo`) and then have that contain either `Unknown::Any` or
-    // `Unknown::Exact`.
     pub(super) object: bool,
     pub(super) array: bool,
 }
 
 impl Exact {
-    pub fn json() -> Self {
+    pub const fn json() -> Self {
         Self {
             bytes: true,
             integer: true,
@@ -46,39 +38,39 @@ impl Exact {
     ///
     /// Meaning, if `other` has a type set to `true`, then `self` needs to as well.
     pub fn is_superset(&self, other: &Self) -> bool {
-        if let (false, true) = (self.bytes, other.bytes) {
+        if (false, true) == (self.bytes, other.bytes) {
             return false;
         }
 
-        if let (false, true) = (self.integer, other.integer) {
+        if (false, true) == (self.integer, other.integer) {
             return false;
         }
 
-        if let (false, true) = (self.float, other.float) {
+        if (false, true) == (self.float, other.float) {
             return false;
         }
 
-        if let (false, true) = (self.boolean, other.boolean) {
+        if (false, true) == (self.boolean, other.boolean) {
             return false;
         }
 
-        if let (false, true) = (self.timestamp, other.timestamp) {
+        if (false, true) == (self.timestamp, other.timestamp) {
             return false;
         }
 
-        if let (false, true) = (self.regex, other.regex) {
+        if (false, true) == (self.regex, other.regex) {
             return false;
         }
 
-        if let (false, true) = (self.null, other.null) {
+        if (false, true) == (self.null, other.null) {
             return false;
         }
 
-        if let (false, true) = (self.object, other.object) {
+        if (false, true) == (self.object, other.object) {
             return false;
         }
 
-        if let (false, true) = (self.array, other.array) {
+        if (false, true) == (self.array, other.array) {
             return false;
         }
 
@@ -104,45 +96,9 @@ impl BitOr for Exact {
     }
 }
 
-impl BitXor for Exact {
-    type Output = Self;
-
-    fn bitxor(self, rhs: Self) -> Self::Output {
-        Self {
-            bytes: self.bytes ^ rhs.bytes,
-            integer: self.integer ^ rhs.integer,
-            float: self.float ^ rhs.float,
-            boolean: self.boolean ^ rhs.boolean,
-            timestamp: self.timestamp ^ rhs.timestamp,
-            regex: self.regex ^ rhs.regex,
-            null: self.null ^ rhs.null,
-            object: self.object ^ rhs.object,
-            array: self.array ^ rhs.array,
-        }
-    }
-}
-
-impl BitAnd for Exact {
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self {
-            bytes: self.bytes & rhs.bytes,
-            integer: self.integer & rhs.integer,
-            float: self.float & rhs.float,
-            boolean: self.boolean & rhs.boolean,
-            timestamp: self.timestamp & rhs.timestamp,
-            regex: self.regex & rhs.regex,
-            null: self.null & rhs.null,
-            object: self.object & rhs.object,
-            array: self.array & rhs.array,
-        }
-    }
-}
-
 impl From<Exact> for Kind {
     fn from(exact: Exact) -> Self {
-        let mut kind = Kind::empty();
+        let mut kind = Self::empty();
 
         if exact.bytes {
             kind.add_bytes();
@@ -193,15 +149,15 @@ impl From<Kind> for Exact {
 impl From<&Kind> for Exact {
     fn from(kind: &Kind) -> Self {
         Self {
-            bytes: kind.is_bytes(),
-            integer: kind.is_integer(),
-            float: kind.is_float(),
-            boolean: kind.is_boolean(),
-            timestamp: kind.is_timestamp(),
-            regex: kind.is_regex(),
-            null: kind.is_null(),
-            object: kind.is_object(),
-            array: kind.is_array(),
+            bytes: kind.contains_bytes(),
+            integer: kind.contains_integer(),
+            float: kind.contains_float(),
+            boolean: kind.contains_boolean(),
+            timestamp: kind.contains_timestamp(),
+            regex: kind.contains_regex(),
+            null: kind.contains_null(),
+            object: kind.contains_object(),
+            array: kind.contains_array(),
         }
     }
 }

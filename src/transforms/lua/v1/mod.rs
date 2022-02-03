@@ -33,7 +33,7 @@ pub struct LuaConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::task)
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
     pub const fn input_type(&self) -> DataType {
@@ -102,16 +102,16 @@ impl Lua {
             let package = lua
                 .globals()
                 .get::<_, mlua::Table<'_>>("package")
-                .context(InvalidLua)?;
+                .context(InvalidLuaSnafu)?;
             let current_paths = package
                 .get::<_, String>("path")
                 .unwrap_or_else(|_| ";".to_string());
             let paths = format!("{};{}", additional_paths, current_paths);
-            package.set("path", paths).context(InvalidLua)?;
+            package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 
-        let func = lua.load(&source).into_function().context(InvalidLua)?;
-        let vector_func = lua.create_registry_value(func).context(InvalidLua)?;
+        let func = lua.load(&source).into_function().context(InvalidLuaSnafu)?;
+        let vector_func = lua.create_registry_value(func).context(InvalidLuaSnafu)?;
 
         Ok(Self {
             source,
@@ -158,7 +158,7 @@ impl Lua {
     }
 }
 
-impl TaskTransform for Lua {
+impl TaskTransform<Event> for Lua {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,

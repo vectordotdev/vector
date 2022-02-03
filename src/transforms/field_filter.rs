@@ -5,7 +5,7 @@ use crate::{
         DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -69,7 +69,7 @@ impl FieldFilter {
 }
 
 impl FunctionTransform for FieldFilter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if event
             .as_log()
             .get(&self.field_name)

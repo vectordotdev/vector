@@ -1,13 +1,17 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     iter::FromIterator,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
+use futures::{future::try_join_all, FutureExt, Sink};
 use itertools::Itertools;
-use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
+use tokio::sync::{
+    mpsc as tokio_mpsc,
+    mpsc::error::{SendError, TrySendError},
+    oneshot,
+};
 use uuid::Uuid;
 
 use super::{ShutdownRx, ShutdownTx};
@@ -67,71 +71,44 @@ impl TapPayload {
 pub struct TapSink {
     tap_tx: TapSender,
     output_id: OutputId,
-    buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
-        Self {
-            tap_tx,
-            output_id,
-            // Pre-allocate space of 100 events, which matches the default `limit` typically
-            // provided to a tap subscription. If there's a higher log volume, this will block
-            // until the upstream event handler has processed the event. Generally, there should
-            // be little upstream pressure in the processing pipeline.
-            buffer: VecDeque::with_capacity(100),
-        }
+    pub const fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
+        Self { tap_tx, output_id }
     }
 }
 
 impl Sink<Event> for TapSink {
     type Error = ();
 
-    /// The sink is ready to accept events if buffer capacity hasn't been reached.
+    /// This sink is always ready to accept, because TapSink should never cause back-pressure.
+    /// Events will be dropped instead of propagating back-pressure
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    /// If the sink is ready, and the event is of type `LogEvent`, add to the buffer.
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        // If we have a `LogEvent`, and space for it in the buffer, queue it.
-        if let Event::Log(ev) = item {
-            if self.buffer.len() < self.buffer.capacity() {
-                self.buffer.push_back(ev);
+    /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
+    fn start_send(self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
+        if let Event::Log(log) = event {
+            let result = self
+                .tap_tx
+                .try_send(TapPayload::Log(self.output_id.clone(), log));
+
+            if let Err(TrySendError::Closed(payload)) = result {
+                debug!(
+                    message = "Couldn't send log event.",
+                    payload = ?payload,
+                    component_id = ?self.output_id,
+                );
             }
         }
 
         Ok(())
     }
 
-    /// Flushing means FIFO dequeuing. This is an O(1) operation on the `VecDeque` buffer.
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        // Loop over the buffer events, pulling from the front. This will terminate when
-        // the buffer is empty.
-        while let Some(ev) = self.buffer.pop_front() {
-            // Attempt to send upstream. If the channel is closed, log and break. If it's
-            // full, return pending to reattempt later.
-            match self
-                .tap_tx
-                .try_send(TapPayload::Log(self.output_id.clone(), ev))
-            {
-                Err(tokio_mpsc::error::TrySendError::Closed(payload)) => {
-                    debug!(
-                        message = "Couldn't send log event.",
-                        payload = ?payload,
-                        component_id = ?self.output_id,
-                    );
-
-                    break;
-                }
-                Err(tokio_mpsc::error::TrySendError::Full(_)) => return Poll::Ready(Ok(())),
-                _ => continue,
-            }
-        }
-
+    /// Events are immediately flushed, so this doesn't do anything
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -166,14 +143,13 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
+fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
         let _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
-            .await
             .is_err()
         {
             debug!(message = "Couldn't disconnect sink.", ?sink_id);
@@ -231,7 +207,7 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output_id, mut control_tx) in outputs.iter() {
+                for (output_id,  control_tx) in outputs.iter() {
                     match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&output_id.to_string()))
@@ -252,7 +228,6 @@ async fn tap_handler(
                             // Attempt to connect the sink.
                             match control_tx
                                 .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
-                                .await
                             {
                                 Ok(_) => {
                                     debug!(
@@ -321,11 +296,21 @@ async fn tap_handler(
 
 #[cfg(test)]
 mod tests {
+    use crate::api::schema::events::create_events_stream;
+    use crate::config::Config;
     use futures::SinkExt;
     use tokio::sync::watch;
 
     use super::*;
+    use crate::api::schema::events::log::Log;
+    use crate::api::schema::events::notification::{EventNotification, EventNotificationType};
+    use crate::api::schema::events::output::OutputEventsPayload;
     use crate::event::{Metric, MetricKind, MetricValue};
+    use crate::sinks::blackhole::BlackholeConfig;
+    use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
+    use crate::test_util::start_topology;
+    use crate::transforms::remap::RemapConfig;
+    use futures::StreamExt;
 
     #[test]
     /// Patterns should accept globbing.
@@ -405,5 +390,227 @@ mod tests {
             sink_rx.recv().await,
             Some(TapPayload::Log(returned_id, _)) if returned_id == id
         ));
+    }
+
+    fn assert_notification(payload: OutputEventsPayload) -> EventNotification {
+        if let OutputEventsPayload::Notification(notification) = payload {
+            notification
+        } else {
+            panic!("Expected payload to be a Notification")
+        }
+    }
+
+    fn assert_log(payload: OutputEventsPayload) -> Log {
+        if let OutputEventsPayload::Log(log) = payload {
+            log
+        } else {
+            panic!("Expected payload to be a Log")
+        }
+    }
+
+    #[tokio::test]
+    async fn integration_test_source() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Json,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["in"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let source_tap_stream =
+            create_events_stream(topology.watch(), vec!["in".to_string()], 500, 100);
+
+        let source_tap_events: Vec<_> = source_tap_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(source_tap_events[0][0].clone()),
+            EventNotification::new("in".to_string(), EventNotificationType::Matched)
+        );
+        let _log = assert_log(source_tap_events[1][0].clone());
+    }
+
+    #[tokio::test]
+    async fn integration_test_transform() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Json,
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some("".to_string()),
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_stream =
+            create_events_stream(topology.watch(), vec!["transform".to_string()], 500, 100);
+
+        let transform_tap_events: Vec<_> = transform_tap_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new("transform".to_string(), EventNotificationType::Matched)
+        );
+        let _log = assert_log(transform_tap_events[1][0].clone());
+    }
+
+    #[tokio::test]
+    async fn integration_test_tap_non_default_output() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_remap_dropped_stream = create_events_stream(
+            topology.watch(),
+            vec!["transform.dropped".to_string()],
+            500,
+            100,
+        );
+
+        let transform_tap_events: Vec<_> =
+            transform_tap_remap_dropped_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new(
+                "transform.dropped".to_string(),
+                EventNotificationType::Matched
+            )
+        );
+        assert_eq!(
+            assert_log(transform_tap_events[1][0].clone())
+                .get_message()
+                .unwrap_or_default(),
+            "test2"
+        );
+    }
+
+    #[tokio::test]
+    async fn integration_test_tap_multiple_outputs() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in-test1",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 1,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test1".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_source(
+            "in-test2",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 1,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test2".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in*"],
+            RemapConfig {
+                source: Some("assert_eq!(.message, \"test1\")".to_string()),
+                drop_on_error: true,
+                reroute_dropped: true,
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let transform_tap_all_outputs_stream =
+            create_events_stream(topology.watch(), vec!["transform*".to_string()], 500, 100);
+
+        let transform_tap_events: Vec<_> = transform_tap_all_outputs_stream.take(2).collect().await;
+        assert_eq!(
+            assert_notification(transform_tap_events[0][0].clone()),
+            EventNotification::new("transform*".to_string(), EventNotificationType::Matched)
+        );
+
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test1"));
+        assert!(transform_tap_events[1]
+            .iter()
+            .map(|payload| assert_log(payload.clone()))
+            .any(|log| log.get_message().unwrap_or_default() == "test2"));
     }
 }

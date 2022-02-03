@@ -160,7 +160,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event).map(|mut metric| {
+                    normalizer.apply(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -173,7 +173,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
@@ -224,10 +224,11 @@ impl CloudWatchMetricsSvc {
     }
 }
 
+#[derive(Default)]
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
@@ -443,6 +444,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::offset::TimeZone;
+    use futures::StreamExt;
     use rand::seq::SliceRandom;
 
     use super::*;
@@ -527,7 +529,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 
@@ -556,7 +558,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 }

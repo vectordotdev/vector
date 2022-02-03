@@ -5,11 +5,11 @@ mod unknown;
 
 use std::collections::BTreeMap;
 
-use super::{merge, Kind};
-use exact::Exact;
 pub use field::Field;
 pub use index::Index;
 use unknown::Unknown;
+
+use super::{merge, Kind};
 
 /// The kinds of a collection (e.g. array or object).
 ///
@@ -24,24 +24,29 @@ pub struct Collection<T: Ord> {
     /// For example, an array collection might be known to have an "integer" state at the 0th
     /// index, but it has an unknown length. It is however known that whatever length the array
     /// has, its values can only be integers or floats, so the `unknown` state is set to those two.
-    unknown: Unknown,
+    ///
+    /// If this field is `None`, it means it is *known* for there to be no unknown fields. This is
+    /// the case for example if you have a literal array, which either has X number of known
+    /// elements, or it's an empty array with no known, but also no unknown elements.
+    unknown: Option<Unknown>,
 }
 
 impl<T: Ord> Collection<T> {
     /// Create a new collection from its parts.
     #[must_use]
-    pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Unknown>) -> Self {
+    pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
         Self {
             known,
-            unknown: unknown.into(),
+            unknown: unknown.into().map(Into::into),
         }
     }
 
     /// Create a new collection with a defined "unknown fields" value, and no known fields.
-    pub fn unknown(unknown: impl Into<Unknown>) -> Self {
+    #[must_use]
+    pub fn from_unknown(unknown: impl Into<Option<Kind>>) -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: unknown.into(),
+            unknown: unknown.into().map(Into::into),
         }
     }
 
@@ -50,7 +55,7 @@ impl<T: Ord> Collection<T> {
     pub fn any() -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Unknown::any(),
+            unknown: Some(Unknown::any()),
         }
     }
 
@@ -59,7 +64,7 @@ impl<T: Ord> Collection<T> {
     pub fn json() -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Unknown::json(),
+            unknown: Some(Unknown::json()),
         }
     }
 
@@ -68,35 +73,77 @@ impl<T: Ord> Collection<T> {
     /// This returns `false` if at least _one_ field kind is known.
     #[must_use]
     pub fn is_any(&self) -> bool {
-        self.known.iter().all(|(_, k)| k.is_any()) && self.unknown.is_any()
+        self.known.values().all(Kind::is_any)
+            && self.unknown.as_ref().map_or(false, Unknown::is_any)
     }
 
     /// Get the "known" and "unknown" parts of the collection.
     #[must_use]
-    pub(super) fn into_parts(self) -> (BTreeMap<T, Kind>, Unknown) {
-        (self.known, self.unknown)
+    pub(super) fn into_parts(self) -> (BTreeMap<T, Kind>, Option<Kind>) {
+        (
+            self.known,
+            self.unknown.map(|unknown| unknown.to_kind().into_owned()),
+        )
     }
 
-    /// Get the "known" field value kinds.
+    /// Get a reference to the "known" elements in the collection.
     #[must_use]
     pub fn known(&self) -> &BTreeMap<T, Kind> {
         &self.known
     }
 
-    /// Get a mutable reference to "known" field value kinds.
+    /// Get a mutable reference to the "known" elements in the collection.
+    #[must_use]
     pub fn known_mut(&mut self) -> &mut BTreeMap<T, Kind> {
         &mut self.known
     }
 
-    /// Get the "unknown" field value kind.
+    /// Get a reference to the "unknown" elements in the collection.
+    ///
+    /// If `None` is returned, it means all elements within the collection are known, i.e. it's
+    /// a "closed" collection.
     #[must_use]
-    pub fn as_unknown(&self) -> &Unknown {
-        &self.unknown
+    pub fn unknown(&self) -> Option<&Unknown> {
+        self.unknown.as_ref()
     }
 
-    /// Set the "unknown" field values to the given kind.
-    pub fn set_unknown(&mut self, unknown: impl Into<Unknown>) {
-        self.unknown = unknown.into();
+    /// Set all "unknown" collection elements to the given kind.
+    pub fn set_unknown(&mut self, unknown: impl Into<Option<Kind>>) {
+        self.unknown = unknown.into().map(Into::into);
+    }
+
+    /// Given a collection of known and unknown types, merge the known types with the unknown type,
+    /// and remove a reference to the known types.
+    ///
+    /// That is, given an object with field "foo" as integer, "bar" as bytes and unknown fields as
+    /// timestamp, after calling this function, the object has no known fields, and all unknown
+    /// fields are marked as either an integer, bytes or timestamp.
+    ///
+    /// Recursively known fields are left untouched. For example, an object with a field "foo" that
+    /// has an object with a field "bar" results in a collection of which any field can have an
+    /// object that has a field "bar".
+    pub fn anonymize(&mut self) {
+        let strategy = merge::Strategy {
+            depth: merge::Depth::Shallow,
+            indices: merge::Indices::Keep,
+        };
+
+        let known_unknown = self
+            .known
+            .values_mut()
+            .reduce(|lhs, rhs| {
+                lhs.merge(rhs.clone(), strategy);
+                lhs
+            })
+            .cloned();
+
+        self.known.clear();
+
+        match (self.unknown.as_mut(), known_unknown) {
+            (None, Some(rhs)) => self.unknown = Some(rhs.into()),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), strategy),
+            _ => {}
+        };
     }
 
     /// Check if `self` is a superset of `other`.
@@ -112,9 +159,11 @@ impl<T: Ord> Collection<T> {
     #[must_use]
     pub fn is_superset(&self, other: &Self) -> bool {
         // `self`'s `unknown` needs to be  a superset of `other`'s.
-        if !self.unknown.is_superset(&other.unknown) {
-            return false;
-        }
+        match (&self.unknown, &other.unknown) {
+            (None, Some(_)) => return false,
+            (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
+            _ => {}
+        };
 
         // All known fields in `other` need to either be a subset of a matching known field in
         // `self`, or a subset of self's `unknown` type state.
@@ -123,7 +172,10 @@ impl<T: Ord> Collection<T> {
             .iter()
             .all(|(key, other_kind)| match self.known.get(key) {
                 Some(self_kind) => self_kind.is_superset(other_kind),
-                None => Kind::from(self.unknown).is_superset(other_kind),
+                None => self
+                    .unknown
+                    .clone()
+                    .map_or(false, |unknown| unknown.to_kind().is_superset(other_kind)),
             })
         {
             return false;
@@ -135,7 +187,10 @@ impl<T: Ord> Collection<T> {
             .iter()
             .all(|(key, self_kind)| match other.known.get(key) {
                 Some(_) => true,
-                None => self_kind.is_superset(&other.unknown.into()),
+                None => other
+                    .unknown
+                    .as_ref()
+                    .map_or(false, |unknown| self_kind.is_superset(&unknown.to_kind())),
             })
     }
 
@@ -146,7 +201,7 @@ impl<T: Ord> Collection<T> {
     /// For *known fields*:
     ///
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
-    ///   are used (depending on the configured [`Strategy`](merge::Strategy).
+    ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
     ///
     /// - If a field exists in one but not the other, the field is used.
     ///
@@ -156,14 +211,19 @@ impl<T: Ord> Collection<T> {
     pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
         self.known
             .iter_mut()
-            .for_each(|(key, self_kind)| match other.known.remove(&key) {
+            .for_each(|(key, self_kind)| match other.known.remove(key) {
                 Some(other_kind) if strategy.depth.is_shallow() => *self_kind = other_kind,
                 Some(other_kind) => self_kind.merge(other_kind, strategy),
                 _ => {}
             });
 
-        self.known.extend(other.known.into_iter());
-        self.unknown = self.unknown | other.unknown;
+        self.known.extend(other.known);
+
+        match (self.unknown.as_mut(), other.unknown) {
+            (None, Some(rhs)) => self.unknown = Some(rhs),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
+            _ => {}
+        };
     }
 }
 
@@ -171,7 +231,7 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
     fn from(known: BTreeMap<T, Kind>) -> Self {
         Self {
             known,
-            unknown: Unknown::any(),
+            unknown: None,
         }
     }
 }
@@ -211,16 +271,16 @@ mod tests {
             (
                 "unknown match",
                 TestCase {
-                    this: Collection::unknown(Kind::regex().or_null()),
-                    other: Collection::unknown(Kind::regex()),
+                    this: Collection::from_unknown(Kind::regex().or_null()),
+                    other: Collection::from_unknown(Kind::regex()),
                     want: true,
                 },
             ),
             (
                 "unknown mis-match",
                 TestCase {
-                    this: Collection::unknown(Kind::regex().or_null()),
-                    other: Collection::unknown(Kind::bytes()),
+                    this: Collection::from_unknown(Kind::regex().or_null()),
+                    other: Collection::from_unknown(Kind::bytes()),
                     want: false,
                 },
             ),
@@ -262,7 +322,7 @@ mod tests {
                         ]),
                         Kind::bytes().or_integer(),
                     ),
-                    other: Collection::unknown(Kind::bytes().or_integer()),
+                    other: Collection::from_unknown(Kind::bytes().or_integer()),
                     want: true,
                 },
             ),
@@ -273,7 +333,7 @@ mod tests {
                         BTreeMap::from([("foo", Kind::integer()), ("bar", Kind::bytes())]),
                         Kind::bytes().or_integer(),
                     ),
-                    other: Collection::unknown(Kind::bytes().or_integer()),
+                    other: Collection::from_unknown(Kind::bytes().or_integer()),
                     want: false,
                 },
             ),
@@ -302,7 +362,7 @@ mod tests {
             },
         ) in HashMap::from([
             (
-                "any merge",
+                "any merge (deep)",
                 TestCase {
                     this: Collection::any(),
                     other: Collection::any(),
@@ -314,7 +374,19 @@ mod tests {
                 },
             ),
             (
-                "json merge",
+                "any merge (shallow)",
+                TestCase {
+                    this: Collection::any(),
+                    other: Collection::any(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::any(),
+                },
+            ),
+            (
+                "json merge (deep)",
                 TestCase {
                     this: Collection::json(),
                     other: Collection::json(),
@@ -326,7 +398,19 @@ mod tests {
                 },
             ),
             (
-                "any w/ json merge",
+                "json merge (shallow)",
+                TestCase {
+                    this: Collection::json(),
+                    other: Collection::json(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::json(),
+                },
+            ),
+            (
+                "any w/ json merge (deep)",
                 TestCase {
                     this: Collection::any(),
                     other: Collection::json(),
@@ -338,7 +422,19 @@ mod tests {
                 },
             ),
             (
-                "merge same knowns",
+                "any w/ json merge (shallow)",
+                TestCase {
+                    this: Collection::any(),
+                    other: Collection::json(),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::any(),
+                },
+            ),
+            (
+                "merge same knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
@@ -350,7 +446,19 @@ mod tests {
                 },
             ),
             (
-                "append different knowns",
+                "merge same knowns (shallow)",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
+                },
+            ),
+            (
+                "append different knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
@@ -365,7 +473,22 @@ mod tests {
                 },
             ),
             (
-                "merge/append same/different knowns",
+                "append different knowns (shallow)",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([
+                        ("foo", Kind::integer()),
+                        ("bar", Kind::bytes()),
+                    ])),
+                },
+            ),
+            (
+                "merge/append same/different knowns (deep)",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([
@@ -383,19 +506,133 @@ mod tests {
                 },
             ),
             (
-                "merge unknowns",
+                "merge/append same/different knowns (shallow)",
                 TestCase {
-                    this: Collection::unknown(Kind::bytes()),
-                    other: Collection::unknown(Kind::integer()),
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    other: Collection::from(BTreeMap::from([
+                        ("foo", Kind::bytes()),
+                        ("bar", Kind::boolean()),
+                    ])),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from(BTreeMap::from([
+                        ("foo", Kind::bytes()),
+                        ("bar", Kind::boolean()),
+                    ])),
+                },
+            ),
+            (
+                "merge unknowns (deep)",
+                TestCase {
+                    this: Collection::from_unknown(Kind::bytes()),
+                    other: Collection::from_unknown(Kind::integer()),
                     strategy: merge::Strategy {
                         depth: merge::Depth::Deep,
                         indices: merge::Indices::Keep,
                     },
-                    want: Collection::unknown(Kind::bytes().or_integer()),
+                    want: Collection::from_unknown(Kind::bytes().or_integer()),
+                },
+            ),
+            (
+                "merge unknowns (shallow)",
+                TestCase {
+                    this: Collection::from_unknown(Kind::bytes()),
+                    other: Collection::from_unknown(Kind::integer()),
+                    strategy: merge::Strategy {
+                        depth: merge::Depth::Shallow,
+                        indices: merge::Indices::Keep,
+                    },
+                    want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),
         ]) {
             this.merge(other, strategy);
+
+            assert_eq!(this, want, "{}", title);
+        }
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_anonymize() {
+        struct TestCase {
+            this: Collection<&'static str>,
+            want: Collection<&'static str>,
+        }
+
+        for (title, TestCase { mut this, want }) in HashMap::from([
+            (
+                "no knowns / any unknown",
+                TestCase {
+                    this: Collection::any(),
+                    want: Collection::any(),
+                },
+            ),
+            (
+                "no knowns / json unknown",
+                TestCase {
+                    this: Collection::json(),
+                    want: Collection::json(),
+                },
+            ),
+            (
+                "integer known / no unknown",
+                TestCase {
+                    this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
+                    want: Collection::from_unknown(Kind::integer()),
+                },
+            ),
+            (
+                "integer known / any unknown",
+                TestCase {
+                    this: {
+                        let mut v = Collection::from(BTreeMap::from([("foo", Kind::integer())]));
+                        v.set_unknown(Kind::any());
+                        v
+                    },
+                    want: Collection::from_unknown(Kind::any()),
+                },
+            ),
+            (
+                "integer known / byte unknown",
+                TestCase {
+                    this: {
+                        let mut v = Collection::from(BTreeMap::from([("foo", Kind::integer())]));
+                        v.set_unknown(Kind::bytes());
+                        v
+                    },
+                    want: Collection::from_unknown(Kind::integer().or_bytes()),
+                },
+            ),
+            (
+                "boolean/array known / byte/object unknown",
+                TestCase {
+                    this: {
+                        let mut v = Collection::from(BTreeMap::from([
+                            ("foo", Kind::boolean()),
+                            (
+                                "bar",
+                                Kind::array(BTreeMap::from([(0.into(), Kind::timestamp())])),
+                            ),
+                        ]));
+                        v.set_unknown(
+                            Kind::bytes()
+                                .or_object(BTreeMap::from([("baz".into(), Kind::regex())])),
+                        );
+                        v
+                    },
+                    want: Collection::from_unknown(
+                        Kind::boolean()
+                            .or_array(BTreeMap::from([(0.into(), Kind::timestamp())]))
+                            .or_bytes()
+                            .or_object(BTreeMap::from([("baz".into(), Kind::regex())])),
+                    ),
+                },
+            ),
+        ]) {
+            this.anonymize();
 
             assert_eq!(this, want, "{}", title);
         }

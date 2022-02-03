@@ -8,7 +8,7 @@ use crate::config::SinkOuter;
 use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util::start_topology};
 
-use vector_core::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 // Each mpsc sender gets an extra buffer slot, and we make a few of those when connecting components.
@@ -53,7 +53,7 @@ async fn serial_backpressure() {
     assert_eq!(sourced_events, expected_sourced_events);
 }
 
-/// Connects a single source to two sinks test and makes sure that the source is only able
+/// Connects a single source to two sinks and makes sure that the source is only able
 /// to emit events that the slower sink accepts.
 #[tokio::test]
 async fn default_fan_out() {
@@ -216,7 +216,7 @@ mod test_sink {
     }
 
     #[async_trait]
-    impl StreamSink for TestBackpressureSink {
+    impl StreamSink<Event> for TestBackpressureSink {
         async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
             let _num_taken = input.take(self.num_to_consume).count().await;
             futures::future::pending::<()>().await;
@@ -237,7 +237,7 @@ mod test_sink {
                 num_to_consume: self.num_to_consume,
             };
             let healthcheck = futures::future::ok(()).boxed();
-            Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+            Ok((VectorSink::from_event_streamsink(sink), healthcheck))
         }
 
         fn input_type(&self) -> DataType {

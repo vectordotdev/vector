@@ -176,7 +176,7 @@ impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone()).boxed();
-        Ok((VectorSink::Stream(Box::new(sink)), hc))
+        Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
     fn input_type(&self) -> DataType {

@@ -169,7 +169,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::task(Ec2MetadataTransform { state }))
+        Ok(Transform::event_task(Ec2MetadataTransform { state }))
     }
 
     fn input_type(&self) -> DataType {
@@ -185,7 +185,7 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl TaskTransform for Ec2MetadataTransform {
+impl TaskTransform<Event> for Ec2MetadataTransform {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -322,7 +322,7 @@ impl MetadataClient {
             .await?
             .map(|body| {
                 serde_json::from_slice(&body[..])
-                    .context(ParseIdentityDocument {})
+                    .context(ParseIdentityDocumentSnafu {})
                     .map_err(Into::into)
             })
             .transpose()
@@ -395,7 +395,7 @@ impl MetadataClient {
                             mac
                         );
 
-                        let subnet_path = subnet_path.parse().context(ParsePath {
+                        let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),
                         })?;
 
@@ -408,7 +408,7 @@ impl MetadataClient {
                         let vpc_path =
                             format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
 
-                        let vpc_path = vpc_path.parse().context(ParsePath {
+                        let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
                         })?;
 
@@ -443,7 +443,10 @@ impl MetadataClient {
     }
 
     async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await.with_context(|| FetchToken {})?;
+        let token = self
+            .get_token()
+            .await
+            .with_context(|_| FetchTokenSnafu {})?;
 
         let mut parts = self.host.clone().into_parts();
 
@@ -548,9 +551,8 @@ mod integration_tests {
 
     use super::*;
     use crate::{
-        event::{metric, LogEvent, Metric},
+        event::{metric, EventArray, LogEvent, Metric},
         test_util::trace_init,
-        transforms::TaskTransform,
     };
 
     fn ec2_metadata_address() -> String {
@@ -580,7 +582,7 @@ mod integration_tests {
         )
     }
 
-    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform> {
+    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform<EventArray>> {
         config
             .build(&TransformContext::default())
             .await
@@ -604,7 +606,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -632,7 +634,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -659,7 +661,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -685,7 +687,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -712,7 +714,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -738,7 +740,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -766,7 +768,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -794,7 +796,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;

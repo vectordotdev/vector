@@ -189,12 +189,15 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
-		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
-		events_in_total:                    components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:              components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:             components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total:            components.sources.internal_metrics.output.metrics.processing_errors_total
-		component_received_events_total:    components.sources.internal_metrics.output.metrics.component_received_events_total
+		command_executed_total:               components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds:   components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total:              components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

@@ -175,7 +175,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use chrono::{TimeZone as _, Utc};
-    use shared::{btreemap, TimeZone};
+    use vector_common::{btreemap, TimeZone};
 
     use super::*;
     use crate::test_util::{

@@ -117,7 +117,10 @@ impl SinkConfig for SqsSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
+        Ok((
+            super::VectorSink::from_event_sink(sink),
+            healthcheck.boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -138,7 +141,7 @@ impl SqsSinkConfig {
             })
             .await
             .map(|_| ())
-            .context(GetQueueAttributes)
+            .context(GetQueueAttributesSnafu)
             .map_err(Into::into)
     }
 
@@ -171,7 +174,7 @@ impl SqsSink {
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
-            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplate)?),
+            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplateSnafu)?),
             (Some(_), false) => return Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
@@ -394,6 +397,7 @@ mod integration_tests {
     use tokio::time::{sleep, Duration};
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string};
 
     fn sqs_address() -> String {
@@ -428,10 +432,11 @@ mod integration_tests {
 
         config.clone().healthcheck(client.clone()).await.unwrap();
 
-        let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = VectorSink::from_event_sink(sink);
 
         let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-        sink.send_all(&mut events.map(Ok)).await.unwrap();
+        sink.run(events).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;
 

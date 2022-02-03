@@ -9,7 +9,7 @@ use vector::{
     config::{TransformConfig, TransformContext},
     event::Event,
     test_util::{collect_ready, runtime},
-    transforms::{self, Transform},
+    transforms::{self, OutputBuffer, Transform},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
@@ -30,7 +30,7 @@ fn bench_add_fields(c: &mut Criterion) {
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = format!(
@@ -45,7 +45,7 @@ fn bench_add_fields(c: &mut Criterion) {
                 "#},
                 key, value
             );
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
                     .unwrap(),
             )
@@ -59,15 +59,15 @@ fn bench_add_fields(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -121,7 +121,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     event = nil
                 end
             "#});
-            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+            Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = indoc! {r#"
@@ -134,7 +134,7 @@ fn bench_field_filter(c: &mut Criterion) {
                 end
                 """
             "#};
-            Transform::task(
+            Transform::event_task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
             )
         }),
@@ -147,15 +147,15 @@ fn bench_field_filter(c: &mut Criterion) {
             Transform::Function(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
+                    let mut buf = OutputBuffer::with_capacity(1);
                     t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter())
+                    stream::iter(buf.into_events())
                 }))
             }
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {

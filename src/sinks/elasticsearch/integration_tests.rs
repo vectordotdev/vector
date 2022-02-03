@@ -1,7 +1,7 @@
-use std::{fs::File, future::ready, io::Read};
+use std::{fs::File, io::Read};
 
 use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde_json::{json, Value};
@@ -151,9 +151,7 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    sink.run(stream::once(ready(input_event.into())))
-        .await
-        .unwrap();
+    sink.run_events(vec![input_event.into()]).await.unwrap();
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -378,12 +376,14 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut event| {
+        sink.run(events.map(move |mut events| {
             if doit {
-                event.as_mut_log().insert("_type", 1);
+                events.for_each_log(|log| {
+                    log.insert("_type", 1);
+                });
             }
             doit = true;
-            event
+            events
         }))
         .await
         .expect("Sending events failed");

@@ -104,7 +104,7 @@ impl SinkConfig for UnitTestSinkConfig {
         };
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn sink_type(&self) -> &'static str {
@@ -124,7 +124,7 @@ pub struct UnitTestSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink for UnitTestSink {
+impl StreamSink<Event> for UnitTestSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut output_events = Vec::new();
         let mut result = UnitTestSinkResult {

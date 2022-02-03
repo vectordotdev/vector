@@ -125,7 +125,6 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use futures::stream;
     use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     use super::*;
@@ -183,7 +182,7 @@ mod test {
         let events_copy = events.clone();
         let mut output = test_util::spawn_collect_ready(
             async move {
-                sink.run(stream::iter(events_copy)).await.unwrap();
+                sink.run_events(events_copy).await.unwrap();
             },
             rx,
             1,
@@ -195,7 +194,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        shared::assert_event_data_eq!(events, output);
+        vector_common::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -248,29 +247,35 @@ mod integration_tests {
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
 
-    fn prometheus_receive_address() -> String {
-        std::env::var("PROMETHEUS_RECEIVE_ADDRESS").unwrap_or_else(|_| "0.0.0.0:9093".into())
+    fn source_receive_address() -> String {
+        std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
     }
 
     #[tokio::test]
     async fn receive_something() {
+        // TODO: This test depends on the single instance of Prometheus that we spin up for
+        // integration tests both scraping an endpoint and then also remote writing that stuff to
+        // this remote write source.  This makes sense from a "test the actual behavior" standpoint
+        // but it feels a little fragile.
+        //
+        // It could be nice to split up the Prometheus integration tests in the future, or
+        // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         components::init_test();
         let config = PrometheusRemoteWriteConfig {
-            address: prometheus_receive_address().parse().unwrap(),
+            address: source_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
             acknowledgements: AcknowledgementsConfig::default(),
         };
 
-        let (tx, rx) = SourceSender::new_test();
+        let (tx, rx) = SourceSender::new_with_buffer(4096);
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
-
         tokio::spawn(source);
 
-        let events = tokio::time::timeout(Duration::from_secs(30), test_util::collect_n(rx, 1))
-            .await
-            .expect("timeout on fetching events");
-        components::SOURCE_TESTS.assert(&["http_path"]);
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
+
+        components::SOURCE_TESTS.assert(&["http_path"]);
     }
 }

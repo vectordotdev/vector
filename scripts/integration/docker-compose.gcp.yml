@@ -1,0 +1,38 @@
+services:
+  gcloud-pubsub:
+    image: messagebird/gcloud-pubsub-emulator
+    environment:
+      - PUBSUB_PROJECT1=testproject,topic1:subscription1
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "gcp-integration-tests"
+      - "--lib"
+      - "::gcp::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - EMULATOR_ADDRESS=http://gcloud-pubsub:8681
+    depends_on:
+      - gcloud-pubsub
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

@@ -1,5 +1,5 @@
 pub mod components;
-mod events;
+pub mod events;
 pub mod filter;
 mod health;
 mod meta;

@@ -64,7 +64,7 @@ mod tests {
     use crate::config::log_schema;
 
     #[test]
-    fn parse_bytes() {
+    fn deserialize_bytes() {
         let input = Bytes::from("foo");
         let deserializer = BytesDeserializer::new();
 

@@ -176,7 +176,7 @@ fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use chrono::prelude::*;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

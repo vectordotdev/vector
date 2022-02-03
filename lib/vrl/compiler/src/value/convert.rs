@@ -62,6 +62,61 @@ impl VrlValueConvert for Value {
             }),
         }
     }
+    // <<<<<<< HEAD
+    // =======
+    // }
+    //
+    // impl From<NotNan<f64>> for Value {
+    //     fn from(v: NotNan<f64>) -> Self {
+    //         Value::Float(v)
+    //     }
+    // }
+    //
+    // impl TryFrom<&Value> for f64 {
+    //     type Error = Error;
+    //
+    //     fn try_from(v: &Value) -> Result<Self, Self::Error> {
+    //         match v {
+    //             Value::Integer(v) => Ok(*v as f64),
+    //             Value::Float(v) => Ok(v.into_inner()),
+    //             _ => Err(Error::Coerce(v.kind(), Kind::Float)),
+    //         }
+    //     }
+    // }
+    //
+    // // TODO: this exists to satisfy the `vector_common::Convert` utility.
+    // //
+    // // We'll have to fix that so that we can remove this impl.
+    // impl From<f64> for Value {
+    //     fn from(v: f64) -> Self {
+    //         let v = if v.is_nan() { 0.0 } else { v };
+    //
+    //         Value::Float(NotNan::new(v).unwrap())
+    //     }
+    // }
+    //
+    // // impl TryFrom<f64> for Value {
+    // //     type Error = Error;
+    //
+    // //     fn try_from(v: f64) -> Result<Self, Self::Error> {
+    // //         Ok(Value::Float(NotNan::new(v).map_err(|_| Error::NanFloat)?))
+    // //     }
+    // // }
+    //
+    // // Value::Bytes ----------------------------------------------------------------
+    //
+    // impl Value {
+    //     pub fn is_bytes(&self) -> bool {
+    //         matches!(self, Value::Bytes(_))
+    //     }
+    //
+    //     pub fn as_bytes(&self) -> Option<&Bytes> {
+    //         match self {
+    //             Value::Bytes(v) => Some(v),
+    //             _ => None,
+    //         }
+    //     }
+    // >>>>>>> jean/value-lib
 
     fn try_integer(self) -> Result<i64, Error> {
         match self {

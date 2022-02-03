@@ -6,10 +6,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     sinks::{
         console::sink::WriterSink,
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            StreamSink,
-        },
+        util::encoding::{EncodingConfig, StandardEncodings},
         Healthcheck, VectorSink,
     },
 };
@@ -47,20 +44,20 @@ impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let sink: Box<dyn StreamSink + Send> = match self.target {
-            Target::Stdout => Box::new(WriterSink {
+        let sink: VectorSink = match self.target {
+            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stdout(),
                 encoding,
             }),
-            Target::Stderr => Box::new(WriterSink {
+            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stderr(),
                 encoding,
             }),
         };
 
-        Ok((VectorSink::Stream(sink), future::ok(()).boxed()))
+        Ok((sink, future::ok(()).boxed()))
     }
 
     fn input_type(&self) -> DataType {

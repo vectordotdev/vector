@@ -1,11 +1,11 @@
 //! All types related to inserting one [`Kind`] into another.
 
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{btree_map::Entry, BTreeMap, VecDeque};
 
-use crate::kind::merge;
+use lookup::{Field, Lookup, Segment};
 
 use super::Kind;
-use lookup::{Field, Lookup, Segment};
+use crate::kind::merge;
 
 /// The strategy to use when an inner segment in a path does not match the actual `Kind`
 /// present.
@@ -28,6 +28,26 @@ pub enum InnerConflict {
     Reject,
 }
 
+impl InnerConflict {
+    /// Check if the active strategy is "merge".
+    #[must_use]
+    pub const fn is_merge(&self) -> bool {
+        matches!(self, Self::Merge(_))
+    }
+
+    /// Check if the active strategy is "replace".
+    #[must_use]
+    pub const fn is_replace(&self) -> bool {
+        matches!(self, Self::Replace)
+    }
+
+    /// Check if the active strategy is "reject".
+    #[must_use]
+    pub const fn is_reject(&self) -> bool {
+        matches!(self, Self::Reject)
+    }
+}
+
 /// The strategy to use when the leaf segment already has a `Kind` present.
 ///
 /// For example, if the caller wants to insert a `Kind` at path `.foo`, but another `Kind`
@@ -45,16 +65,71 @@ pub enum LeafConflict {
     Reject,
 }
 
+impl LeafConflict {
+    /// Check if the active strategy is "merge".
+    #[must_use]
+    pub const fn is_merge(&self) -> bool {
+        matches!(self, Self::Merge(_))
+    }
+
+    /// Check if the active strategy is "replace".
+    #[must_use]
+    pub const fn is_replace(&self) -> bool {
+        matches!(self, Self::Replace)
+    }
+
+    /// Check if the active strategy is "reject".
+    #[must_use]
+    pub const fn is_reject(&self) -> bool {
+        matches!(self, Self::Reject)
+    }
+}
+
+/// The strategy to use when a given path contains a coalesced segment.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum CoalescedPath {
+    /// Insert the required `Kind` into *all* coalesced paths.
+    ///
+    /// Meaning, for path `.foo.(bar | baz).qux and a boolean `Kind`, the result will be:
+    ///
+    ///   .foo         = object
+    ///   .foo.bar     = object
+    ///   .foo.baz     = object
+    ///   .foo.bar.qux = boolean
+    ///   .foo.baz.qux = boolean
+    InsertAll,
+
+    /// Reject coalesced path segments during insertion, returning an error.
+    Reject,
+}
+
+impl CoalescedPath {
+    /// Check if the active strategy is "insert all".
+    #[must_use]
+    pub const fn is_insert_all(&self) -> bool {
+        matches!(self, Self::InsertAll)
+    }
+
+    /// Check if the active strategy is "reject".
+    #[must_use]
+    pub const fn is_reject(&self) -> bool {
+        matches!(self, Self::Reject)
+    }
+}
+
 /// The strategy to apply when inserting a new `Kind` at a given `Path`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Strategy {
     /// The strategy to apply when an inner path segment conflicts with the existing `Kind`
     /// state.
-    inner_conflict: InnerConflict,
+    pub inner_conflict: InnerConflict,
 
     /// The strategy to apply when the existing `Kind` state at the leaf path segment
     /// conflicts with the provided `Kind` state.
-    leaf_conflict: LeafConflict,
+    pub leaf_conflict: LeafConflict,
+
+    /// The strategy to apply when the given `Path` contains a "coalesced" segment.
+    pub coalesced_path: CoalescedPath,
 }
 
 /// The list of errors that can occur when `insert_at_path` fails.
@@ -68,12 +143,15 @@ pub enum Error {
 
     /// The error variant triggered by a negative [`Segment::Index`] value.
     InvalidIndex,
+
+    /// The error variant triggered by [`CoalescedPath`]'s `Reject` variant.
+    CoalescedPathSegment,
 }
 
 impl Kind {
     /// Insert the `Kind` at the given `path` within `self`.
     ///
-    /// This function behaves differently, depending on the [`InsertStrategy`] chosen.
+    /// This function behaves differently, depending on the [`Strategy`] chosen.
     ///
     /// If the insertion strategy does not include a "rejection rule", then the function succeeds,
     /// unless there is a negative (unsupported) index in the path.
@@ -87,10 +165,9 @@ impl Kind {
     ///
     /// - `InvalidIndex`: The provided index in the path is either negative, or out-of-bounds.
     ///
-    /// # Panics
-    ///
-    /// Work in progress.
-    #[allow(clippy::too_many_lines)]
+    /// - `CoalescedPathSegment`: The provided `path` contains a coalesced segment, but the
+    ///                           configured strategy prohibits this segment type.
+    #[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
     pub fn insert_at_path<'a>(
         &'a mut self,
         path: &'a Lookup<'a>,
@@ -110,23 +187,23 @@ impl Kind {
         let mut self_kind = self;
         let mut iter = path.iter().peekable();
 
-        let create_inner_element = |segment: Option<&&Segment<'_>>| -> Kind {
+        let create_inner_element = |segment: Option<&&Segment<'_>>| -> Self {
             match segment {
                 // The next segment is a field, so we'll insert an object to
                 // accommodate.
                 Some(segment) if segment.is_field() || segment.is_coalesce() => {
-                    Kind::object(BTreeMap::default())
+                    Self::object(BTreeMap::default())
                 }
 
                 // The next segment is an index, so we'll insert an array.
-                Some(_) => Kind::array(BTreeMap::default()),
+                Some(_) => Self::array(BTreeMap::default()),
 
                 // There is no next segment, so we'll insert the new `Kind`.
                 None => kind.clone(),
             }
         };
 
-        let get_inner_object = |kind: &'a mut Kind, field: &'a Field<'_>| -> &'a mut Kind {
+        let get_inner_object = |kind: &'a mut Self, field: &'a Field<'_>| -> &'a mut Self {
             kind.as_object_mut()
                 .unwrap()
                 .known_mut()
@@ -134,7 +211,7 @@ impl Kind {
                 .unwrap()
         };
 
-        let get_inner_array = |kind: &'a mut Kind, index: usize| -> &'a mut Kind {
+        let get_inner_array = |kind: &'a mut Self, index: usize| -> &'a mut Self {
             kind.as_array_mut()
                 .unwrap()
                 .known_mut()
@@ -183,86 +260,90 @@ impl Kind {
                     },
 
                     // We don't have an object, but we expect one to exist at this segment of the
-                    // path. The next action to take depends on the configured `InnerConflict`
-                    // strategy:
+                    // path.
                     //
-                    // - Merge: keep the existing `Kind`, and merge the new one into it.
-                    // - Replace: swap out the existing `Kind` for the new one.
-                    // - Reject: return an error.
-                    None => match strategy.inner_conflict {
-                        InnerConflict::Merge(_) => {
+                    // The next action depends on if there are more path segments to iterate.
+                    None => {
+                        // We'll add the object state to the existing `Kind` states.
+                        let mut merge = |segment: Option<&Segment<'_>>| {
                             self_kind.add_object(BTreeMap::from([(
                                 field.into(),
-                                create_inner_element(iter.peek()),
+                                create_inner_element(segment.as_ref()),
                             )]));
 
-                            get_inner_object(self_kind, field)
-                        }
+                            Ok(())
+                        };
 
-                        // We need to replace the existing value, and then, depending on the next
-                        // segment in the path, move into the new value.
-                        InnerConflict::Replace => {
-                            *self_kind = Kind::object(BTreeMap::from([(
+                        // We'll replace the existing `Kind` state with an object.
+                        let replace = |self_kind: &mut Self, segment: Option<&Segment<'_>>| {
+                            *self_kind = Self::object(BTreeMap::from([(
                                 field.into(),
-                                create_inner_element(iter.peek()),
+                                create_inner_element(segment.as_ref()),
                             )]));
 
-                            get_inner_object(self_kind, field)
-                        }
+                            Ok(())
+                        };
 
-                        InnerConflict::Reject => return Err(Error::InnerConflict),
-                    },
+                        match iter.peek() {
+                            // There are more path segments to follow, use the inner strategy.
+                            Some(segment) => {
+                                let _ = match strategy.inner_conflict {
+                                    InnerConflict::Merge(_) => merge(Some(segment)),
+                                    InnerConflict::Replace => replace(self_kind, Some(segment)),
+                                    InnerConflict::Reject => return Err(Error::InnerConflict),
+                                };
+
+                                get_inner_object(self_kind, field)
+                            }
+
+                            // There are no more path segments to follow, so we insert and return.
+                            None => match strategy.leaf_conflict {
+                                LeafConflict::Merge(_) => return merge(Some(segment)),
+                                LeafConflict::Replace => return replace(self_kind, Some(segment)),
+                                LeafConflict::Reject => return Err(Error::LeafConflict),
+                            },
+                        }
+                    }
                 },
 
+                // If the configured strategy disallows coalesced paths, return an error.
+                Segment::Coalesce(_) if strategy.coalesced_path.is_reject() => {
+                    return Err(Error::CoalescedPathSegment)
+                }
+
+                // We're dealing with multiple fields in this segment. This requires us to
+                // recursively call this `insert_at_path` function for each field.
                 Segment::Coalesce(fields) => {
-                    // We pick the last field in the list of coalesced fields, there is no
-                    // "correct" way to handle this case, other than not supporting it.
-                    let field = fields.last().expect("at least one");
+                    debug_assert!(strategy.coalesced_path.is_insert_all());
 
-                    // TODO(Jean):  This code is duplicated from the previous match arm, we'll want
-                    // to DRY this up at some point.
-                    match self_kind.object {
-                        Some(ref mut collection) => {
-                            match collection.known_mut().entry(field.into()) {
-                                Entry::Occupied(entry) => match iter.peek() {
-                                    Some(_) => entry.into_mut(),
-                                    None => match strategy.leaf_conflict {
-                                        LeafConflict::Merge(merge_strategy) => {
-                                            entry.into_mut().merge(kind, merge_strategy);
-                                            return Ok(());
-                                        }
-                                        LeafConflict::Replace => {
-                                            *(entry.into_mut()) = kind;
-                                            return Ok(());
-                                        }
-                                        LeafConflict::Reject => return Err(Error::LeafConflict),
-                                    },
-                                },
-                                Entry::Vacant(entry) => {
-                                    entry.insert(create_inner_element(iter.peek()))
-                                }
-                            }
-                        }
-                        None => match strategy.inner_conflict {
-                            InnerConflict::Merge(_) => {
-                                self_kind.add_object(BTreeMap::from([(
-                                    field.into(),
-                                    create_inner_element(iter.peek()),
-                                )]));
+                    let mut merge = |merge_strategy| {
+                        self_kind.merge(Self::object(BTreeMap::default()), merge_strategy);
+                    };
 
-                                get_inner_object(self_kind, field)
-                            }
-                            InnerConflict::Replace => {
-                                *self_kind = Kind::object(BTreeMap::from([(
-                                    field.into(),
-                                    create_inner_element(iter.peek()),
-                                )]));
+                    let replace =
+                        |self_kind: &mut Self| *self_kind = Self::object(BTreeMap::default());
 
-                                get_inner_object(self_kind, field)
-                            }
+                    match iter.peek() {
+                        Some(segment) => match strategy.inner_conflict {
+                            InnerConflict::Merge(merge_strategy) => merge(merge_strategy),
+                            InnerConflict::Replace => replace(self_kind),
                             InnerConflict::Reject => return Err(Error::InnerConflict),
                         },
-                    }
+
+                        None => match strategy.leaf_conflict {
+                            LeafConflict::Merge(merge_strategy) => merge(merge_strategy),
+                            LeafConflict::Replace => replace(self_kind),
+                            LeafConflict::Reject => return Err(Error::LeafConflict),
+                        },
+                    };
+
+                    return fields.iter().try_for_each(|field| {
+                        let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
+                        segments.push_front(Segment::Field(field.clone()));
+                        let path = Lookup::from(segments);
+
+                        self_kind.insert_at_path(&path, kind.clone(), strategy)
+                    });
                 }
 
                 // Try finding the index in an existing array.
@@ -328,12 +409,12 @@ impl Kind {
                         InnerConflict::Replace => {
                             let index = usize::try_from(*index).map_err(|_| Error::InvalidIndex)?;
 
-                            *self_kind = Kind::array(BTreeMap::from([(
+                            *self_kind = Self::array(BTreeMap::from([(
                                 index.into(),
                                 create_inner_element(iter.peek()),
                             )]));
 
-                            *self_kind = Kind::array(BTreeMap::default());
+                            *self_kind = Self::array(BTreeMap::default());
                             get_inner_array(self_kind, index)
                         }
                         InnerConflict::Reject => return Err(Error::InnerConflict),
@@ -352,9 +433,8 @@ mod tests {
 
     use lookup::LookupBuf;
 
-    use crate::kind::Collection;
-
     use super::*;
+    use crate::kind::Collection;
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -470,6 +550,7 @@ mod tests {
             let strategy = Strategy {
                 inner_conflict: InnerConflict::Reject,
                 leaf_conflict: LeafConflict::Replace,
+                coalesced_path: CoalescedPath::Reject,
             };
 
             let got = this.insert_at_path(&path.to_lookup(), kind, strategy);
@@ -511,6 +592,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Reject,
                         leaf_conflict: LeafConflict::Reject,
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::bytes(),
                     result: Err(Error::LeafConflict),
@@ -525,6 +607,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Reject,
                         leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::integer(),
                     result: Ok(()),
@@ -542,6 +625,7 @@ mod tests {
                             depth: merge::Depth::Shallow,
                             indices: merge::Indices::Keep,
                         }),
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::integer().or_bytes(),
                     result: Ok(()),
@@ -562,6 +646,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Reject,
                         leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::object(BTreeMap::from([(
                         "foo".into(),
@@ -588,6 +673,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Reject,
                         leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::object(BTreeMap::from([(
                         "foo".into(),
@@ -614,6 +700,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Replace,
                         leaf_conflict: LeafConflict::Reject,
+                        coalesced_path: CoalescedPath::Reject,
                     },
                     mutated: Kind::object(BTreeMap::from([(
                         "foo".into(),
@@ -623,6 +710,21 @@ mod tests {
                         )])),
                     )])),
                     result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path reject",
+                TestCase {
+                    this: Kind::bytes(),
+                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Replace,
+                        leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::Reject,
+                    },
+                    mutated: Kind::bytes(),
+                    result: Err(Error::CoalescedPathSegment),
                 },
             ),
             (
@@ -640,14 +742,112 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Replace,
                         leaf_conflict: LeafConflict::Reject,
+                        coalesced_path: CoalescedPath::InsertAll,
                     },
-                    mutated: Kind::object(BTreeMap::from([(
+                    mutated: Kind::object(BTreeMap::from([
+                        (
+                            "fitz".into(),
+                            Kind::object(BTreeMap::from([(
+                                "baz".into(),
+                                Kind::object(BTreeMap::from([("bar".into(), Kind::timestamp())])),
+                            )])),
+                        ),
+                        (
+                            "foo".into(),
+                            Kind::object(BTreeMap::from([(
+                                "baz".into(),
+                                Kind::object(BTreeMap::from([("bar".into(), Kind::timestamp())])),
+                            )])),
+                        ),
+                    ])),
+                    result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path w/o object",
+                TestCase {
+                    this: Kind::bytes(),
+                    path: LookupBuf::from_str(".(fitz | foo).bar.baz").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Replace,
+                        leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::InsertAll,
+                    },
+                    mutated: Kind::object(BTreeMap::from([
+                        (
+                            "fitz".into(),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::object(BTreeMap::from([("baz".into(), Kind::timestamp())])),
+                            )])),
+                        ),
+                        (
+                            "foo".into(),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::object(BTreeMap::from([("baz".into(), Kind::timestamp())])),
+                            )])),
+                        ),
+                    ])),
+                    result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path at leaf /w object",
+                TestCase {
+                    this: Kind::object(BTreeMap::from([(
                         "foo".into(),
-                        Kind::object(BTreeMap::from([(
-                            "baz".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::timestamp())])),
+                        Kind::array(BTreeMap::from([(
+                            1.into(),
+                            Kind::object(BTreeMap::from([("bar".into(), Kind::boolean())])),
                         )])),
                     )])),
+                    path: LookupBuf::from_str(".(fitz | foo)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Deep,
+                            indices: merge::Indices::Append,
+                        }),
+                        leaf_conflict: LeafConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Deep,
+                            indices: merge::Indices::Append,
+                        }),
+                        coalesced_path: CoalescedPath::InsertAll,
+                    },
+                    mutated: Kind::object(BTreeMap::from([
+                        ("fitz".into(), Kind::timestamp()),
+                        (
+                            "foo".into(),
+                            Kind::timestamp().or_array(BTreeMap::from([(
+                                1.into(),
+                                Kind::object(BTreeMap::from([("bar".into(), Kind::boolean())])),
+                            )])),
+                        ),
+                    ])),
+                    result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path at leaf w/o object",
+                TestCase {
+                    this: Kind::boolean(),
+                    path: LookupBuf::from_str(".(fitz | foo)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Replace,
+                        leaf_conflict: LeafConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        coalesced_path: CoalescedPath::InsertAll,
+                    },
+                    mutated: Kind::object(BTreeMap::from([
+                        ("fitz".into(), Kind::timestamp()),
+                        ("foo".into(), Kind::timestamp()),
+                    ]))
+                    .or_boolean(),
                     result: Ok(()),
                 },
             ),

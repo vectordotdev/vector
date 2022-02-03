@@ -1,8 +1,8 @@
 use std::{fs::DirBuilder, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
@@ -96,7 +96,7 @@ impl GlobalOptions {
         DirBuilder::new()
             .recursive(true)
             .create(&data_subdir)
-            .with_context(|| CouldNotCreate { subdir, data_dir })?;
+            .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
     }
 }

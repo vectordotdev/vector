@@ -1,11 +1,11 @@
 //! All types related to merging one [`Kind`] into another.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::BitOr};
 
 use super::{Collection, Kind};
 
 impl Kind {
-    /// Merge `other` into `self`, using the provided `MergeStrategy`.
+    /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
         self.bytes = self.bytes.or(other.bytes);
         self.integer = self.integer.or(other.integer);
@@ -82,13 +82,13 @@ pub enum Depth {
 impl Depth {
     /// Check if `shallow` strategy is enabled.
     #[must_use]
-    pub fn is_shallow(self) -> bool {
+    pub const fn is_shallow(self) -> bool {
         matches!(self, Self::Shallow)
     }
 
     /// Check if `deep` strategy is enabled.
     #[must_use]
-    pub fn is_deep(self) -> bool {
+    pub const fn is_deep(self) -> bool {
         matches!(self, Self::Deep)
     }
 }
@@ -111,18 +111,18 @@ pub enum Indices {
 impl Indices {
     /// Check if `keep` strategy is enabled.
     #[must_use]
-    pub fn is_keep(self) -> bool {
+    pub const fn is_keep(self) -> bool {
         matches!(self, Self::Keep)
     }
 
     /// Check if `append` strategy is enabled.
     #[must_use]
-    pub fn is_append(self) -> bool {
+    pub const fn is_append(self) -> bool {
         matches!(self, Self::Append)
     }
 }
 
-impl std::ops::BitOr for Kind {
+impl BitOr for Kind {
     type Output = Self;
 
     fn bitor(mut self, rhs: Self) -> Self::Output {
@@ -141,9 +141,8 @@ impl std::ops::BitOr for Kind {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::kind::Collection;
-
     use super::*;
+    use crate::kind::Collection;
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -192,27 +191,27 @@ mod tests {
             (
                 "mixed unknown shallow",
                 TestCase {
-                    this: Kind::bytes().or_object(Collection::unknown(Kind::integer())),
-                    other: Kind::bytes().or_object(Collection::unknown(Kind::bytes())),
+                    this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
+                    other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         depth: Depth::Shallow,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
-                        .or_object(Collection::unknown(Kind::integer().or_bytes())),
+                        .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
                 },
             ),
             (
                 "mixed unknown deep",
                 TestCase {
-                    this: Kind::bytes().or_object(Collection::unknown(Kind::integer())),
-                    other: Kind::bytes().or_object(Collection::unknown(Kind::bytes())),
+                    this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
+                    other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         depth: Depth::Deep,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
-                        .or_object(Collection::unknown(Kind::integer().or_bytes())),
+                        .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
                 },
             ),
             (

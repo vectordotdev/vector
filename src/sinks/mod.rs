@@ -59,6 +59,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
+#[cfg(feature = "sinks-new_relic")]
+pub mod new_relic;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]

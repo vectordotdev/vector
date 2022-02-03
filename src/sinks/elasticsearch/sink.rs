@@ -108,7 +108,7 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink for ElasticSearchSink {
+impl StreamSink<Event> for ElasticSearchSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

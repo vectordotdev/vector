@@ -163,7 +163,7 @@ impl MongoDbMetrics {
 
         let mut client_options = ClientOptions::parse(endpoint)
             .await
-            .context(InvalidEndpoint)?;
+            .context(InvalidEndpointSnafu)?;
         client_options.direct_connection = Some(true);
 
         let endpoint = sanitize_endpoint(endpoint, &client_options);
@@ -171,7 +171,7 @@ impl MongoDbMetrics {
         tags.insert("host".into(), client_options.hosts[0].to_string());
 
         Ok(Self {
-            client: Client::with_options(client_options).context(InvalidClientOptions)?,
+            client: Client::with_options(client_options).context(InvalidClientOptionsSnafu)?,
             endpoint,
             namespace,
             tags,
