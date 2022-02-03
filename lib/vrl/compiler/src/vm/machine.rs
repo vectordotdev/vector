@@ -33,6 +33,9 @@ pub enum OpCode {
     /// Merges the two objects at the top of the stack, placing the result back on the stack.
     Merge,
 
+    /// Ands the two objects at the top of the stack, placing the result back on the stack.
+    And,
+
     /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
     Not,
 
@@ -71,6 +74,10 @@ pub enum OpCode {
     /// If the top element of the stack is truthy (not null or false) advances the instruction
     /// pointer by the amount set by the ensuing primitive instruction.
     JumpIfTruthy,
+
+    /// If the top element of the stack is not truthy (not null or false) advances the instruction
+    /// pointer by the amount set by the ensuing primitive instruction.
+    JumpIfFalsey,
 
     /// If the error field of the VM is not set advances the instruction pointer by the amount
     /// set by the ensuing primitive instruction.
@@ -279,6 +286,7 @@ impl Vm {
                 OpCode::Multiply => binary_op(&mut state, Value::try_mul)?,
                 OpCode::Divide => binary_op(&mut state, Value::try_div)?,
                 OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
+                OpCode::And => binary_op(&mut state, Value::try_and)?,
                 OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
                 OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
                 OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
@@ -324,6 +332,13 @@ impl Vm {
                     // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if is_truthy(state.peek_stack()?) {
+                        state.instruction_pointer += jump;
+                    }
+                }
+                OpCode::JumpIfFalsey => {
+                    // If the value at the top of the stack is true, jump by the given amount.
+                    let jump = state.next_primitive()?;
+                    if !is_truthy(state.peek_stack()?) {
                         state.instruction_pointer += jump;
                     }
                 }
