@@ -8,6 +8,7 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use super::parser;
 use crate::{
@@ -254,13 +255,12 @@ fn prometheus(
                                     end: Instant::now()
                                 });
 
-                                let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
                                         emit!(&PrometheusEventsReceived {
-                                            byte_size,
+                                            byte_size: events.size_of(),
                                             count: events.len(),
                                             uri: url.clone()
                                         });
