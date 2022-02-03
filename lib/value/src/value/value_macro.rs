@@ -1,5 +1,3 @@
-//TODO: use the macro in lib/value instead
-
 #[macro_export]
 macro_rules! value {
     ([]) => ({

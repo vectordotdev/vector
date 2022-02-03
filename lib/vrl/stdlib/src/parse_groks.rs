@@ -337,7 +337,7 @@ mod test {
                     "_x_forwarded_for": r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#
                 })
             ],
-            want: Ok(Value::Object(btreemap! {
+            want: Ok(Value::Map(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
                 "duration" => 202000000,
                 "http" => btreemap! {

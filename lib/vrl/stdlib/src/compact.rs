@@ -392,10 +392,10 @@ mod test {
 
         with_map {
             args: func_args![value: map!["key1": Value::Null,
-                                         "key2": 1,
+                                         "key2": 1_i64,
                                          "key3": "",
             ]],
-            want: Ok(Value::Object(map!["key2": 1])),
+            want: Ok(Value::Map(map!["key2": 1_i64])),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
@@ -409,12 +409,12 @@ mod test {
             args: func_args![
                 value: btreemap! {
                     "key1" => "-",
-                    "key2" => 1,
+                    "key2" => 1_i64,
                     "key3" => " "
                 },
                 nullish: true
             ],
-            want: Ok(Value::Object(map!["key2": 1])),
+            want: Ok(Value::Map(map!["key2": 1_i64])),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
     ];

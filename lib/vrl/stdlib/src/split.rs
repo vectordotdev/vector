@@ -56,7 +56,7 @@ impl Function for Split {
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
-        let limit = arguments.optional("limit").unwrap_or(expr!(999999999));
+        let limit = arguments.optional("limit").unwrap_or(expr!(999999999_i64));
 
         Ok(Box::new(SplitFn {
             value,

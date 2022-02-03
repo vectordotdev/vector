@@ -549,36 +549,6 @@ impl Arbitrary for MetricData {
     }
 }
 
-impl Arbitrary for Value {
-    fn arbitrary(g: &mut Gen) -> Self {
-        // Quickcheck can't derive Arbitrary for enums, see
-        // https://github.com/BurntSushi/quickcheck/issues/98.  The magical
-        // constant here are the number of fields in `Value`. Because the field
-        // total is a power of two we, happily, don't introduce a bias into the
-        // field picking.
-        match u8::arbitrary(g) % 8 {
-            0 => {
-                let bytes: Vec<u8> = Vec::arbitrary(g);
-                Value::Bytes(Bytes::from(bytes))
-            }
-            1 => Value::Integer(i64::arbitrary(g)),
-            2 => Value::Float(f64::arbitrary(g) % MAX_F64_SIZE),
-            3 => Value::Boolean(bool::arbitrary(g)),
-            4 => Value::Timestamp(datetime(g)),
-            5 => {
-                let mut gen = Gen::new(MAX_MAP_SIZE);
-                Value::Map(BTreeMap::arbitrary(&mut gen))
-            }
-            6 => {
-                let mut gen = Gen::new(MAX_ARRAY_SIZE);
-                Value::Array(Vec::arbitrary(&mut gen))
-            }
-            7 => Value::Null,
-            _ => unreachable!(),
-        }
-    }
-}
-
 impl Arbitrary for EventMetadata {
     fn arbitrary(_g: &mut Gen) -> Self {
         EventMetadata::default()

@@ -450,11 +450,7 @@ impl VrlValueConvert for Value {
 //     }
 // }
 //
-// impl From<()> for Value {
-//     fn from(_: ()) -> Self {
-//         Value::Null
-//     }
-// }
+
 //
 // impl<T: Into<Value>> From<Option<T>> for Value {
 //     fn from(v: Option<T>) -> Self {

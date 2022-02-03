@@ -199,7 +199,7 @@ mod tests {
                 host: "vector.dev",
                 password: "",
                 path: "/",
-                port: 443,
+                port: 443_i64,
                 query: {},
                 scheme: "https",
                 username: "",

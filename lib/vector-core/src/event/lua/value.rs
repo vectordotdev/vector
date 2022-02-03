@@ -8,6 +8,7 @@ use crate::event::Value;
 #[cfg(test)]
 mod test {
     use chrono::{TimeZone, Utc};
+    use ordered_float::NotNan;
 
     use super::*;
 
@@ -19,13 +20,13 @@ mod test {
                 Value::Bytes("\u{237a}\u{3b2}\u{3b3}".into()),
             ),
             ("123", Value::Integer(123)),
-            ("4.333", Value::Float(4.333)),
+            ("4.333", Value::Float(NotNan::new(4.333).unwrap())),
             ("true", Value::Boolean(true)),
             (
                 "{ x = 1, y = '2', nested = { other = 5.678 } }",
                 Value::Map(
                     vec![
-                        ("x".into(), 1.into()),
+                        ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
@@ -38,7 +39,7 @@ mod test {
             ),
             (
                 "{1, '2', 0.57721566}",
-                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
+                Value::Array(vec![1_i64.into(), "2".into(), 0.577_215_66.into()]),
             ),
             (
                 "os.date('!*t', 1584297428)",
@@ -83,7 +84,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Float(4.333),
+                Value::Float(NotNan::new(4.333).unwrap()),
                 r#"
                 function (value)
                     return value == 4.333
@@ -101,7 +102,7 @@ mod test {
             (
                 Value::Map(
                     vec![
-                        ("x".into(), 1.into()),
+                        ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
@@ -120,7 +121,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
+                Value::Array(vec![1_i64.into(), "2".into(), 0.577_215_66.into()]),
                 r#"
                 function (value)
                     return value[1] == 1 and

@@ -1,6 +1,7 @@
 pub mod convert;
 mod regex;
 pub mod target;
+mod value_macro;
 
 use crate::value::convert::regex_to_bytes;
 use bytes::{Bytes, BytesMut};
@@ -150,6 +151,16 @@ impl Value {
     pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
         self.as_map_mut()
             .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
+    }
+
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
+    pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
+        self.as_map()
+            .expect("Tried to call `Value::unwrap_map` on a non-map value.")
     }
 
     pub fn into_bytes(self) -> Bytes {

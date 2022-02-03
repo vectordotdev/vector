@@ -8185,6 +8185,7 @@ dependencies = [
  "lookup",
  "mlua",
  "ordered-float",
+ "quickcheck",
  "regex",
  "serde",
  "serde_json",

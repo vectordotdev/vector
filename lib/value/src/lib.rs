@@ -36,5 +36,8 @@ mod lua;
 //TODO: use "api" (graphql) feature flag
 mod graphql;
 
+//TODO: use "arbitrary" feature flag
+mod arbitrary;
+
 pub use kind::Kind;
 pub use value::{Value, ValueRegex};

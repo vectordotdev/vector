@@ -6,7 +6,7 @@
 macro_rules! expr {
     ($($v:tt)*) => {{
         let value = $crate::value!($($v)*);
-        Box::new(::vrl::prelude::expression::Expr::from(value))
+        Box::new($crate::expression::Expr::from(value))
     }};
 }
 
@@ -15,7 +15,7 @@ macro_rules! test_type_def {
     ($($name:ident { expr: $expr:expr, want: $def:expr, })+) => {
         mod type_def {
             use super::*;
-
+            use $crate::expression::Expression;
             $(
                 #[test]
                 fn $name() {

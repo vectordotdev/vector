@@ -97,6 +97,12 @@ impl From<BTreeMap<String, Value>> for Value {
     }
 }
 
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Value::Null
+    }
+}
+
 impl<T: Into<Value>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
         match value {

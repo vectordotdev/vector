@@ -86,7 +86,7 @@ mod tests {
         }
 
         scalar_array {
-            expr: |_| expr!([1, "foo", true]),
+            expr: |_| expr!([1_i64, "foo", true]),
             want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
                 0: Kind::Integer,
                 1: Kind::Bytes,
@@ -95,7 +95,7 @@ mod tests {
         }
 
         mixed_array {
-            expr: |_| expr!([1, [true, "foo"], { "bar": null }]),
+            expr: |_| expr!([1_i64, [true, "foo"], { "bar": null }]),
             want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
                 0: Kind::Integer,
                 1: TypeDef::new().array_mapped::<i32, TypeDef>(map! {

@@ -52,7 +52,7 @@ impl Function for Round {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let precision = arguments.optional("precision").unwrap_or(expr!(0));
+        let precision = arguments.optional("precision").unwrap_or(expr!(0_i64));
 
         Ok(Box::new(RoundFn { value, precision }))
     }

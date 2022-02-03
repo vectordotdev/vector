@@ -67,7 +67,7 @@ impl Function for Replace {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let with = arguments.required("with");
-        let count = arguments.optional("count").unwrap_or(expr!(-1));
+        let count = arguments.optional("count").unwrap_or(expr!(-1_i64));
 
         Ok(Box::new(ReplaceFn {
             value,

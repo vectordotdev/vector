@@ -224,16 +224,16 @@ impl From<NotNan<f64>> for Literal {
     }
 }
 
-// impl TryFrom<f64> for Literal {
-//     type Error = Error;
-//
-//     fn try_from(v: f64) -> Result<Self, Self::Error> {
-//         Ok(Literal::Float(NotNan::new(v).map_err(|_| Error {
-//             span: Span::default(),
-//             variant: ErrorVariant::NanFloat,
-//         })?))
-//     }
-// }
+impl TryFrom<f64> for Literal {
+    type Error = Error;
+
+    fn try_from(v: f64) -> Result<Self, Self::Error> {
+        Ok(Literal::Float(NotNan::new(v).map_err(|_| Error {
+            span: Span::default(),
+            variant: ErrorVariant::NanFloat,
+        })?))
+    }
+}
 
 // Literal::Boolean ------------------------------------------------------------
 impl From<bool> for Literal {
@@ -406,7 +406,7 @@ mod tests {
         }
 
         integer {
-            expr: |_| expr!(12),
+            expr: |_| expr!(12_i64),
             want: TypeDef::new().integer(),
         }
     ];

@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_parse_empty_object() {
         let result = parse("{}").unwrap();
-        assert!(result.is_object());
+        assert!(result.is_map());
     }
 
     #[test]
@@ -291,22 +291,22 @@ mod tests {
             r#"{ "hello" => "world", "number" => 42, "float" => 4.2, "array" => [1, 2.3], "object" => { "nope" => nil } }"#,
         )
         .unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         assert!(result.get("hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
         assert!(result.get("float").unwrap().is_float());
         assert!(result.get("array").unwrap().is_array());
-        assert!(result.get("object").unwrap().is_object());
-        let child = result.get("object").unwrap().as_object().unwrap();
+        assert!(result.get("object").unwrap().is_map());
+        let child = result.get("object").unwrap().unwrap_map();
         assert!(child.get("nope").unwrap().is_null());
     }
 
     #[test]
     fn test_parse_arrow_object_key_number() {
         let result = parse(r#"{ 42 => "hello world" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         assert!(result.get("42").unwrap().is_bytes());
     }
 
@@ -315,8 +315,8 @@ mod tests {
         let result =
             parse(r#"{ :colon => "hello world", :"double" => "quote", :'simple' => "quote" }"#)
                 .unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         assert!(result.get(":colon").unwrap().is_bytes());
         assert!(result.get(":double").unwrap().is_bytes());
         assert!(result.get(":simple").unwrap().is_bytes());
@@ -325,16 +325,16 @@ mod tests {
     #[test]
     fn test_parse_arrow_object_key_underscore() {
         let result = parse(r#"{ :with_underscore => "hello world" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         assert!(result.get(":with_underscore").unwrap().is_bytes());
     }
 
     #[test]
     fn test_parse_colon_object_double_quote() {
         let result = parse(r#"{ "hello": "world" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         let value = result.get("hello").unwrap();
         assert_eq!(value, &Value::Bytes("world".into()));
     }
@@ -342,8 +342,8 @@ mod tests {
     #[test]
     fn test_parse_colon_object_single_quote() {
         let result = parse(r#"{ 'hello': 'world' }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         let value = result.get("hello").unwrap();
         assert_eq!(value, &Value::Bytes("world".into()));
     }
@@ -351,8 +351,8 @@ mod tests {
     #[test]
     fn test_parse_colon_object_no_quote() {
         let result = parse(r#"{ hello: "world" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         let value = result.get("hello").unwrap();
         assert_eq!(value, &Value::Bytes("world".into()));
     }
@@ -360,16 +360,16 @@ mod tests {
     #[test]
     fn test_parse_dash() {
         let result = parse(r#"{ "with-dash" => "foo" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         assert!(result.get("with-dash").unwrap().is_bytes());
     }
 
     #[test]
     fn test_parse_quote() {
         let result = parse(r#"{ "with'quote" => "and\"double\"quote" }"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.unwrap_map();
         let value = result.get("with'quote").unwrap();
         assert_eq!(value, &Value::Bytes("and\\\"double\\\"quote".into()));
     }
@@ -377,8 +377,8 @@ mod tests {
     #[test]
     fn test_parse_weird_format() {
         let result = parse(r#"{:hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
-        assert!(result.is_object());
-        let result = result.as_object().unwrap();
+        assert!(result.is_map());
+        let result = result.as_map().unwrap();
         assert!(result.get(":hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
     }
