@@ -15,11 +15,12 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
     internal_events::aws_s3::source::{
         SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
         SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
@@ -254,11 +255,6 @@ impl IngestorProcess {
         let messages = self.receive_messages().await;
         let messages = messages
             .map(|messages| {
-                let byte_size = messages.iter().map(std::mem::size_of_val).sum();
-                emit!(&BytesReceived {
-                    byte_size,
-                    protocol: "tcp",
-                });
                 emit!(&SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
@@ -470,10 +466,6 @@ impl IngestorProcess {
                 let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
                 let mut stream = lines.filter_map(move |line| {
-                    emit!(&SqsS3EventsReceived {
-                        byte_size: line.len()
-                    });
-
                     let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
 
                     log.insert_flat("bucket", bucket_name.clone());
@@ -488,7 +480,13 @@ impl IngestorProcess {
                         }
                     }
 
-                    ready(Some(log.into()))
+                    let event: Event = log.into();
+
+                    emit!(&SqsS3EventsReceived {
+                        byte_size: event.size_of()
+                    });
+
+                    ready(Some(event))
                 });
 
                 let (count, _) = stream.size_hint();
