@@ -8396,6 +8396,7 @@ dependencies = [
  "nom 7.1.0",
  "serde",
  "serde_json",
+ "smallvec",
  "snafu",
  "tracing 0.1.29",
 ]
