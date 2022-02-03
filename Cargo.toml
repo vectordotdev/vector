@@ -213,7 +213,6 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 lookup = { path = "lib/lookup" }
 
 # External libs
-arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
