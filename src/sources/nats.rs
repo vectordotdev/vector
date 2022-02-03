@@ -4,6 +4,7 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -15,7 +16,7 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::NatsEventsReceived,
+    internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -132,29 +133,33 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
+        emit!(&BytesReceived {
+            byte_size: msg.data.len(),
+            protocol: "tcp",
+        });
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
                     emit!(&NatsEventsReceived {
-                        byte_size,
-                        count: events.len()
+                        byte_size: events.size_of(),
+                        count
                     });
 
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let events = stream::iter(events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
+                        event
+                    }));
 
-                        out.send(event).await.map_err(
-                            |error: crate::source_sender::ClosedError| {
-                                error!(message = "Error sending to sink.", %error);
-                            },
-                        )?;
-                    }
+                    out.send_all(events).await.map_err(|error| {
+                        emit!(&StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further
