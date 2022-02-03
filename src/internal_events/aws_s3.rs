@@ -17,7 +17,7 @@ pub mod source {
     impl InternalEvent for SqsS3EventsReceived {
         fn emit_logs(&self) {
             trace!(
-                message = "Events received",
+                message = "Events received.",
                 count = 1,
                 byte_size = %self.byte_size,
             );
