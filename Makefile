@@ -239,7 +239,6 @@ cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
-		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
@@ -251,7 +250,6 @@ target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
-		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}

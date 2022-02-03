@@ -15,6 +15,9 @@ ENV VECTOR_LOG="$VECTOR_LOG"
 
 COPY vector /usr/bin/vector
 
+RUN groupadd -r vector && useradd --no-log-init -r -g vector vector
+USER vector
+
 RUN set -x \
   && ls -la /usr/bin/vector \
   && ldd /usr/bin/vector \
