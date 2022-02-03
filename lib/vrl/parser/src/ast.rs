@@ -126,10 +126,13 @@ pub struct Program(pub Vec<Node<RootExpr>>);
 
 impl<'a> Arbitrary<'a> for Program {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Program(vec![Node::new(
-            Span::default(),
-            RootExpr::arbitrary(u)?,
-        )]))
+        // limit to 15 statements to avoid overwhelming the compiler.
+        let len = usize::arbitrary(u)? % 15;
+        let statements = (0..len)
+            .map(|_| Ok(Node::new(Span::default(), RootExpr::arbitrary(u)?)))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Program(statements))
     }
 }
 
@@ -240,7 +243,7 @@ pub enum Expr {
 
 impl<'a> ArbitraryDepth<'a> for Expr {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
-        match u8::arbitrary(u)? % 3 {
+        match u8::arbitrary(u)? % 4 {
             0 if depth > 0 => Ok(Expr::Op(Node::new(
                 Span::default(),
                 Op::arbitrary_depth(u, depth - 1)?,
@@ -248,6 +251,10 @@ impl<'a> ArbitraryDepth<'a> for Expr {
             1 if depth == DEPTH => Ok(Expr::Assignment(Node::new(
                 Span::default(),
                 Assignment::arbitrary_depth(u, depth - 1)?,
+            ))),
+            2 => Ok(Expr::Variable(Node::new(
+                Span::default(),
+                Ident::arbitrary(u)?,
             ))),
             _ => Ok(Expr::Literal(Node::new(
                 Span::default(),
@@ -304,6 +311,18 @@ impl fmt::Display for Expr {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Ident(pub(crate) String);
 
+impl<'a> Arbitrary<'a> for Ident {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let path = match u8::arbitrary(u)? % 3 {
+            0 => "noog",
+            1 => "flork",
+            _ => "shning",
+        };
+
+        Ok(Ident(path.to_string()))
+    }
+}
+
 impl Ident {
     pub fn new(ident: impl Into<String>) -> Self {
         Self(ident.into())
@@ -357,12 +376,12 @@ pub enum Literal {
 
 impl<'a> Arbitrary<'a> for Literal {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let choice = usize::arbitrary(u)? % 3;
+        let choice = usize::arbitrary(u)? % 100;
         Ok(match choice {
-            //0 => Literal::String(String::arbitrary(u)?),
+            0..=5 => Literal::String(String::arbitrary(u)?),
             // TODO Limit the size of integers and keep them positive so both VRLs can handle it.
+            6..=10 => Literal::Boolean(bool::arbitrary(u)?),
             _ => Literal::Integer((i64::arbitrary(u)? % 100).abs()),
-            //_ => Literal::Boolean(bool::arbitrary(u)?),
         })
     }
 }
