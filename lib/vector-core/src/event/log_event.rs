@@ -24,9 +24,9 @@ use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
-    fields: Value,
+    fields: Arc<Value>,
 
     #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
@@ -36,7 +36,7 @@ pub struct LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
-            fields: Value::Map(BTreeMap::new()),
+            fields: Arc::new(Value::Map(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }
     }
@@ -58,7 +58,7 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Value::Map(Default::default()),
+            fields: Arc::new(Value::Map(Default::default())),
             metadata,
         }
     }
@@ -66,7 +66,10 @@ impl LogEvent {
     ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let fields = Value::Map(map);
-        Self { fields, metadata }
+        Self {
+            fields: Arc::new(fields),
+            metadata,
+        }
     }
 
     /// Convert a `LogEvent` into a tuple of its components
@@ -74,9 +77,11 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+        Arc::make_mut(&mut self.fields);
         (
-            self.fields
+            Arc::try_unwrap(self.fields)
+                .expect("already cloned")
                 .into_map()
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
@@ -158,7 +163,10 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
+            if let Some(val) = Arc::make_mut(&mut self.fields)
+                .as_map_mut()
+                .remove(from_key.as_ref())
+            {
                 self.insert_flat(to_key, val);
             }
         }
@@ -198,7 +206,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        match &self.fields {
+        match self.fields.as_ref() {
             Value::Map(map) => util::log::keys(map),
             _ => unreachable!(),
         }
@@ -216,7 +224,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match &self.fields {
+        match self.fields.as_ref() {
             Value::Map(map) => map,
             _ => unreachable!(),
         }
@@ -224,7 +232,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self.fields {
+        match Arc::make_mut(&mut self.fields) {
             Value::Map(ref mut map) => map,
             _ => unreachable!(),
         }
@@ -324,15 +332,16 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Value::Map(map),
+            fields: Arc::new(Value::Map(map)),
             metadata: EventMetadata::default(),
         }
     }
 }
 
 impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        match event.fields {
+    fn from(mut event: LogEvent) -> BTreeMap<String, Value> {
+        Arc::make_mut(&mut event.fields);
+        match Arc::try_unwrap(event.fields).expect("already cloned") {
             Value::Map(map) => map,
             _ => unreachable!(),
         }
@@ -342,7 +351,7 @@ impl From<LogEvent> for BTreeMap<String, Value> {
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            fields: map.into_iter().collect(),
+            fields: Arc::new(map.into_iter().collect()),
             metadata: EventMetadata::default(),
         }
     }
@@ -380,7 +389,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        Ok(serde_json::to_value(self.fields)?)
+        Ok(serde_json::to_value(self.fields.as_ref())?)
     }
 }
 
