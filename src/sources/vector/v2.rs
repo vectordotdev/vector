@@ -7,6 +7,7 @@ use tonic::{
     transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
+use tracing_futures::Instrument;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -148,7 +149,7 @@ async fn run(
     cx: SourceContext,
     acknowledgements: AcknowledgementsConfig,
 ) -> crate::Result<()> {
-    let _span = crate::trace::current_span();
+    let span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
@@ -163,15 +164,17 @@ async fn run(
             socket.after_read(move |byte_size| {
                 emit!(&TcpBytesReceived {
                     byte_size,
-                    peer_addr
+                    peer_addr,
                 })
             })
         })
     });
 
     Server::builder()
+        .trace_fn(move |_| span.clone())
         .add_service(service)
         .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
+        .in_current_span()
         .await?;
 
     drop(rx.await);
