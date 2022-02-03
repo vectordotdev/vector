@@ -22,7 +22,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -143,6 +143,10 @@ impl HostMetricsConfig {
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
+            emit!(&BytesReceived {
+                byte_size: 0,
+                protocol: "none"
+            });
             let metrics = generator.capture_metrics().await;
             let (count, _) = metrics.size_hint();
             if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
