@@ -251,8 +251,9 @@ mod test {
           let val = Value::from(FluentValue(rmpv::Value::F32(input)));
           match val {
               Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
+                  if input.is_nan() {
+                       //TODO: This has odd behavior until https://github.com/vectordotdev/vector/issues/11177 is fixed
+                       assert_relative_eq!(0.0, f.into_inner())
                   } else {
                       assert_relative_eq!(input as f64, f);
                   }
@@ -267,8 +268,9 @@ mod test {
           let val = Value::from(FluentValue(rmpv::Value::F64(input)));
           match val {
               Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
+                  if input.is_nan() {
+                      //TODO: This has odd behavior until https://github.com/vectordotdev/vector/issues/11177 is fixed
+                       assert_relative_eq!(0.0, f.into_inner())
                   } else {
                       assert_relative_eq!(input, f);
                   }

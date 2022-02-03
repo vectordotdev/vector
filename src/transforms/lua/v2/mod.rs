@@ -344,6 +344,7 @@ fn format_error(error: &mlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use futures::{stream, StreamExt};
+    use ordered_float::NotNan;
 
     use super::*;
     use crate::{
@@ -555,7 +556,10 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(
+            output.as_log()["number"],
+            Value::Float(NotNan::new(3.14159).unwrap())
+        );
         Ok(())
     }
 

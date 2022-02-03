@@ -268,6 +268,7 @@ pub fn format_error(error: &mlua::Error) -> String {
 mod tests {
     use super::*;
     use crate::event::{Event, Value};
+    use ordered_float::NotNan;
 
     #[test]
     fn lua_add_field() {
@@ -396,7 +397,10 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(
+            event.as_log()["number"],
+            Value::Float(NotNan::new(3.14159).unwrap())
+        );
     }
 
     #[test]

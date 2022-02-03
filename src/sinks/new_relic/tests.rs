@@ -2,6 +2,7 @@ use super::*;
 use crate::event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value};
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
+use vrl::prelude::NotNan;
 
 #[test]
 fn generate_config() {
@@ -160,7 +161,10 @@ fn generate_metric_api_model() {
         "my_metric".to_owned()
     );
     assert!(metrics[0].get("value").is_some());
-    assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
+    assert_eq!(
+        metrics[0].get("value").unwrap(),
+        &Value::Float(NotNan::new(100.0).unwrap())
+    );
     assert!(metrics[0].get("timestamp").is_some());
 
     // With timestamp
@@ -184,6 +188,9 @@ fn generate_metric_api_model() {
         "my_metric".to_owned()
     );
     assert!(metrics[0].get("value").is_some());
-    assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
+    assert_eq!(
+        metrics[0].get("value").unwrap(),
+        &Value::Float(NotNan::new(100.0).unwrap())
+    );
     assert!(metrics[0].get("timestamp").is_some());
 }
