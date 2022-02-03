@@ -102,6 +102,92 @@ impl Function for ParseGroks {
         }]
     }
 
+    fn compile_argument(
+        &self,
+        args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("patterns", Some(expr)) => {
+                let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                    if *name == "aliases" {
+                        arg.as_ref()
+                    } else {
+                        None
+                    }
+                });
+
+                let patterns = expr.as_value().unwrap();
+                let patterns = patterns
+                    .try_array()
+                    .unwrap()
+                    .into_iter()
+                    .map(|value| {
+                        let pattern = value
+                            .try_bytes_utf8_lossy()
+                            .expect("grok pattern not bytes")
+                            .into_owned();
+                        Ok(pattern)
+                    })
+                    .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
+
+                let aliases = aliases
+                .map(|aliases| {
+                    aliases
+                        .as_value()
+                        .unwrap()
+                        .try_object()
+                        .unwrap()
+                        .into_iter()
+                        .map(|(key, expr)| {
+                            let alias = expr
+                                .try_bytes_utf8_lossy()
+                                .expect("should be a string")
+                                .into_owned();
+                            Ok((key, alias))
+                        })
+                    .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>().unwrap()
+                })
+                .unwrap_or_default();
+
+                // We use a datadog library here because it is a superset of grok.
+                let grok_rules =
+                    parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
+                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                    })?;
+
+                Ok(Some(Box::new(grok_rules) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        let bytes = value.try_bytes_utf8_lossy()?;
+
+        let remove_empty = args
+            .optional("remove_empty")
+            .map(|v| v.as_boolean().unwrap_or(false))
+            .unwrap_or(false);
+
+        let grok_rules = args
+            .required_any("patterns")
+            .downcast_ref::<Vec<GrokRule>>()
+            .unwrap();
+
+        let v = parse_grok::parse_grok(bytes.as_ref(), grok_rules, remove_empty)
+            .map_err(|e| format!("unable to parse grok: {}", e))?;
+
+        Ok(v)
+    }
+
     fn compile(
         &self,
         _state: &state::Compiler,
