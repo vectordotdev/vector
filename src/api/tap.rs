@@ -626,13 +626,10 @@ mod tests {
                             .any(|log| log.get_message().unwrap_or_default() == "test2");
                     }
                 }
-                None => {
-                    panic!("Failed to tap multiple outputs, not all expected events were found")
-                }
+                None => break,
             }
         }
 
-        assert!(default_output_found);
-        assert!(dropped_output_found);
+        assert!(default_output_found && dropped_output_found);
     }
 }
