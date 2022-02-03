@@ -2,6 +2,47 @@ use std::ops::Range;
 
 use vrl::prelude::*;
 
+fn slice(
+    start: i64,
+    end: Option<i64>,
+    value: Value,
+) -> std::result::Result<Value, ExpressionError> {
+    let range = |len: i64| -> Result<Range<usize>> {
+        let start = match start {
+            start if start < 0 => start + len,
+            start => start,
+        };
+
+        let end = match end {
+            Some(end) if end < 0 => end + len,
+            Some(end) => end,
+            None => len,
+        };
+
+        match () {
+            _ if start < 0 || start > len => {
+                Err(format!(r#""start" must be between "{}" and "{}""#, -len, len).into())
+            }
+            _ if end < start => Err(r#""end" must be greater or equal to "start""#.into()),
+            _ if end > len => Ok(start as usize..len as usize),
+            _ => Ok(start as usize..end as usize),
+        }
+    };
+    match value {
+        Value::Bytes(v) => range(v.len() as i64)
+            .map(|range| v.slice(range))
+            .map(Value::from),
+        Value::Array(mut v) => range(v.len() as i64)
+            .map(|range| v.drain(range).collect::<Vec<_>>())
+            .map(Value::from),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::Bytes | Kind::Array,
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Slice;
 
@@ -62,6 +103,17 @@ impl Function for Slice {
 
         Ok(Box::new(SliceFn { value, start, end }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let start = args.required("start").try_integer()?;
+        let end = args
+            .optional("end")
+            .map(|value| value.try_integer())
+            .transpose()?;
+
+        slice(start, end, value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,42 +130,9 @@ impl Expression for SliceFn {
             Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
+        let value = self.value.resolve(ctx)?;
 
-        let range = |len: i64| -> Result<Range<usize>> {
-            let start = match start {
-                start if start < 0 => start + len,
-                start => start,
-            };
-
-            let end = match end {
-                Some(end) if end < 0 => end + len,
-                Some(end) => end,
-                None => len,
-            };
-
-            match () {
-                _ if start < 0 || start > len => {
-                    Err(format!(r#""start" must be between "{}" and "{}""#, -len, len).into())
-                }
-                _ if end < start => Err(r#""end" must be greater or equal to "start""#.into()),
-                _ if end > len => Ok(start as usize..len as usize),
-                _ => Ok(start as usize..end as usize),
-            }
-        };
-
-        match self.value.resolve(ctx)? {
-            Value::Bytes(v) => range(v.len() as i64)
-                .map(|range| v.slice(range))
-                .map(Value::from),
-            Value::Array(mut v) => range(v.len() as i64)
-                .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Bytes | Kind::Array,
-            }
-            .into()),
-        }
+        slice(start, end, value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

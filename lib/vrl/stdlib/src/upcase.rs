@@ -1,5 +1,9 @@
 use vrl::prelude::*;
 
+fn upcase(value: Value) -> std::result::Result<Value, ExpressionError> {
+    Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Upcase;
 
@@ -34,6 +38,11 @@ impl Function for Upcase {
 
         Ok(Box::new(UpcaseFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        upcase(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,8 +53,7 @@ struct UpcaseFn {
 impl Expression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
+        upcase(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

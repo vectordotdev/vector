@@ -6,7 +6,8 @@ use parser::ast::Node;
 use crate::{
     expression::{ExpressionError, Resolved},
     value::Kind,
-    Context, Expression, Span, State, TypeDef,
+    vm::OpCode,
+    Context, Expression, Span, State, TypeDef, Value,
 };
 
 use super::Expr;
@@ -69,6 +70,26 @@ impl Expression for Abort {
 
     fn type_def(&self, _: &State) -> TypeDef {
         TypeDef::new().infallible().null()
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        match &self.message {
+            None => {
+                // If there is no message, just write a Null to the stack which
+                // the abort instruction will use to know not to attach a message.
+                let nullidx = vm.add_constant(Value::Null);
+                vm.write_opcode(OpCode::Constant);
+                vm.write_primitive(nullidx);
+            }
+            Some(message) => message.compile_to_vm(vm)?,
+        }
+
+        vm.write_opcode(OpCode::Abort);
+
+        // The `Abort` `OpCode` needs the span of the expression to return in the abort error.
+        vm.write_primitive(self.span.start());
+        vm.write_primitive(self.span.end());
+        Ok(())
     }
 }
 
