@@ -1,0 +1,32 @@
+# result: 
+# error[E111]: fallible predicate
+#   ┌─ :2:4
+#   │
+# 2 │ if contains(.noog, "thing") {
+#   │    ^^^^^^^^^^^^^^^^^^^^^^^^
+#   │    │
+#   │    this predicate can result in runtime error
+#   │    handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+# 
+# error[E111]: fallible predicate
+#   ┌─ :6:4
+#   │
+# 6 │ if 23 && 32 {
+#   │    ^^^^^^^^
+#   │    │
+#   │    this predicate can result in runtime error
+#   │    handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+
+if contains(.noog, "thing") {
+  log("ooh")
+}
+
+if 23 && 32 {
+  log("oh")
+}
