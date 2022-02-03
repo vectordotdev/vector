@@ -30,7 +30,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["attribute
 vector_common = { path = "../vector-common", default-features = false }
 
 [dev-dependencies]
-clap = "3.0.13"
+clap = "3.0.14"
 criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 human_bytes = "0.3.0"
@@ -38,7 +38,7 @@ metrics-exporter-prometheus = "0.7"
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false }
 once_cell = "1.9"
-pretty_assertions = "1.0.0"
+pretty_assertions = "1.1.0"
 quickcheck = "1.0"
 rand = "0.8.4"
 serde_yaml = { version = "0.8", default-features = false }

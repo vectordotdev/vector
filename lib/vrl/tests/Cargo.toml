@@ -25,3 +25,7 @@ tracing-subscriber = { version = "0.3.7", default-features = false, features = [
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.4.1" }
+
+[features]
+default = []
+vrl-vm = []

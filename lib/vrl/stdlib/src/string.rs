@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn string(value: Value) -> std::result::Result<Value, ExpressionError> {
+    match value {
+        v @ Value::Bytes(_) => Ok(v),
+        v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct String;
 
@@ -43,6 +50,11 @@ impl Function for String {
 
         Ok(Box::new(StringFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        string(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,10 +64,7 @@ struct StringFn {
 
 impl Expression for StringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Bytes(_) => Ok(v),
-            v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
-        }
+        string(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

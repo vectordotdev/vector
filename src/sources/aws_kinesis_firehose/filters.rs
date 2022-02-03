@@ -153,6 +153,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     emit!(&AwsKinesisFirehoseRequestError {
         request_id,
         error: message.as_str(),
+        code,
     });
 
     let json = warp::reply::json(&FirehoseResponse {
