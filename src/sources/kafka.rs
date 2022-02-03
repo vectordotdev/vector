@@ -15,6 +15,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
@@ -190,7 +191,7 @@ async fn kafka_source(
             }
             Ok(msg) => {
                 emit!(&BytesReceived {
-                    byte_size: std::mem::size_of_val(&msg),
+                    byte_size: msg.payload_len(),
                     protocol: "tcp",
                 });
 
@@ -242,10 +243,10 @@ async fn kafka_source(
                 let mut stream = stream! {
                     loop {
                         match stream.next().await {
-                            Some(Ok((events, byte_size))) => {
+                            Some(Ok((events, _byte_size))) => {
                                 emit!(&KafkaEventsReceived {
                                     count: events.len(),
-                                    byte_size,
+                                    byte_size: events.size_of(),
                                 });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
