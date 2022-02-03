@@ -675,14 +675,15 @@ fn build_task_transform(
         .transform(Box::pin(filtered))
         .flat_map(|events| futures::stream::iter(events.into_events()))
         .map(Ok)
-        .forward(output.with(|event: Event| async {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size: event.size_of(),
-                output: None,
-            });
-            Ok(event)
-        }))
+        .forward(output)
+        // .forward(output.with(|event: Event| async {
+        //     emit!(&EventsSent {
+        //         count: 1,
+        //         byte_size: event.size_of(),
+        //         output: None,
+        //     });
+        //     Ok(event)
+        // }))
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");
