@@ -159,6 +159,8 @@ cargo test \
   --no-fail-fast \
   --no-default-features \
   --features e2e-tests \
+  "${CARGO_TEST_ARGS_CARGO[@]}" \
   -- \
   --nocapture \
-  --test-threads 1
+  --test-threads 1 \
+  "${CARGO_TEST_ARGS_PASSED[@]}"
