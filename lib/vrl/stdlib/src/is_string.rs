@@ -46,6 +46,10 @@ impl Function for IsString {
 
         Ok(Box::new(IsStringFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_bytes()))
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -149,8 +149,31 @@ fn resolve(
         Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
     };
 
+    execute(runtime, program, object, timezone)
+}
+
+#[cfg(not(feature = "vrl-vm"))]
+fn execute(
+    runtime: &mut Runtime,
+    program: vrl::Program,
+    object: &mut dyn Target,
+    timezone: &TimeZone,
+) -> Result<Value, String> {
     runtime
         .resolve(object, &program, timezone)
+        .map_err(|err| err.to_string())
+}
+
+#[cfg(feature = "vrl-vm")]
+fn execute(
+    runtime: &mut Runtime,
+    program: vrl::Program,
+    object: &mut dyn Target,
+    timezone: &TimeZone,
+) -> Result<Value, String> {
+    let vm = runtime.compile(stdlib::all(), &program)?;
+    runtime
+        .run_vm(&vm, object, timezone)
         .map_err(|err| err.to_string())
 }
 
