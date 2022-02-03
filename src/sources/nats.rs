@@ -4,6 +4,7 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -139,9 +140,12 @@ async fn nats_source(
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&NatsEventsReceived { byte_size, count });
+                    emit!(&NatsEventsReceived {
+                        byte_size: events.size_of(),
+                        count
+                    });
 
                     let now = Utc::now();
 
