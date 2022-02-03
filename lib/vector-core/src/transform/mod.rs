@@ -1,5 +1,6 @@
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, fmt, pin::Pin};
 
+use futures::sink::{Buffer, Sink};
 use futures::{stream, SinkExt, Stream, StreamExt};
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use vector_common::EventDataEq;
@@ -212,8 +213,8 @@ impl SyncTransform for Box<dyn FunctionTransform> {
 
 pub struct TransformOutputs {
     outputs_spec: Vec<Output>,
-    primary_output: Option<Fanout>,
-    named_outputs: HashMap<String, Fanout>,
+    primary_output: Option<Buffer<Fanout, Event>>,
+    named_outputs: HashMap<String, Buffer<Fanout, Event>>,
 }
 
 impl TransformOutputs {
@@ -225,6 +226,7 @@ impl TransformOutputs {
 
         for output in outputs_in {
             let (fanout, control) = Fanout::new();
+            let fanout = fanout.buffer(1024);
             match output.port {
                 None => {
                     primary_output = Some(fanout);
@@ -421,7 +423,11 @@ impl OutputBuffer {
         self.0.drain(..)
     }
 
-    async fn send(&mut self, output: &mut Fanout) {
+    async fn send<S>(&mut self, output: &mut S)
+    where
+        S: Sink<Event> + Unpin,
+        <S as futures_util::Sink<Event>>::Error: fmt::Debug,
+    {
         for event in self.0.drain(..) {
             output.feed(event).await.expect("unit error");
         }

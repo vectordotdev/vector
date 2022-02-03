@@ -32,7 +32,7 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
     sinks: Vec<(ComponentKey, Option<GenericEventSink>)>,
-    i: usize,
+    polling_idx: usize,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
 }
 
@@ -42,7 +42,7 @@ impl Fanout {
 
         let fanout = Self {
             sinks: vec![],
-            i: 0,
+            polling_idx: 0,
             control_channel: control_rx,
         };
 
@@ -73,8 +73,8 @@ impl Fanout {
             tokio::spawn(async move { removed.close().await });
         }
 
-        if self.i > i {
-            self.i -= 1;
+        if self.polling_idx > i {
+            self.polling_idx -= 1;
         }
     }
 
@@ -152,12 +152,12 @@ impl Sink<Event> for Fanout {
 
         this.process_control_messages(cx);
 
-        while let Some((_, sink)) = this.sinks.get_mut(this.i) {
+        while let Some((_, sink)) = this.sinks.get_mut(this.polling_idx) {
             match sink {
                 Some(sink) => match sink.as_mut().poll_ready(cx) {
                     Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Ok(())) => this.i += 1,
-                    Poll::Ready(Err(())) => this.handle_sink_error(this.i)?,
+                    Poll::Ready(Ok(())) => this.polling_idx += 1,
+                    Poll::Ready(Err(())) => this.handle_sink_error(this.polling_idx)?,
                 },
                 // process_control_messages ended because control channel returned
                 // Pending so it's fine to return Pending here since the control
@@ -166,7 +166,7 @@ impl Sink<Event> for Fanout {
             }
         }
 
-        this.i = 0;
+        this.polling_idx = 0;
 
         Poll::Ready(Ok(()))
     }

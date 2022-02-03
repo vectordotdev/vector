@@ -158,7 +158,7 @@ pub async fn build_pieces(
 
             let (fanout, control) = Fanout::new();
             let pump = async move {
-                rx.map(Ok).forward(fanout).await?;
+                rx.map(Ok).forward(fanout.buffer(1024)).await?;
                 Ok(TaskOutput::Source)
             };
 
@@ -659,6 +659,7 @@ fn build_task_transform(
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (output, control) = Fanout::new();
+    let output = output.buffer(1024);
 
     let input_rx = crate::utilization::wrap(input_rx);
 
