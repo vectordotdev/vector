@@ -13,6 +13,11 @@ use vrl::{
     Program, Runtime, Terminate,
 };
 
+#[cfg(feature = "vrl-vm")]
+use std::sync::Arc;
+#[cfg(feature = "vrl-vm")]
+use vrl::Vm;
+
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
@@ -83,6 +88,9 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
+
+    #[cfg(feature = "vrl-vm")]
+    vm: Arc<Vm>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -117,14 +125,21 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
+        let runtime = Runtime::default();
+
+        #[cfg(feature = "vrl-vm")]
+        let vm = Arc::new(runtime.compile(functions, &program)?);
+
         Ok(Remap {
             component_key: context.key.clone(),
             program,
-            runtime: Runtime::default(),
+            runtime,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm,
         })
     }
 
@@ -171,6 +186,18 @@ impl Remap {
             }
         }
     }
+
+    #[cfg(feature = "vrl-vm")]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        self.runtime.run_vm(&self.vm, target, &self.timezone)
+    }
+
+    #[cfg(not(feature = "vrl-vm"))]
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+        let result = self.runtime.resolve(target, &self.program, &self.timezone);
+        self.runtime.clear();
+        result
+    }
 }
 
 impl Clone for Remap {
@@ -183,6 +210,8 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
+            #[cfg(feature = "vrl-vm")]
+            vm: Arc::clone(&self.vm),
         }
     }
 }
@@ -210,11 +239,7 @@ impl SyncTransform for Remap {
         };
 
         let mut target: VrlTarget = event.into();
-
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
+        let result = self.run_vrl(&mut target);
 
         match result {
             Ok(_) => {

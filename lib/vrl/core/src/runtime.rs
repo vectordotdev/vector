@@ -1,7 +1,9 @@
-use std::{error::Error, fmt};
-
-use compiler::ExpressionError;
+use compiler::{
+    vm::{OpCode, Vm},
+    ExpressionError, Function,
+};
 use lookup::LookupBuf;
+use std::{error::Error, fmt};
 use vector_common::TimeZone;
 
 use crate::{state, Context, Program, Target, Value};
@@ -108,5 +110,31 @@ impl Runtime {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(values.pop().unwrap_or(Value::Null))
+    }
+
+    pub fn compile(&self, fns: Vec<Box<dyn Function>>, program: &Program) -> Result<Vm, String> {
+        let mut vm = Vm::new(fns);
+
+        for expr in program.iter() {
+            expr.compile_to_vm(&mut vm)?;
+        }
+
+        vm.write_opcode(OpCode::Return);
+
+        Ok(vm)
+    }
+
+    /// Given the provided [`Target`], runs the [`Vm`] to completion.
+    pub fn run_vm(
+        &mut self,
+        vm: &Vm,
+        target: &mut dyn Target,
+        timezone: &TimeZone,
+    ) -> Result<Value, Terminate> {
+        let mut context = Context::new(target, &mut self.state, timezone);
+        vm.interpret(&mut context).map_err(|err| match err {
+            ExpressionError::Abort { .. } => Terminate::Abort(err),
+            err @ ExpressionError::Error { .. } => Terminate::Error(err),
+        })
     }
 }

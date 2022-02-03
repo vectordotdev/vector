@@ -541,7 +541,7 @@ mod tests {
         assert_eq!(
             parse_grok_rules(
                 &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
-                btreemap! {}
+                btreemap! {},
             )
             .unwrap_err()
             .to_string(),
@@ -804,8 +804,22 @@ mod tests {
                 Ok(Value::from(btreemap! {})),
             ),
             (
+                r#"%{data::keyvalue(":")}"#,
+                r#"kafka_cluster_status:8ca7b736f0aa43e5"#,
+                Ok(Value::from(btreemap! {
+                    "kafka_cluster_status" => "8ca7b736f0aa43e5"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue}"#,
+                r#"field=2.0e"#,
+                Ok(Value::from(btreemap! {
+                "field" => "2.0e"
+                })),
+            ),
+            (
                 r#"%{data::keyvalue("=", "\\w.\\-_@:")}"#,
-                r#"IN=eth0 OUT= MAC"#,// no value
+                r#"IN=eth0 OUT= MAC"#, // no value
                 Ok(Value::from(btreemap! {
                     "IN" => "eth0"
                 })),

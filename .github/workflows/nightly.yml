@@ -306,19 +306,30 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+        container:
+          - "quay.io/centos/centos:stream8"
+          - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
+          - "amazonlinux:2"
+          - "fedora:34"
+          - "fedora:35"
+          - "fedora:36"
     container:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          yum update -y && \
+          yum update -y
           yum install -y \
           ca-certificates \
-          curl \
           git \
           systemd \
           tar \
           make
+          # conflicts with curl-minimal on some distros and --allowerased is not
+          # supported on some distros
+          if ! command -v curl &> /dev/null ; then
+            yum install -y curl
+          fi
       - name: checkout
         uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV

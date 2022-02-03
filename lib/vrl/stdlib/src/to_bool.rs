@@ -1,6 +1,21 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
+fn to_bool(value: Value) -> std::result::Result<Value, ExpressionError> {
+    use Value::*;
+
+    match value {
+        Boolean(_) => Ok(value),
+        Integer(v) => Ok(Boolean(v != 0)),
+        Float(v) => Ok(Boolean(v != 0.0)),
+        Null => Ok(Boolean(false)),
+        Bytes(v) => Conversion::Boolean
+            .convert(v)
+            .map_err(|e| e.to_string().into()),
+        v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToBool;
 
@@ -142,6 +157,12 @@ impl Function for ToBool {
 
         Ok(Box::new(ToBoolFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        to_bool(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -151,20 +172,9 @@ struct ToBoolFn {
 
 impl Expression for ToBoolFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
         let value = self.value.resolve(ctx)?;
 
-        match value {
-            Boolean(_) => Ok(value),
-            Integer(v) => Ok(Boolean(v != 0)),
-            Float(v) => Ok(Boolean(v != 0.0)),
-            Null => Ok(Boolean(false)),
-            Bytes(v) => Conversion::Boolean
-                .convert(v)
-                .map_err(|e| e.to_string().into()),
-            v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),
-        }
+        to_bool(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
