@@ -69,8 +69,8 @@ order = [
 
 [transforms.processing.logs.pipelines.nginx]
 name = "nginx"
-filter.type = "datadog_search"
-filter.source = "source:nginx"
+filter.type = "vrl"
+filter.source=".source == \"nginx\""
 
 [[transforms.processing.logs.pipelines.nginx.transforms]]
 type = "remap"
@@ -190,8 +190,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.redis]
 name = "redis"
-filter.type = "datadog_search"
-filter.source = "source:redis"
+filter.type = "vrl"
+filter.source=".source == \"redis\""
 
 [[transforms.processing.logs.pipelines.redis.transforms]]
 type = "remap"
@@ -262,8 +262,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.consul]
 name = "consul"
-filter.type = "datadog_search"
-filter.source = "source:consul"
+filter.type = "vrl"
+filter.source=".source == \"consul\""
 
 [[transforms.processing.logs.pipelines.consul.transforms]]
 type = "remap"
@@ -326,8 +326,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.python]
 name = "python"
-filter.type = "datadog_search"
-filter.source = "source:python"
+filter.type = "vrl"
+filter.source=".source == \"python\""
 
 [[transforms.processing.logs.pipelines.python.transforms]]
 type = "remap"
@@ -452,8 +452,8 @@ if exists(.custom.dd.service) {
 
 [transforms.processing.logs.pipelines.rabbitmq]
 name = "rabbitmq"
-filter.type = "datadog_search"
-filter.source = "source:rabbitmq"
+filter.type = "vrl"
+filter.source=".source == \"rabbitmq\""
 
 [[transforms.processing.logs.pipelines.rabbitmq.transforms]]
 type = "remap"
@@ -519,8 +519,8 @@ if exists(.custom.message) {
 
 [transforms.processing.logs.pipelines.zookeeper]
 name = "zookeeper"
-filter.type = "datadog_search"
-filter.source = "source:zookeeper"
+filter.type = "vrl"
+filter.source=".source == \"zookeeper\""
 
 [[transforms.processing.logs.pipelines.zookeeper.transforms]]
 type = "remap"
@@ -602,8 +602,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.elasticsearch]
 name = "elasticsearch"
-filter.type = "datadog_search"
-filter.source = "source:elasticsearch"
+filter.type = "vrl"
+filter.source=".source == \"elasticsearch\""
 
 [[transforms.processing.logs.pipelines.elasticsearch.transforms]]
 type = "remap"
@@ -675,8 +675,8 @@ if exists(.custom.nodeId) {
 
 [transforms.processing.logs.pipelines.kafka]
 name = "kafka"
-filter.type = "datadog_search"
-filter.source = "source:kafka"
+filter.type = "vrl"
+filter.source=".source == \"kafka\""
 
 [[transforms.processing.logs.pipelines.kafka.transforms]]
 type = "remap"
@@ -759,8 +759,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.couchdb]
 name = "couchdb"
-filter.type = "datadog_search"
-filter.source = "source:couchdb"
+filter.type = "vrl"
+filter.source=".source == \"couchdb\""
 
 [[transforms.processing.logs.pipelines.couchdb.transforms]]
 type = "remap"
@@ -831,8 +831,8 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 
 [transforms.processing.logs.pipelines.docker]
 name = "docker"
-filter.type = "datadog_search"
-filter.source = "source:docker"
+filter.type = "vrl"
+filter.source=".source == \"docker\""
 
 [[transforms.processing.logs.pipelines.docker.transforms]]
 type = "remap"
@@ -905,8 +905,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.datadog_agent]
 name = "datadog_agent"
-filter.type = "datadog_search"
-filter.source = "source:(agent OR datadog-agent OR datadog-agent-cluster-worker OR datadog-cluster-agent OR process-agent OR security-agent OR system-probe OR trace-agent)"
+filter.type = "vrl"
+filter.source=".source == \"agent\" || .source == \"datadog-agent\" || .source == \"datadog-agent-cluster-worker\" || .source == \"datadog-cluster-agent\" || .source == \"process-agent\" || .source == \"security-agent\" || .source == \"system-probe\" || .source == \"trace-agent\""
 
 [[transforms.processing.logs.pipelines.datadog_agent.transforms]]
 type = "remap"
@@ -961,8 +961,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.ruby]
 name = "ruby"
-filter.type = "datadog_search"
-filter.source = "source:ruby"
+filter.type = "vrl"
+filter.source=".source == \"ruby\""
 
 [[transforms.processing.logs.pipelines.ruby.transforms]]
 type = "remap"
@@ -1132,8 +1132,8 @@ if (result, err = .custom.duration*1000000; err == null) {
 
 [transforms.processing.logs.pipelines.vault]
 name = "vault"
-filter.type = "datadog_search"
-filter.source = "source:vault"
+filter.type = "vrl"
+filter.source=".source == \"vault\""
 
 [[transforms.processing.logs.pipelines.vault.transforms]]
 type = "remap"
@@ -1246,8 +1246,8 @@ if exists(.custom.request.operation) {
 
 [transforms.processing.logs.pipelines.nginx_ingress_controller]
 name = "nginx_ingress_controller"
-filter.type = "datadog_search"
-filter.source = "source:nginx-ingress-controller"
+filter.type = "vrl"
+filter.source=".source == \"nginx-ingress-controller\""
 
 [[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
 type = "remap"
@@ -1376,8 +1376,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.mysql]
 name = "mysql"
-filter.type = "datadog_search"
-filter.source = "source:mysql"
+filter.type = "vrl"
+filter.source=".source == \"mysql\""
 
 [[transforms.processing.logs.pipelines.mysql.transforms]]
 type = "remap"
@@ -1499,8 +1499,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler]
 name = "kubernetes_cluster_autoscaler"
-filter.type = "datadog_search"
-filter.source = "source:cluster-autoscaler"
+filter.type = "vrl"
+filter.source=".source == \"cluster-autoscaler\""
 
 [[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
 type = "remap"
@@ -1561,8 +1561,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.aws_alb_ingress_controller]
 name = "aws_alb_ingress_controller"
-filter.type = "datadog_search"
-filter.source = "source:aws-alb-ingress-controller"
+filter.type = "vrl"
+filter.source=".source == \"aws-alb-ingress-controller\""
 
 [[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
 type = "remap"
@@ -1623,8 +1623,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.proxysql]
 name = "proxysql"
-filter.type = "datadog_search"
-filter.source = "source:proxysql"
+filter.type = "vrl"
+filter.source=".source == \"proxysql\""
 
 [[transforms.processing.logs.pipelines.proxysql.transforms]]
 type = "remap"
@@ -1828,8 +1828,8 @@ if exists(.custom.message) {
 
 [transforms.processing.logs.pipelines.azure]
 name = "azure"
-filter.type = "datadog_search"
-filter.source = "source:(azure OR azure.alertsmanagement OR azure.analysisservices OR azure.apiconfiguration OR azure.apimanagement OR azure.authorization OR azure.automation OR azure.batchai OR azure.batchazure.cache OR azure.blockchain OR azure.cache OR azure.cdn OR azure.classiccompute OR azure.classicstorage OR azure.cognitiveservices OR azure.containerinstance OR azure.containerregistry OR azure.containerservice OR azure.datafactory OR azure.datalakestore OR azure.dbformariadb OR azure.dbformysql OR azure.dbforpostgresql OR azure.devices OR azure.documentdb OR azure.enterpriseknowledgegraph OR azure.eventgrid OR azure.eventhub OR azure.hdinsight OR azure.insights OR azure.iotcentral OR azure.keyvault OR azure.kusto OR azure.logic OR azure.machinelearningservices OR azure.managedidentity OR azure.operationalinsights OR azure.operationsmanagement OR azure.peering OR azure.relay OR azure.resourcegroup OR azure.resources OR azure.search OR azure.security OR azure.servicebus OR azure.servicefabric OR azure.streamanalytics OR azure.subscription OR azure.synapse)"
+filter.type = "vrl"
+filter.source=".source == \"azure\" || .source == \"azure.alertsmanagement\" || .source == \"azure.analysisservices\" || .source == \"azure.apiconfiguration\" || .source == \"azure.apimanagement\" || .source == \"azure.authorization\" || .source == \"azure.automation\" || .source == \"azure.batchai\" || .source == \"azure.batchazure.cache\" || .source == \"azure.blockchain\" || .source == \"azure.cache\" || .source == \"azure.cdn\" || .source == \"azure.classiccompute\" || .source == \"azure.classicstorage\" || .source == \"azure.cognitiveservices\" || .source == \"azure.containerinstance\" || .source == \"azure.containerregistry\" || .source == \"azure.containerservice\" || .source == \"azure.datafactory\" || .source == \"azure.datalakestore\" || .source == \"azure.dbformariadb\" || .source == \"azure.dbformysql\" || .source == \"azure.dbforpostgresql\" || .source == \"azure.devices\" || .source == \"azure.documentdb\" || .source == \"azure.enterpriseknowledgegraph\" || .source == \"azure.eventgrid\" || .source == \"azure.eventhub\" || .source == \"azure.hdinsight\" || .source == \"azure.insights\" || .source == \"azure.iotcentral\" || .source == \"azure.keyvault\" || .source == \"azure.kusto\" || .source == \"azure.logic\" || .source == \"azure.machinelearningservices\" || .source == \"azure.managedidentity\" || .source == \"azure.operationalinsights\" || .source == \"azure.operationsmanagement\" || .source == \"azure.peering\" || .source == \"azure.relay\" || .source == \"azure.resourcegroup\" || .source == \"azure.resources\" || .source == \"azure.search\" || .source == \"azure.security\" || .source == \"azure.servicebus\" || .source == \"azure.servicefabric\" || .source == \"azure.streamanalytics\" || .source == \"azure.subscription\" || .source == \"azure.synapse\""
 
 [[transforms.processing.logs.pipelines.azure.transforms]]
 type = "remap"
@@ -1918,8 +1918,8 @@ if exists(.custom.identity.authorization.evidence.principalId) {
 
 [transforms.processing.logs.pipelines.azure_web]
 name = "azure_web"
-filter.type = "datadog_search"
-filter.source = "source:azure.web"
+filter.type = "vrl"
+filter.source=".source == \"azure.web\""
 
 [[transforms.processing.logs.pipelines.azure_web.transforms]]
 type = "remap"
@@ -2008,8 +2008,8 @@ if exists(.custom.identity.authorization.evidence.principalId) {
 
 [transforms.processing.logs.pipelines.azure_storage]
 name = "azure_storage"
-filter.type = "datadog_search"
-filter.source = "source:azure.storage"
+filter.type = "vrl"
+filter.source=".source == \"azure.storage\""
 
 [[transforms.processing.logs.pipelines.azure_storage.transforms]]
 type = "remap"
@@ -2098,8 +2098,8 @@ if exists(.custom.identity.authorization.evidence.principalId) {
 
 [transforms.processing.logs.pipelines.azure_network]
 name = "azure_network"
-filter.type = "datadog_search"
-filter.source = "source:azure.network"
+filter.type = "vrl"
+filter.source=".source == \"azure.network\""
 
 [[transforms.processing.logs.pipelines.azure_network.transforms]]
 type = "remap"
@@ -2196,8 +2196,8 @@ if exists(.custom.identity.authorization.evidence.principalId) {
 
 [transforms.processing.logs.pipelines.azure_compute]
 name = "azure_compute"
-filter.type = "datadog_search"
-filter.source = "source:azure.compute"
+filter.type = "vrl"
+filter.source=".source == \"azure.compute\""
 
 [[transforms.processing.logs.pipelines.azure_compute.transforms]]
 type = "remap"
@@ -2294,8 +2294,8 @@ if exists(.custom.identity.authorization.evidence.principalId) {
 
 [transforms.processing.logs.pipelines.etcd]
 name = "etcd"
-filter.type = "datadog_search"
-filter.source = "source:etcd"
+filter.type = "vrl"
+filter.source=".source == \"etcd\""
 
 [[transforms.processing.logs.pipelines.etcd.transforms]]
 type = "remap"
@@ -2357,8 +2357,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.glog_pipeline]
 name = "glog_pipeline"
-filter.type = "datadog_search"
-filter.source = "source:(admission-webhook OR api-server OR cert-manager-acmesolver OR cert-manager-cainjector OR cert-manager-controller OR cert-manager-webhook OR cluster-proportional-autoscaler-amd64 OR hyperkube OR ip-masq-agent OR k8s-prometheus-adapter-amd64 OR kube-apiserver OR kube-controller-manager OR kube-proxy OR kube-state-metrics OR metacontroller OR metrics-server-amd64 OR prometheus-operator OR vpa-admission-controller OR vpa-recommender OR vpa-updater)"
+filter.type = "vrl"
+filter.source=".source == \"admission-webhook\" || .source == \"api-server\" || .source == \"cert-manager-acmesolver\" || .source == \"cert-manager-cainjector\" || .source == \"cert-manager-controller\" || .source == \"cert-manager-webhook\" || .source == \"cluster-proportional-autoscaler-amd64\" || .source == \"hyperkube\" || .source == \"ip-masq-agent\" || .source == \"k8s-prometheus-adapter-amd64\" || .source == \"kube-apiserver\" || .source == \"kube-controller-manager\" || .source == \"kube-proxy\" || .source == \"kube-state-metrics\" || .source == \"metacontroller\" || .source == \"metrics-server-amd64\" || .source == \"prometheus-operator\" || .source == \"vpa-admission-controller\" || .source == \"vpa-recommender\" || .source == \"vpa-updater\""
 
 [[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
 type = "remap"
@@ -2419,8 +2419,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.auth0]
 name = "auth0"
-filter.type = "datadog_search"
-filter.source = "source:auth0"
+filter.type = "vrl"
+filter.source=".source == \"auth0\""
 
 [[transforms.processing.logs.pipelines.auth0.transforms]]
 type = "remap"
@@ -2513,8 +2513,8 @@ if exists(.custom.message) {
 
 [transforms.processing.logs.pipelines.kube_scheduler__glog_]
 name = "kube_scheduler__glog_"
-filter.type = "datadog_search"
-filter.source = "source:(kube_scheduler OR kube-scheduler)"
+filter.type = "vrl"
+filter.source=".source == \"kube_scheduler\" || .source == \"kube-scheduler\""
 
 [[transforms.processing.logs.pipelines.kube_scheduler__glog_.transforms]]
 type = "remap"
@@ -2575,8 +2575,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.aws_ecs_agent]
 name = "aws_ecs_agent"
-filter.type = "datadog_search"
-filter.source = "source:amazon-ecs-agent"
+filter.type = "vrl"
+filter.source=".source == \"amazon-ecs-agent\""
 
 [[transforms.processing.logs.pipelines.aws_ecs_agent.transforms]]
 type = "remap"
@@ -2639,8 +2639,8 @@ if exists(.custom.msg) {
 
 [transforms.processing.logs.pipelines.nodejs]
 name = "nodejs"
-filter.type = "datadog_search"
-filter.source = "source:nodejs"
+filter.type = "vrl"
+filter.source=".source == \"nodejs\""
 
 [[transforms.processing.logs.pipelines.nodejs.transforms]]
 type = "remap"
@@ -2784,8 +2784,8 @@ if exists(.custom.dd.service) {
 
 [transforms.processing.logs.pipelines.postgresql]
 name = "postgresql"
-filter.type = "datadog_search"
-filter.source = "source:postgresql"
+filter.type = "vrl"
+filter.source=".source == \"postgresql\""
 
 [[transforms.processing.logs.pipelines.postgresql.transforms]]
 type = "remap"
@@ -2880,20 +2880,20 @@ if (result, err = .custom.duration * 1000000; err == null) {
 
 [transforms.processing.logs.pipelines.cassandra]
 name = "cassandra"
-filter.type = "datadog_search"
-filter.source = "source:cassandra"
+filter.type = "vrl"
+filter.source=".source == \"cassandra\""
 
 [[transforms.processing.logs.pipelines.cassandra.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .message,
-patterns: ["%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)","%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}","%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*","%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*","%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}","%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}","%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*","%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})","%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data}","%{_prefix} %{data:msg}"],
+patterns: ["%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)","%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}","%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*","%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*","%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) f|| .source == \"commitlog\" %{data:commitlog}","%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}","%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*","%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})","%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data}","%{_prefix} %{data:msg}"],
 aliases: {
 "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
 "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
 "cassandra_pool_cleaner2": "%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
 "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
-"cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
+"cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) f|| .source == \"commitlog\" %{data:commitlog}",
 "cassandra_compaction": "%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
 "cassandra_gc_format": "%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
 "cassandra_thread_pending": "%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})",
@@ -2966,8 +2966,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.apache_httpd]
 name = "apache_httpd"
-filter.type = "datadog_search"
-filter.source = "source:httpd"
+filter.type = "vrl"
+filter.source=".source == \"httpd\""
 
 [[transforms.processing.logs.pipelines.apache_httpd.transforms]]
 type = "remap"
@@ -3062,8 +3062,8 @@ if starts_with(status, "e", case_sensitive: false) {
 
 [transforms.processing.logs.pipelines.azure_recovery_services]
 name = "azure_recovery_services"
-filter.type = "datadog_search"
-filter.source = "source:azure.recoveryservices"
+filter.type = "vrl"
+filter.source=".source == \"azure.recoveryservices\""
 
 [[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
 type = "remap"
@@ -3160,8 +3160,8 @@ if exists(.custom.properties.Entity_Name) {
 
 [transforms.processing.logs.pipelines.c_]
 name = "c_"
-filter.type = "datadog_search"
-filter.source = "source:csharp"
+filter.type = "vrl"
+filter.source=".source == \"csharp\""
 
 [[transforms.processing.logs.pipelines.c_.transforms]]
 type = "remap"
@@ -3345,8 +3345,8 @@ if exists(.custom.dd.service) {
 
 [transforms.processing.logs.pipelines.web_browser_logs]
 name = "web_browser_logs"
-filter.type = "datadog_search"
-filter.source = "source:browser"
+filter.type = "vrl"
+filter.source=".source == \"browser\""
 
 [[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
 type = "remap"
