@@ -12,7 +12,7 @@ use crate::{
     buffer_usage_data::BufferUsageHandle,
     disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
     encoding::FixedEncodable,
-    Acker, Bufferable,
+    Acker, Bufferable, WhenFull,
 };
 
 mod acknowledgements;
@@ -256,7 +256,7 @@ where
     R: Bufferable,
 {
     let config = DiskBufferConfig::from_path(data_dir).build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
     Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
@@ -274,7 +274,7 @@ where
     // ensures it is a minimum size related to the data file size limit, etc.
     let mut config = DiskBufferConfig::from_path(data_dir).build();
     config.max_buffer_size = max_buffer_size;
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -292,7 +292,7 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_record_size(max_record_size)
         .build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -310,7 +310,7 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
         .build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await

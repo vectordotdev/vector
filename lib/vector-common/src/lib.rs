@@ -36,6 +36,3 @@ pub mod internal_event;
 
 #[cfg(feature = "tokenize")]
 pub mod tokenize;
-
-#[macro_use]
-extern crate tracing;

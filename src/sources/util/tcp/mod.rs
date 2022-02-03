@@ -1,11 +1,16 @@
+mod request_limiter;
+
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
+
 use std::net::{IpAddr, SocketAddr};
+
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -15,6 +20,7 @@ use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
 use super::{AfterReadExt as _, StreamDecodingError};
+use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
     config::{AcknowledgementsConfig, Resource, SourceContext},
@@ -27,6 +33,8 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     SourceSender,
 };
+
+const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
 async fn make_listener(
     addr: SocketListenAddr,
@@ -143,15 +151,18 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
+            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
+
             listener
                 .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
-                .for_each(move |(connection, permit)| {
+                .for_each(move |(connection, tcp_connection_permit)| {
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = cx.out.clone();
                     let connection_gauge = connection_gauge.clone();
+                    let request_limiter = request_limiter.clone();
 
                     async move {
                         let socket = match connection {
@@ -193,12 +204,13 @@ where
                                 peer_addr.ip(),
                                 out,
                                 acknowledgements.enabled(),
+                                request_limiter,
                             );
 
                             tokio::spawn(
                                 fut.map(move |()| {
                                     drop(open_token);
-                                    drop(permit);
+                                    drop(tcp_connection_permit);
                                 })
                                 .instrument(span.clone()),
                             );
@@ -221,6 +233,7 @@ async fn handle_stream<T>(
     peer_addr: IpAddr,
     mut out: SourceSender,
     acknowledgements: bool,
+    request_limiter: RequestLimiter,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -260,30 +273,45 @@ async fn handle_stream<T>(
     let host = Bytes::from(peer_addr.to_string());
 
     loop {
+        let mut permit = tokio::select! {
+            _ = &mut tripwire => break,
+            _ = &mut shutdown_signal => {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                    break;
+                }
+                None
+            },
+            permit = request_limiter.acquire() => {
+                Some(permit)
+            }
+            else => break,
+        };
+
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
-                debug!("Start graceful shutdown.");
-                // Close our write part of TCP socket to signal the other side
-                // that it should stop writing and close the channel.
-                let socket = reader.get_ref().get_ref().get_ref();
-                if let Some(stream) = socket.get_ref() {
-                    let socket = SockRef::from(stream);
-                    if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                        warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-                    }
-                } else {
-                    // Connection hasn't yet been established so we are done here.
-                    debug!("Closing connection that hasn't yet been fully established.");
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
             },
             res = reader.next() => {
                 match res {
                     Some(Ok((frames, byte_size))) => {
+                        let _num_frames = frames.len();
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
+
+
                         let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+
+                        if let Some(permit) = &mut permit {
+                            // Note that this is intentionally not the "number of events in a single request", but rather
+                            // the "number of events currently available". This may contain events from multiple events,
+                            // but it should always contain all events from each request.
+                            permit.decoding_finished(events.len());
+                        }
+
+
                         if let Some(batch) = batch {
                             for event in &mut events {
                                 event.add_batch_notifier(Arc::clone(&batch));
@@ -340,6 +368,25 @@ async fn handle_stream<T>(
             }
             else => break,
         }
+
+        drop(permit);
+    }
+}
+
+fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
+    debug!("Start graceful shutdown.");
+    // Close our write part of TCP socket to signal the other side
+    // that it should stop writing and close the channel.
+    if let Some(stream) = socket.get_ref() {
+        let socket = SockRef::from(stream);
+        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+        }
+        false
+    } else {
+        // Connection hasn't yet been established so we are done here.
+        debug!("Closing connection that hasn't yet been fully established.");
+        true
     }
 }
 

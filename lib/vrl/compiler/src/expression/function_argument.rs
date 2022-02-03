@@ -6,7 +6,7 @@ use crate::{
     Parameter, Span,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionArgument {
     ident: Option<Node<Ident>>,
     parameter: Option<Parameter>,

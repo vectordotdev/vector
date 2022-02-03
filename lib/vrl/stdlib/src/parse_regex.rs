@@ -1,7 +1,21 @@
 use regex::Regex;
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
 
 use crate::util;
+
+fn parse_regex(
+    value: Value,
+    numeric_groups: bool,
+    pattern: &Regex,
+) -> std::result::Result<Value, ExpressionError> {
+    let bytes = value.try_bytes()?;
+    let value = String::from_utf8_lossy(&bytes);
+    let parsed = pattern
+        .captures(&value)
+        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+        .ok_or("could not find any pattern matches")?;
+    Ok(parsed.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRegex;
@@ -73,6 +87,51 @@ impl Function for ParseRegex {
             },
         ]
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("pattern", Some(expr)) => {
+                let regex: regex::Regex = match expr {
+                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
+                        Ok((**regex).clone())
+                    }
+                    expr => Err(Error::UnexpectedExpression {
+                        keyword: "pattern",
+                        expected: "regex",
+                        expr: expr.clone(),
+                    }),
+                }?;
+
+                Ok(Some(Box::new(regex) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let pattern = args
+            .required_any("pattern")
+            .downcast_ref::<regex::Regex>()
+            .ok_or("no pattern")?;
+        let value = args.required("value");
+        let numeric_groups = args
+            .optional("numeric_groups")
+            .map(|value| value.try_boolean())
+            .transpose()?
+            .unwrap_or(false);
+
+        parse_regex(value, numeric_groups, pattern)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,17 +143,11 @@ pub(crate) struct ParseRegexFn {
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
-        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
+        let value = self.value.resolve(ctx)?;
+        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+        let pattern = &self.pattern;
 
-        let parsed = self
-            .pattern
-            .captures(&value)
-            .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
-            .ok_or("could not find any pattern matches")?;
-
-        Ok(parsed.into())
+        parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

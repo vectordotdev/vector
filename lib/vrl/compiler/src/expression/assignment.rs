@@ -9,6 +9,7 @@ use crate::{
         ast::{self, Ident},
         Node,
     },
+    vm::OpCode,
     Context, Expression, Span, State, TypeDef, Value,
 };
 
@@ -150,6 +151,10 @@ impl Expression for Assignment {
 
     fn type_def(&self, state: &State) -> TypeDef {
         self.variant.type_def(state)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.variant.compile_to_vm(vm)
     }
 }
 
@@ -397,6 +402,45 @@ where
             Single { expr, .. } => expr.type_def(state),
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        match self {
+            Variant::Single { target, expr } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+
+                vm.write_opcode(OpCode::SetPath);
+
+                // Add the target to the list of targets, write its index as a primitive for the
+                //  `SetPath` opcode to retrieve.
+                let target = vm.get_target(&target.into());
+                vm.write_primitive(target);
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::SetPathInfallible);
+
+                // Write the target for the `Ok` path.
+                let target = vm.get_target(&ok.into());
+                vm.write_primitive(target);
+
+                // Write the target for the `Error` path.
+                let target = vm.get_target(&err.into());
+                vm.write_primitive(target);
+
+                // Add the default value (the value to set to the `Ok` target should we have an error).
+                let default = vm.add_constant(default.clone());
+                vm.write_primitive(default);
+            }
+        }
+        Ok(())
     }
 }
 
