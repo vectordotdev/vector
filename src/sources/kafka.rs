@@ -241,9 +241,9 @@ async fn kafka_source(
                 let mut stream = FramedRead::new(payload, decoder.clone());
                 let (count, _) = stream.size_hint();
                 let mut stream = stream! {
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((events, _byte_size))) => {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((events, _byte_size)) => {
                                 emit!(&KafkaEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
@@ -262,14 +262,13 @@ async fn kafka_source(
                                     yield event;
                                 }
                             },
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 // Error is logged by `crate::codecs::Decoder`, no further handling
                                 // is needed here.
                                 if !error.can_continue() {
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
                 }
