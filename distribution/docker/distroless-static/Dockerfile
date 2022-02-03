@@ -9,6 +9,10 @@ FROM gcr.io/distroless/static
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
 COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
+
+RUN groupadd -r vector && useradd --no-log-init -r -g vector vector
+USER vector
+
 VOLUME /var/lib/vector/
 
 # Smoke test

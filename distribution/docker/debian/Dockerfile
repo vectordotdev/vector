@@ -10,6 +10,10 @@ RUN apt-get update && apt-get install -y ca-certificates tzdata systemd && rm -r
 COPY --from=builder /usr/bin/vector /usr/bin/vector
 COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
 COPY --from=builder /etc/vector /etc/vector
+
+RUN groupadd -r vector && useradd --no-log-init -r -g vector vector
+USER vector
+
 VOLUME /var/lib/vector/
 
 # Smoke test
