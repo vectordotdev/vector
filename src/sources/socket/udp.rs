@@ -7,6 +7,7 @@ use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -108,11 +109,11 @@ pub fn udp(
 
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok((mut events, byte_size)) => {
+                            Ok((mut events, _byte_size)) => {
                                 let count = events.len();
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Udp,
-                                    byte_size,
+                                    byte_size: events.size_of(),
                                     count,
                                 });
 

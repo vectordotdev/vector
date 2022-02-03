@@ -3,6 +3,7 @@ use chrono::Utc;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -112,10 +113,10 @@ impl TcpSource for RawTcpSource {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
         emit!(&SocketEventsReceived {
             mode: SocketMode::Tcp,
-            byte_size,
+            byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
             count: events.len()
         });
 

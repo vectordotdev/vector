@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -51,11 +52,11 @@ fn handle_events(
     events: &mut [Event],
     host_key: &str,
     received_from: Option<Bytes>,
-    byte_size: usize,
+    _byte_size: usize,
 ) {
     emit!(&SocketEventsReceived {
         mode: SocketMode::Unix,
-        byte_size,
+        byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
         count: events.len()
     });
 

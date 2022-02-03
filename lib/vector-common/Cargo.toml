@@ -50,4 +50,5 @@ nom = { version = "7", optional = true }
 serde_json = { version = "1.0.78", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.136", optional = true, features = ["derive"] }
 snafu = { version = "0.7", optional = true }
+smallvec = { version = "1", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
