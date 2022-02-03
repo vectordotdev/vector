@@ -23,6 +23,7 @@ pub enum BufferBuildError {
 
 #[derive(Deserialize, Serialize)]
 enum BufferTypeKind {
+    #[serde(rename = "memory")]
     Memory,
     #[serde(rename = "disk")]
     DiskV1,
@@ -206,6 +207,7 @@ pub const fn memory_buffer_default_max_events() -> usize {
 #[serde(rename_all = "snake_case")]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    #[serde(rename = "memory")]
     Memory {
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: usize,
@@ -441,7 +443,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           "#,
             BufferType::Memory {
                 max_events: 500,
@@ -451,7 +453,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           max_events: 100
           "#,
             BufferType::Memory {
@@ -462,7 +464,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           when_full: drop_newest
           "#,
             BufferType::Memory {
@@ -473,7 +475,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           when_full: overflow
           "#,
             BufferType::Memory {
