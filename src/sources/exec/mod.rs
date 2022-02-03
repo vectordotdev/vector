@@ -18,6 +18,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
@@ -381,11 +382,11 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, byte_size), stream)) = receiver.recv().await {
+    'send: while let Some(((events, _byte_size), stream)) = receiver.recv().await {
         emit!(&ExecEventsReceived {
             count: events.len(),
             command: config.command_line().as_str(),
-            byte_size,
+            byte_size: events.size_of(),
         });
 
         let total_count = events.len();
