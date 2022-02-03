@@ -28,6 +28,7 @@ use crate::{
 
 pub mod api;
 mod builder;
+mod cmd;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -45,6 +46,7 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};

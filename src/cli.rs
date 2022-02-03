@@ -181,6 +181,9 @@ pub enum SubCommand {
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
 
+    /// Output a provided Vector configuration as a single JSON object, useful for checking in to version control.
+    OutConfig(config::Opts),
+
     /// List available components, then exit.
     List(list::Opts),
 
