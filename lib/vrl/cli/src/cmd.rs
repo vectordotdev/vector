@@ -114,7 +114,9 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let state = state::Runtime::default();
+            let runtime = Runtime::new(state);
+            let result = execute(&mut object, &program, &tz, runtime, stdlib::all()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -145,16 +147,30 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
+#[cfg(not(feature = "vrl-vm"))]
 fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
+    mut runtime: Runtime,
+    _functions: Vec<Box<dyn vrl::Function>>,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
-
     runtime
         .resolve(object, program, timezone)
+        .map_err(Error::Runtime)
+}
+
+#[cfg(feature = "vrl-vm")]
+fn execute(
+    object: &mut impl Target,
+    program: &Program,
+    timezone: &TimeZone,
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
+) -> Result<Value, Error> {
+    let vm = runtime.compile(functions, program).unwrap();
+    runtime
+        .run_vm(&vm, object, timezone)
         .map_err(Error::Runtime)
 }
 

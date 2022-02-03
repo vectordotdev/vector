@@ -10,8 +10,9 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted,
-        AwsEcsMetricsResponseError, HttpBytesReceived, HttpEventsReceived, StreamClosedError,
+        AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -154,11 +155,10 @@ async fn aws_ecs_metrics(
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
-                                emit!(&HttpEventsReceived {
+                                emit!(&AwsEcsMetricsEventsReceived {
                                     byte_size,
-                                    protocol: "http",
+                                    count,
                                     http_path: uri.path(),
-                                    count
                                 });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
