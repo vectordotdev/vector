@@ -25,7 +25,7 @@ We cover them below to help you upgrade quickly:
 ### Component name field renamed to ID {#name-to-id}
 
 Historically we've referred to the component ID field as `name` in some places, `id` in others. We've decided to
-standardize on `ID` as we feel this is more closer to the intention of the field: an unchanging identifier for
+standardize on `ID` as we feel this is closer to the intention of the field: an unchanging identifier for
 components.
 
 For example, with the component config:
@@ -40,7 +40,7 @@ source = ""
 The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
 
 We have preserved compatibility with existing usages of `component_name` for the `internal_metrics` sources by keeping
-`component_name` and adding `component_id` as a new tag. Howover, wwe recommend switching usages over to `component_id`
+`component_name` and adding `component_id` as a new tag. However, we recommend switching usages over to `component_id`
 as we will be removing `component_name` in the future: if you were grouping by this tag in your metrics queries, or
 referring to it in a `remap` or `lua` transform, you should update it to refer to `component_id`.
 
