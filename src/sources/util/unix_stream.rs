@@ -17,8 +17,7 @@ use crate::{
     codecs,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError,
-        UnixSocketFileDeleteError,
+        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
