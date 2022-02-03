@@ -80,6 +80,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             error = ?self.error,
             error_type = "parse_failed",
             stage = "processing",
+            internal_log_rate_secs = 10,
         );
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
@@ -116,6 +117,7 @@ impl InternalEvent for PrometheusHttpResponseError {
             stage = "receiving",
             error = self.code.canonical_reason().unwrap_or("unknown status code"),
             error_type = "request_failed",
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -147,6 +149,7 @@ impl InternalEvent for PrometheusHttpError {
             error = ?self.error,
             error_type = "request_failed",
             stage = "receiving",
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -174,7 +177,8 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             message = "Could not decode request body.",
             error = ?self.error,
             error_type = "parse_failed",
-            stage = "processing"
+            stage = "processing",
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -200,6 +204,7 @@ impl InternalEvent for PrometheusNoNameError {
             error = "Decoded timeseries is missing the __name__ field.",
             error_type = "parse_failed",
             stage = "processing",
+            internal_log_rate_secs = 10,
         );
     }
 
