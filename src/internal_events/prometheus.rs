@@ -18,7 +18,7 @@ pub struct PrometheusEventsReceived {
 impl InternalEvent for PrometheusEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
             uri = %self.uri,
@@ -114,7 +114,7 @@ impl InternalEvent for PrometheusHttpResponseError {
             url = %self.url,
             code = %self.code,
             stage = "receiving",
-            error = "Invalid HTTP response",
+            error = self.code.canonical_reason().unwrap_or("unknown status code"),
             error_type = "request_failed",
         );
     }
@@ -125,7 +125,7 @@ impl InternalEvent for PrometheusHttpResponseError {
             "code" => self.code.to_string(),
             "url" => self.url.to_string(),
             "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
-            "error_type" => "http_error",
+            "error_type" => "request_failed",
             "stage" => "receiving",
         );
         // deprecated
@@ -155,7 +155,7 @@ impl InternalEvent for PrometheusHttpError {
             "component_errors_total", 1,
             "url" => self.url.to_string(),
             "error" => self.error.to_string(),
-            "error_type" => "http_error",
+            "error_type" => "request_failed",
             "stage" => "receiving",
         );
         // deprecated
