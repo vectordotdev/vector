@@ -25,7 +25,7 @@ We cover them below to help you upgrade quickly:
 ### Component name field renamed to ID {#name-to-id}
 
 Historically we've referred to the component ID field as `name` in some places, `id` in others. We've decided to
-standardize on `ID` as we feel this is more closer to the intention of the field: an unchanging identifier for
+standardize on `ID` as we feel this is closer to the intention of the field: an unchanging identifier for
 components.
 
 For example, with the component config:
