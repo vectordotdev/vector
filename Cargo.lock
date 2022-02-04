@@ -1454,7 +1454,7 @@ dependencies = [
  "prost-types 0.9.0",
  "tonic",
  "tonic-build",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
 ]
 
 [[package]]
@@ -1475,7 +1475,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-subscriber",
 ]
 
@@ -3936,7 +3936,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-subscriber",
 ]
 
@@ -7618,7 +7618,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.18",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
 ]
 
 [[package]]
@@ -7652,11 +7652,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
+checksum = "03cfcb51380632a72d3111cb8d3447a8d908e577d31beeac006f836383d29a23"
 dependencies = [
  "lazy_static",
+ "valuable",
 ]
 
 [[package]]
@@ -7665,7 +7666,7 @@ version = "0.2.0"
 source = "git+https://github.com/vectordotdev/tracing-fluent-assertions?branch=bump-tracing-subscriber#0b32307299b832bfbcaf6026e2f53436b8b9abee"
 dependencies = [
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-subscriber",
 ]
 
@@ -7699,7 +7700,7 @@ dependencies = [
  "dashmap 5.0.0",
  "mock_instant",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-subscriber",
 ]
 
@@ -7711,7 +7712,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
 ]
 
 [[package]]
@@ -7721,7 +7722,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
 ]
 
 [[package]]
@@ -7740,7 +7741,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8094,6 +8095,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8271,7 +8278,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -8459,7 +8466,7 @@ dependencies = [
  "toml",
  "tower",
  "tracing 0.1.29",
- "tracing-core 0.1.21",
+ "tracing-core 0.1.22",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
