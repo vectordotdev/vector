@@ -243,7 +243,7 @@ pub enum Expr {
 
 impl<'a> ArbitraryDepth<'a> for Expr {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
-        match u8::arbitrary(u)? % 4 {
+        match u8::arbitrary(u)? % 5 {
             0 if depth > 0 => Ok(Expr::Op(Node::new(
                 Span::default(),
                 Op::arbitrary_depth(u, depth - 1)?,
@@ -255,6 +255,10 @@ impl<'a> ArbitraryDepth<'a> for Expr {
             2 => Ok(Expr::Variable(Node::new(
                 Span::default(),
                 Ident::arbitrary(u)?,
+            ))),
+            3 if depth > 0 => Ok(Expr::IfStatement(Node::new(
+                Span::default(),
+                IfStatement::arbitrary_depth(u, depth - 1)?,
             ))),
             _ => Ok(Expr::Literal(Node::new(
                 Span::default(),
@@ -455,6 +459,22 @@ impl fmt::Debug for Container {
 #[derive(Clone, PartialEq)]
 pub struct Block(pub Vec<Node<Expr>>);
 
+impl<'a> ArbitraryDepth<'a> for Block {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let len = usize::arbitrary(u)? % 5;
+        let statements = (0..len)
+            .map(|_| {
+                Ok(Node::new(
+                    Span::default(),
+                    Expr::arbitrary_depth(u, depth - 1)?,
+                ))
+            })
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Block(statements))
+    }
+}
+
 impl Block {
     pub fn into_inner(self) -> Vec<Node<Expr>> {
         self.0
@@ -624,6 +644,20 @@ pub struct IfStatement {
     pub alternative: Option<Node<Block>>,
 }
 
+impl<'a> ArbitraryDepth<'a> for IfStatement {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let predicate = Predicate::arbitrary_depth(u, depth - 1)?;
+        let consequent = Block::arbitrary_depth(u, depth - 1)?;
+        let alternative = Block::arbitrary_depth(u, depth - 1)?;
+
+        Ok(IfStatement {
+            predicate: Node::new(Span::default(), predicate),
+            consequent: Node::new(Span::default(), consequent),
+            alternative: Some(Node::new(Span::default(), alternative)),
+        })
+    }
+}
+
 impl fmt::Debug for IfStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.alternative {
@@ -657,6 +691,15 @@ impl fmt::Display for IfStatement {
 pub enum Predicate {
     One(Box<Node<Expr>>),
     Many(Vec<Node<Expr>>),
+}
+
+impl<'a> ArbitraryDepth<'a> for Predicate {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        Ok(Predicate::One(Box::new(Node::new(
+            Span::default(),
+            Expr::arbitrary_depth(u, depth - 1)?,
+        ))))
+    }
 }
 
 impl fmt::Display for Predicate {
