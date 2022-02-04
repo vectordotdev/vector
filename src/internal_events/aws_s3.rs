@@ -167,7 +167,7 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => "Unable to delete some of the messages.",
-                "error_type" => "deletion_failed",
+                "error_type" => "acknowledgement_failed",
                 "stage" => "processing",
             );
             // deprecated
