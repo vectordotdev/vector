@@ -11,7 +11,7 @@ use serde::{
 use crate::{
     event::PathComponent,
     serde::skip_serializing_if_default,
-    sinks::util::encoding::{deserialize_path_components, EncodingConfiguration, TimestampFormat},
+    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.
