@@ -37,12 +37,6 @@ bitflags::bitflags! {
     }
 }
 
-// impl Value {
-//     pub fn kind(&self) -> Kind {
-//         self.into()
-//     }
-// }
-
 impl Kind {
     pub const fn new(kind: u16) -> Self {
         Kind::from_bits_truncate(kind)

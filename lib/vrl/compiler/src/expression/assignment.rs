@@ -1,9 +1,3 @@
-use std::{convert::TryFrom, fmt};
-
-use diagnostic::{DiagnosticError, Label, Note};
-use lookup::LookupBuf;
-
-use crate::value;
 use crate::{
     expression::{Expr, Literal, Resolved},
     parser::{
@@ -12,6 +6,9 @@ use crate::{
     },
     Context, Expression, Span, State, TypeDef, Value,
 };
+use diagnostic::{DiagnosticError, Label, Note};
+use lookup::LookupBuf;
+use std::{convert::TryFrom, fmt};
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {

@@ -110,14 +110,12 @@ impl Expression for ToFloatFn {
 
         match value {
             Float(_) => Ok(value),
-            Integer(v) => Ok(NotNan::new((v as f64)).unwrap().into()),
+            Integer(v) => Ok(NotNan::new(v as f64).unwrap().into()),
             Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
             Null => Ok(NotNan::new(0.0).unwrap().into()),
-            Timestamp(v) => Ok(
-                NotNan::new((v.timestamp_nanos() as f64 / 1_000_000_000_f64))
-                    .unwrap()
-                    .into(),
-            ),
+            Timestamp(v) => Ok(NotNan::new(v.timestamp_nanos() as f64 / 1_000_000_000_f64)
+                .unwrap()
+                .into()),
             Bytes(v) => Conversion::Float
                 .convert(v)
                 .map_err(|e| e.to_string().into()),

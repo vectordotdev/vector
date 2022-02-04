@@ -1,15 +1,9 @@
-use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterator};
-
+use super::{Error, Kind, Value};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
+use std::{borrow::Cow, collections::BTreeMap};
 use value::ValueRegex;
-
-use super::{Error, Kind, Value};
-use crate::{
-    expression::{container, Container, Expr, Literal},
-    Expression,
-};
 
 /// conversions that should be added to `Value` but rely on things outside of the `value` crate
 pub trait VrlValueConvert {

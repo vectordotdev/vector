@@ -1015,9 +1015,8 @@ impl PartialEq<Value> for Value {
             (Value::Array(a), Value::Array(b)) => a.eq(b),
             (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
             (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
+            (Value::Regex(a), Value::Regex(b)) => a.eq(b),
             (Value::Float(a), Value::Float(b)) => {
-                //TODO: why is this so odd, and doesn't match VRL Value
-
                 // This compares floats with the following rules:
                 // * NaNs compare as equal
                 // * Positive and negative infinity are not equal
@@ -1623,5 +1622,53 @@ mod test2 {
     #[test]
     fn test_display_null() {
         assert_eq!(Value::Null.to_string(), "null");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::value;
+    use lookup::{parser, LookupBuf};
+
+    #[test]
+    fn test_object() {
+        let path = parser::parse_lookup("foo.bar.baz").unwrap().into_buf();
+        let value = value!(12);
+
+        let object = value!({ "foo": { "bar": { "baz": 12 } } });
+
+        assert_eq!(value.at_path(&path), object);
+    }
+
+    #[test]
+    fn test_root() {
+        let path = LookupBuf::default();
+        let value = value!(12);
+
+        let object = value!(12);
+
+        assert_eq!(value.at_path(&path), object);
+    }
+
+    #[test]
+    fn test_array() {
+        let path = parser::parse_lookup("[2]").unwrap().into_buf();
+        let value = value!(12);
+
+        let object = value!([null, null, 12]);
+
+        assert_eq!(value.at_path(&path), object);
+    }
+
+    #[test]
+    fn test_complex() {
+        let path = parser::parse_lookup("[2].foo.(bar | baz )[1]")
+            .unwrap()
+            .into_buf();
+        let value = value!({ "bar": [12_i64] });
+
+        let object = value!([null, null, { "foo": { "baz": [null, { "bar": [12_i64] }] } } ]);
+
+        assert_eq!(value.at_path(&path), object);
     }
 }

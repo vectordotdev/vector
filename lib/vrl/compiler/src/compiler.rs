@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;

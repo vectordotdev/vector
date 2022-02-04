@@ -1,12 +1,11 @@
 use std::fmt;
 
-use crate::value::VrlValueConvert;
+use crate::value::{Kind, VrlValueConvert};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast::Node;
 
 use crate::{
     expression::{ExpressionError, Resolved},
-    value::Kind,
     Context, Expression, Span, State, TypeDef,
 };
 

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::collections::BTreeMap;
 
 use super::convert::VrlValueConvert;
 use super::Error;

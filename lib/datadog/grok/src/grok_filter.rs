@@ -79,10 +79,6 @@ impl TryFrom<&Function> for GrokFilter {
     }
 }
 
-fn f64_to_value(f: f64) -> Result<Value, GrokRuntimeError> {
-    Value::try_from(f).map_err(|_| GrokRuntimeError::NanFloat)
-}
-
 /// Applies a given Grok filter to the value and returns the result or error.
 /// For detailed description and examples of specific filters check out https://docs.datadoghq.com/logs/log_configuration/parsing/?tab=filters
 pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRuntimeError> {
@@ -112,23 +108,6 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
-            Value::Bytes(v) => Ok(f64_to_value(
-                String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?,
-            )?),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(
-                filter.to_string(),
-                value.to_string(),
-            )),
-        },
-        GrokFilter::Scale(scale_factor) => match value {
-            Value::Integer(v) => Ok(Value::Float(
-                NotNan::new((*v as f64) * scale_factor).expect("NaN"),
-            )),
-            Value::Float(v) => Ok(Value::Float(
-                NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
-            )),
             Value::Bytes(v) => {
                 let v = Ok(String::from_utf8_lossy(v)
                     .parse::<f64>()
