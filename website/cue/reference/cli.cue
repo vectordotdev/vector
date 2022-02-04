@@ -261,7 +261,7 @@ cli: {
 
 		"tap": {
 			description: """
-				Observe output log events from source or transform components. Logs are sampled
+				Observe output events from source or transform components. Events are sampled
 				at a specified interval.
 				"""
 
@@ -270,7 +270,7 @@ cli: {
 			options: {
 				"interval": {
 					_short:      "i"
-					description: "Interval to sample logs at, in milliseconds"
+					description: "Interval to sample events at, in milliseconds"
 					type:        "integer"
 					default:     500
 				}
@@ -281,13 +281,13 @@ cli: {
 				}
 				"limit": {
 					_short:      "l"
-					description: "Maximum number of log events to sample each interval"
+					description: "Maximum number of events to sample each interval"
 					type:        "integer"
 					default:     100
 				}
 				"format": {
 					_short:      "f"
-					description: "Encoding format for logs printed to screen"
+					description: "Encoding format for events printed to screen"
 					type:        "enum"
 					default:     "json"
 					enum: {
