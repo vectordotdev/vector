@@ -5096,9 +5096,9 @@ dependencies = [
 
 [[package]]
 name = "prettydiff"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5671a83709b2755fe5b776d4915701bf36ed2cd9575035502ec12818141d71"
+checksum = "f4c2e16521a3f483fe30b00e6a18d71035c2c8c019c267258bb5408c2f8aafa2"
 dependencies = [
  "ansi_term",
  "prettytable-rs",
