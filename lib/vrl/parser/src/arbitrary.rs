@@ -7,8 +7,8 @@
 use crate::{
     arbitrary_depth::ArbitraryDepth,
     ast::{
-        Assignment, AssignmentOp, AssignmentTarget, Block, Expr, Ident, IfStatement, Node, Op,
-        Opcode, Predicate, RootExpr,
+        Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, Group, Ident,
+        IfStatement, Node, Op, Opcode, Predicate, RootExpr,
     },
     Literal, Program,
 };
@@ -41,7 +41,7 @@ impl<'a> Arbitrary<'a> for Program {
 
 impl<'a> ArbitraryDepth<'a> for Expr {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
-        match u8::arbitrary(u)? % 5 {
+        match u8::arbitrary(u)? % 6 {
             0 if depth > 0 => Ok(Expr::Op(Node::new(
                 Span::default(),
                 Op::arbitrary_depth(u, depth - 1)?,
@@ -57,6 +57,10 @@ impl<'a> ArbitraryDepth<'a> for Expr {
             3 if depth > 0 => Ok(Expr::IfStatement(Node::new(
                 Span::default(),
                 IfStatement::arbitrary_depth(u, depth - 1)?,
+            ))),
+            4 => Ok(Expr::Container(Node::new(
+                Span::default(),
+                Container::arbitrary_depth(u, depth - 1)?,
             ))),
             _ => Ok(Expr::Literal(Node::new(
                 Span::default(),
@@ -152,7 +156,18 @@ impl<'a> ArbitraryDepth<'a> for Assignment {
             Span::new(7, 10),
             Expr::arbitrary_depth(u, depth - 1)?,
         ));
-        Ok(Assignment::Single { target, op, expr })
+
+        if u8::arbitrary(u)? % 2 == 0 {
+            Ok(Assignment::Single { target, op, expr })
+        } else {
+            let err = Node::new(Span::new(0, 5), AssignmentTarget::arbitrary(u)?);
+            Ok(Assignment::Infallible {
+                ok: target,
+                err,
+                op,
+                expr,
+            })
+        }
     }
 }
 
@@ -166,6 +181,30 @@ impl<'a> Arbitrary<'a> for AssignmentTarget {
 
         Ok(AssignmentTarget::External(Some(
             LookupBuf::from_str(path).unwrap(),
+        )))
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for Container {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        match u8::arbitrary(u)? % 2 {
+            0 => Ok(Container::Group(Box::new(Node::new(
+                Span::default(),
+                Group::arbitrary_depth(u, depth - 1)?,
+            )))),
+            _ => Ok(Container::Block(Node::new(
+                Span::default(),
+                Block::arbitrary_depth(u, depth - 1)?,
+            ))),
+        }
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for Group {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        Ok(Group(Node::new(
+            Span::default(),
+            Expr::arbitrary_depth(u, depth - 1)?,
         )))
     }
 }
