@@ -1850,9 +1850,12 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 name = "datadog-filter"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
  "datadog-search-syntax",
  "dyn-clone",
  "regex",
+ "serde_json",
+ "vector_core",
 ]
 
 [[package]]

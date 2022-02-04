@@ -23,7 +23,7 @@ split-debuginfo = "unpacked" # Faster debug builds on macOS
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
 [profile.release]
-debug = false # Do not include debug symbols in the executable.
+debug = false
 
 [profile.bench]
 debug = true
@@ -900,3 +900,9 @@ path = "benches/codecs/main.rs"
 harness = false
 test = false
 required-features = ["codecs-benches"]
+
+[[bench]]
+name = "dd_search"
+path = "benches/dd_search.rs"
+harness = false
+test = false

@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use dyn_clone::{clone_trait_object, DynClone};
 
 use super::{Matcher, Run};
 
@@ -9,7 +8,7 @@ use super::{Matcher, Run};
 /// function. Each method returns a heap-allocated `Matcher<V>` (typically a closure) containing
 /// logic to determine whether the value matches the filter. A filter is intended to be side-effect
 /// free and idempotent, and so only receives an immutable reference to self.
-pub trait Filter<V: Debug + Send + Sync + Clone + 'static>: DynClone {
+pub trait Filter<V: Debug + Send + Sync + Clone + 'static> {
     /// Determine whether a field value exists.
     fn exists(&self, field: Field) -> Box<dyn Matcher<V>>;
 
@@ -86,5 +85,3 @@ pub trait Filter<V: Debug + Send + Sync + Clone + 'static>: DynClone {
         }
     }
 }
-
-clone_trait_object!(<V>Filter<V>);
