@@ -11,7 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
-parser = { package = "vrl-parser", path = "../../parser" }
+parser = { package = "vrl-parser", path = "../../parser", features = ["fuzz"] }
 core =  { package = "vrl", path = "../../core" }
 
 [dependencies.vrl-compiler]

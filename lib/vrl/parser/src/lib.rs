@@ -5,6 +5,9 @@ lalrpop_mod!(
     parser
 );
 
+#[cfg(feature = "fuzz")]
+mod arbitrary;
+#[cfg(feature = "fuzz")]
 mod arbitrary_depth;
 pub mod ast;
 mod lex;
