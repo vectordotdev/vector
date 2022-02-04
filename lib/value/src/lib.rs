@@ -23,6 +23,10 @@
 #![allow(
     clippy::cargo_common_metadata,
     clippy::single_match_else,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::module_name_repetitions,
+    clippy::multiple_crate_versions,
     unreachable_code,
     unused_variables
 )]

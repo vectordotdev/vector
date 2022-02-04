@@ -10,7 +10,8 @@ pub struct ValueRegex(regex::Regex);
 
 impl ValueRegex {
     /// Returns the raw Regex type that is being wrapped
-    #[must_use] pub fn into_inner(self) -> regex::Regex {
+    #[must_use]
+    pub fn into_inner(self) -> regex::Regex {
         self.0
     }
 }
@@ -25,7 +26,7 @@ impl Eq for ValueRegex {}
 
 impl Hash for ValueRegex {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.as_str().hash(state)
+        self.0.as_str().hash(state);
     }
 }
 

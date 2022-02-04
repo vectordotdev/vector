@@ -136,9 +136,7 @@ impl Value {
     /// Returns a string representation of the type of data represented
     pub fn kind(&self) -> &str {
         match self {
-            Value::Bytes(_) => "string",
-            // Regex intentionally pretends to be "Bytes"
-            Value::Regex(_) => "string",
+            Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
@@ -151,66 +149,42 @@ impl Value {
 
     /// Checks if the Value is a `Value::Float`
     pub fn is_float(&self) -> bool {
-        match self {
-            Self::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Float(_))
     }
 
     /// Checks if the Value is a `Value::Bytes`
     pub fn is_bytes(&self) -> bool {
-        match self {
-            Self::Bytes(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Bytes(_))
     }
 
     /// Checks if the Value is a `Value::Timestamp`
     pub fn is_timestamp(&self) -> bool {
-        match self {
-            Self::Timestamp(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Timestamp(_))
     }
 
     /// Checks if the Value is a `Value::Regex`
     pub fn is_regex(&self) -> bool {
-        match self {
-            Self::Regex(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Regex(_))
     }
 
     /// Checks if the Value is a `Value::Map`
     pub fn is_map(&self) -> bool {
-        match self {
-            Self::Map(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Map(_))
     }
 
     /// Checks if the Value is a `Value::Boolean`
     pub fn is_boolean(&self) -> bool {
-        match self {
-            Self::Boolean(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Boolean(_))
     }
 
     /// Checks if the Value is a `Value::Null`
     pub fn is_null(&self) -> bool {
-        match self {
-            Self::Null => true,
-            _ => false,
-        }
+        matches!(self, Self::Null)
     }
 
     /// Checks if the Value is a `Value::Integer`
     pub fn is_integer(&self) -> bool {
-        match self {
-            Self::Integer(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Integer(_))
     }
 
     /// Checks if the Value is a `Value::Array`
@@ -246,7 +220,7 @@ impl Value {
                     self = Value::Map(map);
                 }
                 SegmentBuf::Coalesce(fields) => {
-                    let field = fields.last().unwrap();
+                    let field = fields.last().expect("at least 1 field");
                     let mut map = BTreeMap::default();
                     map.insert(field.as_str().to_owned(), self);
                     self = Value::Map(map);
@@ -309,9 +283,16 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(segment),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(segment),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 if working_lookup.is_empty() {
                     trace!("Cannot remove self. Caller must remove.");
                     Err(ValueError::RemovingSelf)
@@ -552,9 +533,16 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(_s),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(_s),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 trace!("Mismatched primitive field while trying to use segment.");
                 Ok(None)
             }
@@ -598,9 +586,16 @@ impl Value {
             // We've met an end and found our value.
             (None, item) => Ok(Some(item)),
             // This is just not allowed!
-            (_,
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => unimplemented!(),
+            (
+                _,
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => unimplemented!(),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -689,9 +684,16 @@ impl Value {
             // The top level insert will always be a map (or an array in tests).
             // Then for further descents into the lookup, in the `insert_map` function
             // if the type is one of the following, the field is modified to be a map.
-            (Some(segment),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(segment),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 trace!("Encountered descent into a primitive.");
                 Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
@@ -806,7 +808,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Value::Map(Default::default());
+                    let mut inner = Value::Map(BTreeMap::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -830,7 +832,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Value::Map(Default::default());
+                        let mut inner = Value::Map(BTreeMap::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {
@@ -882,7 +884,7 @@ impl Value {
                         Value::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Value::Map(Default::default())
+                        Value::Map(BTreeMap::default())
                     }
                 }
             })
@@ -937,10 +939,10 @@ impl Value {
                 *value = Value::Array(Vec::with_capacity(next_len.abs() as usize));
             }
             SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(Default::default());
+                *value = Value::Map(BTreeMap::default());
             }
             SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(Default::default());
+                *value = Value::Map(BTreeMap::default());
             }
             _ => (),
         }
