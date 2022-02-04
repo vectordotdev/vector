@@ -1,16 +1,25 @@
 //! A collection of support structures that are used in the process of encoding
 //! events into bytes.
 
+pub mod format;
+pub mod framing;
+
+pub use format::{
+    BoxedSerializer, JsonSerializer, JsonSerializerConfig, RawMessageSerializer,
+    RawMessageSerializerConfig, Serializer, SerializerConfig,
+};
+pub use framing::{
+    BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
+    Framer, FramingConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+};
+
 use crate::{
-    codecs::{NewlineDelimitedEncoder, RawMessageSerializer},
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
 };
 use bytes::BytesMut;
-use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use tokio_util::codec::LinesCodecError;
 
 /// An error that occurred while encoding structured events into byte frames.
 #[derive(Debug)]
@@ -37,91 +46,6 @@ impl From<std::io::Error> for Error {
         Self::FramingError(Box::new(error))
     }
 }
-
-/// An error that occurred while framing bytes.
-pub trait FramingError: std::error::Error + Send + Sync {}
-
-impl std::error::Error for BoxedFramingError {}
-
-impl FramingError for std::io::Error {}
-
-impl FramingError for LinesCodecError {}
-
-impl From<std::io::Error> for BoxedFramingError {
-    fn from(error: std::io::Error) -> Self {
-        Box::new(error)
-    }
-}
-
-/// A `Box` containing a `FramingError`.
-pub type BoxedFramingError = Box<dyn FramingError>;
-
-/// Wrap bytes into a frame.
-pub trait Framer:
-    tokio_util::codec::Encoder<(), Error = BoxedFramingError> + DynClone + Debug + Send + Sync
-{
-}
-
-/// Default implementation for `Framer`s that implement
-/// `tokio_util::codec::Encoder`.
-impl<Encoder> Framer for Encoder where
-    Encoder:
-        tokio_util::codec::Encoder<(), Error = BoxedFramingError> + Clone + Debug + Send + Sync
-{
-}
-
-dyn_clone::clone_trait_object!(Framer);
-
-/// A `Box` containing a `Framer`.
-pub type BoxedFramer = Box<dyn Framer>;
-
-/// Define options for a framer and build it from the config object.
-///
-/// Implementors must annotate the struct with `#[typetag::serde(name = "...")]`
-/// to define which value should be read from the `method` key to select their
-/// implementation.
-#[typetag::serde(tag = "method")]
-pub trait FramingConfig: Debug + DynClone + Send + Sync {
-    /// Builds a framer from this configuration.
-    ///
-    /// Fails if the configuration is invalid.
-    fn build(&self) -> crate::Result<BoxedFramer>;
-}
-
-dyn_clone::clone_trait_object!(FramingConfig);
-
-/// Serialize a structured event into a byte frame.
-pub trait Serializer:
-    tokio_util::codec::Encoder<Event, Error = crate::Error> + DynClone + Debug + Send + Sync
-{
-}
-
-/// Default implementation for `Serializer`s that implement
-/// `tokio_util::codec::Encoder`.
-impl<Encoder> Serializer for Encoder where
-    Encoder: tokio_util::codec::Encoder<Event, Error = crate::Error> + Clone + Debug + Send + Sync
-{
-}
-
-dyn_clone::clone_trait_object!(Serializer);
-
-/// A `Box` containing a `Serializer`.
-pub type BoxedSerializer = Box<dyn Serializer>;
-
-/// Define options for a serializer and build it from the config object.
-///
-/// Implementors must annotate the struct with `#[typetag::serde(name = "...")]`
-/// to define which value should be read from the `codec` key to select their
-/// implementation.
-#[typetag::serde(tag = "codec")]
-pub trait SerializerConfig: Debug + DynClone + Send + Sync {
-    /// Builds a serializer from this configuration.
-    ///
-    /// Fails if the configuration is invalid.
-    fn build(&self) -> crate::Result<BoxedSerializer>;
-}
-
-dyn_clone::clone_trait_object!(SerializerConfig);
 
 #[derive(Debug, Clone)]
 /// An encoder that can encode structured events into byte frames.
