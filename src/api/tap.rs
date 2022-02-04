@@ -13,6 +13,7 @@ use tokio::sync::{
     oneshot,
 };
 use uuid::Uuid;
+use vector_core::event::Metric;
 
 use super::{ShutdownRx, ShutdownTx};
 use crate::{
@@ -50,7 +51,7 @@ pub enum TapNotification {
 #[derive(Debug)]
 pub enum TapPayload {
     Log(OutputId, LogEvent),
-    Metric(OutputId, LogEvent),
+    Metric(OutputId, Metric),
     Notification(String, TapNotification),
 }
 
@@ -90,17 +91,12 @@ impl Sink<Event> for TapSink {
 
     /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
     fn start_send(self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        let send_result = match event {
-            Event::Log(log) => self
-                .tap_tx
-                .try_send(TapPayload::Log(self.output_id.clone(), log)),
-            Event::Metric(metric) => self.tap_tx.try_send(TapPayload::Metric(
-                self.output_id.clone(),
-                LogEvent::default(),
-            )),
+        let payload = match event {
+            Event::Log(log) => TapPayload::Log(self.output_id.clone(), log),
+            Event::Metric(metric) => TapPayload::Metric(self.output_id.clone(), metric),
         };
 
-        if let Err(TrySendError::Closed(payload)) = send_result {
+        if let Err(TrySendError::Closed(payload)) = self.tap_tx.try_send(payload) {
             debug!(
                 message = "Couldn't send event.",
                 payload = ?payload,

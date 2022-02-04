@@ -2692,6 +2692,76 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "Metric",
+          "description": "Metric event with fields for querying metric data",
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Id of the component associated with the metric event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timestamp",
+              "description": "Metric timestamp",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "string",
+              "description": "Metric event as an encoded string format",
+              "args": [
+                {
+                  "name": "encoding",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "EventEncodingType",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "INTERFACE",
           "name": "MetricType",
           "description": null,
@@ -2896,6 +2966,11 @@
             {
               "kind": "OBJECT",
               "name": "Log",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Metric",
               "ofType": null
             },
             {
