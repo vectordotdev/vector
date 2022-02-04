@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
@@ -155,7 +156,7 @@ impl Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 emit!(&StatsdEventsReceived {
-                    byte_size: bytes.len()
+                    byte_size: metric.size_of(),
                 });
                 Ok(smallvec![Event::Metric(metric)])
             }
