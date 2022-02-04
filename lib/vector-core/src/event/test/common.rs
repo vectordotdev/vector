@@ -3,7 +3,6 @@ use std::{
     iter,
 };
 
-
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
@@ -13,7 +12,6 @@ use crate::event::{
 };
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
-const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
 const MAX_STR_SIZE: usize = 16;
 const ALPHABET: [&str; 27] = [
