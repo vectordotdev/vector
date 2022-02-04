@@ -1017,7 +1017,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.datadog_agent]
 name = "datadog_agent"
 filter.type = "datadog_search"
-filter.source = "source:(agent OR datadog-agent OR datadog-agent-cluster-worker OR datadog-cluster-agent OR process-agent OR security-agent OR system-probe OR trace-agent)"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.datadog_agent.transforms]]
 type = "remap"
@@ -2093,7 +2093,7 @@ if exists(.custom.message) {
 [transforms.processing.logs.pipelines.azure]
 name = "azure"
 filter.type = "datadog_search"
-filter.source = "source:(azure OR azure.alertsmanagement OR azure.analysisservices OR azure.apiconfiguration OR azure.apimanagement OR azure.authorization OR azure.automation OR azure.batchai OR azure.batchazure.cache OR azure.blockchain OR azure.cache OR azure.cdn OR azure.classiccompute OR azure.classicstorage OR azure.cognitiveservices OR azure.containerinstance OR azure.containerregistry OR azure.containerservice OR azure.datafactory OR azure.datalakestore OR azure.dbformariadb OR azure.dbformysql OR azure.dbforpostgresql OR azure.devices OR azure.documentdb OR azure.enterpriseknowledgegraph OR azure.eventgrid OR azure.eventhub OR azure.hdinsight OR azure.insights OR azure.iotcentral OR azure.keyvault OR azure.kusto OR azure.logic OR azure.machinelearningservices OR azure.managedidentity OR azure.operationalinsights OR azure.operationsmanagement OR azure.peering OR azure.relay OR azure.resourcegroup OR azure.resources OR azure.search OR azure.security OR azure.servicebus OR azure.servicefabric OR azure.streamanalytics OR azure.subscription OR azure.synapse)"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure.transforms]]
 type = "remap"
@@ -2707,7 +2707,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.glog_pipeline]
 name = "glog_pipeline"
 filter.type = "datadog_search"
-filter.source = "source:(admission-webhook OR api-server OR cert-manager-acmesolver OR cert-manager-cainjector OR cert-manager-controller OR cert-manager-webhook OR cluster-proportional-autoscaler-amd64 OR hyperkube OR ip-masq-agent OR k8s-prometheus-adapter-amd64 OR kube-apiserver OR kube-controller-manager OR kube-proxy OR kube-state-metrics OR metacontroller OR metrics-server-amd64 OR prometheus-operator OR vpa-admission-controller OR vpa-recommender OR vpa-updater)"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
 type = "remap"
@@ -3039,7 +3039,7 @@ if exists(.custom.message) {
 [transforms.processing.logs.pipelines.kube_scheduler_glog]
 name = "kube_scheduler_glog"
 filter.type = "datadog_search"
-filter.source = "source:(kube_scheduler OR kube-scheduler)"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.kube_scheduler_glog.transforms]]
 type = "remap"
