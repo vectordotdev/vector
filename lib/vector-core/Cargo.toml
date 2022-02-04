@@ -56,7 +56,7 @@ twox-hash = { version = "1.6.2", default-features = false }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
-value = { package = "value", path = "../value"}
+value = { package = "value", path = "../value", features = ["lua"]}
 
 [build-dependencies]
 prost-build = "0.9"

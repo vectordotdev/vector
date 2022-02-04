@@ -1,6 +1,5 @@
 // Value::Array ----------------------------------------------------------------
 
-use crate::value::timestamp_to_string;
 use crate::Value;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -8,10 +7,6 @@ use ordered_float::NotNan;
 use regex::Regex;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-
-use toml::Value as TomlValue;
-
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 impl Value {
     /// Returns the value as Vec<Value> only if the type is Value::Array, otherwise returns None
@@ -62,11 +57,6 @@ impl Value {
         }
     }
 
-    /// Returns the value as Bytes only if the type is Value::Bytes, otherwise returns None
-    pub fn into_bytes(self) -> Bytes {
-        self.convert_to_bytes()
-    }
-
     /// Returns the value as BTreeMap<String, Value> only if the type is Value::Map, otherwise returns None
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {
@@ -109,23 +99,6 @@ impl Value {
     pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
         self.as_map()
             .expect("Tried to call `Value::unwrap_map` on a non-map value.")
-    }
-
-    /// Converts the Value into Bytes, using it's String representation
-    pub fn convert_to_bytes(&self) -> Bytes {
-        match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            Value::Regex(regex) => regex_to_bytes(regex),
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(format!("{}", num)),
-            Value::Float(num) => Bytes::from(format!("{}", num)),
-            Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
-            Value::Array(arr) => {
-                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
-            }
-            Value::Null => Bytes::from("<null>"),
-        }
     }
 
     /// Converts the Value into a byte representation regardless of its original type.
@@ -281,58 +254,6 @@ impl From<Cow<'_, str>> for Value {
     }
 }
 
-//TODO: use toml feature?
-impl TryFrom<TomlValue> for Value {
-    type Error = Error;
-
-    fn try_from(toml: TomlValue) -> Result<Self, Error> {
-        Ok(match toml {
-            TomlValue::String(s) => Self::from(s),
-            TomlValue::Integer(i) => Self::from(i),
-            TomlValue::Array(a) => Self::from(
-                a.into_iter()
-                    .map(Value::try_from)
-                    .collect::<Result<Vec<_>, Error>>()?,
-            ),
-            TomlValue::Table(t) => Self::from(
-                t.into_iter()
-                    .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
-                    .collect::<Result<BTreeMap<_, _>, Error>>()?,
-            ),
-            TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
-            TomlValue::Boolean(b) => Self::from(b),
-            TomlValue::Float(f) => Self::from(f),
-        })
-    }
-}
-
-impl From<serde_json::Value> for Value {
-    fn from(json_value: serde_json::Value) -> Self {
-        match json_value {
-            serde_json::Value::Bool(b) => Value::Boolean(b),
-            serde_json::Value::Number(n) => {
-                let float_or_byte = || {
-                    n.as_f64()
-                        // JSON doesn't support "NaN"
-                        .map(|f| Value::Float(NotNan::new(f).unwrap()))
-                        .unwrap_or_else(|| Value::Bytes(n.to_string().into()))
-                };
-                n.as_i64().map_or_else(float_or_byte, Value::Integer)
-            }
-            serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
-            serde_json::Value::Object(obj) => Value::Map(
-                obj.into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect(),
-            ),
-            serde_json::Value::Array(arr) => {
-                Value::Array(arr.into_iter().map(Value::from).collect())
-            }
-            serde_json::Value::Null => Value::Null,
-        }
-    }
-}
-
 // impl TryFrom<f64> for Value {
 //     type Error = ();
 //
@@ -340,25 +261,3 @@ impl From<serde_json::Value> for Value {
 //         Ok(Value::Float(NotNan::new(value).map_err(|_| ())?))
 //     }
 // }
-
-impl TryFrom<Value> for serde_json::Value {
-    type Error = Error;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
-            Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
-            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
-            Value::Regex(regex) => Ok(serde_json::Value::from(regex.to_string())),
-            Value::Map(v) => Ok(serde_json::to_value(v)?),
-            Value::Array(v) => Ok(serde_json::to_value(v)?),
-            Value::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
-        }
-    }
-}
-
-pub fn regex_to_bytes(regex: &Regex) -> Bytes {
-    Bytes::copy_from_slice(regex.to_string().as_bytes())
-}

@@ -16,18 +16,16 @@ snafu = { version = "0.6"}
 regex = "1"
 ordered-float = "2"
 
-# TODO: add "lua" feature flag
-mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = false }
+# Optional
+mlua = { version = "0.7.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+async-graphql = { version = "3.0.20", default-features = false, optional = true }
+toml = { version = "0.5.8", default-features = false, optional = true }
+serde = { version = "1.0.133", default-features = false, features = ["derive"], optional = true }
+serde_json = { version = "1.0.74", default-features = false, features = ["raw_value"], optional = true }
+quickcheck = {version = "1.0.3", optional = true }
 
-# TODO: add graphql feature flag (feature = "api")
-async-graphql = { version = "3.0.20", default-features = false, optional = false }
-
-# TODO: add a toml feature flag
-toml = { version = "0.5.8", default-features = false }
-
-# TODO: serde feature flag?
-serde = { version = "1.0.133", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.74", default-features = false, features = ["raw_value"] }
-
-#TODO: "arbitrary" feature flag
-quickcheck = "1.0.3"
+[features]
+lua = ["mlua"]
+api = ["async-graphql"]
+arbitrary = ["quickcheck"]
+json = ["serde", "serde_json"]

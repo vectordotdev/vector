@@ -1847,6 +1847,7 @@ dependencies = [
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
+ "value",
  "vector_common",
  "vrl-compiler",
 ]

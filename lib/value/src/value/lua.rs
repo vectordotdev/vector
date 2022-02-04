@@ -1,5 +1,9 @@
+use bytes::Bytes;
+use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use mlua::prelude::LuaValue;
+use mlua::prelude::*;
 use ordered_float::NotNan;
+use regex::Regex;
 
 use crate::value::Value;
 
@@ -51,9 +55,9 @@ impl<'a> FromLua<'a> for Value {
     }
 }
 
-use crate::value::convert::regex_to_bytes;
-use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
-use mlua::prelude::*;
+pub fn regex_to_bytes(regex: &Regex) -> Bytes {
+    Bytes::copy_from_slice(regex.to_string().as_bytes())
+}
 
 /// TODO: This was copy/pasted from Vector
 

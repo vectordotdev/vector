@@ -27,6 +27,7 @@ tracing = { version = "0.1.29", default-features = false }
 # Internal
 lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common" }
+value = { path = "../../value", features = ["json"] }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [build-dependencies]
