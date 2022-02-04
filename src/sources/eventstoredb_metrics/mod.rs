@@ -5,6 +5,7 @@ use http::Uri;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use self::types::Stats;
 use crate::{
@@ -12,7 +13,8 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{
-        EventStoreDbMetricsHttpError, EventStoreDbMetricsReceived, EventStoreDbStatsParsingError,
+        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
+        EventStoreDbStatsParsingError, StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -101,6 +103,10 @@ fn eventstoredb(
                                 continue;
                             }
                         };
+                        emit!(&BytesReceived {
+                            byte_size: bytes.len(),
+                            protocol: "http",
+                        });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
@@ -110,15 +116,14 @@ fn eventstoredb(
 
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
+                                let count = metrics.len();
+                                let byte_size = metrics.size_of();
 
-                                emit!(&EventStoreDbMetricsReceived {
-                                    events: metrics.len(),
-                                    byte_size: bytes.len(),
-                                });
+                                emit!(&EventStoreDbMetricsEventsReceived { count, byte_size });
 
                                 let mut metrics = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = cx.out.send_all(&mut metrics).await {
-                                    error!(message = "Error sending metric.", %error);
+                                    emit!(&StreamClosedError { count, error });
                                     break;
                                 }
                             }

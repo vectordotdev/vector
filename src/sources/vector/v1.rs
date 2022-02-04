@@ -128,13 +128,12 @@ impl TcpSource for VectorSource {
 mod test {
     use std::net::SocketAddr;
 
-    use futures::stream;
-    use shared::assert_event_data_eq;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
+    use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -189,7 +188,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 

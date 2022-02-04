@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
 
 use lazy_static::lazy_static;
 use uaparser::UserAgentParser as UAParser;
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
 use woothee::parser::Parser as WootheeParser;
 
 lazy_static! {
@@ -136,6 +136,90 @@ impl Function for ParseUserAgent {
             parser,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match name {
+            "mode" => {
+                let mode = expr
+                    .and_then(|expr| {
+                        expr.as_value().map(|value| {
+                            let s = value.try_bytes_utf8_lossy().expect("mode not bytes");
+                            Mode::from_str(&s).map_err(|_| Error::InvalidEnumVariant {
+                                keyword: "mode",
+                                value,
+                                variants: Mode::all_value(),
+                            })
+                        })
+                    })
+                    .transpose()?
+                    .unwrap_or_default();
+
+                let parser = match mode {
+                    Mode::Fast => {
+                        let parser = WootheeParser::new();
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                parser.parse_user_agent(s).partial_schema()
+                            }),
+                        }
+                    }
+                    Mode::Reliable => {
+                        let fast = WootheeParser::new();
+                        let slow = &UA_PARSER;
+
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                let ua = fast.parse_user_agent(s);
+                                let ua = if ua.browser.family.is_none() || ua.os.family.is_none() {
+                                    let better_ua = slow.parse_user_agent(s);
+                                    better_ua.or(ua)
+                                } else {
+                                    ua
+                                };
+                                ua.partial_schema()
+                            }),
+                        }
+                    }
+                    Mode::Enriched => {
+                        let fast = WootheeParser::new();
+                        let slow = &UA_PARSER;
+
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                slow.parse_user_agent(s)
+                                    .or(fast.parse_user_agent(s))
+                                    .full_schema()
+                            }),
+                        }
+                    }
+                };
+
+                Ok(Some(Box::new(parser) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let string = value.try_bytes_utf8_lossy()?;
+        let parser = args
+            .required_any("mode")
+            .downcast_ref::<ParserMode>()
+            .ok_or("no parser mode")?;
+
+        Ok((parser.fun)(&string))
+    }
+}
+
+struct ParserMode {
+    fun: Box<dyn Fn(&str) -> Value + Send + Sync>,
 }
 
 #[derive(Clone)]

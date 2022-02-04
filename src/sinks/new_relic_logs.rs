@@ -334,7 +334,7 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
 
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

@@ -130,6 +130,15 @@ impl Filter<LogEvent> for EventFilter {
                                 Comparison::Gte => lhs >= rhs,
                             }
                         }
+                        // Integer value - Float boundary
+                        (Some(Value::Integer(lhs)), ComparisonValue::Float(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => (*lhs as f64) < *rhs,
+                                Comparison::Lte => *lhs as f64 <= *rhs,
+                                Comparison::Gt => *lhs as f64 > *rhs,
+                                Comparison::Gte => *lhs as f64 >= *rhs,
+                            }
+                        }
                         // Floats.
                         (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => {
                             match comparator {
@@ -137,6 +146,15 @@ impl Filter<LogEvent> for EventFilter {
                                 Comparison::Lte => lhs <= rhs,
                                 Comparison::Gt => lhs > rhs,
                                 Comparison::Gte => lhs >= rhs,
+                            }
+                        }
+                        // Float value - Integer boundary
+                        (Some(Value::Float(lhs)), ComparisonValue::Integer(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => *lhs < *rhs as f64,
+                                Comparison::Lte => *lhs <= *rhs as f64,
+                                Comparison::Gt => *lhs > *rhs as f64,
+                                Comparison::Gte => *lhs >= *rhs as f64,
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.

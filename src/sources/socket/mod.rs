@@ -532,7 +532,7 @@ mod test {
         // Spawn future that keeps sending lines to the TCP source forever.
         tokio::spawn(async move {
             let input = stream::repeat(())
-                .map(move |_| Event::new_empty_log())
+                .map(move |_| Event::new_empty_log().into())
                 .boxed();
             sink.run(input).await.unwrap();
         });
