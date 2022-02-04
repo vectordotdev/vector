@@ -208,8 +208,9 @@ impl Iterator for EventArrayIntoIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Logs(i) | Self::Traces(i) => i.next().map(Into::into),
+            Self::Logs(i) => i.next().map(Into::into),
             Self::Metrics(i) => i.next().map(Into::into),
+            Self::Traces(i) => i.next().map(Event::Trace),
         }
     }
 }
