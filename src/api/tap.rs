@@ -90,18 +90,22 @@ impl Sink<Event> for TapSink {
 
     /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
     fn start_send(self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        if let Event::Log(log) = event {
-            let result = self
+        let send_result = match event {
+            Event::Log(log) => self
                 .tap_tx
-                .try_send(TapPayload::Log(self.output_id.clone(), log));
+                .try_send(TapPayload::Log(self.output_id.clone(), log)),
+            Event::Metric(metric) => self.tap_tx.try_send(TapPayload::Metric(
+                self.output_id.clone(),
+                LogEvent::default(),
+            )),
+        };
 
-            if let Err(TrySendError::Closed(payload)) = result {
-                debug!(
-                    message = "Couldn't send log event.",
-                    payload = ?payload,
-                    component_id = ?self.output_id,
-                );
-            }
+        if let Err(TrySendError::Closed(payload)) = send_result {
+            debug!(
+                message = "Couldn't send event.",
+                payload = ?payload,
+                component_id = ?self.output_id,
+            );
         }
 
         Ok(())
