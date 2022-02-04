@@ -3,13 +3,30 @@ use libfuzzer_sys::fuzz_target;
 use std::collections::BTreeMap;
 use vrl_compiler as vrl;
 
+fn dump(text: &str) {
+    use std::io::prelude::*;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("nork.txt")
+        .unwrap();
+
+    file.write_all(text.as_bytes()).unwrap();
+    file.write_all(b"\n\n").unwrap();
+}
+
 fuzz_target!(|data: Vec<parser::Program>| {
     for expr in data {
         // Compile the VRL.
-        let exprstr = format!("{:?}", expr);
+        let exprstr = format!("{}", expr);
+        let exprdebug = format!("{:?}", expr);
+        dump(&format!("Compiling {:?}", exprstr));
+
         match vrl::compile(expr, &vec![]) {
             Ok(program) => {
-                println!("expr {:?}", exprstr);
+                dump(&format!("Compiled {:?}", exprstr));
                 let timezone = Default::default();
                 let mut runtime = core::Runtime::default();
 
@@ -24,10 +41,20 @@ fuzz_target!(|data: Vec<parser::Program>| {
                 let result_resolve = runtime.resolve(&mut target_resolve, &program, &timezone);
 
                 if result_vm != result_resolve {
-                    println!(" OOOOOPS");
-                    println!("expr    : {:?}", exprstr);
+                    println!(" OOOOOPS result");
+                    println!("expr    : {}", exprstr);
+                    println!("debug   : {}", exprdebug);
                     println!("vm      : {:?}", result_vm);
                     println!("resolve : {:?}", result_resolve);
+                    println!("-------=======------");
+                }
+
+                if target_vm != target_resolve {
+                    println!(" OOOOOPS target");
+                    println!("expr    : {}", exprstr);
+                    println!("debug   : {}", exprdebug);
+                    println!("vm      : {:?}", target_vm);
+                    println!("resolve : {:?}", target_resolve);
                     println!("-------=======------");
                 }
 
