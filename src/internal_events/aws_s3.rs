@@ -166,7 +166,7 @@ pub mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error" => "Unable to delete some of the messages.",
+                "error" => "Unable to delete SQS message.",
                 "error_type" => "acknowledgement_failed",
                 "stage" => "processing",
             );
