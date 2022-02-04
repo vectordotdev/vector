@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{

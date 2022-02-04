@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
-use vector_core::ByteSizeOf;
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -22,7 +21,7 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
@@ -286,10 +285,6 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
         .and_then(|timestamp| timestamp.as_timestamp().cloned())
         .unwrap_or_else(Utc::now);
     log.insert(log_schema().timestamp_key(), timestamp);
-
-    emit!(&SyslogEventReceived {
-        byte_size: event.size_of()
-    });
 
     trace!(
         message = "Processing one event.",

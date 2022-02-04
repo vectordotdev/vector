@@ -5,6 +5,7 @@ use futures::{stream, StreamExt};
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs,

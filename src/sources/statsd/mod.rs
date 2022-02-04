@@ -15,7 +15,7 @@ use crate::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -151,12 +151,7 @@ impl Deserializer for StatsdDeserializer {
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
-            Ok(metric) => {
-                emit!(&StatsdEventReceived {
-                    byte_size: bytes.len()
-                });
-                Ok(smallvec![Event::Metric(metric)])
-            }
+            Ok(metric) => Ok(smallvec![Event::Metric(metric)]),
             Err(error) => {
                 emit!(&StatsdInvalidRecord {
                     error: &error,

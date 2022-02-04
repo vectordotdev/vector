@@ -11,13 +11,15 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::field;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
     codecs,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
+        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
+        UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
@@ -82,6 +84,12 @@ pub fn build_unix_stream_source(
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((mut events, byte_size)) => {
+                                emit!(&SocketEventsReceived {
+                                    mode: SocketMode::Unix,
+                                    byte_size: events.size_of(),
+                                    count: events.len(),
+                                });
+
                                 handle_events(&mut events, received_from.clone(), byte_size);
 
                                 let count = events.len();
