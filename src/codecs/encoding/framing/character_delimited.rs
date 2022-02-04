@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
-use super::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::BoxedFramingError;
 
 /// Config used to build a `CharacterDelimitedEncoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -10,20 +10,18 @@ pub struct CharacterDelimitedEncoderConfig {
     character_delimited: CharacterDelimitedEncoderOptions,
 }
 
+impl CharacterDelimitedEncoderConfig {
+    /// Build the `CharacterDelimitedEncoder` from this configuration.
+    pub const fn build(&self) -> CharacterDelimitedEncoder {
+        CharacterDelimitedEncoder::new(self.character_delimited.delimiter)
+    }
+}
+
 /// Options for building a `CharacterDelimitedEncoder`.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedEncoderOptions {
     /// The character that delimits byte sequences.
     delimiter: u8,
-}
-
-#[typetag::serde(name = "character_delimited")]
-impl FramingConfig for CharacterDelimitedEncoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(CharacterDelimitedEncoder::new(
-            self.character_delimited.delimiter,
-        )))
-    }
 }
 
 /// An encoder for handling bytes that are delimited by (a) chosen character(s).
