@@ -17,7 +17,7 @@ use crate::{
         LogToMetricTemplateParseError, TemplateRenderingFailed,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -382,7 +382,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(config, &event) {
                 Ok(metric) => {
@@ -728,7 +728,7 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(
@@ -783,7 +783,7 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(

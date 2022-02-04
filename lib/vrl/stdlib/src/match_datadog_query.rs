@@ -12,6 +12,8 @@ use vrl::prelude::*;
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
 
+struct DynMatcher(Box<dyn Matcher<Value>>);
+
 impl Function for MatchDatadogQuery {
     fn identifier(&self) -> &'static str {
         "match_datadog_query"
@@ -67,6 +69,55 @@ impl Function for MatchDatadogQuery {
         let filter = build_matcher(&node, &VrlFilter::default());
 
         Ok(Box::new(MatchDatadogQueryFn { value, filter }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("query", Some(expr)) => {
+                let query_value =
+                    expr.as_value()
+                        .ok_or_else(|| vrl::function::Error::UnexpectedExpression {
+                            keyword: "query",
+                            expected: "literal",
+                            expr: expr.clone(),
+                        })?;
+
+                let query = query_value
+                    .try_bytes_utf8_lossy()
+                    .expect("datadog search query should be a UTF8 string");
+
+                // Compile the Datadog search query to AST.
+                let node = parse(&query).map_err(|e| {
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+                })?;
+
+                // Build the matcher function that accepts a VRL event value. This will parse the `node`
+                // at boot-time and return a boxed func that contains just the logic required to match a
+                // VRL `Value` against the Datadog Search Syntax literal.
+                let filter = build_matcher(&node, &VrlFilter::default());
+
+                Ok(Some(
+                    Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>
+                ))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        let filter = arguments
+            .required_any("query")
+            .downcast_ref::<DynMatcher>()
+            .unwrap();
+
+        Ok(filter.0.run(&value).into())
     }
 
     fn parameters(&self) -> &'static [Parameter] {

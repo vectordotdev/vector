@@ -1,7 +1,5 @@
-use std::cmp;
-
-use serde::{Deserialize, Serialize};
-
+use crate::http::build_proxy_connector;
+use crate::tls::MaybeTlsSettings;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
@@ -9,6 +7,8 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
+use serde::{Deserialize, Serialize};
+use std::cmp;
 
 #[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
 #[derivative(Default)]
@@ -44,17 +44,7 @@ pub struct AwsSqsConfig {
 #[typetag::serde(name = "aws_sqs")]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        let mut config_builder = aws_sdk_sqs::config::Builder::new()
-            .credentials_provider(self.auth.credentials_provider().await);
-
-        if let Some(endpoint_override) = self.region.endpoint()? {
-            config_builder = config_builder.endpoint_resolver(endpoint_override);
-        }
-        if let Some(region) = self.region.region() {
-            config_builder = config_builder.region(region);
-        }
-
-        let client = aws_sdk_sqs::Client::from_conf(config_builder.build());
+        let client = self.build_client(&cx).await?;
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
         let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
@@ -77,6 +67,31 @@ impl SourceConfig for AwsSqsConfig {
 
     fn source_type(&self) -> &'static str {
         "aws_sqs"
+    }
+}
+
+impl AwsSqsConfig {
+    async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
+        let mut config_builder = aws_sdk_sqs::config::Builder::new()
+            .credentials_provider(self.auth.credentials_provider().await);
+
+        if let Some(endpoint_override) = self.region.endpoint()? {
+            config_builder = config_builder.endpoint_resolver(endpoint_override);
+        }
+        if let Some(region) = self.region.region() {
+            config_builder = config_builder.region(region);
+        }
+
+        if cx.proxy.enabled {
+            let tls_settings = MaybeTlsSettings::enable_client()?;
+            let proxy = build_proxy_connector(tls_settings, &cx.proxy)?;
+            let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+            let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
+            let client = aws_sdk_sqs::Client::from_conf_conn(config_builder.build(), connector);
+            Ok(client)
+        } else {
+            Ok(aws_sdk_sqs::Client::from_conf(config_builder.build()))
+        }
     }
 }
 

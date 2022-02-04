@@ -150,7 +150,7 @@ where
 
             self.flush();
 
-            return Some(T::decode(buffer).unwrap());
+            return Some(T::decode(T::get_metadata(), buffer).unwrap());
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);

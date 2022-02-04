@@ -9,12 +9,12 @@ license = "MPL-2.0"
 
 [dependencies]
 futures = "0.3"
-k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_16"] }
+k8s-openapi = { version = "0.14.0", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
 reqwest = { version = "0.11.9", features = ["json"] }
 serde_json = "1"
-tokio = { version = "1.15.0", features = ["full"] }
+tokio = { version = "1.16.1", features = ["full"] }
 indoc = "1.0.3"
 env_logger = "0.9"
 tracing = { version = "0.1", features = ["log"] }

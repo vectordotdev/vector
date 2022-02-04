@@ -7,7 +7,7 @@ use crate::{
     },
     event::Event,
     internal_events::FilterEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -76,7 +76,7 @@ impl Filter {
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
         } else {

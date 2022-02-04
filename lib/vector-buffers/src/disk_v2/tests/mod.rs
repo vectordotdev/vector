@@ -11,8 +11,8 @@ use super::Ledger;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
-    encoding::{DecodeBytes, EncodeBytes},
-    Acker, Bufferable,
+    encoding::FixedEncodable,
+    Acker, Bufferable, WhenFull,
 };
 
 mod acknowledgements;
@@ -182,10 +182,11 @@ impl ByteSizeOf for SizedRecord {
     }
 }
 
-impl EncodeBytes for SizedRecord {
-    type Error = io::Error;
+impl FixedEncodable for SizedRecord {
+    type EncodeError = io::Error;
+    type DecodeError = io::Error;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
     {
@@ -200,12 +201,8 @@ impl EncodeBytes for SizedRecord {
         buffer.put_bytes(0x42, self.0 as usize);
         Ok(())
     }
-}
 
-impl DecodeBytes for SizedRecord {
-    type Error = io::Error;
-
-    fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<SizedRecord, Self::DecodeError>
     where
         B: Buf,
     {
@@ -224,10 +221,11 @@ impl ByteSizeOf for UndecodableRecord {
     }
 }
 
-impl EncodeBytes for UndecodableRecord {
-    type Error = io::Error;
+impl FixedEncodable for UndecodableRecord {
+    type EncodeError = io::Error;
+    type DecodeError = io::Error;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
     {
@@ -241,12 +239,8 @@ impl EncodeBytes for UndecodableRecord {
         buffer.put_u32(42);
         Ok(())
     }
-}
 
-impl DecodeBytes for UndecodableRecord {
-    type Error = io::Error;
-
-    fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::Error>
+    fn decode<B>(_buffer: B) -> Result<UndecodableRecord, Self::DecodeError>
     where
         B: Buf,
     {
@@ -262,7 +256,7 @@ where
     R: Bufferable,
 {
     let config = DiskBufferConfig::from_path(data_dir).build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
     Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
@@ -280,7 +274,7 @@ where
     // ensures it is a minimum size related to the data file size limit, etc.
     let mut config = DiskBufferConfig::from_path(data_dir).build();
     config.max_buffer_size = max_buffer_size;
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -298,7 +292,7 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_record_size(max_record_size)
         .build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -316,7 +310,7 @@ where
     let config = DiskBufferConfig::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
         .build();
-    let usage_handle = BufferUsageHandle::noop();
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
         .await

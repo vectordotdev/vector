@@ -364,7 +364,7 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
-    use shared::btreemap;
+    use vector_common::btreemap;
     use vrl_core::{self, Target};
 
     use super::{
@@ -375,7 +375,7 @@ mod test {
     #[test]
     fn log_get() {
         use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
@@ -427,7 +427,7 @@ mod test {
     #[test]
     fn log_insert() {
         use lookup::SegmentBuf;
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (
@@ -537,7 +537,7 @@ mod test {
     #[test]
     fn log_remove() {
         use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (
@@ -631,7 +631,7 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (

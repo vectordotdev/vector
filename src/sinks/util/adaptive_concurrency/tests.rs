@@ -442,6 +442,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = controller
         .capture_metrics()
+        .into_iter()
         .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them

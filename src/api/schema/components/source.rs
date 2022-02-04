@@ -8,7 +8,7 @@ use super::{sink, state, transform, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoSourceMetrics},
+        metrics::{self, outputs_by_component_key, IntoSourceMetrics, Output},
         sort,
     },
     config::{ComponentKey, DataType, OutputId},
@@ -27,6 +27,7 @@ pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
     pub output_type: DataType,
+    pub outputs: Vec<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -63,6 +64,9 @@ impl From<&SourceOutputType> for DataType {
             SourceOutputType::Trace => DataType::Trace,
         }
     }
+    pub fn get_outputs(&self) -> &[String] {
+        self.0.outputs.as_ref()
+    }
 }
 
 impl sort::SortableByField<SourcesSortFieldName> for Source {
@@ -96,6 +100,11 @@ impl Source {
     /// Source output type
     pub async fn output_types(&self) -> Vec<SourceOutputType> {
         self.get_output_types()
+    }
+
+    /// Source output streams
+    pub async fn outputs(&self) -> Vec<Output> {
+        outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Transform outputs
@@ -168,16 +177,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log | DataType::Metric,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ]
     }
@@ -245,16 +257,19 @@ mod tests {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
                 output_type: DataType::Log | DataType::Metric,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 
@@ -276,16 +291,19 @@ mod tests {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "file".to_string(),
                 output_type: DataType::Log | DataType::Metric,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 
@@ -307,21 +325,25 @@ mod tests {
                 component_key: ComponentKey::from("gen4"),
                 component_type: "demo_trace".to_string(),
                 output_type: DataType::Trace,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "mutliple_type".to_string(),
                 output_type: DataType::Log | DataType::Metric | DataType::Trace,
+                outputs: vec![],
             }),
         ];
 
@@ -343,21 +365,25 @@ mod tests {
                 component_key: ComponentKey::from("gen4"),
                 component_type: "demo_trace".to_string(),
                 output_type: DataType::Trace,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "mutliple_type".to_string(),
                 output_type: DataType::Log | DataType::Metric | DataType::Trace,
+                outputs: vec![],
             }),
         ];
 

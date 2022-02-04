@@ -38,7 +38,7 @@ use vector::{
     source_sender::{ReceiverStream, SourceSender},
     sources::Source,
     test_util::{temp_dir, temp_file},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 use vector_buffers::Acker;
 
@@ -227,7 +227,7 @@ pub struct MockTransform {
 }
 
 impl FunctionTransform for MockTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log

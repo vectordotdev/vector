@@ -100,7 +100,7 @@ mod test {
     use indoc::indoc;
     use ordered_float::NotNan;
     use regex::Regex;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::Value;
 

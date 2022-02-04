@@ -1,5 +1,20 @@
 use vrl::prelude::*;
 
+fn to_string(value: Value) -> std::result::Result<Value, ExpressionError> {
+    use chrono::SecondsFormat;
+    use Value::*;
+    let value = match value {
+        v @ Bytes(_) => v,
+        Integer(v) => v.to_string().into(),
+        Float(v) => v.to_string().into(),
+        Boolean(v) => v.to_string().into(),
+        Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
+        Null => "".into(),
+        v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
+    };
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToString;
 
@@ -87,6 +102,12 @@ impl Function for ToString {
 
         Ok(Box::new(ToStringFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        to_string(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,20 +117,9 @@ struct ToStringFn {
 
 impl Expression for ToStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use chrono::SecondsFormat;
-        use Value::*;
+        let value = self.value.resolve(ctx)?;
 
-        let value = match self.value.resolve(ctx)? {
-            v @ Bytes(_) => v,
-            Integer(v) => v.to_string().into(),
-            Float(v) => v.to_string().into(),
-            Boolean(v) => v.to_string().into(),
-            Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
-            Null => "".into(),
-            v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
-        };
-
-        Ok(value)
+        to_string(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

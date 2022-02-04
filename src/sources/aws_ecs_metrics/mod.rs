@@ -5,13 +5,15 @@ use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
+        AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -131,6 +133,7 @@ async fn aws_ecs_metrics(
         let request = Request::get(&url)
             .body(Body::empty())
             .expect("error creating request");
+        let uri = request.uri().clone();
 
         let start = Instant::now();
         match client.request(request).await {
@@ -142,43 +145,55 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        let byte_size = body.len();
+                        emit!(&HttpBytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http",
+                            http_path: uri.path(),
+                        });
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
-                                emit!(&AwsEcsMetricsReceived {
-                                    byte_size,
-                                    count: metrics.len(),
+                                let count = metrics.len();
+                                emit!(&AwsEcsMetricsEventsReceived {
+                                    byte_size: metrics.size_of(),
+                                    count,
+                                    http_path: uri.path(),
                                 });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);
                                 if let Err(error) = out.send_all(&mut events).await {
-                                    error!(message = "Error sending metric.", %error);
+                                    emit!(&StreamClosedError { error, count });
                                     return Err(());
                                 }
                             }
                             Err(error) => {
                                 emit!(&AwsEcsMetricsParseError {
                                     error,
-                                    url: &url,
+                                    endpoint: &url,
                                     body: String::from_utf8_lossy(&body),
                                 });
                             }
                         }
                     }
                     Err(error) => {
-                        emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                        emit!(&AwsEcsMetricsHttpError {
+                            error,
+                            endpoint: &url
+                        });
                     }
                 }
             }
             Ok(response) => {
-                emit!(&AwsEcsMetricsErrorResponse {
+                emit!(&AwsEcsMetricsResponseError {
                     code: response.status(),
-                    url: &url,
+                    endpoint: &url,
                 });
             }
             Err(error) => {
-                emit!(&AwsEcsMetricsHttpError { error, url: &url });
+                emit!(&AwsEcsMetricsHttpError {
+                    error,
+                    endpoint: &url
+                });
             }
         }
     }

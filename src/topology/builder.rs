@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -658,7 +658,7 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (output, control) = Fanout::new();
+    let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
@@ -674,15 +674,15 @@ fn build_task_transform(
     let transform = t
         .transform(Box::pin(filtered))
         .flat_map(|events| futures::stream::iter(events.into_events()))
-        .map(Ok)
-        .forward(output.with(|event: Event| async {
+        .inspect(|event: &Event| {
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
                 output: None,
             });
-            Ok(event)
-        }))
+        })
+        .map(Ok)
+        .forward(fanout)
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");

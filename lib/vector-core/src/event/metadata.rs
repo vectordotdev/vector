@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use crate::ByteSizeOf;

@@ -8,12 +8,12 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use shared::btreemap;
 use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
+use vector_common::btreemap;
 
 use super::{filter_result_sync, FilterList, HostMetrics};
 use crate::event::metric::Metric;
