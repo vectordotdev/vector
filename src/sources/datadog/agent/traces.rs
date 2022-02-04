@@ -75,7 +75,7 @@ fn build_trace_filter(
                         })
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::LOGS))
+                    handle_request(events, acknowledgements, out.clone(), Some(agent::TRACES))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
