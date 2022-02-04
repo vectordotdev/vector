@@ -11,6 +11,7 @@
 {{ $padding := .padding | default "py-3 md:py-4 md:px-5" }}
 {{ $additional_classes := .additional_classes | default "" }}
 
+{{/*  toggleModal defined in partial "modal.html"  */}}
 <a href="{{ $link }}">
     <button
         onclick="toggleModal({{.form_id}})"

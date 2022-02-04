@@ -16,7 +16,7 @@
 <script>
     const formID = {{ $form.form_id }};
 
-    {{/*  this function ends with 2 to discern it from the baseof loadMarketoForm() that is built into every page  */}}
+    /*  this function ends with 2 to discern it from the baseof loadMarketoForm() that is built into every page  */
     const loadMarketoForm2 = () => {
         MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', formID, (form) => {
             const formOnPage = document.getElementById(`mktoForm_${formID}`);
@@ -27,7 +27,7 @@
             function displayThankYouMessage() {
                 const thankyouMessage = document.getElementById(`thankyou--${formID}`);
 
-                { {/*  Hide form, unhide thankyou message  */ } }
+                /*  Hide form, unhide thankyou message  */
                 formOnPage.classList.add('hidden');
                 thankyouMessage.classList.remove('hidden');
             }
@@ -35,7 +35,7 @@
             form.onSuccess((values, followUpUrl) => {
                 displayThankYouMessage();
 
-                { {/*  No redirect  */ } }
+                /*  No redirect  */
                 return false;
             })
         });

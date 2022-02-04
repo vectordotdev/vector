@@ -1,4 +1,4 @@
-{{/*  modal takes in one arg, "form", that is a SLICE of DICT: [ { form_id, form_title, and form_thankyou }, ... ]  */}}
+{{/* modal takes in one arg, "form", that is a SLICE of DICT: [ { form_id, form_title, and form_thankyou }, ... ] */}}
 
 {{ $form_id_array := slice }}
 
@@ -30,10 +30,12 @@
 {{ end }}
 
 <script>
+    /*  MktoForms2 is a global variable used for all marketo forms -- source is script above  */
     const { MktoForms2 } = window;
-    const formIDsArray = {{ $form_id_array }};
 
     const loadMarketoForm = () => {
+        const formIDsArray = {{ $form_id_array }};
+
         formIDsArray.forEach(id => {
             MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', id, (form) => {
                 const formOnPage = document.getElementById(`mktoForm_${id}`);
@@ -45,7 +47,7 @@
                     const thankyouMessage = document.getElementById(`modal-thankyou--${id}`);
                     const signUpHeader = document.querySelector(`#modal-container--${id} > div > p`);
 
-                    {{/*  Hide form and modal title, unhide thankyou message  */}}
+                    /*  Hide form and modal title, unhide thankyou message  */
                     formOnPage.classList.add('hidden');
                     signUpHeader.classList.add('hidden');
                     thankyouMessage.classList.remove('hidden');
@@ -54,7 +56,7 @@
                 form.onSuccess((values, followUpUrl) => {
                     displayThankYouMessage();
 
-                    {{/*  No redirect  */}}
+                    /*  No redirect  */
                     return false;
                 })
             });
