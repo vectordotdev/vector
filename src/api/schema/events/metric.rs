@@ -18,14 +18,6 @@ impl Metric {
     pub const fn new(output_id: OutputId, event: event::Metric) -> Self {
         Self { output_id, event }
     }
-
-    pub fn get_timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.data().timestamp().as_ref()
-    }
-
-    pub fn get_tags(&self) -> Option<&MetricTags> {
-        self.event.series().tags.as_ref()
-    }
 }
 
 #[Object]
@@ -38,12 +30,40 @@ impl Metric {
 
     /// Metric timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.get_timestamp()
+        self.event.data().timestamp().as_ref()
+    }
+
+    /// Metric name
+    async fn name(&self) -> &str {
+        self.event.name()
+    }
+
+    /// Metric namespace
+    async fn namespace(&self) -> Option<&str> {
+        self.event.namespace()
+    }
+
+    /// Metric kind
+    async fn kind(&self) -> &str {
+        match self.event.kind() {
+            event::MetricKind::Incremental => "incremental",
+            event::MetricKind::Absolute => "absolute",
+        }
+    }
+
+    /// Metric type
+    async fn value_type(&self) -> &str {
+        self.event.value().as_name()
+    }
+
+    /// Metric value in human readable form
+    async fn value(&self) -> String {
+        self.event.value().to_string()
     }
 
     /// Metric tags
     async fn tags(&self) -> Option<&MetricTags> {
-        self.get_tags()
+        self.event.tags()
     }
 
     /// Metric event as an encoded string format
