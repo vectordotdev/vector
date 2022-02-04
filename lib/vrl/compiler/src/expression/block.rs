@@ -50,6 +50,13 @@ impl Expression for Block {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let mut jumps = Vec::new();
 
+        // An empty block should resolve to Null.
+        if self.inner.is_empty() {
+            let null = vm.add_constant(Value::Null);
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(null);
+        }
+
         for expr in &self.inner {
             // Write each of the inner expressions
             expr.compile_to_vm(vm)?;

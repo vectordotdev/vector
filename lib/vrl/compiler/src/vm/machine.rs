@@ -164,9 +164,17 @@ impl Vm {
         }
     }
 
+    /// Adds the given value to our list of constants and returns it's position in the list.
+    /// If the constant already exists, the position of that element is returned without adding
+    /// the value again.
     pub fn add_constant(&mut self, object: Value) -> usize {
-        self.values.push(object);
-        self.values.len() - 1
+        match self.values.iter().position(|value| value == &object) {
+            None => {
+                self.values.push(object);
+                self.values.len() - 1
+            }
+            Some(pos) => pos,
+        }
     }
 
     pub fn write_opcode(&mut self, code: OpCode) {
