@@ -357,6 +357,11 @@ form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span {
   line-height: 1.25rem !important;
 }
 
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span,
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span a {
+  color: rgb(212, 212, 216) !important;
+}
+
 form.mktoForm.flex.flex-col .mktoButtonRow span.mktoButtonWrap {
   display: block;
   width: 100%;
