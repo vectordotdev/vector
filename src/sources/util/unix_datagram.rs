@@ -11,7 +11,7 @@ use crate::{
     codecs,
     event::Event,
     internal_events::{
-        SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
@@ -69,6 +69,11 @@ async fn listen(
                         error: &error
                     })
                 })?;
+
+                emit!(&BytesReceived {
+                    protocol: "unix",
+                    byte_size,
+                });
 
                 let payload = buf.split_to(byte_size);
 
