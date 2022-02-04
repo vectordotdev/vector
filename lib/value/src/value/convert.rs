@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 impl Value {
-    /// Returns the value as Vec<Value> only if the type is Value::Array, otherwise returns None
+    /// Returns the value as Vec<Value> only if the type is `Value::Array`, otherwise returns None
     pub fn as_array(&self) -> Option<&[Value]> {
         match self {
             Value::Array(v) => Some(v),
@@ -17,7 +17,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as Vec<Value> only if the type is Value::Array, otherwise returns None
+    /// Returns the value as Vec<Value> only if the type is `Value::Array`, otherwise returns None
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
         match self {
             Value::Array(v) => Some(v),
@@ -25,7 +25,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as DateTime<Utc> only if the type is Value::Timestamp, otherwise returns None
+    /// Returns the value as `DateTime`<Utc> only if the type is `Value::Timestamp`, otherwise returns None
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
@@ -33,7 +33,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as Bytes only if the type is Value::Bytes, otherwise returns None
+    /// Returns the value as Bytes only if the type is `Value::Bytes`, otherwise returns None
     pub fn as_bytes(&self) -> Option<&Bytes> {
         match self {
             Value::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
@@ -41,7 +41,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as BTreeMap<String, Value> only if the type is Value::Map, otherwise returns None
+    /// Returns the value as BTreeMap<String, Value> only if the type is `Value::Map`, otherwise returns None
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
         match &self {
             Value::Map(map) => Some(map),
@@ -49,7 +49,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as NotNan<f64> only if the type is Value::Float, otherwise returns None
+    /// Returns the value as `NotNan`<f64> only if the type is `Value::Float`, otherwise returns None
     pub fn as_float(&self) -> Option<NotNan<f64>> {
         match self {
             Value::Float(f) => Some(*f),
@@ -57,7 +57,7 @@ impl Value {
         }
     }
 
-    /// Returns the value as BTreeMap<String, Value> only if the type is Value::Map, otherwise returns None
+    /// Returns the value as BTreeMap<String, Value> only if the type is `Value::Map`, otherwise returns None
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {
             Value::Map(map) => Some(map),
@@ -65,7 +65,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Integer
+    /// Checks if the Value is a `Value::Integer`
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Value::Integer(i) => Some(*i),

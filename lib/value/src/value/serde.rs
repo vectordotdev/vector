@@ -181,10 +181,7 @@ impl From<serde_json::Value> for Value {
             serde_json::Value::Bool(b) => Value::Boolean(b),
             serde_json::Value::Number(n) => {
                 let float_or_byte = || {
-                    n.as_f64()
-                        // JSON doesn't support "NaN"
-                        .map(|f| Value::Float(NotNan::new(f).unwrap()))
-                        .unwrap_or_else(|| Value::Bytes(n.to_string().into()))
+                    n.as_f64().map_or_else(|| Value::Bytes(n.to_string().into()), |f| Value::Float(NotNan::new(f).unwrap()))
                 };
                 n.as_i64().map_or_else(float_or_byte, Value::Integer)
             }

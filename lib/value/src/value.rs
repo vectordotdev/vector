@@ -126,7 +126,7 @@ impl fmt::Display for Value {
             Value::Timestamp(val) => {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
-            Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
+            Value::Regex(regex) => write!(f, "r'{}'", **regex),
             Value::Null => write!(f, "null"),
         }
     }
@@ -149,7 +149,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Float
+    /// Checks if the Value is a `Value::Float`
     pub fn is_float(&self) -> bool {
         match self {
             Self::Float(_) => true,
@@ -157,7 +157,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Bytes
+    /// Checks if the Value is a `Value::Bytes`
     pub fn is_bytes(&self) -> bool {
         match self {
             Self::Bytes(_) => true,
@@ -165,7 +165,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Timestamp
+    /// Checks if the Value is a `Value::Timestamp`
     pub fn is_timestamp(&self) -> bool {
         match self {
             Self::Timestamp(_) => true,
@@ -173,7 +173,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Regex
+    /// Checks if the Value is a `Value::Regex`
     pub fn is_regex(&self) -> bool {
         match self {
             Self::Regex(_) => true,
@@ -181,7 +181,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Map
+    /// Checks if the Value is a `Value::Map`
     pub fn is_map(&self) -> bool {
         match self {
             Self::Map(_) => true,
@@ -189,7 +189,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Boolean
+    /// Checks if the Value is a `Value::Boolean`
     pub fn is_boolean(&self) -> bool {
         match self {
             Self::Boolean(_) => true,
@@ -197,7 +197,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Null
+    /// Checks if the Value is a `Value::Null`
     pub fn is_null(&self) -> bool {
         match self {
             Self::Null => true,
@@ -205,7 +205,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Integer
+    /// Checks if the Value is a `Value::Integer`
     pub fn is_integer(&self) -> bool {
         match self {
             Self::Integer(_) => true,
@@ -213,7 +213,7 @@ impl Value {
         }
     }
 
-    /// Checks if the Value is a Value::Array
+    /// Checks if the Value is a `Value::Array`
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -309,13 +309,9 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(segment), Value::Boolean(_))
-            | (Some(segment), Value::Bytes(_))
-            | (Some(segment), Value::Regex(_))
-            | (Some(segment), Value::Timestamp(_))
-            | (Some(segment), Value::Float(_))
-            | (Some(segment), Value::Integer(_))
-            | (Some(segment), Value::Null) => {
+            (Some(segment),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 if working_lookup.is_empty() {
                     trace!("Cannot remove self. Caller must remove.");
                     Err(ValueError::RemovingSelf)
@@ -556,13 +552,9 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(_s), Value::Boolean(_))
-            | (Some(_s), Value::Bytes(_))
-            | (Some(_s), Value::Regex(_))
-            | (Some(_s), Value::Timestamp(_))
-            | (Some(_s), Value::Float(_))
-            | (Some(_s), Value::Integer(_))
-            | (Some(_s), Value::Null) => {
+            (Some(_s),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 trace!("Mismatched primitive field while trying to use segment.");
                 Ok(None)
             }
@@ -606,13 +598,9 @@ impl Value {
             // We've met an end and found our value.
             (None, item) => Ok(Some(item)),
             // This is just not allowed!
-            (_, Value::Boolean(_))
-            | (_, Value::Bytes(_))
-            | (_, Value::Regex(_))
-            | (_, Value::Timestamp(_))
-            | (_, Value::Float(_))
-            | (_, Value::Integer(_))
-            | (_, Value::Null) => unimplemented!(),
+            (_,
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => unimplemented!(),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -701,13 +689,9 @@ impl Value {
             // The top level insert will always be a map (or an array in tests).
             // Then for further descents into the lookup, in the `insert_map` function
             // if the type is one of the following, the field is modified to be a map.
-            (Some(segment), Value::Boolean(_))
-            | (Some(segment), Value::Bytes(_))
-            | (Some(segment), Value::Regex(_))
-            | (Some(segment), Value::Timestamp(_))
-            | (Some(segment), Value::Float(_))
-            | (Some(segment), Value::Integer(_))
-            | (Some(segment), Value::Null) => {
+            (Some(segment),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 trace!("Encountered descent into a primitive.");
                 Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
