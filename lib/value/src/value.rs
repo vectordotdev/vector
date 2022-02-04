@@ -3,21 +3,19 @@ mod regex;
 pub mod target;
 mod value_macro;
 
-use crate::value::convert::regex_to_bytes;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use core::fmt;
-use lookup::{Field, FieldBuf, Look, Lookup, LookupBuf, Segment, SegmentBuf};
+use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use snafu::Snafu;
 use std::collections::BTreeMap;
-use std::fmt::{Debug, Write};
+use std::fmt::Debug;
 use tracing::instrument;
 use tracing::trace;
 use tracing::trace_span;
-use tracing::Instrument;
 
 pub use self::regex::ValueRegex;
 
@@ -51,17 +49,34 @@ impl From<lookup::LookupError> for ValueError {
     }
 }
 
+/// The main Value type. Used for representing the data of Events in Vector and variables in VRL
 #[derive(Clone, Debug, PartialOrd, Eq, Hash)]
 pub enum Value {
+    /// Bytes. Usually representing a UTF8 String
     Bytes(Bytes),
+
+    /// An Integer
     Integer(i64),
+
+    /// A float that is not NaN
     Float(NotNan<f64>),
+
+    /// Boolean
     Boolean(bool),
+
+    /// A UTC timestamp
     Timestamp(DateTime<Utc>),
+
+    /// A map of values
     Map(BTreeMap<String, Value>),
+
+    /// A sequential list of values
     Array(Vec<Value>),
-    /// In the context of Vector, this is treated the same as Bytes. It means something more in VRL
+
+    /// A Regex. In the context of Vector, this is treated the same as Bytes. It means something more in VRL
     Regex(ValueRegex),
+
+    /// Null
     Null,
 }
 
@@ -105,7 +120,7 @@ impl fmt::Display for Value {
 }
 
 impl Value {
-    // TODO: return Cow
+    /// Converts the value to a string representation
     pub fn to_string_lossy(&self) -> String {
         match self {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
@@ -120,6 +135,7 @@ impl Value {
         }
     }
 
+    /// Returns a string representation of the type of data represented
     pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",
@@ -135,59 +151,7 @@ impl Value {
         }
     }
 
-    /// Returns self as a mutable `BTreeMap<String, Value>`
-    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
-        match self {
-            Value::Map(ref mut m) => Some(m),
-            _ => None,
-        }
-    }
-
-    /// Returns self as a mutable `BTreeMap<String, Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Map`.
-    pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        self.as_map_mut()
-            .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
-    }
-
-    /// Returns self as a mutable `BTreeMap<String, Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Map`.
-    pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
-        self.as_map()
-            .expect("Tried to call `Value::unwrap_map` on a non-map value.")
-    }
-
-    pub fn into_bytes(self) -> Bytes {
-        self.as_bytes()
-    }
-
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
-        match &self {
-            Value::Map(map) => Some(map),
-            _ => None,
-        }
-    }
-
-    pub fn as_float(&self) -> Option<NotNan<f64>> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
-    }
-
-    pub fn as_int(&self) -> Option<i64> {
-        match self {
-            Value::Integer(i) => Some(*i),
-            _ => None,
-        }
-    }
-
+    /// Checks if the Value is a Value::Float
     pub fn is_float(&self) -> bool {
         match self {
             Self::Float(_) => true,
@@ -195,6 +159,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Bytes
     pub fn is_bytes(&self) -> bool {
         match self {
             Self::Bytes(_) => true,
@@ -202,6 +167,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Timestamp
     pub fn is_timestamp(&self) -> bool {
         match self {
             Self::Timestamp(_) => true,
@@ -209,6 +175,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Regex
     pub fn is_regex(&self) -> bool {
         match self {
             Self::Regex(_) => true,
@@ -216,6 +183,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Map
     pub fn is_map(&self) -> bool {
         match self {
             Self::Map(_) => true,
@@ -223,6 +191,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Boolean
     pub fn is_boolean(&self) -> bool {
         match self {
             Self::Boolean(_) => true,
@@ -230,6 +199,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Null
     pub fn is_null(&self) -> bool {
         match self {
             Self::Null => true,
@@ -237,6 +207,7 @@ impl Value {
         }
     }
 
+    /// Checks if the Value is a Value::Integer
     pub fn is_integer(&self) -> bool {
         match self {
             Self::Integer(_) => true,
@@ -244,65 +215,9 @@ impl Value {
         }
     }
 
-    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
-        match self {
-            Value::Map(map) => Some(map),
-            _ => None,
-        }
-    }
-
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
-            _ => None,
-        }
-    }
-
-    //TODO: rename to "as_bytes"
-    pub fn as_bytes2(&self) -> Option<&Bytes> {
-        match self {
-            Value::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
-            _ => None,
-        }
-    }
-
-    //TODO: rename, this doesn't match the other "as_x" functions (maybe coerce_to_bytes?)
-    pub fn as_bytes(&self) -> Bytes {
-        match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            Value::Regex(regex) => regex_to_bytes(regex),
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(format!("{}", num)),
-            Value::Float(num) => Bytes::from(format!("{}", num)),
-            Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
-            Value::Array(arr) => {
-                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
-            }
-            Value::Null => Bytes::from("<null>"),
-        }
-    }
-
-    //TODO: this can probably be merged with "as_byte" above
-    /// Converts the Value into a byte representation regardless of its original type.
-    /// Object and Array are currently not supported, although technically there's no reason why it
-    /// couldn't in future should the need arise.
-    pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
-        match self {
-            Value::Bytes(bytes) => Ok(bytes.clone()),
-            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
-            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
-            Value::Boolean(b) => Ok(if *b {
-                Bytes::copy_from_slice(&[1_u8])
-            } else {
-                Bytes::copy_from_slice(&[0_u8])
-            }),
-            Value::Map(_o) => Err("cannot convert object to bytes.".to_string()),
-            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
-            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
-            Value::Regex(r) => Ok(r.to_string().into()),
-            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
-        }
+    /// Checks if the Value is a Value::Array
+    pub fn is_array(&self) -> bool {
+        matches!(self, Value::Array(_))
     }
 
     /// Merges `incoming` value into self.
@@ -1028,7 +943,7 @@ impl<'de> Deserialize<'de> for Value {
         impl<'de> Visitor<'de> for ValueVisitor {
             type Value = Value;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("any valid JSON value")
             }
 

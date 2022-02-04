@@ -113,7 +113,7 @@ impl TcpSource for LogstashSource {
                     .get_flat("@timestamp")
                     .and_then(|timestamp| {
                         self.timestamp_converter
-                            .convert::<Value>(timestamp.as_bytes())
+                            .convert::<Value>(timestamp.convert_to_bytes())
                             .ok()
                     })
                     .unwrap_or_else(|| now.clone());

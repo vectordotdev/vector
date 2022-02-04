@@ -84,7 +84,7 @@ impl FunctionTransform for JsonParser {
 
         let parsed = value
             .and_then(|value| {
-                let to_parse = value.as_bytes();
+                let to_parse = value.convert_to_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(&JsonParserFailedParse {

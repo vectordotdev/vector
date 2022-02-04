@@ -43,7 +43,7 @@ impl KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes()),
+        Event::Log(log) => log.get(key_field).map(|value| value.convert_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))

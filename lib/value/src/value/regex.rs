@@ -9,6 +9,7 @@ use std::{
 pub struct ValueRegex(regex::Regex);
 
 impl ValueRegex {
+    /// Returns the raw Regex type that is being wrapped
     pub fn into_inner(self) -> regex::Regex {
         self.0
     }

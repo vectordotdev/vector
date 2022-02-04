@@ -1008,7 +1008,7 @@ fn line_agg_adapter(
             .get(&*STREAM)
             .expect("stream must exist in the event");
 
-        let stream = stream_value.as_bytes();
+        let stream = stream_value.convert_to_bytes();
         let message = message_value.into_bytes();
         (stream, message, log_event)
     });

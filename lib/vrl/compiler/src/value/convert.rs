@@ -44,7 +44,7 @@ impl VrlValueConvert for Value {
     }
 
     fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
-        match self.as_bytes2() {
+        match self.as_bytes() {
             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
                 got: self.vrl_kind(),

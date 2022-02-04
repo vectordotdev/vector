@@ -1,3 +1,4 @@
+/// A macro to easily create a Value type
 #[macro_export]
 macro_rules! value {
     ([]) => ({

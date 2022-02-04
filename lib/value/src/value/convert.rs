@@ -14,10 +14,7 @@ use toml::Value as TomlValue;
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 impl Value {
-    pub fn is_array(&self) -> bool {
-        matches!(self, Value::Array(_))
-    }
-
+    /// Returns the value as Vec<Value> only if the type is Value::Array, otherwise returns None
     pub fn as_array(&self) -> Option<&[Value]> {
         match self {
             Value::Array(v) => Some(v),
@@ -25,6 +22,7 @@ impl Value {
         }
     }
 
+    /// Returns the value as Vec<Value> only if the type is Value::Array, otherwise returns None
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
         match self {
             Value::Array(v) => Some(v),
@@ -32,15 +30,124 @@ impl Value {
         }
     }
 
-    // pub fn try_array(self) -> Result<Vec<Value>, Error> {
-    //     match self {
-    //         Value::Array(v) => Ok(v),
-    //         _ => Err(Error::Expected {
-    //             got: self.kind(),
-    //             expected: Kind::Array,
-    //         }),
-    //     }
-    // }
+    /// Returns the value as DateTime<Utc> only if the type is Value::Timestamp, otherwise returns None
+    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
+        match &self {
+            Value::Timestamp(ts) => Some(ts),
+            _ => None,
+        }
+    }
+
+    /// Returns the value as Bytes only if the type is Value::Bytes, otherwise returns None
+    pub fn as_bytes(&self) -> Option<&Bytes> {
+        match self {
+            Value::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
+            _ => None,
+        }
+    }
+
+    /// Returns the value as BTreeMap<String, Value> only if the type is Value::Map, otherwise returns None
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match &self {
+            Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
+    /// Returns the value as NotNan<f64> only if the type is Value::Float, otherwise returns None
+    pub fn as_float(&self) -> Option<NotNan<f64>> {
+        match self {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    /// Returns the value as Bytes only if the type is Value::Bytes, otherwise returns None
+    pub fn into_bytes(self) -> Bytes {
+        self.convert_to_bytes()
+    }
+
+    /// Returns the value as BTreeMap<String, Value> only if the type is Value::Map, otherwise returns None
+    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
+        match self {
+            Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
+    /// Checks if the Value is a Value::Integer
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            Value::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+        match self {
+            Value::Map(ref mut m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
+    pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        self.as_map_mut()
+            .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
+    }
+
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
+    pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
+        self.as_map()
+            .expect("Tried to call `Value::unwrap_map` on a non-map value.")
+    }
+
+    /// Converts the Value into Bytes, using it's String representation
+    pub fn convert_to_bytes(&self) -> Bytes {
+        match self {
+            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Regex(regex) => regex_to_bytes(regex),
+            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            Value::Integer(num) => Bytes::from(format!("{}", num)),
+            Value::Float(num) => Bytes::from(format!("{}", num)),
+            Value::Boolean(b) => Bytes::from(format!("{}", b)),
+            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
+            Value::Array(arr) => {
+                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
+            }
+            Value::Null => Bytes::from("<null>"),
+        }
+    }
+
+    /// Converts the Value into a byte representation regardless of its original type.
+    /// Object and Array are currently not supported, although technically there's no reason why it
+    /// couldn't in future should the need arise.
+    pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
+        match self {
+            Value::Bytes(bytes) => Ok(bytes.clone()),
+            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
+            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
+            Value::Boolean(b) => Ok(if *b {
+                Bytes::copy_from_slice(&[1_u8])
+            } else {
+                Bytes::copy_from_slice(&[0_u8])
+            }),
+            Value::Map(_o) => Err("cannot convert object to bytes.".to_string()),
+            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
+            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
+            Value::Regex(r) => Ok(r.to_string().into()),
+            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+        }
+    }
 }
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
