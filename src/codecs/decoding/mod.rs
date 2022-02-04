@@ -68,6 +68,7 @@ impl StreamDecodingError for Error {
 
 /// Configuration for building a `Framer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `BytesDecoder`.
     Bytes(BytesDecoderConfig),
@@ -139,6 +140,7 @@ impl tokio_util::codec::Decoder for Framer {
 
 /// Configuration for building a `Deserializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "codec", rename_all = "snake_case")]
 pub enum DeserializerConfig {
     /// Configures the `BytesDeserializer`.
     Bytes(BytesDeserializerConfig),
