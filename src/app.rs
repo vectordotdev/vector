@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    num::NonZeroUsize,
-    path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
 use once_cell::race::OnceNonZeroUsize;
@@ -253,6 +248,7 @@ impl Application {
             #[cfg(feature = "api")]
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
+                use std::sync::{Arc, atomic::AtomicBool};
                 emit!(&ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
