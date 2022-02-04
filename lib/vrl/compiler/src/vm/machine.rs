@@ -129,6 +129,10 @@ pub enum OpCode {
     /// will have been created by the `compile_argument` function of the `Function` that is about to be called
     /// at compile time. (Used, for example, to precompile and store regexes at compile time.)
     MoveStaticParameter,
+
+    /// After each statement (with the exception of the last one) within a block we need to pop the
+    /// stack, and if we are in an error state jump to the end of the block.
+    EndStatement,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -364,6 +368,15 @@ impl Vm {
                         state.instruction_pointer += jump;
                     }
                 }
+                OpCode::EndStatement => {
+                    let jump = state.next_primitive()?;
+                    if state.error.is_some() {
+                        state.instruction_pointer += jump;
+                    } else {
+                        state.pop_stack()?;
+                    }
+                }
+
                 OpCode::Jump => {
                     // Moves the instruction pointer by the amount specified.
                     let jump = state.next_primitive()?;

@@ -57,12 +57,18 @@ impl Expression for Block {
             vm.write_primitive(null);
         }
 
-        for expr in &self.inner {
+        let mut expressions = self.inner.iter().peekable();
+
+        while let Some(expr) = expressions.next() {
             // Write each of the inner expressions
             expr.compile_to_vm(vm)?;
 
-            // If there is an error, we need to jump to the end of the block.
-            jumps.push(vm.emit_jump(OpCode::JumpIfErr));
+            if expressions.peek().is_some() {
+                // At the end of each statement (apart from the last one) we need to clean up
+                // This involves popping the value remaining on the stack, and jumping to the end
+                // of the block if we are in error.
+                jumps.push(vm.emit_jump(OpCode::EndStatement));
+            }
         }
 
         // Update all the jumps to jump to the end of the block.
