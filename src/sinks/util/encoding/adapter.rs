@@ -125,17 +125,17 @@ where
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(&self) -> (Option<Framer>, Serializer) {
+    pub fn encoding(self) -> (Option<Framer>, Serializer) {
         let (framer, serializer) = match self {
             Self::Encoding(config) => {
-                let framer = config.framing.as_ref().map(FramingConfig::build);
+                let framer = config.framing.clone().map(FramingConfig::build);
                 let serializer = config.encoding.encoding.build();
 
                 (framer, serializer)
             }
             Self::LegacyEncodingConfig(config) => {
                 let migration = Migrator::migrate(config.encoding.codec());
-                let framer = migration.0.as_ref().map(FramingConfig::build);
+                let framer = migration.0.map(FramingConfig::build);
                 let serializer = migration.1.build();
 
                 (framer, serializer)
@@ -281,7 +281,7 @@ mod tests {
             EncodingConfigAdapter::LegacyEncodingConfig(_) => panic!(),
         };
 
-        assert!(matches!(encoding, SerializerConfig::RawMessage(_)));
+        assert!(matches!(encoding, SerializerConfig::RawMessage));
     }
 
     #[test]

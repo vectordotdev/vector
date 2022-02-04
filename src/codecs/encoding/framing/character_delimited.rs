@@ -7,7 +7,8 @@ use super::BoxedFramingError;
 /// Config used to build a `CharacterDelimitedEncoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedEncoderConfig {
-    character_delimited: CharacterDelimitedEncoderOptions,
+    /// Options for the character delimited encoder.
+    pub character_delimited: CharacterDelimitedEncoderOptions,
 }
 
 impl CharacterDelimitedEncoderConfig {

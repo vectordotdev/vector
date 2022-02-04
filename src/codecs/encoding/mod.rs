@@ -10,7 +10,7 @@ pub use format::{
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
 
 use crate::{
@@ -48,21 +48,50 @@ impl From<std::io::Error> for Error {
 }
 
 /// Configuration for building a `Framer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `CharacterDelimitedEncoder`.
-    CharacterDelimited(CharacterDelimitedEncoderConfig),
+    CharacterDelimited {
+        /// Options for the character delimited encoder.
+        character_delimited: CharacterDelimitedEncoderOptions,
+    },
     /// Configures the `NewlineDelimitedEncoder`.
-    NewlineDelimited(NewlineDelimitedEncoderConfig),
+    NewlineDelimited,
+}
+
+impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
+    fn from(config: CharacterDelimitedEncoderConfig) -> Self {
+        Self::CharacterDelimited {
+            character_delimited: config.character_delimited,
+        }
+    }
+}
+
+impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
+    fn from(_: NewlineDelimitedEncoderConfig) -> Self {
+        Self::NewlineDelimited
+    }
 }
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub const fn build(&self) -> Framer {
+    pub const fn build(self) -> Framer {
         match self {
-            FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
+            FramingConfig::CharacterDelimited {
+                character_delimited,
+            } => Framer::CharacterDelimited(
+                CharacterDelimitedEncoderConfig {
+                    character_delimited,
+                }
+                .build(),
+            ),
+            FramingConfig::NewlineDelimited => {
+                Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
+            }
         }
     }
 }
@@ -91,21 +120,38 @@ impl tokio_util::codec::Encoder<()> for Framer {
 }
 
 /// Configuration for building a `Serializer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
     /// Configures the `JsonSerializer`.
-    Json(JsonSerializerConfig),
+    Json,
     /// Configures the `RawMessageSerializer`.
-    RawMessage(RawMessageSerializerConfig),
+    RawMessage,
+}
+
+impl From<JsonSerializerConfig> for SerializerConfig {
+    fn from(_: JsonSerializerConfig) -> Self {
+        Self::Json
+    }
+}
+
+impl From<RawMessageSerializerConfig> for SerializerConfig {
+    fn from(_: RawMessageSerializerConfig) -> Self {
+        Self::RawMessage
+    }
 }
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub const fn build(&self) -> Serializer {
         match self {
-            SerializerConfig::Json(config) => Serializer::Json(config.build()),
-            SerializerConfig::RawMessage(config) => Serializer::RawMessage(config.build()),
+            SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
+            SerializerConfig::RawMessage => {
+                Serializer::RawMessage(RawMessageSerializerConfig.build())
+            }
         }
     }
 }
@@ -200,7 +246,7 @@ impl EncodingConfig {
     }
 
     /// Builds an `Encoder` from the provided configuration.
-    pub const fn build(&self) -> Encoder {
+    pub const fn build(self) -> Encoder {
         // Build the framer.
         let framer = self.framing.build();
 
