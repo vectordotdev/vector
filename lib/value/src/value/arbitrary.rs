@@ -32,7 +32,8 @@ impl Arbitrary for Value {
             }
             1 => Value::Integer(i64::arbitrary(g)),
             2 => Value::Float(
-                NotNan::new(f64::arbitrary(g) % MAX_F64_SIZE).unwrap_or(NotNan::new(0.0).unwrap()),
+                NotNan::new(f64::arbitrary(g) % MAX_F64_SIZE)
+                    .unwrap_or_else(|_| NotNan::new(0.0).unwrap()),
             ),
             3 => Value::Boolean(bool::arbitrary(g)),
             4 => Value::Timestamp(datetime(g)),
