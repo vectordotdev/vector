@@ -69,7 +69,7 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -226,9 +226,7 @@ mod integration_tests {
         let nc_pub = nc.clone();
 
         let (tx, rx) = SourceSender::new_test();
-        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
-            .build()
-            .unwrap();
+        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
         tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
         let msg = "my message";
         nc_pub.publish(&subject, msg).await.unwrap();

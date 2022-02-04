@@ -371,13 +371,13 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(self) -> crate::Result<Decoder> {
+    pub fn build(self) -> Decoder {
         // Build the framer.
         let framer = self.framing.build();
 
         // Build the deserializer.
         let deserializer = self.decoding.build();
 
-        Ok(Decoder::new(framer, deserializer))
+        Decoder::new(framer, deserializer)
     }
 }

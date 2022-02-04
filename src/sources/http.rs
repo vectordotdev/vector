@@ -173,7 +173,7 @@ impl SourceConfig for SimpleHttpConfig {
             )
         };
 
-        let decoder = DecodingConfig::new(framing, decoding).build()?;
+        let decoder = DecodingConfig::new(framing, decoding).build();
         let source = SimpleHttpSource {
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),

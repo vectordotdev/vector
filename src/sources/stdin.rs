@@ -87,7 +87,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding).build()?;
+    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
