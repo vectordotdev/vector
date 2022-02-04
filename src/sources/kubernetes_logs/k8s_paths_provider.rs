@@ -2,12 +2,14 @@
 
 #![deny(missing_docs)]
 
-use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
+use std::path::PathBuf;
+
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
-use std::path::PathBuf;
+
+use super::path_helpers::build_pod_logs_directory;
+use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
@@ -208,12 +210,14 @@ fn exclude_paths<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
     use super::{
         build_container_exclusion_patterns, exclude_paths, extract_excluded_containers_for_pod,
         extract_pod_logs_directory, list_pod_log_paths,
     };
-    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-    use std::path::PathBuf;
 
     #[test]
     fn test_extract_pod_logs_directory() {

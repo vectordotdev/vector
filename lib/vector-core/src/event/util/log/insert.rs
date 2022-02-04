@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::{collections::BTreeMap, iter::Peekable};
+
+use super::{PathComponent, PathIter, Value};
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
 pub fn insert(fields: &mut BTreeMap<String, Value>, path: &str, value: Value) -> Option<Value> {
@@ -91,10 +92,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
-    use serde_json::json;
     use std::collections::BTreeMap;
+
+    use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn test_insert_nested() {

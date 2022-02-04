@@ -1,14 +1,17 @@
 {{ $colored := .color }}
-{{ range site.Menus.comms }}
+{{ range $index, $val := site.Menus.comms }}
 {{ $color := .Params.color }}
 {{ $iconColor := cond $colored $color "gray-300" }}
 {{ $hoverColor := cond $colored "gray-500" $color }}
-<a href="{{ .URL }}" rel="noopener" target="_blank">
-  <span class="sr-only">
-    {{ .Name }} icon and link
-  </span>
-  <span class="{{ with .Params.dark }}dark:text-{{ . }} dark:hover:text-{{ $hoverColor }}{{ end }} text-{{ $iconColor }} hover:text-{{ $hoverColor }}">
-    <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
-  </span>
-</a>
+<div class="pt-1.5 {{ if ne $index 0 }}ml-3.5{{ end }}">
+  <a href="{{ $val.URL }}" rel="noopener" target="_blank">
+    <span class="sr-only">
+      {{ $val.Name }} icon and link
+    </span>
+    <span
+      class="{{ with .Params.dark }}dark:text-{{ . }} dark:hover:text-{{ $hoverColor }}{{ end }} text-{{ $iconColor }} hover:text-{{ $hoverColor }}">
+      <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
+    </span>
+  </a>
+</div>
 {{ end }}

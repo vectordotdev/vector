@@ -1,8 +1,9 @@
 //! A state wrapper that delays deletes.
 
+use std::{collections::VecDeque, time::Duration};
+
 use async_trait::async_trait;
 use futures::{future::BoxFuture, FutureExt};
-use std::{collections::VecDeque, time::Duration};
 use tokio::time::{sleep_until, timeout_at, Instant};
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
@@ -136,11 +137,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, MaintainedWrite, Write};
-    use super::*;
-    use crate::test_util::trace_init;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
+    use super::{
+        super::{mock, MaintainedWrite, Write},
+        *,
+    };
+    use crate::test_util::trace_init;
 
     const DELAY_FOR: Duration = Duration::from_secs(3600);
 

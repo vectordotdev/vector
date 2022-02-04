@@ -1,16 +1,23 @@
-use crate::buffers::{BufferConfig, WhenFull};
-use crate::config::Config;
-use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
-use crate::sources::demo_logs::DemoLogsConfig;
-use crate::sources::splunk_hec::SplunkConfig;
-use crate::test_util::{next_addr, start_topology, temp_dir, wait_for_tcp};
-use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+use std::{
+    net::{SocketAddr, TcpListener},
+    time::Duration,
+};
+
 use futures::StreamExt;
-use std::net::{SocketAddr, TcpListener};
-use std::time::Duration;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+
+use crate::{
+    buffers::{BufferConfig, WhenFull},
+    config::Config,
+    sinks::{
+        console::{ConsoleSinkConfig, Encoding, Target},
+        prometheus::exporter::PrometheusExporterConfig,
+    },
+    sources::{demo_logs::DemoLogsConfig, splunk_hec::SplunkConfig},
+    test_util::{next_addr, start_topology, temp_dir, wait_for_tcp},
+    transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig},
+};
 
 #[tokio::test]
 async fn topology_reuse_old_port() {

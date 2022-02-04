@@ -1,8 +1,9 @@
 //! An instrumenting state wrapper.
 
-use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+
+use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// adds instrumentation.
@@ -65,13 +66,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, MaintainedWrite, Write};
-    use super::*;
-    use crate::{event::metric::MetricValue, test_util::trace_init};
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use once_cell::sync::OnceCell;
     use tokio::sync::{Mutex, MutexGuard};
+
+    use super::{
+        super::{mock, MaintainedWrite, Write},
+        *,
+    };
+    use crate::{event::metric::MetricValue, test_util::trace_init};
 
     fn prepare_test() -> (
         Writer<mock::Writer<Pod>>,
@@ -108,6 +112,7 @@ mod tests {
 
         controller
             .capture_metrics()
+            .into_iter()
             .find(|metric| {
                 metric.name() == "k8s_state_ops_total" && metric.tags() == tags_to_lookup.as_ref()
             })

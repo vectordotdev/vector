@@ -1,13 +1,11 @@
+use aws_config::{
+    default_provider::credentials::default_provider,
+    meta::credentials::LazyCachingCredentialsProvider, profile::ProfileFileCredentialsProvider,
+    sts::AssumeRoleProviderBuilder,
+};
+use aws_types::{credentials::SharedCredentialsProvider, Credentials};
+
 use crate::aws::auth::AwsAuthentication;
-use aws_config::default_provider::credentials::default_provider;
-use aws_config::meta::credentials::LazyCachingCredentialsProvider;
-use aws_config::profile::ProfileFileCredentialsProvider;
-
-use aws_config::sts::AssumeRoleProviderBuilder;
-
-use aws_types::credentials::SharedCredentialsProvider;
-
-use aws_types::Credentials;
 
 impl AwsAuthentication {
     pub async fn credentials_provider(&self) -> SharedCredentialsProvider {

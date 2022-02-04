@@ -1,7 +1,10 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
+    transforms::Transform,
+};
 
 /// This transform is a simple helper to chain expansions.
 /// You can put a list of transforms that expands in parallel inside a transform that
@@ -46,11 +49,11 @@ impl TransformConfig for ExpanderConfig {
             .unwrap_or(DataType::Any)
     }
 
-    fn output_type(&self) -> DataType {
+    fn outputs(&self) -> Vec<Output> {
         self.inner
             .last()
-            .map(|(_, item)| item.output_type())
-            .unwrap_or(DataType::Any)
+            .map(|(_, item)| item.outputs())
+            .unwrap_or_else(|| vec![Output::default(DataType::Any)])
     }
 
     fn transform_type(&self) -> &'static str {

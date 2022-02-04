@@ -19,16 +19,17 @@
 //!   The reference implementation on preparing the in-cluster config.
 //!
 
-use crate::{
-    config::ProxyConfig,
-    http::{HttpClient, HttpError},
-    tls::TlsSettings,
-};
 use http::{
     header::{self, HeaderValue},
     uri, Request, Response, Uri,
 };
 use hyper::body::Body;
+
+use crate::{
+    config::ProxyConfig,
+    http::{HttpClient, HttpError},
+    tls::TlsSettings,
+};
 
 pub mod config;
 

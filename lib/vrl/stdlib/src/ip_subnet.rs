@@ -1,6 +1,7 @@
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use vrl::prelude::*;
 
 lazy_static! {

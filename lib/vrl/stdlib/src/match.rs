@@ -75,8 +75,9 @@ impl Expression for MatchFn {
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         r#match => Match;

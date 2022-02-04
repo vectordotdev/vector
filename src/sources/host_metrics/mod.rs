@@ -1,15 +1,7 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
-    internal_events::HostMetricsEventReceived,
-    shutdown::ShutdownSignal,
-    Pipeline,
-};
+use std::{collections::BTreeMap, fmt, path::Path};
+
 use chrono::{DateTime, Utc};
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
@@ -18,13 +10,22 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-#[cfg(unix)]
-use shared::btreemap;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::path::Path;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+#[cfg(unix)]
+use vector_common::btreemap;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 
 #[cfg(target_os = "linux")]
 mod cgroups;
@@ -110,8 +111,8 @@ impl SourceConfig for HostMetricsConfig {
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -135,18 +136,27 @@ impl HostMetricsConfig {
         self.scrape_interval_secs = value;
     }
 
-    async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
-
+    async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
+            emit!(&BytesReceived {
+                byte_size: 0,
+                protocol: "none"
+            });
             let metrics = generator.capture_metrics().await;
-            out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
+            let (count, _) = metrics.size_hint();
+            if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
+                emit!(&StreamClosedError {
+                    count,
+                    error: error.clone()
+                });
+                error!(message = "Error sending host metrics.", %error);
+                return Err(());
+            }
         }
 
         Ok(())
@@ -228,8 +238,9 @@ impl HostMetrics {
                 metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
-        emit!(&HostMetricsEventReceived {
-            count: metrics.len()
+        emit!(&EventsReceived {
+            count: metrics.len(),
+            byte_size: metrics.size_of(),
         });
         metrics.into_iter().map(Into::into)
     }
@@ -477,9 +488,9 @@ impl Serialize for PatternWrapper {
 
 #[cfg(test)]
 pub(self) mod tests {
+    use std::{collections::HashSet, future::Future};
+
     use super::*;
-    use std::collections::HashSet;
-    use std::future::Future;
 
     #[test]
     fn filterlist_default_includes_everything() {

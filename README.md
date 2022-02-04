@@ -143,7 +143,7 @@ Vector is an end-to-end, unified, open data platform.
 |     **Reliability** |   **✓**    |       |           |         |          |           |           |
 |         Memory-safe |   **✓**    |       |           |         |          |           |           |
 | Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |   ✓   |           |    ✓    |    ✓     |     ✓     |     ✓     |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs

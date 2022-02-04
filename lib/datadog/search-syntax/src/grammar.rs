@@ -1,10 +1,10 @@
 #![allow(clippy::upper_case_acronyms)]
+use itertools::Itertools;
+use pest::iterators::Pair;
+
 use crate::node::{
     BooleanBuilder, Comparison, ComparisonValue, LuceneClause, LuceneOccur, QueryNode, Range,
 };
-
-use itertools::Itertools;
-use pest::iterators::Pair;
 
 #[derive(Debug, Parser)]
 #[grammar = "grammar.pest"]

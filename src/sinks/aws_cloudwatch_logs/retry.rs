@@ -1,9 +1,9 @@
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
-use crate::sinks::util::retries::RetryLogic;
-use rusoto_core::request::BufferedHttpResponse;
-use rusoto_core::RusotoError;
-use rusoto_logs::{CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError};
 use std::marker::PhantomData;
+
+use rusoto_core::{request::BufferedHttpResponse, RusotoError};
+use rusoto_logs::{CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError};
+
+use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
 
 #[derive(Debug)]
 pub struct CloudwatchRetryLogic<T> {

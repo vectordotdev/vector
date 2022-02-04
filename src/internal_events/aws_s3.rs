@@ -1,7 +1,6 @@
 // ## skip check-events ##
 
 pub mod source {
-    use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;
     use rusoto_sqs::{
@@ -9,6 +8,8 @@ pub mod source {
         DeleteMessageBatchResultEntry, ReceiveMessageError,
     };
     use vector_core::internal_event::InternalEvent;
+
+    use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
     pub struct SqsS3EventReceived {

@@ -17,13 +17,12 @@ use vector_core::{
     event::{metric::MetricSketch, Metric, MetricValue},
 };
 
+use super::config::{
+    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
+};
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     sinks::util::{encode_namespace, Compressor},
-};
-
-use super::config::{
-    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -206,7 +205,7 @@ impl DatadogMetricsEncoder {
                         return Ok(Some(metric));
                     }
                     let _ = serde_json::to_writer(&mut self.state.buf, series)
-                        .context(JsonEncodingFailed)?;
+                        .context(JsonEncodingFailedSnafu)?;
                 }
             }
             // We can't encode sketches incrementally (yet), so we don't do any encoding here.  We
@@ -330,9 +329,9 @@ impl DatadogMetricsEncoder {
             self.log_schema,
             &mut self.state.buf,
         )
-        .context(PendingEncodeFailed)?;
+        .context(PendingEncodeFailedSnafu)?;
 
-        if self.try_compress_buffer().context(CompressionFailed)? {
+        if self.try_compress_buffer().context(CompressionFailedSnafu)? {
             // Since we encoded and compressed them successfully, add them to the "processed" list.
             self.state.processed.extend(pending);
             Ok(())
@@ -354,12 +353,12 @@ impl DatadogMetricsEncoder {
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
-            .context(CompressionFailed)?;
+            .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
-        let payload = state.writer.finish().context(CompressionFailed)?;
+        let payload = state.writer.finish().context(CompressionFailedSnafu)?;
         let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
@@ -594,7 +593,7 @@ where
     };
 
     // Now try encoding this sketch payload, and then try to compress it.
-    sketch_payload.encode(buf).context(ProtoEncodingFailed)
+    sketch_payload.encode(buf).context(ProtoEncodingFailedSnafu)
 }
 
 fn get_compressor() -> Compressor {
@@ -706,13 +705,12 @@ mod tests {
         metrics::AgentDDSketch,
     };
 
-    use crate::sinks::datadog::metrics::{config::DatadogMetricsEndpoint, encoder::EncoderError};
-
     use super::{
         encode_tags, encode_timestamp, get_compressor, max_compression_overhead_len,
         max_uncompressed_header_len, validate_payload_size_limits, write_payload_footer,
         write_payload_header, DatadogMetricsEncoder,
     };
+    use crate::sinks::datadog::metrics::{config::DatadogMetricsEndpoint, encoder::EncoderError};
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };

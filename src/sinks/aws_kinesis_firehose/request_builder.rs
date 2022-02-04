@@ -1,13 +1,16 @@
-use crate::event::{Event, LogEvent};
-use crate::event::{EventFinalizers, Finalizable};
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{Compression, RequestBuilder};
-use bytes::Bytes;
-
-use rusoto_firehose::Record;
 use std::io;
-use vector_core::buffers::Ackable;
-use vector_core::ByteSizeOf;
+
+use bytes::Bytes;
+use rusoto_firehose::Record;
+use vector_core::{buffers::Ackable, ByteSizeOf};
+
+use crate::{
+    event::{Event, EventFinalizers, Finalizable, LogEvent},
+    sinks::util::{
+        encoding::{EncodingConfig, StandardEncodings},
+        Compression, RequestBuilder,
+    },
+};
 
 pub struct KinesisRequestBuilder {
     pub compression: Compression,

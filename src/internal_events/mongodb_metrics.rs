@@ -1,8 +1,9 @@
 // ## skip check-events ##
 
+use std::time::Instant;
+
 use metrics::{counter, histogram};
 use mongodb::{bson, error::Error as MongoError};
-use std::time::Instant;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

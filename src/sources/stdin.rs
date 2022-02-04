@@ -1,19 +1,24 @@
-use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::StdinEventsReceived,
-    serde::{default_decoding, default_framing_stream_based},
-    shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
-    Pipeline,
-};
+use std::{io, thread};
+
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{io, thread};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    config::{
+        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
+    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
+    serde::{default_decoding, default_framing_stream_based},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    SourceSender,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -56,8 +61,8 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -73,7 +78,7 @@ pub fn stdin_source<R>(
     mut stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> crate::Result<super::Source>
 where
     R: Send + io::BufRead + 'static,
@@ -104,6 +109,10 @@ where
 
             stdin.consume(len);
 
+            emit!(&BytesReceived {
+                byte_size: len,
+                protocol: "none"
+            });
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
                 break;
@@ -112,17 +121,14 @@ where
     });
 
     Ok(Box::pin(async move {
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
-
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
-        let result = stream! {
-            loop {
-                match stream.next().await {
-                    Some(Ok((events, byte_size))) => {
+        let mut stream = stream! {
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok((events, _byte_size)) => {
                         emit!(&StdinEventsReceived {
-                            byte_size,
+                            byte_size: events.size_of(),
                             count: events.len()
                         });
 
@@ -141,34 +147,38 @@ where
                             yield event;
                         }
                     }
-                    Some(Err(error)) => {
+                    Err(error) => {
                         // Error is logged by `crate::codecs::Decoder`, no
                         // further handling is needed here.
                         if !error.can_continue() {
                             break;
                         }
                     }
-                    None => break,
                 }
             }
         }
-        .map(Ok)
-        .forward(&mut out)
-        .await;
+        .boxed();
 
-        info!("Finished sending.");
-
-        let _ = out.flush().await; // Error emitted by sink_map_err.
-
-        result
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
+                Err(())
+            }
+        }
     }))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{test_util::trace_init, Pipeline};
     use std::io::Cursor;
+
+    use super::*;
+    use crate::{test_util::trace_init, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -179,7 +189,7 @@ mod tests {
     async fn stdin_decodes_line() {
         trace_init();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 

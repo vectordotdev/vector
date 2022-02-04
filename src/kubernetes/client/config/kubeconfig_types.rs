@@ -16,8 +16,9 @@
 // # See the License for the specific language governing permissions and
 // # limitations under the License.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 /// that is normally stored in `~/.kube/config`

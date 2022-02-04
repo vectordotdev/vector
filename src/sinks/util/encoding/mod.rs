@@ -57,31 +57,28 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+#[cfg(feature = "codecs")]
+mod adapter;
 mod codec;
-
-pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
-
 mod config;
-
-pub use config::EncodingConfig;
-
 mod fixed;
-
-pub use fixed::EncodingConfigFixed;
-
 mod with_default;
 
-pub use codec::as_tracked_write;
-pub use with_default::EncodingConfigWithDefault;
+use std::{fmt::Debug, io, sync::Arc};
 
-use crate::event::{LogEvent, MaybeAsLogMut};
-use crate::{
-    event::{Event, PathComponent, PathIter, Value},
-    Result,
-};
 use serde::{Deserialize, Serialize};
 
-use std::{fmt::Debug, io, sync::Arc};
+use crate::{
+    event::{Event, LogEvent, MaybeAsLogMut, PathComponent, PathIter, Value},
+    Result,
+};
+
+#[cfg(feature = "codecs")]
+pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
+pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use config::EncodingConfig;
+pub use fixed::EncodingConfigFixed;
+pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -275,12 +272,32 @@ pub enum TimestampFormat {
     Rfc3339,
 }
 
+fn deserialize_path_components<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<Vec<PathComponent<'static>>>>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let fields: Option<Vec<&str>> = serde::de::Deserialize::deserialize(deserializer)?;
+    Ok(fields.map(|fields| {
+        fields
+            .iter()
+            .map(|only| {
+                PathIter::new(only)
+                    .map(|component| component.into_static())
+                    .collect()
+            })
+            .collect()
+    }))
+}
+
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+    use vector_common::btreemap;
+
     use super::*;
     use crate::config::log_schema;
-    use indoc::indoc;
-    use shared::btreemap;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {

@@ -1,9 +1,12 @@
-use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
-use crate::event::{Event, LogEvent};
 use datadog_filter::{build_matcher, Matcher, Run};
 use datadog_search_syntax::parse;
 use serde::{Deserialize, Serialize};
 use vector_datadog_filter::EventFilter;
+
+use crate::{
+    conditions::{Condition, ConditionConfig, ConditionDescription},
+    event::{Event, LogEvent},
+};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct DatadogSearchConfig {
@@ -54,8 +57,9 @@ fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use datadog_filter_test::get_checks;
+
+    use super::*;
 
     #[test]
     fn generate_config() {

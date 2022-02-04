@@ -1,14 +1,16 @@
-use super::BuildError;
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
-    internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
-    transforms::{FunctionTransform, Transform},
-};
+use lazy_static::lazy_static;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
-use lazy_static::lazy_static;
+use super::BuildError;
+use crate::{
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
+    event::{Event, Value},
+    internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -57,8 +59,8 @@ impl TransformConfig for ConcatConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -134,7 +136,7 @@ impl Concat {
 }
 
 impl FunctionTransform for Concat {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 
         for substring in self.items.iter() {

@@ -1,24 +1,25 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::internal_events::EndpointBytesSent;
-use crate::proto::vector as proto_vector;
-use crate::sinks::util::uri;
-use crate::sinks::vector::v2::VectorSinkError;
-use crate::Error;
-use futures::future::BoxFuture;
-use futures::TryFutureExt;
+use std::task::{Context, Poll};
+
+use futures::{future::BoxFuture, TryFutureExt};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use prost::Message;
 use proto_event::EventWrapper;
-use std::task::{Context, Poll};
-use tonic::body::BoxBody;
-use tonic::IntoRequest;
-use vector_core::buffers::Ackable;
-use vector_core::event::proto as proto_event;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use tonic::{body::BoxBody, IntoRequest};
+use vector_core::{
+    buffers::Ackable, event::proto as proto_event, internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_events::EndpointBytesSent,
+    proto::vector as proto_vector,
+    sinks::{util::uri, vector::v2::VectorSinkError},
+    Error,
+};
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
@@ -41,6 +42,7 @@ impl DriverResponse for VectorResponse {
         EventsSent {
             count: self.events_count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -99,6 +101,7 @@ impl tower::Service<VectorRequest> for VectorService {
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let events_count = list.events.len();
+        let events_byte_size = list.events_byte_size;
 
         let request = proto_vector::PushEventsRequest {
             events: list.events,
@@ -116,7 +119,7 @@ impl tower::Service<VectorRequest> for VectorService {
                     });
                     VectorResponse {
                         events_count,
-                        events_byte_size: 0,
+                        events_byte_size,
                     }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())

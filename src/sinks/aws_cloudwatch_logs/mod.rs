@@ -8,11 +8,10 @@ mod sink;
 
 mod integration_tests;
 
-use self::config::CloudwatchLogsSinkConfig;
-
-use crate::{config::SinkDescription, internal_events::TemplateRenderingFailed};
-
 use snafu::Snafu;
+
+use self::config::CloudwatchLogsSinkConfig;
+use crate::{config::SinkDescription, internal_events::TemplateRenderingFailed};
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]

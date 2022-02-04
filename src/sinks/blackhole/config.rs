@@ -1,8 +1,10 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::blackhole::sink::BlackholeSink;
-use crate::sinks::{Healthcheck, VectorSink};
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
+};
 
 const fn default_print_interval_secs() -> u64 {
     1
@@ -25,7 +27,7 @@ impl SinkConfig for BlackholeConfig {
         let sink = BlackholeSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

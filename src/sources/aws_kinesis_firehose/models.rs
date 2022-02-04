@@ -1,5 +1,4 @@
-use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents an AWS Kinesis Firehose request

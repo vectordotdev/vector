@@ -1,10 +1,12 @@
-use crate::expression::Expr;
-use crate::parser::{Ident, Node};
-use crate::{Parameter, Span};
-use std::fmt;
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
-#[derive(Debug, PartialEq)]
+use crate::{
+    expression::Expr,
+    parser::{Ident, Node},
+    Parameter, Span,
+};
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionArgument {
     ident: Option<Node<Ident>>,
     parameter: Option<Parameter>,

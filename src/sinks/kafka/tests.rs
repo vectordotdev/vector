@@ -3,19 +3,13 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use crate::event::Value;
-    use crate::kafka::KafkaCompression;
-    use crate::sinks::kafka::config::{KafkaRole, KafkaSinkConfig};
-    use crate::sinks::kafka::sink::KafkaSink;
-    use crate::sinks::kafka::*;
-    use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-    use crate::sinks::util::{BatchConfig, NoDefaultsBatchSettings, StreamSink};
-    use crate::test_util::components;
-    use crate::{
-        kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{random_lines_with_stream, random_string, wait_for},
-        tls::TlsOptions,
+    use std::{
+        collections::{BTreeMap, HashMap},
+        future::ready,
+        thread,
+        time::Duration,
     };
+
     use bytes::Bytes;
     use futures::StreamExt;
     use rdkafka::{
@@ -23,10 +17,29 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use std::collections::HashMap;
-    use std::{collections::BTreeMap, future::ready, thread, time::Duration};
-    use vector_core::buffers::Acker;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::{
+        buffers::Acker,
+        event::{BatchNotifier, BatchStatus},
+    };
+
+    use crate::{
+        event::Value,
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        sinks::{
+            kafka::{
+                config::{KafkaRole, KafkaSinkConfig},
+                sink::KafkaSink,
+                *,
+            },
+            util::{
+                encoding::{EncodingConfig, StandardEncodings},
+                BatchConfig, NoDefaultsBatchSettings,
+            },
+            VectorSink,
+        },
+        test_util::{components, random_lines_with_stream, random_string, wait_for},
+        tls::TlsOptions,
+    };
 
     #[tokio::test]
     async fn healthcheck() {
@@ -246,7 +259,8 @@ mod integration_test {
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
         let (acker, ack_counter) = Acker::basic();
-        let sink = Box::new(KafkaSink::new(config, acker).unwrap());
+        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -254,19 +268,20 @@ mod integration_test {
 
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        let input_events = events.map(|mut event| {
+        let input_events = events.map(move |mut events| {
+            let headers_key = headers_key.clone();
             let mut header_values = BTreeMap::new();
             header_values.insert(
                 header_1_key.to_string(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            event
-                .as_mut_log()
-                .insert(headers_key.clone(), header_values);
-            event
+            events.for_each_log(move |log| {
+                log.insert(headers_key.clone(), header_values.clone());
+            });
+            events
         });
         components::init_test();
-        sink.run(Box::pin(input_events)).await.unwrap();
+        sink.run(input_events).await.unwrap();
         components::SINK_TESTS.assert(&["protocol"]);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

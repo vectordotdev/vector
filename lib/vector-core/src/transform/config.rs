@@ -1,14 +1,9 @@
-use crate::config::{ComponentKey, GlobalOptions};
-use async_trait::async_trait;
-use indexmap::IndexMap;
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum DataType {
-    Any,
-    Log,
-    Metric,
-}
+use async_trait::async_trait;
+use indexmap::IndexMap;
+
+use crate::config::{ComponentKey, DataType, GlobalOptions, Output};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
@@ -55,11 +50,7 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn input_type(&self) -> DataType;
 
-    fn output_type(&self) -> DataType;
-
-    fn named_outputs(&self) -> Vec<String> {
-        Vec::new()
-    }
+    fn outputs(&self) -> Vec<Output>;
 
     fn transform_type(&self) -> &'static str;
 

@@ -22,9 +22,9 @@ extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
-#[cfg(feature = "jemallocator")]
+#[cfg(feature = "tikv-jemallocator")]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
@@ -56,7 +56,6 @@ pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
@@ -66,8 +65,9 @@ pub mod shutdown;
 pub mod signal;
 pub mod sink;
 pub mod sinks;
+pub mod source_sender;
 pub mod sources;
-pub(crate) mod stats;
+pub mod stats;
 pub mod stream;
 #[cfg(feature = "api-client")]
 mod tap;
@@ -89,8 +89,7 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use pipeline::Pipeline;
-
+pub use source_sender::SourceSender;
 pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {

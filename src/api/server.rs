@@ -1,13 +1,15 @@
-use super::{handler, schema, ShutdownTx};
-use crate::{config, topology};
+use std::{convert::Infallible, net::SocketAddr};
+
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig, WebSocketProtocols},
     Data, Request, Schema,
 };
 use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
-use std::{convert::Infallible, net::SocketAddr};
 use tokio::sync::oneshot;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
+
+use super::{handler, schema, ShutdownTx};
+use crate::{config, topology};
 
 pub struct Server {
     _shutdown: ShutdownTx,
@@ -89,16 +91,13 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
     // Handle GraphQL queries. Headers will first be parsed to determine whether the query is
     // a subscription and if so, an attempt will be made to upgrade the connection to WebSockets.
     // All other queries will fall back to the default HTTP handler.
-    let graphql_handler =
-        warp::path("graphql")
-            .and(graphql_subscription_handler)
-            .or(
-                async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
-                    |(schema, request): (Schema<_, _, _>, Request)| async move {
-                        Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
-                    },
-                ),
-            );
+    let graphql_handler = warp::path("graphql").and(graphql_subscription_handler.or(
+        async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
+            |(schema, request): (Schema<_, _, _>, Request)| async move {
+                Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
+            },
+        ),
+    ));
 
     // Provide a playground for executing GraphQL queries/mutations/subscriptions.
     let graphql_playground = if playground {

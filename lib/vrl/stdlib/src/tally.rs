@@ -1,6 +1,6 @@
-use vrl::prelude::*;
-
 use std::collections::{BTreeMap, HashMap};
+
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tally;

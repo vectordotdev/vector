@@ -1,5 +1,6 @@
+use vector_common::TimeZone;
+
 use crate::{state::Runtime, Target};
-use shared::TimeZone;
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,

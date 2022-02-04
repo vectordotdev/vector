@@ -6,12 +6,12 @@ edition = "2021"
 publish = false
 
 [dependencies]
+bytes = "1.1.0"
 compiler = { package = "vrl-compiler", path = "../compiler" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
-parser = { package = "vrl-parser", path = "../parser" }
-lookup = { path = "../../lookup" }
-shared = { path = "../../shared", default-features = false }
-bytes = "1.1.0"
 indoc = "1"
+lookup = { path = "../../lookup" }
 ordered-float = "2"
+parser = { package = "vrl-parser", path = "../parser" }
 thiserror = "1"
+vector_common = { path = "../../vector-common", default-features = false }

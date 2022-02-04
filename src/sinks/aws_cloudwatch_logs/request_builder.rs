@@ -1,19 +1,20 @@
-use crate::config::LogSchema;
-use crate::event::{Event, Value};
 use chrono::Utc;
-
 use snafu::ResultExt;
-use vector_core::event::{EventFinalizers, Finalizable};
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::{EventFinalizers, Finalizable},
+    ByteSizeOf,
+};
 
-use super::CloudwatchLogsError;
-use super::TemplateRenderingFailed;
-use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
-use crate::sinks::aws_cloudwatch_logs::IoError;
-use crate::sinks::util::encoding::{Encoder, EncodingConfiguration, StandardEncodings};
-
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::template::Template;
+use super::{CloudwatchLogsError, TemplateRenderingFailed};
+use crate::{
+    config::LogSchema,
+    event::{Event, Value},
+    sinks::{
+        aws_cloudwatch_logs::{CloudwatchKey, IoSnafu},
+        util::encoding::{Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings},
+    },
+    template::Template,
+};
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
@@ -83,7 +84,7 @@ impl CloudwatchRequestBuilder {
         let mut message_bytes = vec![];
         self.encoding
             .encode_input(event, &mut message_bytes)
-            .context(IoError)?;
+            .context(IoSnafu)?;
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
         if message.len() > MAX_MESSAGE_SIZE {

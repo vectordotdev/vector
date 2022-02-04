@@ -1,6 +1,6 @@
-use crate::ast::GrokPattern;
-use crate::lexer::Lexer;
 use lalrpop_util::{lalrpop_mod, ParseError};
+
+use crate::{ast::GrokPattern, lexer::Lexer};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -22,11 +22,11 @@ pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::ast::{Destination, Function, FunctionArgument};
-
     use lookup::{LookupBuf, SegmentBuf};
     use vrl_compiler::Value;
+
+    use super::*;
+    use crate::ast::{Destination, Function, FunctionArgument};
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(
@@ -119,6 +119,24 @@ mod tests {
         assert_eq!(
             parse_grok_pattern(input).expect_err("must be an invalid escape error"),
             "invalid escape literal '\\:'"
+        );
+    }
+
+    #[test]
+    fn escaped_new_line() {
+        let input = r#"%{data::array("\\n")}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(
+            parsed.destination,
+            Some(Destination {
+                path: LookupBuf::root(),
+                filter_fn: Some(Function {
+                    name: "array".to_string(),
+                    args: Some(vec![FunctionArgument::Arg("\n".into())]),
+                })
+            })
         );
     }
 }

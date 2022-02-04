@@ -1,6 +1,8 @@
-use crate::config;
 use std::path::PathBuf;
+
 use structopt::StructOpt;
+
+use crate::config;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]

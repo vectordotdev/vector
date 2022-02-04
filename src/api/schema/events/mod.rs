@@ -1,19 +1,18 @@
 mod encoding;
-mod log;
-mod notification;
-mod output;
-
-use encoding::EventEncodingType;
-use output::OutputEventsPayload;
-
-use crate::{api::tap::TapController, topology::WatchRx};
+pub mod log;
+pub mod notification;
+pub mod output;
 
 use async_graphql::{Context, Subscription};
+use encoding::EventEncodingType;
 use futures::Stream;
 use itertools::Itertools;
+use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{api::tap::TapController, topology::WatchRx};
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -38,7 +37,7 @@ impl EventsSubscription {
 /// Creates an events stream based on component ids, and a provided interval. Will emit
 /// control messages that bubble up the application if the sink goes away. The stream contains
 /// all matching events; filtering should be done at the caller level.
-fn create_events_stream(
+pub(crate) fn create_events_stream(
     watch_rx: WatchRx,
     component_id_patterns: Vec<String>,
     interval: u64,

@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
+
+use super::{PathComponent, PathIter, Value};
 
 /// Removes field value specified by the given path and return its value.
 ///
@@ -68,9 +69,9 @@ fn array_remove(values: &mut Vec<Value>, index: usize) -> Option<Value> {
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn array_remove_from_middle() {

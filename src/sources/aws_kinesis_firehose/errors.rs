@@ -1,9 +1,10 @@
-use super::handlers::RecordDecodeError;
 use snafu::Snafu;
 use warp::http::StatusCode;
 
+use super::handlers::RecordDecodeError;
+
 #[derive(Debug, Snafu)]
-#[snafu(visibility = "pub")]
+#[snafu(visibility(pub(crate)))]
 pub enum RequestError {
     #[snafu(display(
         "Missing access key. X-Amz-Firehose-Access-Key required for request: {}",
@@ -40,7 +41,7 @@ pub enum RequestError {
         source
     ))]
     ShuttingDown {
-        source: crate::pipeline::ClosedError,
+        source: crate::source_sender::ClosedError,
         request_id: String,
     },
     #[snafu(display("Unsupported encoding: {}", encoding))]

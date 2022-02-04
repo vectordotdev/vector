@@ -1,6 +1,5 @@
-use vrl::prelude::*;
-
 use indexmap::IndexSet;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unique;

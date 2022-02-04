@@ -1,11 +1,14 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,8 +42,8 @@ impl TransformConfig for AnsiStripperConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -54,7 +57,7 @@ pub struct AnsiStripper {
 }
 
 impl FunctionTransform for AnsiStripper {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
@@ -78,8 +81,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
-    use crate::transforms::test::transform_one;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

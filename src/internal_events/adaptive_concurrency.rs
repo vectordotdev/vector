@@ -1,5 +1,6 @@
-use metrics::histogram;
 use std::time::Duration;
+
+use metrics::histogram;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

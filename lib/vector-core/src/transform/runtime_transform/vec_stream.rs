@@ -22,12 +22,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use futures::{stream::Fuse, Stream, StreamExt};
-use pin_project::pin_project;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{stream::Fuse, Stream, StreamExt};
+use pin_project::pin_project;
 
 impl<T: ?Sized> VecStreamExt for T where T: Stream {}
 

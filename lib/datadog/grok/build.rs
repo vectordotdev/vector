@@ -9,14 +9,13 @@ use std::{
 };
 
 fn main() {
+    read_grok_patterns();
+
+    println!("cargo:rerun-if-changed=src/parser.lalrpop");
     lalrpop::Configuration::new()
         .always_use_colors()
         .process_current_dir()
         .unwrap();
-
-    println!("cargo:rerun-if-changed=src/parser.lalrpop");
-
-    read_grok_patterns();
 }
 
 /// Reads grok patterns defined in the `patterns` folder into the static `PATTERNS` variable

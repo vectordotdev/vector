@@ -1,10 +1,11 @@
-use futures::{future::BoxFuture, FutureExt};
-use hyper::client::connect::dns::Name;
-use snafu::ResultExt;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
     task::{Context, Poll},
 };
+
+use futures::{future::BoxFuture, FutureExt};
+use hyper::client::connect::dns::Name;
+use snafu::ResultExt;
 use tokio::task::spawn_blocking;
 use tower::Service;
 
@@ -40,9 +41,9 @@ impl Resolver {
                 (name_ref, dummy_port).to_socket_addrs()
             })
             .await
-            .context(JoinError)?
+            .context(JoinSnafu)?
             .map(LookupIp)
-            .context(UnableLookup)
+            .context(UnableLookupSnafu)
         }
     }
 }

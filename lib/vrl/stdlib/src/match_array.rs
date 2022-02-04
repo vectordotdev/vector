@@ -100,8 +100,9 @@ impl Expression for MatchArrayFn {
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         match_array => MatchArray;

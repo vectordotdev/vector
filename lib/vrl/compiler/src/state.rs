@@ -1,6 +1,6 @@
-use crate::expression::assignment;
-use crate::{parser::ast::Ident, TypeDef, Value};
 use std::{any::Any, collections::HashMap};
+
+use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
 
 /// The state held by the compiler.
 ///

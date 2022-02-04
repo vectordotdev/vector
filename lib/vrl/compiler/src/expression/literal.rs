@@ -1,13 +1,15 @@
-use crate::expression::Resolved;
-use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use std::{borrow::Cow, convert::TryFrom, fmt};
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
+
+use crate::{
+    expression::Resolved, value::Regex, vm::OpCode, Context, Expression, Span, State, TypeDef,
+    Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -84,6 +86,14 @@ impl Expression for Literal {
         };
 
         type_def.infallible()
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Add the literal as a constant.
+        let constant = vm.add_constant(self.to_value());
+        vm.write_opcode(OpCode::Constant);
+        vm.write_primitive(constant);
+        Ok(())
     }
 }
 

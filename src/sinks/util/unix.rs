@@ -1,3 +1,13 @@
+use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{stream::BoxStream, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio::{net::UnixStream, time::sleep};
+use vector_core::{buffers::Acker, ByteSizeOf};
+
 use crate::{
     config::SinkContext,
     event::Event,
@@ -15,14 +25,6 @@ use crate::{
         Healthcheck, VectorSink,
     },
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{stream::BoxStream, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
-use tokio::{net::UnixStream, time::sleep};
-use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -49,7 +51,7 @@ impl UnixSinkConfig {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -73,7 +75,7 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectError)
+        UnixStream::connect(&self.path).await.context(ConnectSnafu)
     }
 
     async fn connect_backoff(&self) -> UnixStream {
@@ -131,7 +133,7 @@ impl UnixSink {
 }
 
 #[async_trait]
-impl StreamSink for UnixSink {
+impl StreamSink<Event> for UnixSink {
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
@@ -175,10 +177,13 @@ impl StreamSink for UnixSink {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sinks::util::{encode_log, Encoding};
-    use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
+
+    use super::*;
+    use crate::{
+        sinks::util::{encode_log, Encoding},
+        test_util::{random_lines_with_stream, CountReceiver},
+    };
 
     fn temp_uds_path(name: &str) -> PathBuf {
         tempfile::tempdir().unwrap().into_path().join(name)

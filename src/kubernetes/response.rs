@@ -1,8 +1,8 @@
 //! Trait and related types for Kubernetes HTTP Responses.
 
-use k8s_openapi::Response as K8sResponse;
 use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, ResponseError, WatchResponse,
+    apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, Response as K8sResponse,
+    ResponseError, WatchResponse,
 };
 use serde::de::DeserializeOwned;
 

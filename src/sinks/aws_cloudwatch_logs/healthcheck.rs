@@ -1,7 +1,8 @@
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
 use rusoto_core::RusotoError;
 use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient, DescribeLogGroupsRequest};
 use snafu::Snafu;
+
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {

@@ -1,8 +1,10 @@
-use crate::sinks::util::{Merged, SinkBatchSettings};
-
-use super::super::batch::{Batch, BatchConfig, BatchError, PushResult};
-use super::super::ElementCount;
 use vector_core::ByteSizeOf;
+
+use super::super::{
+    batch::{Batch, BatchConfig, BatchError, PushResult},
+    ElementCount,
+};
+use crate::sinks::util::{Merged, SinkBatchSettings};
 
 pub trait Partition<K> {
     fn partition(&self) -> K;

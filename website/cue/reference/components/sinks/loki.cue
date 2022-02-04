@@ -23,7 +23,12 @@ components: sinks: loki: {
 				max_events:   100_000
 				timeout_secs: 1
 			}
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -118,7 +123,7 @@ components: sinks: loki: {
 			type: string: {
 				default: "drop"
 				enum: {
-					"drop":              "Drop the event, with a warning."
+					"drop":              "Drop the event."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
@@ -129,6 +134,7 @@ components: sinks: loki: {
 			required:    false
 			type: bool: default: false
 		}
+
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."

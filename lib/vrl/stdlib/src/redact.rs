@@ -1,7 +1,10 @@
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
+
 use lazy_static::lazy_static;
-use std::borrow::Cow;
-use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -267,8 +270,9 @@ impl FromStr for Redactor {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         redact => Redact;

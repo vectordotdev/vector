@@ -1,9 +1,10 @@
-use pin_project::pin_project;
 use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use pin_project::pin_project;
 use tokio::io::{self, AsyncRead, AsyncWrite, ReadBuf};
 
 /// A type wrapper for objects that can exist in either a raw state or

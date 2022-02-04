@@ -1,12 +1,13 @@
 // ## skip check-events ##
 
+use std::time::Duration;
+
 use http::{
     header::{self, HeaderMap, HeaderValue},
     Request, Response,
 };
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
-use std::time::Duration;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
