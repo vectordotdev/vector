@@ -77,7 +77,7 @@ order = [
 [transforms.processing.logs.pipelines.nginx]
 name = "nginx"
 filter.type = "datadog_search"
-filter.source = "source:nginx"
+filter.source = "*:*"
 
 [[transforms.processing.logs.pipelines.nginx.transforms]]
 type = "remap"
@@ -213,7 +213,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.redis]
 name = "redis"
 filter.type = "datadog_search"
-filter.source = "source:redis"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.redis.transforms]]
 type = "remap"
@@ -290,7 +290,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.consul]
 name = "consul"
 filter.type = "datadog_search"
-filter.source = "source:consul"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.consul.transforms]]
 type = "remap"
@@ -361,7 +361,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.python]
 name = "python"
 filter.type = "datadog_search"
-filter.source = "source:python"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.python.transforms]]
 type = "remap"
@@ -513,7 +513,7 @@ if exists(.custom.dd.service) {
 [transforms.processing.logs.pipelines.rabbitmq]
 name = "rabbitmq"
 filter.type = "datadog_search"
-filter.source = "source:rabbitmq"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.rabbitmq.transforms]]
 type = "remap"
@@ -586,7 +586,7 @@ if exists(.custom.message) {
 [transforms.processing.logs.pipelines.zookeeper]
 name = "zookeeper"
 filter.type = "datadog_search"
-filter.source = "source:zookeeper"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.zookeeper.transforms]]
 type = "remap"
@@ -679,7 +679,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.elasticsearch]
 name = "elasticsearch"
 filter.type = "datadog_search"
-filter.source = "source:elasticsearch"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.elasticsearch.transforms]]
 type = "remap"
@@ -761,7 +761,7 @@ if .custom.node_name == null {
 [transforms.processing.logs.pipelines.kafka]
 name = "kafka"
 filter.type = "datadog_search"
-filter.source = "source:kafka"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.kafka.transforms]]
 type = "remap"
@@ -856,7 +856,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.couchdb]
 name = "couchdb"
 filter.type = "datadog_search"
-filter.source = "source:couchdb"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.couchdb.transforms]]
 type = "remap"
@@ -936,7 +936,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [transforms.processing.logs.pipelines.docker]
 name = "docker"
 filter.type = "datadog_search"
-filter.source = "source:docker"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.docker.transforms]]
 type = "remap"
@@ -1080,7 +1080,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.ruby]
 name = "ruby"
 filter.type = "datadog_search"
-filter.source = "source:ruby"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.ruby.transforms]]
 type = "remap"
@@ -1291,7 +1291,7 @@ if (result, err = .custom.duration*1000000; err == null) {
 [transforms.processing.logs.pipelines.vault]
 name = "vault"
 filter.type = "datadog_search"
-filter.source = "source:vault"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.vault.transforms]]
 type = "remap"
@@ -1414,7 +1414,7 @@ if .custom.http.method == null {
 [transforms.processing.logs.pipelines.nginx_ingress_controller]
 name = "nginx_ingress_controller"
 filter.type = "datadog_search"
-filter.source = "source:nginx-ingress-controller"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
 type = "remap"
@@ -1559,7 +1559,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.mysql]
 name = "mysql"
 filter.type = "datadog_search"
-filter.source = "source:mysql"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.mysql.transforms]]
 type = "remap"
@@ -1701,7 +1701,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler]
 name = "kubernetes_cluster_autoscaler"
 filter.type = "datadog_search"
-filter.source = "source:cluster-autoscaler"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
 type = "remap"
@@ -1768,7 +1768,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.aws_alb_ingress_controller]
 name = "aws_alb_ingress_controller"
 filter.type = "datadog_search"
-filter.source = "source:aws-alb-ingress-controller"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
 type = "remap"
@@ -1835,7 +1835,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.proxysql]
 name = "proxysql"
 filter.type = "datadog_search"
-filter.source = "source:proxysql"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.proxysql.transforms]]
 type = "remap"
@@ -2199,7 +2199,7 @@ del(.custom.identity.authorization.evidence.principalId)
 [transforms.processing.logs.pipelines.azure_web]
 name = "azure_web"
 filter.type = "datadog_search"
-filter.source = "source:azure.web"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure_web.transforms]]
 type = "remap"
@@ -2305,7 +2305,7 @@ del(.custom.identity.authorization.evidence.principalId)
 [transforms.processing.logs.pipelines.azure_storage]
 name = "azure_storage"
 filter.type = "datadog_search"
-filter.source = "source:azure.storage"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure_storage.transforms]]
 type = "remap"
@@ -2411,7 +2411,7 @@ del(.custom.identity.authorization.evidence.principalId)
 [transforms.processing.logs.pipelines.azure_network]
 name = "azure_network"
 filter.type = "datadog_search"
-filter.source = "source:azure.network"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure_network.transforms]]
 type = "remap"
@@ -2525,7 +2525,7 @@ del(.custom.identity.authorization.evidence.principalId)
 [transforms.processing.logs.pipelines.azure_compute]
 name = "azure_compute"
 filter.type = "datadog_search"
-filter.source = "source:azure.compute"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure_compute.transforms]]
 type = "remap"
@@ -2639,7 +2639,7 @@ del(.custom.identity.authorization.evidence.principalId)
 [transforms.processing.logs.pipelines.etcd]
 name = "etcd"
 filter.type = "datadog_search"
-filter.source = "source:etcd"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.etcd.transforms]]
 type = "remap"
@@ -2774,7 +2774,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.auth0]
 name = "auth0"
 filter.type = "datadog_search"
-filter.source = "source:auth0"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.auth0.transforms]]
 type = "remap"
@@ -3106,7 +3106,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.aws_ecs-agent]
 name = "aws_ecs-agent"
 filter.type = "datadog_search"
-filter.source = "source:amazon-ecs-agent"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
 type = "remap"
@@ -3171,7 +3171,7 @@ if exists(.custom.msg) {
 [transforms.processing.logs.pipelines.nodejs]
 name = "nodejs"
 filter.type = "datadog_search"
-filter.source = "source:nodejs"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.nodejs.transforms]]
 type = "remap"
@@ -3331,7 +3331,7 @@ if exists(.custom.dd.service) {
 [transforms.processing.logs.pipelines.postgresql]
 name = "postgresql"
 filter.type = "datadog_search"
-filter.source = "source:postgresql"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.postgresql.transforms]]
 type = "remap"
@@ -3442,7 +3442,7 @@ if (result, err = .custom.duration * 1000000; err == null) {
 [transforms.processing.logs.pipelines.cassandra]
 name = "cassandra"
 filter.type = "datadog_search"
-filter.source = "source:cassandra"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.cassandra.transforms]]
 type = "remap"
@@ -3542,7 +3542,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.apache_httpd]
 name = "apache_httpd"
 filter.type = "datadog_search"
-filter.source = "source:httpd"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.apache_httpd.transforms]]
 type = "remap"
@@ -3645,7 +3645,7 @@ if status == "" {
 [transforms.processing.logs.pipelines.azure_recovery_services]
 name = "azure_recovery_services"
 filter.type = "datadog_search"
-filter.source = "source:azure.recoveryservices"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
 type = "remap"
@@ -3762,7 +3762,7 @@ del(.custom.properties.Entity_Name)
 [transforms.processing.logs.pipelines.c]
 name = "c"
 filter.type = "datadog_search"
-filter.source = "source:csharp"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.c.transforms]]
 type = "remap"
@@ -4000,7 +4000,7 @@ if exists(.custom.dd.service) {
 [transforms.processing.logs.pipelines.web_browser_logs]
 name = "web_browser_logs"
 filter.type = "datadog_search"
-filter.source = "source:browser"
+filter.source = "-*:*"
 
 [[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
 type = "remap"
