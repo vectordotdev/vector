@@ -1,4 +1,9 @@
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{
+    collections::HashMap,
+    num::NonZeroUsize,
+    path::PathBuf,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use futures::StreamExt;
 use once_cell::race::OnceNonZeroUsize;
@@ -253,7 +258,7 @@ impl Application {
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), topology.watch(), topology.running.clone()))
+                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

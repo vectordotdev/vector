@@ -69,7 +69,7 @@ fn make_routes(
 
     // Health.
     let health = warp::path("health")
-        .and(with_shared(running.clone()))
+        .and(with_shared(running))
         .and_then(handler::health);
 
     // 404.
@@ -160,5 +160,5 @@ fn make_routes(
 fn with_shared(
     shared: Arc<AtomicBool>,
 ) -> impl Filter<Extract = (Arc<AtomicBool>,), Error = Infallible> + Clone {
-    warp::any().map(move || shared.clone())
+    warp::any().map(move || Arc::<AtomicBool>::clone(&shared))
 }
