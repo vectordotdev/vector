@@ -3,7 +3,7 @@ use std::{
     iter,
 };
 
-use bytes::Bytes;
+
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
