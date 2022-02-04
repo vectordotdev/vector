@@ -144,20 +144,20 @@ impl SourceConfig for SimpleHttpConfig {
         let (framing, decoding) = if let Some(encoding) = self.encoding {
             match encoding {
                 Encoding::Text => (
-                    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::new()),
-                    DeserializerConfig::Bytes(BytesDeserializerConfig::new()),
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
                 ),
                 Encoding::Json => (
-                    FramingConfig::Bytes(BytesDecoderConfig::new()),
-                    DeserializerConfig::Json(JsonDeserializerConfig::new()),
+                    BytesDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
                 ),
                 Encoding::Ndjson => (
-                    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::new()),
-                    DeserializerConfig::Json(JsonDeserializerConfig::new()),
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
                 ),
                 Encoding::Binary => (
-                    FramingConfig::Bytes(BytesDecoderConfig::new()),
-                    DeserializerConfig::Bytes(BytesDeserializerConfig::new()),
+                    BytesDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
                 ),
             }
         } else {
@@ -452,7 +452,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            Some(FramingConfig::Bytes(BytesDecoderConfig::new())),
+            Some(BytesDecoderConfig::new().into()),
             None,
         )
         .await;
@@ -482,7 +482,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -523,7 +523,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -567,7 +567,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -610,7 +610,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -685,7 +685,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -724,7 +724,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -799,7 +799,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -831,7 +831,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -881,7 +881,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(DeserializerConfig::Json(JsonDeserializerConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 

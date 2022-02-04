@@ -13,7 +13,8 @@ pub struct OctetCountingDecoderConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    octet_counting: OctetCountingDecoderOptions,
+    /// Options for the octet counting decoder.
+    pub octet_counting: OctetCountingDecoderOptions,
 }
 
 impl OctetCountingDecoderConfig {

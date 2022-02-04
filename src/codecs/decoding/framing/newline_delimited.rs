@@ -11,7 +11,8 @@ pub struct NewlineDelimitedDecoderConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    newline_delimited: NewlineDelimitedDecoderOptions,
+    /// Options for the newline delimited decoder.
+    pub newline_delimited: NewlineDelimitedDecoderOptions,
 }
 
 /// Options for building a `NewlineDelimitedDecoder`.

@@ -12,9 +12,10 @@ pub use format::{
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, FramingError, LengthDelimitedDecoder,
-    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
-    OctetCountingDecoder, OctetCountingDecoderConfig,
+    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
+    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
+    NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
+    OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -67,29 +68,98 @@ impl StreamDecodingError for Error {
 }
 
 /// Configuration for building a `Framer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `BytesDecoder`.
-    Bytes(BytesDecoderConfig),
+    Bytes,
     /// Configures the `CharacterDelimitedDecoder`.
-    CharacterDelimited(CharacterDelimitedDecoderConfig),
+    CharacterDelimited {
+        /// Options for the character delimited decoder.
+        character_delimited: CharacterDelimitedDecoderOptions,
+    },
     /// Configures the `LengthDelimitedDecoder`.
-    LengthDelimited(LengthDelimitedDecoderConfig),
+    LengthDelimited,
     /// Configures the `NewlineDelimitedDecoder`.
-    NewlineDelimited(NewlineDelimitedDecoderConfig),
+    NewlineDelimited {
+        #[serde(
+            default,
+            skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        )]
+        /// Options for the newline delimited decoder.
+        newline_delimited: NewlineDelimitedDecoderOptions,
+    },
     /// Configures the `OctetCountingDecoder`.
-    OctetCounting(OctetCountingDecoderConfig),
+    OctetCounting {
+        #[serde(
+            default,
+            skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        )]
+        /// Options for the octet counting decoder.
+        octet_counting: OctetCountingDecoderOptions,
+    },
+}
+
+impl From<BytesDecoderConfig> for FramingConfig {
+    fn from(_: BytesDecoderConfig) -> Self {
+        Self::Bytes
+    }
+}
+
+impl From<CharacterDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: CharacterDelimitedDecoderConfig) -> Self {
+        Self::CharacterDelimited {
+            character_delimited: config.character_delimited,
+        }
+    }
+}
+
+impl From<LengthDelimitedDecoderConfig> for FramingConfig {
+    fn from(_: LengthDelimitedDecoderConfig) -> Self {
+        Self::LengthDelimited
+    }
+}
+
+impl From<NewlineDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: NewlineDelimitedDecoderConfig) -> Self {
+        Self::NewlineDelimited {
+            newline_delimited: config.newline_delimited,
+        }
+    }
+}
+
+impl From<OctetCountingDecoderConfig> for FramingConfig {
+    fn from(config: OctetCountingDecoderConfig) -> Self {
+        Self::OctetCounting {
+            octet_counting: config.octet_counting,
+        }
+    }
 }
 
 impl FramingConfig {
-    fn build(&self) -> Framer {
+    fn build(self) -> Framer {
         match self {
-            FramingConfig::Bytes(config) => Framer::Bytes(config.build()),
-            FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
-            FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
-            FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
+            FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
+            FramingConfig::CharacterDelimited {
+                character_delimited,
+            } => Framer::CharacterDelimited(
+                CharacterDelimitedDecoderConfig {
+                    character_delimited,
+                }
+                .build(),
+            ),
+            FramingConfig::LengthDelimited => {
+                Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
+            }
+            FramingConfig::NewlineDelimited { newline_delimited } => Framer::NewlineDelimited(
+                NewlineDelimitedDecoderConfig { newline_delimited }.build(),
+            ),
+            FramingConfig::OctetCounting { octet_counting } => {
+                Framer::OctetCounting(OctetCountingDecoderConfig { octet_counting }.build())
+            }
         }
     }
 }
@@ -139,25 +209,47 @@ impl tokio_util::codec::Decoder for Framer {
 }
 
 /// Configuration for building a `Deserializer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum DeserializerConfig {
     /// Configures the `BytesDeserializer`.
-    Bytes(BytesDeserializerConfig),
+    Bytes,
     /// Configures the `JsonDeserializer`.
-    Json(JsonDeserializerConfig),
+    Json,
     #[cfg(feature = "sources-syslog")]
     /// Configures the `SyslogDeserializer`.
-    Syslog(SyslogDeserializerConfig),
+    Syslog,
+}
+
+impl From<BytesDeserializerConfig> for DeserializerConfig {
+    fn from(_: BytesDeserializerConfig) -> Self {
+        Self::Bytes
+    }
+}
+
+impl From<JsonDeserializerConfig> for DeserializerConfig {
+    fn from(_: JsonDeserializerConfig) -> Self {
+        Self::Json
+    }
+}
+
+#[cfg(feature = "sources-syslog")]
+impl From<SyslogDeserializerConfig> for DeserializerConfig {
+    fn from(_: SyslogDeserializerConfig) -> Self {
+        Self::Syslog
+    }
 }
 
 impl DeserializerConfig {
     fn build(&self) -> Deserializer {
         match self {
-            DeserializerConfig::Bytes(config) => Deserializer::Bytes(config.build()),
-            DeserializerConfig::Json(config) => Deserializer::Json(config.build()),
+            DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
+            DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
             #[cfg(feature = "sources-syslog")]
-            DeserializerConfig::Syslog(config) => Deserializer::Syslog(config.build()),
+            DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
         }
     }
 }
@@ -279,7 +371,7 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> crate::Result<Decoder> {
+    pub fn build(self) -> crate::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
 
