@@ -271,6 +271,8 @@ pub(crate) use self::splunk_hec::*;
 pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
+#[cfg(feature = "sources-syslog")]
+pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
@@ -282,8 +284,8 @@ pub use self::windows::*;
 pub use self::{
     adaptive_concurrency::*, add_fields::*, add_tags::*, aggregate::*, ansi_stripper::*, batch::*,
     blackhole::*, common::*, conditions::*, elasticsearch::*, encoding_transcode::*, heartbeat::*,
-    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, split::*, stdin::*, syslog::*,
-    tcp::*, template::*, udp::*, unix::*, vector::*,
+    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, split::*, stdin::*, tcp::*,
+    template::*, udp::*, unix::*, vector::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
