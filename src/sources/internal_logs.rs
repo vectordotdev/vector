@@ -2,12 +2,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future, stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{InternalLogsEventsReceived, StreamClosedError},
+    internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
@@ -65,24 +64,13 @@ async fn run(
         .chain(tokio_stream::wrappers::BroadcastStream::new(
             subscription.receiver,
         ))
-        .filter_map(|log| {
-            future::ready(log.ok().and_then(|l| {
-                if l.contains("internal") {
-                    None
-                } else {
-                    Some(l)
-                }
-            }))
-        })
+        .filter_map(|log| future::ready(log.ok()))
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        emit!(&InternalLogsEventsReceived {
-            byte_size: log.size_of(),
-        });
         if let Ok(hostname) = &hostname {
             log.insert(host_key.clone(), hostname.to_owned());
         }
@@ -90,6 +78,7 @@ async fn run(
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
         if let Err(error) = out.send(Event::from(log)).await {
+            // this wont trigger any infinite loop considering it stops the component
             emit!(&StreamClosedError { error, count: 1 });
             return Err(());
         }
