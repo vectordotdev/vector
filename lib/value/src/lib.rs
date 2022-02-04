@@ -29,5 +29,5 @@
 pub mod kind;
 mod value;
 
+pub use self::value::{Value, ValueRegex};
 pub use kind::Kind;
-pub use value::{Value, ValueRegex};

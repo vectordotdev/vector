@@ -81,7 +81,7 @@ impl Value {
         }
     }
 
-    /// Returns self as a mutable `BTreeMap<String, Value>`
+    /// Returns self as a `&mut BTreeMap<String, Value>`
     ///
     /// # Panics
     ///
@@ -91,7 +91,7 @@ impl Value {
             .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
     }
 
-    /// Returns self as a mutable `BTreeMap<String, Value>`
+    /// Returns self as a `&BTreeMap<String, Value>`
     ///
     /// # Panics
     ///
@@ -99,6 +99,16 @@ impl Value {
     pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
         self.as_map()
             .expect("Tried to call `Value::unwrap_map` on a non-map value.")
+    }
+
+    /// Returns self as a `&[Value]`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Array`.
+    pub fn unwrap_array(&self) -> &[Value] {
+        self.as_array()
+            .expect("Tried to call `Value::unwrap_array` on a non-array value.")
     }
 
     /// Converts the Value into a byte representation regardless of its original type.

@@ -56,7 +56,7 @@ twox-hash = { version = "1.6.2", default-features = false }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
-value = { package = "value", path = "../value", features = ["lua"]}
+value = { package = "value", path = "../value", features = ["lua", "json"]}
 
 [build-dependencies]
 prost-build = "0.9"
@@ -75,6 +75,7 @@ rand = "0.8.4"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
+value = { package = "value", path = "../value", features = ["lua", "json", "arbitrary"]}
 
 [features]
 api = ["async-graphql"]

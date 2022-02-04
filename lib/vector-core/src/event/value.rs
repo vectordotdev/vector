@@ -1,16 +1,4 @@
-
-
-
-
-
-
-
-
-
-
 pub use value::Value;
-
-
 
 // #[derive(PartialOrd, Debug, Clone, Deserialize)]
 // pub enum Value {
@@ -142,96 +130,7 @@ pub use value::Value;
 //
 
 //
-//     /// Get a mutable borrow of the value by lookup.
-//     ///
-//     /// ```rust
-//     /// use vector_core::event::Value;
-//     /// use lookup::Lookup;
-//     /// use std::collections::BTreeMap;
-//     ///
-//     /// let mut inner_map = Value::from(BTreeMap::default());
-//     /// inner_map.insert("baz", 1);
-//     ///
-//     /// let mut map = Value::from(BTreeMap::default());
-//     /// map.insert("bar", inner_map.clone());
-//     ///
-//     /// assert_eq!(map.get_mut("bar").unwrap(), Some(&mut Value::from(inner_map)));
-//     ///
-//     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
-//     /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
-//     /// ```
-//     ///
-//     /// # Panics
-//     ///
-//     /// This function may panic if an invariant is violated, indicating a
-//     /// serious bug.
-//     #[allow(clippy::missing_errors_doc)]
-//     pub fn get_mut<'a>(
-//         &mut self,
-//         lookup: impl Into<Lookup<'a>> + Debug,
-//     ) -> std::result::Result<Option<&mut Value>, EventError> {
-//         let mut working_lookup = lookup.into();
-//         let span = trace_span!("get_mut", lookup = %working_lookup);
-//         let _guard = span.enter();
-//
-//         let this_segment = working_lookup.pop_front();
-//         match (this_segment, self) {
-//             // We've met an end and found our value.
-//             (None, item) => Ok(Some(item)),
-//             // This is just not allowed!
-//             (_, Value::Boolean(_))
-//             | (_, Value::Bytes(_))
-//             | (_, Value::Timestamp(_))
-//             | (_, Value::Float(_))
-//             | (_, Value::Integer(_))
-//             | (_, Value::Null) => unimplemented!(),
-//             // Descend into a coalesce
-//             (Some(Segment::Coalesce(sub_segments)), value) => {
-//                 // Creating a needle with a back out of the loop is very important.
-//                 let mut needle = None;
-//                 for sub_segment in sub_segments {
-//                     let mut lookup = Lookup::from(sub_segment);
-//                     lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
-//                                                            // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-//                                                            // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-//                     if value.contains(lookup.clone()) {
-//                         needle = Some(lookup);
-//                         break;
-//                     }
-//                 }
-//                 match needle {
-//                     Some(needle) => value.get_mut(needle),
-//                     None => Ok(None),
-//                 }
-//             }
-//             // Descend into a map
-//             (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
-//                 match map.get_mut(name) {
-//                     Some(inner) => inner.get_mut(working_lookup.clone()),
-//                     None => Ok(None),
-//                 }
-//             }
-//             (Some(Segment::Index(_)), Value::Map(_))
-//             | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
-//             // Descend into an array
-//             (Some(Segment::Index(i)), Value::Array(array)) => {
-//                 let index = if i.is_negative() {
-//                     if i.abs() > array.len() as isize {
-//                         // The index is before the start of the array.
-//                         return Ok(None);
-//                     }
-//                     (array.len() as isize + i) as usize
-//                 } else {
-//                     i as usize
-//                 };
-//
-//                 match array.get_mut(index) {
-//                     Some(inner) => inner.get_mut(working_lookup.clone()),
-//                     None => Ok(None),
-//                 }
-//             }
-//         }
-//     }
+
 //
 
 //

@@ -3781,7 +3781,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "snafu 0.7.0",
+ "snafu",
  "tracing 0.1.29",
 ]
 
@@ -5241,7 +5241,7 @@ dependencies = [
  "prost 0.9.0",
  "prost-build 0.9.0",
  "prost-types 0.9.0",
- "snafu 0.7.0",
+ "snafu",
  "vector_common",
 ]
 
@@ -6825,16 +6825,6 @@ dependencies = [
 
 [[package]]
 name = "snafu"
-version = "0.6.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eab12d3c261b2308b0d80c26fffb58d17eba81a4be97890101f416b478c79ca7"
-dependencies = [
- "doc-comment",
- "snafu-derive 0.6.10",
-]
-
-[[package]]
-name = "snafu"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2eba135d2c579aa65364522eb78590cdf703176ef71ad4c32b00f58f7afb2df5"
@@ -6842,18 +6832,7 @@ dependencies = [
  "doc-comment",
  "futures-core",
  "pin-project 1.0.10",
- "snafu-derive 0.7.0",
-]
-
-[[package]]
-name = "snafu-derive"
-version = "0.6.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1508efa03c362e23817f96cde18abed596a25219a8b2c66e8db33c03543d315b"
-dependencies = [
- "proc-macro2 1.0.36",
- "quote 1.0.15",
- "syn 1.0.86",
+ "snafu-derive",
 ]
 
 [[package]]
@@ -6886,7 +6865,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "snafu 0.7.0",
+ "snafu",
  "tokio",
  "tracing 0.1.29",
  "tracing-subscriber",
@@ -8183,6 +8162,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.1.0",
  "chrono",
+ "indoc",
  "lookup",
  "mlua",
  "ordered-float",
@@ -8190,7 +8170,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "snafu 0.6.10",
+ "snafu",
  "toml",
  "tracing 0.1.29",
 ]
@@ -8350,7 +8330,7 @@ dependencies = [
  "sha2 0.10.1",
  "smallvec",
  "smpl_jwt",
- "snafu 0.7.0",
+ "snafu",
  "snap",
  "socket2 0.4.4",
  "stream-cancel",
@@ -8474,7 +8454,7 @@ dependencies = [
  "rkyv",
  "serde",
  "serde_yaml",
- "snafu 0.7.0",
+ "snafu",
  "temp-dir",
  "tempdir",
  "tokio",
@@ -8500,7 +8480,7 @@ dependencies = [
  "ordered-float",
  "serde",
  "serde_json",
- "snafu 0.7.0",
+ "snafu",
  "tracing 0.1.29",
  "value",
 ]
@@ -8554,7 +8534,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "snafu 0.7.0",
+ "snafu",
  "substring",
  "tokio",
  "tokio-stream",

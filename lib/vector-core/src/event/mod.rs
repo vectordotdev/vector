@@ -7,7 +7,6 @@ use std::{
 
 pub use ::value::Value;
 use bytes::{Buf, BufMut, Bytes};
-use chrono::{DateTime, SecondsFormat, Utc};
 use enumflags2::{bitflags, BitFlags, FromBitsError};
 use prost::Message;
 use snafu::Snafu;
@@ -224,10 +223,6 @@ impl EventDataEq for Event {
             _ => false,
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 impl From<BTreeMap<String, Value>> for Event {

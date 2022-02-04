@@ -16,7 +16,7 @@ impl Value {
     ///    value:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -31,7 +31,7 @@ impl Value {
     ///    `None`:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -46,14 +46,14 @@ impl Value {
     ///    exists:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///    # use std::collections::BTreeMap;
     ///    # use std::iter::FromIterator;
     ///
     ///    let map = BTreeMap::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
-    ///    let value =Value::Map(map);
+    ///    let value = Value::Map(map);
     ///    let path = LookupBuf::from_str("foo").unwrap();
     ///
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
@@ -76,7 +76,7 @@ impl Value {
     /// ## Insert At Field
     ///
     /// ```
-    /// # use vrl_compiler::Value;
+    /// # use value::Value;
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
@@ -99,7 +99,7 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use vrl_compiler::{value, Value};
+    /// # use value::{Value, value};
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
