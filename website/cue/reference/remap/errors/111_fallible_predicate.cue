@@ -1,7 +1,7 @@
 package metadata
 
 remap: errors: "111": {
-	title:       "Unhandled predicate error error"
+	title:       "Unhandled predicate error"
 	description: """
 		A predicate is fallible and its [runtime error](\(urls.vrl_runtime_errors)) isn't handled in the VRL
 		program.
