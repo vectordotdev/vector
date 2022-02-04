@@ -9,29 +9,39 @@ use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct PrometheusEventReceived {
+pub struct PrometheusEventsReceived {
     pub byte_size: usize,
     pub count: usize,
     pub uri: http::Uri,
 }
 
-impl InternalEvent for PrometheusEventReceived {
+impl InternalEvent for PrometheusEventsReceived {
     fn emit_logs(&self) {
-        debug!(message = "Scraped events.", count = ?self.count);
+        trace!(
+            message = "Events received.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+            uri = %self.uri,
+        );
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => format!("{}",self.uri),
+            "uri" => self.uri.to_string(),
         );
         counter!(
+            "component_received_event_bytes_total", self.byte_size as u64,
+            "uri" => self.uri.to_string(),
+        );
+        // deprecated
+        counter!(
             "events_in_total", self.count as u64,
-            "uri" => format!("{}",self.uri),
+            "uri" => self.uri.to_string(),
         );
         counter!(
             "processed_bytes_total", self.byte_size as u64,
-            "uri" => format!("{}",self.uri),
+            "uri" => self.uri.to_string(),
         );
     }
 }
@@ -64,7 +74,14 @@ pub struct PrometheusParseError<'a> {
 #[cfg(feature = "sources-prometheus")]
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = ?self.error, stage = "processing");
+        error!(
+            message = "Parsing error.",
+            url = %self.url,
+            error = ?self.error,
+            error_type = "parse_failed",
+            stage = "processing",
+            internal_log_rate_secs = 10,
+        );
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
@@ -73,13 +90,15 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
-            "stage" => "processing",
+            "error" => self.error.to_string(),
             "error_type" => "parse_failed",
+            "stage" => "processing",
             "url" => self.url.to_string(),
         );
+        // deprecated
+        counter!("parse_errors_total", 1);
     }
 }
 
@@ -96,19 +115,23 @@ impl InternalEvent for PrometheusHttpResponseError {
             url = %self.url,
             code = %self.code,
             stage = "receiving",
-            error = "Invalid HTTP response"
+            error = self.code.canonical_reason().unwrap_or("unknown status code"),
+            error_type = "request_failed",
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "code" => self.code.to_string(),
             "url" => self.url.to_string(),
-            "error_type" => "http_error",
+            "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
+            "error_type" => "request_failed",
             "stage" => "receiving",
         );
+        // deprecated
+        counter!("http_error_response_total", 1);
     }
 }
 
@@ -124,18 +147,22 @@ impl InternalEvent for PrometheusHttpError {
             message = "HTTP request processing error.",
             url = %self.url,
             error = ?self.error,
+            error_type = "request_failed",
             stage = "receiving",
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "url" => self.url.to_string(),
-            "error_type" => "http_error",
+            "error" => self.error.to_string(),
+            "error_type" => "request_failed",
             "stage" => "receiving",
         );
+        // deprecated
+        counter!("http_request_errors_total", 1);
     }
 }
 
@@ -149,17 +176,21 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         error!(
             message = "Could not decode request body.",
             error = ?self.error,
-            stage = "processing"
+            error_type = "parse_failed",
+            stage = "processing",
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
+            "error" => self.error.to_string(),
             "error_type" => "parse_failed",
             "stage" => "processing",
         );
+        // deprecated
+        counter!("parse_errors_total", 1);
     }
 }
 
@@ -171,18 +202,21 @@ impl InternalEvent for PrometheusNoNameError {
         error!(
             message = "Could not decode timeseries.",
             error = "Decoded timeseries is missing the __name__ field.",
+            error_type = "parse_failed",
             stage = "processing",
-            internal_log_rate_secs = 5
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
+            "error" => "Decoded timeseries is missing the __name__ field.",
             "error_type" => "parse_failed",
             "stage" => "processing",
         );
+        // deprecated
+        counter!("parse_errors_total", 1);
     }
 }
 
