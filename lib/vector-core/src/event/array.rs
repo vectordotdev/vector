@@ -323,3 +323,61 @@ impl Iterator for EventArrayIntoIter {
         }
     }
 }
+
+/// Intermediate buffer for conversion of a sequence of individual
+/// `Event`s into a sequence of `EventArray`s by coalescing contiguous
+/// events of the same type into one array. This is used by
+/// `events_into_array`.
+#[derive(Debug, Default)]
+pub struct EventArrayBuffer(Option<EventArray>);
+
+impl EventArrayBuffer {
+    #[must_use]
+    fn push(&mut self, event: Event) -> Option<EventArray> {
+        match (event, &mut self.0) {
+            (Event::Log(event), Some(EventArray::Logs(array))) => array.push(event),
+            (Event::Metric(event), Some(EventArray::Metrics(array))) => array.push(event),
+            (Event::Trace(event), Some(EventArray::Traces(array))) => array.push(event),
+            (event, current) => {
+                let array = EventArray::from(event);
+                if let Some(array) = current.replace(array) {
+                    return Some(array);
+                }
+            }
+        }
+        None
+    }
+
+    fn take(&mut self) -> Option<EventArray> {
+        self.0.take()
+    }
+}
+
+/// Convert the iterator over individual `Event`s into an iterator
+/// over coalesced `EventArray`s.
+pub fn events_into_arrays(
+    events: impl IntoIterator<Item = Event>,
+) -> impl Iterator<Item = EventArray> {
+    IntoEventArraysIter {
+        inner: events.into_iter().fuse(),
+        current: Default::default(),
+    }
+}
+
+/// Iterator type implementing `into_arrays`
+pub struct IntoEventArraysIter<I> {
+    inner: iter::Fuse<I>,
+    current: EventArrayBuffer,
+}
+
+impl<I: Iterator<Item = Event>> Iterator for IntoEventArraysIter<I> {
+    type Item = EventArray;
+    fn next(&mut self) -> Option<Self::Item> {
+        for event in self.inner.by_ref() {
+            if let Some(array) = self.current.push(event) {
+                return Some(array);
+            }
+        }
+        self.current.take()
+    }
+}

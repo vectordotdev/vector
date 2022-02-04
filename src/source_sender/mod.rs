@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
     config::Output,
-    event::{Event, EventArray},
+    event::{array, Event, EventArray, EventContainer},
     internal_event::{EventsSent, DEFAULT_OUTPUT},
     ByteSizeOf,
 };
@@ -230,13 +230,14 @@ impl Inner {
         let mut count = 0;
         let mut byte_size = 0;
 
-        for event in events.into_iter() {
-            let event_size = event.size_of();
-            // FIXME: Merge the events into an array if possible
-            match self.inner.send(EventArray::from(event.into())).await {
+        let events = events.into_iter().map(Into::into);
+        for events in array::events_into_arrays(events) {
+            let this_count = events.len();
+            let this_size = events.size_of();
+            match self.inner.send(events).await {
                 Ok(()) => {
-                    count += 1;
-                    byte_size += event_size;
+                    count += this_count;
+                    byte_size += this_size;
                 }
                 Err(error) => {
                     emit!(&EventsSent {
