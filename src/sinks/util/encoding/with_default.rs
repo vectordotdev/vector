@@ -28,6 +28,11 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    #[serde(
+        default,
+        skip_serializing_if = "skip_serializing_if_default",
+        deserialize_with = "deserialize_path_components"
+    )]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -100,7 +105,7 @@ where
         where
             T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone + Default,
         {
-            type Value = InnerWithDefault<T>;
+            type Value = EncodingConfigWithDefault<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("string or map")
@@ -144,18 +149,4 @@ where
         concrete.validate().map_err(de::Error::custom)?;
         Ok(concrete)
     }
-}
-
-#[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
-pub struct InnerWithDefault<E: Default> {
-    #[serde(default)]
-    codec: E,
-    #[serde(default)]
-    schema: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_path_components")]
-    only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
-    #[serde(default)]
-    except_fields: Option<Vec<String>>,
-    #[serde(default)]
-    timestamp_format: Option<TimestampFormat>,
 }
