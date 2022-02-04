@@ -43,7 +43,8 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
             error = %self.error,
             error_type = "parse_error",
             stage = "processing",
-            bytes = %String::from_utf8_lossy(&self.bytes)
+            bytes = %String::from_utf8_lossy(&self.bytes),
+            rate_limit_secs = 10,
         );
     }
 
@@ -98,6 +99,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             error = %self.error,
             error_type = "connection_failed",
             stage = "processing",
+            rate_limit_secs = 10,
         );
     }
 
