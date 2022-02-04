@@ -32,16 +32,24 @@ impl Condition for DatadogSearchRunner {
     }
 }
 
+#[derive(Debug, Clone)]
+/// A struct that will always fail its check `Event`s.
+pub struct AlwaysFail;
+
+impl Condition for AlwaysFail {
+    #[inline]
+    fn check(&self, _event: &Event) -> bool {
+        false
+    }
+}
+
 #[typetag::serde(name = "datadog_search")]
 impl ConditionConfig for DatadogSearchConfig {
     fn build(
         &self,
         _enrichment_tables: &enrichment::TableRegistry,
     ) -> crate::Result<Box<dyn Condition>> {
-        let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
-
-        Ok(Box::new(DatadogSearchRunner { matcher }))
+        Ok(Box::new(AlwaysFail))
     }
 }
 
