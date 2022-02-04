@@ -54,6 +54,10 @@ impl Source {
             .map(Into::into)
             .collect()
     }
+
+    pub fn get_outputs(&self) -> &[String] {
+        self.0.outputs.as_ref()
+    }
 }
 
 impl From<&SourceOutputType> for DataType {
@@ -63,9 +67,6 @@ impl From<&SourceOutputType> for DataType {
             SourceOutputType::Metric => DataType::Metric,
             SourceOutputType::Trace => DataType::Trace,
         }
-    }
-    pub fn get_outputs(&self) -> &[String] {
-        self.0.outputs.as_ref()
     }
 }
 
