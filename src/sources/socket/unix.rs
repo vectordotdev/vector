@@ -12,7 +12,6 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
@@ -54,12 +53,6 @@ fn handle_events(
     received_from: Option<Bytes>,
     _byte_size: usize,
 ) {
-    emit!(&SocketEventsReceived {
-        mode: SocketMode::Unix,
-        byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
-        count: events.len()
-    });
-
     let now = Utc::now();
 
     for event in events {

@@ -10,7 +10,8 @@ use crate::{
     codecs,
     event::Event,
     internal_events::{
-        SocketMode, SocketReceiveError, StreamClosedError, UnixSocketFileDeleteError,
+        SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
@@ -84,6 +85,12 @@ async fn listen(
                 loop {
                     match stream.next().await {
                         Some(Ok((mut events, byte_size))) => {
+                            emit!(&SocketEventsReceived {
+                                mode: SocketMode::Unix,
+                                byte_size: events.size_of(),
+                                count: events.len()
+                            });
+
                             handle_events(&mut events, received_from.clone(), byte_size);
 
                             let count = events.len();
