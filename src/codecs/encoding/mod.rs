@@ -49,7 +49,7 @@ impl From<std::io::Error> for Error {
 
 /// Configuration for building a `Framer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "method")]
+#[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `CharacterDelimitedEncoder`.
     CharacterDelimited(CharacterDelimitedEncoderConfig),
@@ -92,7 +92,7 @@ impl tokio_util::codec::Encoder<()> for Framer {
 
 /// Configuration for building a `Serializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "codec")]
+#[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
     /// Configures the `JsonSerializer`.
     Json(JsonSerializerConfig),
