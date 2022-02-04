@@ -125,7 +125,7 @@ where
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(&self) -> crate::Result<(Option<Framer>, Serializer)> {
+    pub fn encoding(&self) -> (Option<Framer>, Serializer) {
         let (framer, serializer) = match self {
             Self::Encoding(config) => {
                 let framer = config.framing.as_ref().map(FramingConfig::build);
@@ -142,7 +142,7 @@ where
             }
         };
 
-        Ok((framer, serializer))
+        (framer, serializer)
     }
 }
 
