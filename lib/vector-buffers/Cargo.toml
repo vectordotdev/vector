@@ -26,7 +26,7 @@ snafu = { version = "0.7.0", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
 tokio = { version = "1.16.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
-tracing = { version = "0.1.29", default-features = false, features = ["attributes"] }
+tracing = { version = "0.1.30", default-features = false, features = ["attributes"] }
 vector_common = { path = "../vector-common", default-features = false }
 
 [dev-dependencies]
