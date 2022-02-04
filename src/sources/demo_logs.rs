@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -166,9 +167,12 @@ async fn demo_logs_source(
         let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived { count, byte_size });
+                    emit!(&EventsReceived {
+                        count,
+                        byte_size: events.size_of()
+                    });
                     let now = Utc::now();
 
                     let mut events = stream::iter(events).map(|mut event| {
