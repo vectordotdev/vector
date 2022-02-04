@@ -90,7 +90,7 @@ struct TimerConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self).map(Transform::task)
+        Lua::new(self).map(Transform::event_task)
     }
 
     pub const fn input_type(&self) -> DataType {

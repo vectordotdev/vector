@@ -130,8 +130,8 @@ mod tests {
     use flate2::read::GzEncoder;
     use futures::Stream;
     use pretty_assertions::assert_eq;
-    use shared::assert_event_data_eq;
     use tokio::time::{sleep, Duration};
+    use vector_common::assert_event_data_eq;
 
     use super::*;
     use crate::{

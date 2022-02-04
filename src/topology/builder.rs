@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -35,7 +35,7 @@ use crate::{
         ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
@@ -347,14 +347,14 @@ pub async fn build_pieces(
 
             sink.run(
                 rx.by_ref()
-                    .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
+                    .map(EventArray::from) // Convert the `Event` into an `EventArray`
+                    .filter(|events| ready(filter_events_type(events, input_type)))
+                    .inspect(|events| {
                         emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
+                            count: events.len(),
+                            byte_size: events.size_of(),
                         })
                     })
-                    .map(Into::into) // Convert the `Event` into an `EventArray`
                     .take_until_if(tripwire),
             )
             .await
@@ -450,6 +450,14 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
         DataType::Any => true,
         DataType::Log => matches!(event, Event::Log(_)),
         DataType::Metric => matches!(event, Event::Metric(_)),
+    }
+}
+
+const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
+    match data_type {
+        DataType::Any => true,
+        DataType::Log => matches!(events, EventArray::Logs(_)),
+        DataType::Metric => matches!(events, EventArray::Metrics(_)),
     }
 }
 
@@ -644,35 +652,37 @@ impl Runner {
 }
 
 fn build_task_transform(
-    t: Box<dyn TaskTransform>,
+    t: Box<dyn TaskTransform<EventArray>>,
     input_rx: BufferReceiver<Event>,
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (output, control) = Fanout::new();
+    let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .inspect(|event| {
+        .map(EventArray::from)
+        .filter(move |events| ready(filter_events_type(events, input_type)))
+        .inspect(|events| {
             emit!(&EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
+                count: events.len(),
+                byte_size: events.size_of(),
             })
         });
     let transform = t
         .transform(Box::pin(filtered))
-        .map(Ok)
-        .forward(output.with(|event: Event| async {
+        .flat_map(|events| futures::stream::iter(events.into_events()))
+        .inspect(|event: &Event| {
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
                 output: None,
             });
-            Ok(event)
-        }))
+        })
+        .map(Ok)
+        .forward(fanout)
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");

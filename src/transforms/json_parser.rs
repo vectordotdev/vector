@@ -7,7 +7,7 @@ use crate::{
     },
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -78,7 +78,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl FunctionTransform for JsonParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 

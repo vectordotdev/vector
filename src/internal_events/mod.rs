@@ -68,8 +68,6 @@ mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
-#[cfg(feature = "sources-host_metrics")]
-mod host_metrics;
 mod http;
 pub mod http_client;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -215,14 +213,13 @@ pub use self::fluent::*;
 pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
-#[cfg(feature = "sources-host_metrics")]
-pub(crate) use self::host_metrics::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
     feature = "sinks-http",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
+    feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]

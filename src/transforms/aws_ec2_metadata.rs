@@ -169,7 +169,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::task(Ec2MetadataTransform { state }))
+        Ok(Transform::event_task(Ec2MetadataTransform { state }))
     }
 
     fn input_type(&self) -> DataType {
@@ -185,7 +185,7 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl TaskTransform for Ec2MetadataTransform {
+impl TaskTransform<Event> for Ec2MetadataTransform {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -551,9 +551,8 @@ mod integration_tests {
 
     use super::*;
     use crate::{
-        event::{metric, LogEvent, Metric},
+        event::{metric, EventArray, LogEvent, Metric},
         test_util::trace_init,
-        transforms::TaskTransform,
     };
 
     fn ec2_metadata_address() -> String {
@@ -583,7 +582,7 @@ mod integration_tests {
         )
     }
 
-    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform> {
+    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform<EventArray>> {
         config
             .build(&TransformContext::default())
             .await
@@ -607,7 +606,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -635,7 +634,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -662,7 +661,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -688,7 +687,7 @@ mod integration_tests {
         .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform_events(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -715,7 +714,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -741,7 +740,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -769,7 +768,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -797,7 +796,7 @@ mod integration_tests {
             .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform_events(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;

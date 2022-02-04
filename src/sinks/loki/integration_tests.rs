@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
-use shared::encode_logfmt;
+use vector_common::encode_logfmt;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use super::config::{LokiConfig, OutOfOrderAction};

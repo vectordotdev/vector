@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use crate::event::Event;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClosedError;
 
 impl fmt::Display for ClosedError {

@@ -46,6 +46,10 @@ impl Function for IsFloat {
 
         Ok(Box::new(IsFloatFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_float()))
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,5 @@
 use std::{
-    fmt,
+    fmt, mem,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -304,7 +304,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         let this = self.project();
         let item_size = this.instrumentation.as_ref().map(|_| item.size_of());
 
-        let result = match this.state {
+        match mem::replace(this.state, SendState::Idle) {
             // Sender isn't ready at all.
             SendState::Idle => panic!(
                 "`start_send` should not be called unless `poll_ready` returned successfully"
@@ -321,6 +321,15 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
                 let result = this.base.start_send(item);
                 if result.is_ok() {
                     *this.base_flush = true;
+
+                    if let Some(item_size) = item_size {
+                        // Only update our instrumentation if _we_ got the item, not the overflow.
+                        let handle = this
+                            .instrumentation
+                            .as_ref()
+                            .expect("item_size can't be present without instrumentation");
+                        handle.increment_received_event_count_and_byte_size(1, item_size as u64);
+                    }
                 }
                 result
             }
@@ -332,21 +341,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
                 }
                 result
             }
-        };
-
-        if let Some(item_size) = item_size {
-            // Only update our instrumentation if _we_ got the item, not the overflow.
-            let handle = this
-                .instrumentation
-                .as_ref()
-                .expect("item_size can't be present without instrumentation");
-            if *this.base_flush {
-                handle.increment_received_event_count_and_byte_size(1, item_size as u64);
-            }
         }
-
-        *this.state = SendState::Idle;
-        result
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

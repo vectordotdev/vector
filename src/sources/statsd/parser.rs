@@ -210,7 +210,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-shared::impl_event_data_eq!(ParseError);
+vector_common::impl_event_data_eq!(ParseError);
 
 impl error::Error for ParseError {}
 
@@ -228,7 +228,7 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};

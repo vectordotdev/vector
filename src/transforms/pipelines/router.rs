@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
     event::Event,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -128,7 +128,7 @@ impl TransformConfig for EventFilterConfig {
 }
 
 impl FunctionTransform for EventFilterConfig {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.inner.validate(&event) {
             output.push(event);
         }

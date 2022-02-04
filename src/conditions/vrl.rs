@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, Program, Runtime, Value};
 
 use crate::{
@@ -102,8 +102,10 @@ impl Condition for Vrl {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
             })
-            .unwrap_or_else(|_| {
-                emit!(&VrlConditionExecutionError);
+            .unwrap_or_else(|err| {
+                emit!(&VrlConditionExecutionError {
+                    error: err.to_string().as_ref()
+                });
                 false
             })
     }
