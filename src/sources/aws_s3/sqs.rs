@@ -489,12 +489,13 @@ impl IngestorProcess {
                     ready(Some(event))
                 });
 
-                let (count, _) = stream.size_hint();
-
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
                     Err(error) => {
-                        emit!(&StreamClosedError { error, count });
+                        // count is set to 0 to have no discarded events considering
+                        // the events are not yet aknoledged and will be retried in
+                        // case of error
+                        emit!(&StreamClosedError { error, count: 0 });
                         Some(crate::source_sender::ClosedError)
                     }
                 };
