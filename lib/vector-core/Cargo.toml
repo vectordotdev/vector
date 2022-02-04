@@ -6,6 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+async-broadcast = { version = "0.3.4", default-features = false }
 async-graphql = { version = "3.0.28", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.3", features = ["derive", "serde"] }
@@ -43,7 +44,7 @@ serde_json = { version = "1.0.78", default-features = false }
 snafu = { version = "0.7.0", default-features = false }
 substring = { version = "1.4", default-features = false }
 tokio = { version = "1.16.1", default-features = false }
-tokio-stream = { version = "0.1", default-features = false, optional = true }
+tokio-stream = { version = "0.1", default-features = false }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tower = { version = "0.4", default-features = false, features = ["util"] }
@@ -78,7 +79,7 @@ vector_common = { path = "../vector-common", default-features = false, features 
 [features]
 api = ["async-graphql"]
 default = []
-lua = ["mlua", "tokio-stream"]
+lua = ["mlua"]
 vrl = ["vrl-core", "enrichment"]
 test = ["vector_common/test"]
 
