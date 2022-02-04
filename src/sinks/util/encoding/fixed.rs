@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event::PathComponent,
+    event::{PathComponent, PathIter},
     serde::skip_serializing_if_default,
     sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
@@ -21,7 +21,11 @@ pub struct EncodingConfigFixed<E: Default + PartialEq> {
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "skip_serializing_if_default",
+        deserialize_with = "deserialize_path_components"
+    )]
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
@@ -70,4 +74,23 @@ where
             timestamp_format: Default::default(),
         }
     }
+}
+
+fn deserialize_path_components<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<Vec<PathComponent<'static>>>>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let fields: Option<Vec<&str>> = serde::de::Deserialize::deserialize(deserializer)?;
+    Ok(fields.map(|fields| {
+        fields
+            .iter()
+            .map(|only| {
+                PathIter::new(only)
+                    .map(|component| component.into_static())
+                    .collect()
+            })
+            .collect()
+    }))
 }
