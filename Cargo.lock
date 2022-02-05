@@ -2931,7 +2931,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.23.1",
+ "nix",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -3013,7 +3013,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.23.1",
+ "nix",
  "widestring",
  "winapi 0.3.9",
 ]
@@ -4250,19 +4250,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
 dependencies = [
  "smallvec",
-]
-
-[[package]]
-name = "nix"
-version = "0.22.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 1.0.0",
- "libc",
- "memoffset",
 ]
 
 [[package]]
@@ -6223,9 +6210,9 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "9.0.0"
+version = "9.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "790487c3881a63489ae77126f57048b42d62d3b2bafbf37453ea19eedb6340d6"
+checksum = "db7826789c0e25614b03e5a54a0717a86f9ff6e6e5247f92b369472869320039"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -6234,7 +6221,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.22.3",
+ "nix",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -8206,7 +8193,7 @@ dependencies = [
  "metrics-util",
  "mlua",
  "mongodb",
- "nix 0.23.1",
+ "nix",
  "nom 7.1.0",
  "notify",
  "num-format",
