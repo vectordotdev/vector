@@ -299,7 +299,6 @@ mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};
     use crate::config::Config;
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
-    use futures::SinkExt;
     use tokio::sync::watch;
 
     use super::*;
@@ -382,8 +381,10 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         ));
 
-        let _ = fanout.send(metric_event).await.unwrap();
-        let _ = fanout.send(log_event).await.unwrap();
+        let _ = fanout
+            .send_all(vec![metric_event, log_event])
+            .await
+            .unwrap();
 
         // 3rd payload should be the metric event
         assert!(matches!(

@@ -1,11 +1,7 @@
 use crate::{config::ComponentKey, event::Event};
 use futures::Sink;
-use futures_util::SinkExt;
-use std::{
-    fmt,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use futures_util::{stream::FuturesUnordered, SinkExt, StreamExt};
+use std::{fmt, pin::Pin};
 use tokio::sync::mpsc;
 
 type GenericEventSink = Pin<Box<dyn Sink<Event, Error = ()> + Send>>;
@@ -32,7 +28,6 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
     sinks: Vec<(ComponentKey, Option<GenericEventSink>)>,
-    i: usize,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
 }
 
@@ -42,11 +37,78 @@ impl Fanout {
 
         let fanout = Self {
             sinks: vec![],
-            i: 0,
             control_channel: control_rx,
         };
 
         (fanout, control_tx)
+    }
+
+    /// Send a full vec of Events into the Fanout
+    ///
+    /// This function accepts a `Vec<Event>` and duplicates it down into the
+    /// Fanout's sinks. We take care to avoid the slow receiver problem as much
+    /// as possible but any misbehaving downstream WILL cause this function to
+    /// suffer high latencies. The memory use of this function is
+    /// `N*mem::size_of(events)`, where N is the number of downstream targets.
+    ///
+    /// # Errors
+    ///
+    /// Function will error with `()` in case downstream Sink operations
+    /// fail. This is, we recognize, not very helpful.
+    ///
+    /// # Panics
+    ///
+    /// This function will only panic if there are internal logic errors,
+    /// specifically around the size of the buffer created to house clones of
+    /// Vec<Event>.
+    pub async fn send_all(&mut self, events: Vec<Event>) -> Result<(), ()> {
+        self.process_control_messages().await;
+
+        if self.sinks.is_empty() {
+            // nothing, intentionally
+        } else if self.sinks.len() == 1 {
+            if let Some(sink) = &mut self.sinks[0].1 {
+                for event in events {
+                    sink.feed(event).await?;
+                }
+                sink.flush().await?;
+            }
+        } else {
+            let mut faulty_sinks = Vec::with_capacity(0);
+
+            {
+                let mut jobs = FuturesUnordered::new();
+                let mut clone_army: Vec<Vec<Event>> = Vec::with_capacity(self.sinks.len());
+                for _ in 0..(self.sinks.len() - 1) {
+                    clone_army.push(events.clone());
+                }
+                clone_army.push(events);
+
+                for (id, ms) in &mut self.sinks {
+                    if let Some(sink) = ms.as_mut() {
+                        let events: Vec<Event> = clone_army.pop().unwrap();
+                        jobs.push(async move {
+                            for event in events {
+                                sink.feed(event).await.map_err(|e| (id.clone(), e))?;
+                            }
+                            sink.flush().await.map_err(|e| (id.clone(), e))
+                        });
+                    }
+                }
+
+                while let Some(res) = jobs.next().await {
+                    if let Err((id, ())) = res {
+                        faulty_sinks.push(id);
+                    }
+                }
+            }
+
+            for id in faulty_sinks.drain(..) {
+                self.remove(&id);
+            }
+        }
+
+        Ok(())
     }
 
     /// Add a new sink as an output.
@@ -72,10 +134,6 @@ impl Fanout {
         if let Some(mut removed) = removed {
             tokio::spawn(async move { removed.close().await });
         }
-
-        if self.i > i {
-            self.i -= 1;
-        }
     }
 
     fn replace(&mut self, id: &ComponentKey, sink: Option<GenericEventSink>) {
@@ -86,148 +144,36 @@ impl Fanout {
         }
     }
 
-    pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
-        while let Poll::Ready(Some(message)) = self.control_channel.poll_recv(cx) {
-            match message {
-                ControlMessage::Add(id, sink) => self.add(id, sink),
-                ControlMessage::Remove(id) => self.remove(&id),
-                ControlMessage::Replace(id, sink) => self.replace(&id, sink),
+    async fn process_control_messages(&mut self) {
+        loop {
+            match self.control_channel.try_recv() {
+                Ok(ControlMessage::Add(id, sink)) => self.add(id, sink),
+                Ok(ControlMessage::Remove(id)) => self.remove(&id),
+                Ok(ControlMessage::Replace(id, sink)) => self.replace(&id, sink),
+                Err(mpsc::error::TryRecvError::Empty)
+                | Err(mpsc::error::TryRecvError::Disconnected) => break,
             }
         }
-    }
-
-    #[inline]
-    fn handle_sink_error(&mut self, index: usize) -> Result<(), ()> {
-        // If there's only one sink, propagate the error to the source ASAP
-        // so it stops reading from its input. If there are multiple sinks,
-        // keep pushing to the non-errored ones (while the errored sink
-        // triggers a more graceful shutdown).
-        if self.sinks.len() == 1 {
-            Err(())
-        } else {
-            self.sinks.remove(index);
-            Ok(())
-        }
-    }
-
-    fn poll_sinks<F>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        poll: F,
-    ) -> Poll<Result<(), ()>>
-    where
-        F: Fn(
-            Pin<&mut (dyn Sink<Event, Error = ()> + Send)>,
-            &mut Context<'_>,
-        ) -> Poll<Result<(), ()>>,
-    {
-        self.process_control_messages(cx);
-
-        let mut poll_result = Poll::Ready(Ok(()));
-
-        let mut i = 0;
-        while let Some((_, sink)) = self.sinks.get_mut(i) {
-            if let Some(sink) = sink {
-                match poll(sink.as_mut(), cx) {
-                    Poll::Pending => poll_result = Poll::Pending,
-                    Poll::Ready(Ok(())) => (),
-                    Poll::Ready(Err(())) => {
-                        self.handle_sink_error(i)?;
-                        continue;
-                    }
-                }
-            }
-            i += 1;
-        }
-
-        poll_result
-    }
-}
-
-impl Sink<Event> for Fanout {
-    type Error = ();
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
-        let this = self.get_mut();
-
-        this.process_control_messages(cx);
-
-        while let Some((_, sink)) = this.sinks.get_mut(this.i) {
-            match sink {
-                Some(sink) => match sink.as_mut().poll_ready(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Ok(())) => this.i += 1,
-                    Poll::Ready(Err(())) => this.handle_sink_error(this.i)?,
-                },
-                // process_control_messages ended because control channel returned
-                // Pending so it's fine to return Pending here since the control
-                // channel will notify current task when it receives a message.
-                None => return Poll::Pending,
-            }
-        }
-
-        this.i = 0;
-
-        Poll::Ready(Ok(()))
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), ()> {
-        let mut items = vec![item; self.sinks.len()];
-
-        let mut i = 1;
-        while let Some((_, sink)) = self.sinks.get_mut(i) {
-            if let Some(sink) = sink.as_mut() {
-                let item = items.pop().unwrap();
-                if sink.as_mut().start_send(item).is_err() {
-                    self.handle_sink_error(i)?;
-                    continue;
-                }
-            }
-            i += 1;
-        }
-
-        if let Some((_, sink)) = self.sinks.first_mut() {
-            if let Some(sink) = sink.as_mut() {
-                let item = items.pop().unwrap();
-                if sink.as_mut().start_send(item).is_err() {
-                    self.handle_sink_error(0)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
-        self.poll_sinks(cx, |sink, cx| sink.poll_flush(cx))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
-        self.poll_sinks(cx, |sink, cx| sink.poll_close(cx))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{ControlMessage, Fanout};
+    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
+    use futures::{Sink, StreamExt};
+    use futures_util::SinkExt;
+    use pretty_assertions::assert_eq;
     use std::{
         mem,
         pin::Pin,
         task::{Context, Poll},
     };
-
-    use futures::{stream, Sink, SinkExt, StreamExt};
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
-    use vector_buffers::{
-        topology::{
-            builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender, SenderAdapter},
-        },
-        WhenFull,
-    };
-
-    use super::{ControlMessage, Fanout};
-    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
+    use vector_buffers::topology::channel::BufferReceiver;
+    use vector_buffers::topology::channel::{BufferSender, SenderAdapter};
+    use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
 
     async fn build_sender_pair(capacity: usize) -> (BufferSender<Event>, BufferReceiver<Event>) {
         TopologyBuilder::standalone_memory(capacity, WhenFull::Block).await
@@ -335,15 +281,13 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
-        let (fanout, _, receivers) = fanout_from_senders(&[2, 2]).await;
+        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]).await;
         let events = make_events(2);
 
-        stream::iter(events.clone())
-            .map(Ok)
-            .forward(fanout)
+        fanout
+            .send_all(events.clone())
             .await
-            .expect("forward should not fail");
-
+            .expect("send_all should not fail");
         for receiver in receivers {
             assert_eq!(collect_ready(receiver), events);
         }
@@ -355,13 +299,13 @@ mod tests {
         let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
-        let mut first_send = spawn(async { fanout.send(events[0].clone()).await });
+        let mut first_send = spawn(async { fanout.send_all(vec![events[0].clone()]).await });
         let first_send_result = assert_ready!(first_send.poll());
         assert!(first_send_result.is_ok());
         drop(first_send);
 
         // Second send should return pending because sender B is now full:
-        let mut second_send = spawn(async { fanout.send(events[1].clone()).await });
+        let mut second_send = spawn(async { fanout.send_all(vec![events[1].clone()]).await });
         assert_pending!(second_send.poll());
 
         // Now read an item from each receiver to free up capacity for the second sender:
@@ -387,11 +331,11 @@ mod tests {
 
         // Send in the first two events to our initial two senders:
         fanout
-            .send(events[0].clone())
+            .send_all(vec![events[0].clone()])
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send_all(vec![events[1].clone()])
             .await
             .expect("send should not fail");
 
@@ -400,7 +344,7 @@ mod tests {
 
         // Send in the last event which all three senders will now get:
         fanout
-            .send(events[2].clone())
+            .send_all(vec![events[2].clone()])
             .await
             .expect("send should not fail");
 
@@ -419,11 +363,11 @@ mod tests {
 
         // Send in the first two events to our initial two senders:
         fanout
-            .send(events[0].clone())
+            .send_all(vec![events[0].clone()])
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send_all(vec![events[1].clone()])
             .await
             .expect("send should not fail");
 
@@ -432,7 +376,7 @@ mod tests {
 
         // Send in the last event which only the first sender will get:
         fanout
-            .send(events[2].clone())
+            .send_all(vec![events[2].clone()])
             .await
             .expect("send should not fail");
 
@@ -454,13 +398,13 @@ mod tests {
             let events = make_events(2);
 
             // First send should immediately complete because all senders have capacity:
-            let mut first_send = spawn(async { fanout.send(events[0].clone()).await });
+            let mut first_send = spawn(async { fanout.send_all(vec![events[0].clone()]).await });
             let first_send_result = assert_ready!(first_send.poll());
             assert!(first_send_result.is_ok());
             drop(first_send);
 
             // Second send should return pending because sender B is now full:
-            let mut second_send = spawn(async { fanout.send(events[1].clone()).await });
+            let mut second_send = spawn(async { fanout.send_all(vec![events[1].clone()]).await });
             assert_pending!(second_send.poll());
 
             // Now read an item from each receiver to free up capacity:
@@ -496,11 +440,11 @@ mod tests {
         let events = make_events(2);
 
         fanout
-            .send(events[0].clone())
+            .send_all(vec![events[0].clone()])
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send_all(vec![events[1].clone()])
             .await
             .expect("send should not fail");
     }
@@ -512,11 +456,11 @@ mod tests {
 
         // First two sends should immediately complete because all senders have capacity:
         fanout
-            .send(events[0].clone())
+            .send_all(vec![events[0].clone()])
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send_all(vec![events[1].clone()])
             .await
             .expect("send should not fail");
 
@@ -525,7 +469,7 @@ mod tests {
 
         // And do the third send which should also complete since all senders still have capacity:
         fanout
-            .send(events[2].clone())
+            .send_all(vec![events[2].clone()])
             .await
             .expect("send should not fail");
 
@@ -547,11 +491,11 @@ mod tests {
 
         // First two sends should immediately complete because all senders have capacity:
         fanout
-            .send(events[0].clone())
+            .send_all(vec![events[0].clone()])
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send_all(vec![events[1].clone()])
             .await
             .expect("send should not fail");
 
@@ -562,7 +506,7 @@ mod tests {
             start_sender_replace(&control, &mut receivers, 0, 4).await;
 
         // Third send should return pending because now we have an in-flight replacement:
-        let mut third_send = spawn(async { fanout.send(events[2].clone()).await });
+        let mut third_send = spawn(async { fanout.send_all(vec![events[2].clone()]).await });
         assert_pending!(third_send.poll());
 
         // Finish our sender replacement, which should wake up the third send and allow it to
@@ -643,8 +587,8 @@ mod tests {
         // Spawn a task to send the events into the `Fanout`.  We spawn a task so that we can await
         // the receivers while the forward task drives itself to completion:
         let events = make_events(3);
-        let send = stream::iter(events.clone()).map(Ok).forward(fanout);
-        tokio::spawn(send);
+        let items = events.clone();
+        tokio::spawn(async move { fanout.send_all(items).await });
 
         // Wait for all of our receivers for non-erroring-senders to complete, and make sure they
         // got all of the events we sent in.  We also spawn these as tasks so they can empty

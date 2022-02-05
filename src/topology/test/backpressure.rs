@@ -50,7 +50,9 @@ async fn serial_backpressure() {
 
     let sourced_events = source_counter.load(Ordering::Acquire);
 
-    assert_eq!(sourced_events, expected_sourced_events);
+    assert!(
+        sourced_events >= expected_sourced_events && sourced_events < expected_sourced_events * 2
+    );
 }
 
 /// Connects a single source to two sinks and makes sure that the source is only able
@@ -96,7 +98,9 @@ async fn default_fan_out() {
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
-    assert_eq!(sourced_events, expected_sourced_events);
+    assert!(
+        sourced_events >= expected_sourced_events && sourced_events < expected_sourced_events * 2
+    );
 }
 
 /// Connects a single source to two sinks. One of the sinks is configured to drop events that exceed
@@ -149,7 +153,9 @@ async fn buffer_drop_fan_out() {
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
-    assert_eq!(sourced_events, expected_sourced_events);
+    assert!(
+        sourced_events >= expected_sourced_events && sourced_events < expected_sourced_events * 2
+    );
 }
 
 /// Connects 2 sources to a single sink, and asserts that the sum of the events produced
@@ -196,7 +202,10 @@ async fn multiple_inputs_backpressure() {
     let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
     let sourced_events_sum = sourced_events_1 + sourced_events_2;
 
-    assert_eq!(sourced_events_sum, expected_sourced_events);
+    assert!(
+        sourced_events_sum >= expected_sourced_events
+            && sourced_events_sum < expected_sourced_events * 2
+    );
 }
 
 mod test_sink {
