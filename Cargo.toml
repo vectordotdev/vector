@@ -309,7 +309,7 @@ schannel = "0.1.19"
 windows-service = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.6.0"
+security-framework = "2.6.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
