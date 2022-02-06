@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 
+use super::{BoxedDeserializer, Deserializer, DeserializerConfig};
 use crate::{
-    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, Value},
     internal_events::SyslogConvertUtf8Error,

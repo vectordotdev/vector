@@ -15,6 +15,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
@@ -190,7 +191,7 @@ async fn kafka_source(
             }
             Ok(msg) => {
                 emit!(&BytesReceived {
-                    byte_size: std::mem::size_of_val(&msg),
+                    byte_size: msg.payload_len(),
                     protocol: "tcp",
                 });
 
@@ -240,12 +241,12 @@ async fn kafka_source(
                 let mut stream = FramedRead::new(payload, decoder.clone());
                 let (count, _) = stream.size_hint();
                 let mut stream = stream! {
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((events, byte_size))) => {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((events, _byte_size)) => {
                                 emit!(&KafkaEventsReceived {
                                     count: events.len(),
-                                    byte_size,
+                                    byte_size: events.size_of(),
                                 });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
@@ -261,14 +262,13 @@ async fn kafka_source(
                                     yield event;
                                 }
                             },
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 // Error is logged by `crate::codecs::Decoder`, no further handling
                                 // is needed here.
                                 if !error.can_continue() {
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
                 }

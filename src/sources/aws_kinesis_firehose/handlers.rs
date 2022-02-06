@@ -6,7 +6,7 @@ use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::event::BatchNotifier;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
 use super::{
@@ -50,10 +50,10 @@ pub async fn firehose(
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {
             match stream.next().await {
-                Some(Ok((events, byte_size))) => {
+                Some(Ok((events, _byte_size))) => {
                     emit!(&EventsReceived {
                         count: events.len(),
-                        byte_size
+                        byte_size: events.size_of(),
                     });
 
                     let (batch, receiver) = acknowledgements

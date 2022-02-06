@@ -38,7 +38,7 @@ pin-project = { version = "1.0.10", default-features = false }
 prost = { version = "0.9", default-features = false, features = ["std"] }
 prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.136", default-features = false, features = ["derive"] }
+serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.78", default-features = false }
 snafu = { version = "0.7.0", default-features = false }
 substring = { version = "1.4", default-features = false }
@@ -47,10 +47,10 @@ tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tower = { version = "0.4", default-features = false, features = ["util"] }
-tracing = { version = "0.1.29", default-features = false }
+tracing = { version = "0.1.30", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.3.7", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.8", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
 vector_buffers = { path = "../vector-buffers", default-features = false }
@@ -72,7 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.3"
-tracing-subscriber = { version = "0.3.7", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { version = "0.3.8", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
