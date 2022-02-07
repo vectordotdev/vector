@@ -4,6 +4,7 @@ use bytes::{Buf, BufMut};
 
 use super::builder::TopologyBuilder;
 use crate::{
+    buffer_usage_data::BufferUsageHandle,
     encoding::FixedEncodable,
     topology::channel::{BufferReceiver, BufferSender},
     Bufferable, WhenFull,
@@ -55,21 +56,24 @@ pub async fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
-) -> (BufferSender<u64>, BufferReceiver<u64>) {
-    match mode {
+) -> (BufferSender<u64>, BufferReceiver<u64>, BufferUsageHandle) {
+    let handle = BufferUsageHandle::noop(mode);
+    let (tx, rx) = match mode {
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
             let (overflow_sender, overflow_receiver) =
-                TopologyBuilder::memory_v2(capacity, overflow_mode).await;
+                TopologyBuilder::memory_v2(capacity, overflow_mode, handle.clone()).await;
             let (mut base_sender, mut base_receiver) =
-                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow).await;
+                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow, handle.clone()).await;
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => TopologyBuilder::memory_v2(capacity, m).await,
-    }
+        m => TopologyBuilder::memory_v2(capacity, m, handle.clone()).await,
+    };
+
+    (tx, rx, handle)
 }
 
 /// Gets the current capacity of the underlying base channel of the given sender.

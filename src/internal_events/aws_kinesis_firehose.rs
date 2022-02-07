@@ -1,23 +1,7 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use crate::sources::aws_kinesis_firehose::Compression;
-
-#[derive(Debug)]
-pub struct AwsKinesisFirehoseEventsReceived {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for AwsKinesisFirehoseEventsReceived {
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
@@ -43,6 +27,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
     pub request_id: Option<&'a str>,
+    pub code: hyper::StatusCode,
     pub error: &'a str,
 }
 
@@ -51,11 +36,22 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         error!(
             message = "Error occurred while handling request.",
             error = ?self.error,
+            error_type = "http_error",
+            error_code = %self.code,
+            stage = "receiving",
             internal_log_rate_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "receiving",
+            "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
+            "error_code" => self.code.to_string(),
+            "error_type" => "http_error",
+        );
+        // deprecated
         counter!("request_read_errors_total", 1);
     }
 }
@@ -68,14 +64,23 @@ pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
 
 impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
             error = ?self.error,
+            stage = "processing",
+            error_type = "decoding_error",
             internal_log_rate_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "processing",
+            "error" => self.error.to_string(),
+            "error_type" => "decoding_error",
+        );
+        // deprecated
         counter!("request_automatic_decode_errors_total", 1);
     }
 }

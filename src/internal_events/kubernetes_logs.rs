@@ -80,6 +80,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_type = "event_annotation",
             event = ?self.event,
             stage = "processing",
+            rate_limit_secs = 10,
         );
     }
 
@@ -124,6 +125,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = "parser",
             stage = "processing",
+            rate_limit_secs = 10,
         );
     }
 
@@ -153,6 +155,7 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
             error = %self.error,
             error_type = "kubernetes_lifecycle",
             stage = "processing",
+            rate_limit_secs = 10,
         );
     }
 

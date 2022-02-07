@@ -22,7 +22,7 @@ serde = { version = "1.0.136", default-features = false  }
 serde_json = { version = "1.0.78", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
 thiserror = { version = "1", default-features = false }
-tracing = { version = "0.1.29", default-features = false }
+tracing = { version = "0.1.30", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }
