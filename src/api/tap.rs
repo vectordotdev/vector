@@ -329,9 +329,9 @@ mod tests {
     }
 
     #[tokio::test]
-    /// A tap sink should match a pattern, receive the correct notifications, and
-    /// discard non `LogEvent` events.
-    async fn sink_log_events() {
+    /// A tap sink should match a pattern, receive the correct notifications,
+    /// and receive events
+    async fn sink_events() {
         let pattern_matched = "tes*";
         let pattern_not_matched = "xyz";
         let id = OutputId::from(&ComponentKey::from("test"));
@@ -385,7 +385,13 @@ mod tests {
         let _ = fanout.send(metric_event).await.unwrap();
         let _ = fanout.send(log_event).await.unwrap();
 
-        // 3rd payload should be the log event
+        // 3rd payload should be the metric event
+        assert!(matches!(
+            sink_rx.recv().await,
+            Some(TapPayload::Metric(returned_id, _)) if returned_id == id
+        ));
+
+        // 4th payload should be the log event
         assert!(matches!(
             sink_rx.recv().await,
             Some(TapPayload::Log(returned_id, _)) if returned_id == id
