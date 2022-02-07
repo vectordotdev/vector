@@ -12,7 +12,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType,
+    BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 
@@ -34,6 +34,12 @@ impl<const N: usize> Message<N> {
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+impl<const N: usize> EventCount for Message<N> {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
