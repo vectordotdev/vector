@@ -111,6 +111,7 @@ impl Metric {
                 .expect("JSON serialization of metric event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of metric event failed. Please report."),
+            EventEncodingType::Logfmt => todo!(),
         }
     }
 }
