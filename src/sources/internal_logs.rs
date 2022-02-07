@@ -2,11 +2,12 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future, stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::StreamClosedError,
+    internal_events::{InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
@@ -71,6 +72,11 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
+        // This event doesn't emit any log
+        emit!(&InternalLogsEventsReceived {
+            count: 1,
+            byte_size: log.size_of(),
+        });
         if let Ok(hostname) = &hostname {
             log.insert(host_key.clone(), hostname.to_owned());
         }
