@@ -331,7 +331,7 @@ mod tests {
         ]) {
             assert_eq!(
                 kind.find_at_path(&path.to_lookup())
-                    .map(|v| v.map(|v| v.into_owned())),
+                    .map(|v| v.map(std::borrow::Cow::into_owned)),
                 want,
                 "returned: {}",
                 title

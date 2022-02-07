@@ -102,6 +102,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_nest_at_path() {
         struct TestCase {
             kind: Kind,
