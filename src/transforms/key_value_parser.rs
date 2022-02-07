@@ -8,9 +8,7 @@ use crate::{
         log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::{Event, Value},
-    internal_events::{
-        KeyValueFieldDoesNotExistError, KeyValueParserError, KeyValueTargetExistsError,
-    },
+    internal_events::{KeyValueParserError, ParserMissingFieldError, ParserTargetExistsError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -153,7 +151,7 @@ impl FunctionTransform for KeyValue {
                     if self.overwrite_target {
                         log.remove(target_field);
                     } else {
-                        emit!(&KeyValueTargetExistsError { target_field });
+                        emit!(&ParserTargetExistsError { target_field });
                         return output.push(event);
                     }
                 }
@@ -182,8 +180,8 @@ impl FunctionTransform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            emit!(&KeyValueFieldDoesNotExistError {
-                field: self.field.to_string()
+            emit!(&ParserMissingFieldError {
+                field: self.field.as_str()
             });
         };
 

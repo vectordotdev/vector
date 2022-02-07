@@ -6,7 +6,7 @@ use crate::{
         log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
-    internal_events::{JsonParserError, JsonParserTargetExistsError},
+    internal_events::{JsonParserError, ParserTargetExistsError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -110,7 +110,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&JsonParserTargetExistsError { target_field })
+                        emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

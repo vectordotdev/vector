@@ -2,15 +2,15 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RegexParserMatchError<'a> {
+pub struct ParserMatchError<'a> {
     pub value: &'a [u8],
 }
 
-impl InternalEvent for RegexParserMatchError<'_> {
+impl InternalEvent for ParserMatchError<'_> {
     fn emit_logs(&self) {
         error!(
-            message = "Regex pattern failed to match.",
-            error = "Regex pattern failed to match.",
+            message = "Pattern failed to match.",
+            error = "Pattern failed to match.",
             error_type = "condition_failed",
             stage = "processing",
             field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
@@ -21,7 +21,7 @@ impl InternalEvent for RegexParserMatchError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Regex pattern failed to match.",
+            "error" => "Pattern failed to match.",
             "error_type" => "condition_failed",
             "stage" => "processing",
         );
@@ -31,11 +31,11 @@ impl InternalEvent for RegexParserMatchError<'_> {
 }
 
 #[derive(Debug)]
-pub struct RegexParserMissingFieldError<'a> {
+pub struct ParserMissingFieldError<'a> {
     pub field: &'a str,
 }
 
-impl InternalEvent for RegexParserMissingFieldError<'_> {
+impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Field does not exist.",
@@ -61,11 +61,11 @@ impl InternalEvent for RegexParserMissingFieldError<'_> {
 }
 
 #[derive(Debug)]
-pub struct RegexParserTargetExistsError<'a> {
+pub struct ParserTargetExistsError<'a> {
     pub target_field: &'a str,
 }
 
-impl<'a> InternalEvent for RegexParserTargetExistsError<'a> {
+impl<'a> InternalEvent for ParserTargetExistsError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Target field already exists.",
@@ -91,12 +91,12 @@ impl<'a> InternalEvent for RegexParserTargetExistsError<'a> {
 }
 
 #[derive(Debug)]
-pub struct RegexParserConversionError<'a> {
+pub struct ParserConversionError<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,
 }
 
-impl<'a> InternalEvent for RegexParserConversionError<'a> {
+impl<'a> InternalEvent for ParserConversionError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Could not convert types.",

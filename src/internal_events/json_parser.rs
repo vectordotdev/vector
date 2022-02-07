@@ -41,35 +41,3 @@ impl<'a> InternalEvent for JsonParserError<'a> {
         );
     }
 }
-
-#[derive(Debug)]
-pub struct JsonParserTargetExistsError<'a> {
-    pub target_field: &'a str,
-}
-
-impl<'a> InternalEvent for JsonParserTargetExistsError<'a> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Target field already exists.",
-            error = "Target field already exists.",
-            error_type = "condition_failed",
-            stage = "processing",
-            target_field = %self.target_field,
-            internal_log_rate_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", 1,
-            "error" => "Target field already exists.",
-            "error_type" => "condition_failed",
-            "stage" => "processing",
-        );
-        // deprecated
-        counter!(
-            "processing_errors_total", 1,
-            "error_type" => "target_field_exists",
-        );
-    }
-}

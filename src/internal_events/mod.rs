@@ -65,8 +65,6 @@ mod filter;
 mod fluent;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
-#[cfg(feature = "transforms-grok_parser")]
-mod grok_parser;
 mod heartbeat;
 mod http;
 pub mod http_client;
@@ -82,8 +80,6 @@ mod key_value_parser;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
-#[cfg(feature = "transforms-logfmt_parser")]
-mod logfmt_parser;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
 mod loki;
@@ -98,6 +94,14 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(any(
+    feature = "transforms-grok_parser",
+    feature = "transforms-json_parser",
+    feature = "transforms-key_value_parser",
+    feature = "transforms-logfmt_parser",
+    feature = "transforms-regex_parser"
+))]
+mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
@@ -108,8 +112,6 @@ mod pulsar;
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
-#[cfg(feature = "transforms-regex_parser")]
-mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
@@ -211,8 +213,6 @@ pub use self::filter::*;
 pub use self::fluent::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
-#[cfg(feature = "transforms-grok_parser")]
-pub(crate) use self::grok_parser::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
@@ -234,8 +234,6 @@ pub(crate) use self::key_value_parser::*;
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
-#[cfg(feature = "transforms-logfmt_parser")]
-pub use self::logfmt_parser::*;
 #[cfg(feature = "sinks-loki")]
 pub(crate) use self::loki::*;
 #[cfg(feature = "transforms-lua")]
@@ -246,6 +244,14 @@ pub(crate) use self::metric_to_log::*;
 pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[cfg(any(
+    feature = "transforms-grok_parser",
+    feature = "transforms-json_parser",
+    feature = "transforms-key_value_parser",
+    feature = "transforms-logfmt_parser",
+    feature = "transforms-regex_parser",
+))]
+pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
@@ -254,8 +260,6 @@ pub(crate) use self::prometheus::*;
 pub use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
-#[cfg(feature = "transforms-regex_parser")]
-pub(crate) use self::regex_parser::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
