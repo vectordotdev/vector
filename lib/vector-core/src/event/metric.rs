@@ -1237,7 +1237,7 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     }
 }
 
-fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
+pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
     let mut counts = vec![0; buckets.len()];
     let mut sum = 0.0;
     let mut count = 0;

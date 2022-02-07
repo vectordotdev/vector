@@ -3,11 +3,11 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{MetricSketch, Quantile};
+use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    sinks::util::encode_namespace,
+    sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 
 pub(super) trait MetricCollector {
@@ -54,8 +54,67 @@ pub(super) trait MetricCollector {
                 MetricValue::Set { values } => {
                     self.emit_value(timestamp, name, "", values.len() as f64, tags, None);
                 }
-                MetricValue::Distribution { .. } => {
-                    unreachable!("distributions have been normalized to histograms or sketches")
+                MetricValue::Distribution {
+                    samples,
+                    statistic: StatisticKind::Histogram,
+                } => {
+                    // convert distributions into aggregated histograms
+                    let (buckets, count, sum) = samples_to_buckets(samples, buckets);
+                    let mut bucket_count = 0.0;
+                    for bucket in buckets {
+                        bucket_count += bucket.count as f64;
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_bucket",
+                            bucket_count as f64,
+                            tags,
+                            Some(("le", bucket.upper_limit.to_string())),
+                        );
+                    }
+                    self.emit_value(
+                        timestamp,
+                        name,
+                        "_bucket",
+                        count as f64,
+                        tags,
+                        Some(("le", "+Inf".to_string())),
+                    );
+                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
+                    self.emit_value(timestamp, name, "_count", count as f64, tags, None);
+                }
+                MetricValue::Distribution {
+                    samples,
+                    statistic: StatisticKind::Summary,
+                } => {
+                    if let Some(statistic) = DistributionStatistic::from_samples(samples, quantiles)
+                    {
+                        for (q, v) in statistic.quantiles.iter() {
+                            self.emit_value(
+                                timestamp,
+                                name,
+                                "",
+                                *v,
+                                tags,
+                                Some(("quantile", q.to_string())),
+                            );
+                        }
+                        self.emit_value(timestamp, name, "_sum", statistic.sum, tags, None);
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_count",
+                            statistic.count as f64,
+                            tags,
+                            None,
+                        );
+                        self.emit_value(timestamp, name, "_min", statistic.min, tags, None);
+                        self.emit_value(timestamp, name, "_max", statistic.max, tags, None);
+                        self.emit_value(timestamp, name, "_avg", statistic.avg, tags, None);
+                    } else {
+                        self.emit_value(timestamp, name, "_sum", 0.0, tags, None);
+                        self.emit_value(timestamp, name, "_count", 0.0, tags, None);
+                    }
                 }
                 MetricValue::AggregatedHistogram {
                     buckets,
