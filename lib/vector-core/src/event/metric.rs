@@ -1242,12 +1242,7 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
     let mut sum = 0.0;
     let mut count = 0;
     for sample in samples {
-        if let Some((i, _)) = buckets
-            .iter()
-            .enumerate()
-            .skip_while(|&(_, b)| *b < sample.value)
-            .next()
-        {
+        if let Some((i, _)) = buckets.iter().enumerate().find(|&(_, b)| *b < sample.value) {
             counts[i] += sample.rate;
         }
 
