@@ -1,15 +1,13 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use crate::template::TemplateRenderingError;
-
-pub struct TemplateRenderingFailed<'a> {
+pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
     pub drop_event: bool,
-    pub error: TemplateRenderingError,
+    pub error: crate::template::TemplateRenderingError,
 }
 
-impl<'a> InternalEvent for TemplateRenderingFailed<'a> {
+impl<'a> InternalEvent for TemplateRenderingError<'a> {
     fn emit_logs(&self) {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
@@ -20,13 +18,33 @@ impl<'a> InternalEvent for TemplateRenderingFailed<'a> {
             msg.push_str("; discarding event");
         }
         msg.push('.');
-        warn!(message = %msg, error = %self.error, internal_log_rate_secs = 30);
+        error!(
+            message = %msg,
+            error = %self.error,
+            error_type = "render_error",
+            stage = "processing",
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "render_error",
+            "stage" => "processing",
+        );
+        // deprecated
         counter!("processing_errors_total", 1,
             "error_type" => "render_error");
         if self.drop_event {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error" => self.error.to_string(),
+                "error_type" => "render_error",
+                "stage" => "processing",
+            );
+            // deprecated
             counter!("events_discarded_total", 1);
         }
     }
