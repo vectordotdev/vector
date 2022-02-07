@@ -11,7 +11,9 @@ use crate::{
         log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
+    internal_events::{
+        GrokParserConversionError, GrokParserMatchError, GrokParserMissingFieldError,
+    },
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -133,7 +135,7 @@ impl FunctionTransform for GrokParser {
                                 event.insert_path(path, value);
                             }
                         }
-                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(&GrokParserConversionError { name, error }),
                     }
                 }
 
@@ -141,12 +143,12 @@ impl FunctionTransform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                emit!(&GrokParserFailedMatch {
+                emit!(&GrokParserMatchError {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(&GrokParserMissingField {
+            emit!(&GrokParserMissingFieldError {
                 field: self.field.as_ref()
             });
         }
