@@ -10,10 +10,16 @@ mod newline_delimited;
 mod octet_counting;
 
 pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
-pub use character_delimited::{CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig};
+pub use character_delimited::{
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
+};
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
-pub use newline_delimited::{NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig};
-pub use octet_counting::{OctetCountingDecoder, OctetCountingDecoderConfig};
+pub use newline_delimited::{
+    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions,
+};
+pub use octet_counting::{
+    OctetCountingDecoder, OctetCountingDecoderConfig, OctetCountingDecoderOptions,
+};
 
 use super::StreamDecodingError;
 use ::bytes::Bytes;

@@ -5,19 +5,21 @@ pub mod format;
 pub mod framing;
 
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, Deserializer,
-    DeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
+    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
+    JsonDeserializerConfig,
 };
 #[cfg(feature = "sources-syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, Framer, FramingConfig, FramingError, LengthDelimitedDecoder,
-    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
-    OctetCountingDecoder, OctetCountingDecoderConfig,
+    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
+    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
+    NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
+    OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
 
 use bytes::{Bytes, BytesMut};
+use format::Deserializer as _;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -65,19 +67,232 @@ impl StreamDecodingError for Error {
     }
 }
 
+/// Configuration for building a `Framer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum FramingConfig {
+    /// Configures the `BytesDecoder`.
+    Bytes,
+    /// Configures the `CharacterDelimitedDecoder`.
+    CharacterDelimited {
+        /// Options for the character delimited decoder.
+        character_delimited: CharacterDelimitedDecoderOptions,
+    },
+    /// Configures the `LengthDelimitedDecoder`.
+    LengthDelimited,
+    /// Configures the `NewlineDelimitedDecoder`.
+    NewlineDelimited {
+        #[serde(
+            default,
+            skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        )]
+        /// Options for the newline delimited decoder.
+        newline_delimited: NewlineDelimitedDecoderOptions,
+    },
+    /// Configures the `OctetCountingDecoder`.
+    OctetCounting {
+        #[serde(
+            default,
+            skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        )]
+        /// Options for the octet counting decoder.
+        octet_counting: OctetCountingDecoderOptions,
+    },
+}
+
+impl From<BytesDecoderConfig> for FramingConfig {
+    fn from(_: BytesDecoderConfig) -> Self {
+        Self::Bytes
+    }
+}
+
+impl From<CharacterDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: CharacterDelimitedDecoderConfig) -> Self {
+        Self::CharacterDelimited {
+            character_delimited: config.character_delimited,
+        }
+    }
+}
+
+impl From<LengthDelimitedDecoderConfig> for FramingConfig {
+    fn from(_: LengthDelimitedDecoderConfig) -> Self {
+        Self::LengthDelimited
+    }
+}
+
+impl From<NewlineDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: NewlineDelimitedDecoderConfig) -> Self {
+        Self::NewlineDelimited {
+            newline_delimited: config.newline_delimited,
+        }
+    }
+}
+
+impl From<OctetCountingDecoderConfig> for FramingConfig {
+    fn from(config: OctetCountingDecoderConfig) -> Self {
+        Self::OctetCounting {
+            octet_counting: config.octet_counting,
+        }
+    }
+}
+
+impl FramingConfig {
+    fn build(self) -> Framer {
+        match self {
+            FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
+            FramingConfig::CharacterDelimited {
+                character_delimited,
+            } => Framer::CharacterDelimited(
+                CharacterDelimitedDecoderConfig {
+                    character_delimited,
+                }
+                .build(),
+            ),
+            FramingConfig::LengthDelimited => {
+                Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
+            }
+            FramingConfig::NewlineDelimited { newline_delimited } => Framer::NewlineDelimited(
+                NewlineDelimitedDecoderConfig { newline_delimited }.build(),
+            ),
+            FramingConfig::OctetCounting { octet_counting } => {
+                Framer::OctetCounting(OctetCountingDecoderConfig { octet_counting }.build())
+            }
+        }
+    }
+}
+
+/// Produce byte frames from a byte stream / byte message.
 #[derive(Debug, Clone)]
+pub enum Framer {
+    /// Uses a `BytesDecoder` for framing.
+    Bytes(BytesDecoder),
+    /// Uses a `CharacterDelimitedDecoder` for framing.
+    CharacterDelimited(CharacterDelimitedDecoder),
+    /// Uses a `LengthDelimitedDecoder` for framing.
+    LengthDelimited(LengthDelimitedDecoder),
+    /// Uses a `NewlineDelimitedDecoder` for framing.
+    NewlineDelimited(NewlineDelimitedDecoder),
+    /// Uses a `OctetCountingDecoder` for framing.
+    OctetCounting(OctetCountingDecoder),
+    /// Uses an opaque `Framer` implementation for framing.
+    Boxed(BoxedFramer),
+}
+
+impl tokio_util::codec::Decoder for Framer {
+    type Item = Bytes;
+    type Error = BoxedFramingError;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match self {
+            Framer::Bytes(framer) => framer.decode(src),
+            Framer::CharacterDelimited(framer) => framer.decode(src),
+            Framer::LengthDelimited(framer) => framer.decode(src),
+            Framer::NewlineDelimited(framer) => framer.decode(src),
+            Framer::OctetCounting(framer) => framer.decode(src),
+            Framer::Boxed(framer) => framer.decode(src),
+        }
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match self {
+            Framer::Bytes(framer) => framer.decode_eof(src),
+            Framer::CharacterDelimited(framer) => framer.decode_eof(src),
+            Framer::LengthDelimited(framer) => framer.decode_eof(src),
+            Framer::NewlineDelimited(framer) => framer.decode_eof(src),
+            Framer::OctetCounting(framer) => framer.decode_eof(src),
+            Framer::Boxed(framer) => framer.decode_eof(src),
+        }
+    }
+}
+
+/// Configuration for building a `Deserializer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+pub enum DeserializerConfig {
+    /// Configures the `BytesDeserializer`.
+    Bytes,
+    /// Configures the `JsonDeserializer`.
+    Json,
+    #[cfg(feature = "sources-syslog")]
+    /// Configures the `SyslogDeserializer`.
+    Syslog,
+}
+
+impl From<BytesDeserializerConfig> for DeserializerConfig {
+    fn from(_: BytesDeserializerConfig) -> Self {
+        Self::Bytes
+    }
+}
+
+impl From<JsonDeserializerConfig> for DeserializerConfig {
+    fn from(_: JsonDeserializerConfig) -> Self {
+        Self::Json
+    }
+}
+
+#[cfg(feature = "sources-syslog")]
+impl From<SyslogDeserializerConfig> for DeserializerConfig {
+    fn from(_: SyslogDeserializerConfig) -> Self {
+        Self::Syslog
+    }
+}
+
+impl DeserializerConfig {
+    fn build(&self) -> Deserializer {
+        match self {
+            DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
+            DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
+            #[cfg(feature = "sources-syslog")]
+            DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
+        }
+    }
+}
+
+/// Parse structured events from bytes.
+#[derive(Debug, Clone)]
+pub enum Deserializer {
+    /// Uses a `BytesDeserializer` for deserialization.
+    Bytes(BytesDeserializer),
+    /// Uses a `JsonDeserializer` for deserialization.
+    Json(JsonDeserializer),
+    #[cfg(feature = "sources-syslog")]
+    /// Uses a `SyslogDeserializer` for deserialization.
+    Syslog(SyslogDeserializer),
+    /// Uses an opaque `Deserializer` implementation for deserialization.
+    Boxed(BoxedDeserializer),
+}
+
+impl format::Deserializer for Deserializer {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        match self {
+            Deserializer::Bytes(deserializer) => deserializer.parse(bytes),
+            Deserializer::Json(deserializer) => deserializer.parse(bytes),
+            #[cfg(feature = "sources-syslog")]
+            Deserializer::Syslog(deserializer) => deserializer.parse(bytes),
+            Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
+        }
+    }
+}
+
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
+#[derive(Debug, Clone)]
 pub struct Decoder {
-    framer: BoxedFramer,
-    deserializer: BoxedDeserializer,
+    framer: Framer,
+    deserializer: Deserializer,
 }
 
 impl Default for Decoder {
     fn default() -> Self {
         Self {
-            framer: Box::new(NewlineDelimitedDecoder::new()),
-            deserializer: Box::new(BytesDeserializer::new()),
+            framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            deserializer: Deserializer::Bytes(BytesDeserializer::new()),
         }
     }
 }
@@ -86,7 +301,7 @@ impl Decoder {
     /// Creates a new `Decoder` with the specified `Framer` to produce byte
     /// frames from the byte stream / byte messages and `Deserializer` to parse
     /// structured events from a byte frame.
-    pub fn new(framer: BoxedFramer, deserializer: BoxedDeserializer) -> Self {
+    pub const fn new(framer: Framer, deserializer: Deserializer) -> Self {
         Self {
             framer,
             deserializer,
@@ -143,26 +358,26 @@ impl tokio_util::codec::Decoder for Decoder {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DecodingConfig {
     /// The framing config.
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     /// The decoding config.
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
-    pub fn new(framing: Box<dyn FramingConfig>, decoding: Box<dyn DeserializerConfig>) -> Self {
+    pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
         Self { framing, decoding }
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> crate::Result<Decoder> {
+    pub fn build(self) -> Decoder {
         // Build the framer.
-        let framer: BoxedFramer = self.framing.build()?;
+        let framer = self.framing.build();
 
         // Build the deserializer.
-        let deserializer: BoxedDeserializer = self.decoding.build()?;
+        let deserializer = self.decoding.build();
 
-        Ok(Decoder::new(framer, deserializer))
+        Decoder::new(framer, deserializer)
     }
 }

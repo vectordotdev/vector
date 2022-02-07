@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 
-use super::{BoxedDeserializer, Deserializer, DeserializerConfig};
+use super::Deserializer;
 use crate::{
     config::log_schema,
     event::{Event, Value},
@@ -15,10 +15,10 @@ use crate::{
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct SyslogDeserializerConfig;
 
-#[typetag::serde(name = "syslog")]
-impl DeserializerConfig for SyslogDeserializerConfig {
-    fn build(&self) -> crate::Result<BoxedDeserializer> {
-        Ok(Box::new(SyslogDeserializer))
+impl SyslogDeserializerConfig {
+    /// Build the `SyslogDeserializer` from this configuration.
+    pub const fn build(&self) -> SyslogDeserializer {
+        SyslogDeserializer
     }
 }
 

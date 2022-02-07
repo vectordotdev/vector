@@ -1,4 +1,3 @@
-use super::{BoxedSerializer, SerializerConfig};
 use crate::{config::log_schema, event::Event};
 
 use bytes::{BufMut, BytesMut};
@@ -14,12 +13,10 @@ impl RawMessageSerializerConfig {
     pub const fn new() -> Self {
         Self
     }
-}
 
-#[typetag::serde(name = "text")]
-impl SerializerConfig for RawMessageSerializerConfig {
-    fn build(&self) -> crate::Result<BoxedSerializer> {
-        Ok(Box::new(RawMessageSerializer))
+    /// Build the `RawMessageSerializer` from this configuration.
+    pub const fn build(&self) -> RawMessageSerializer {
+        RawMessageSerializer
     }
 }
 

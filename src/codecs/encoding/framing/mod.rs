@@ -6,7 +6,9 @@
 mod character_delimited;
 mod newline_delimited;
 
-pub use character_delimited::{CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig};
+pub use character_delimited::{
+    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions,
+};
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
 
 use dyn_clone::DynClone;
