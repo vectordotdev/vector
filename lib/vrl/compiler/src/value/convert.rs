@@ -21,12 +21,22 @@ pub trait VrlValueConvert {
         let float = NotNan::new(f).map_err(|_| Error::NanFloat)?;
         Ok(Value::Float(float))
     }
+
+    fn coerce_f64(&self) -> Result<f64, Error>;
     /// This was renamed from "kind" so it doesn't collide with the now existing "kind".
     /// This should be fixed when this is unified with the `value/kind` type
     fn vrl_kind(&self) -> Kind;
 }
 
 impl VrlValueConvert for Value {
+    fn coerce_f64(&self) -> Result<f64, Error> {
+        match self {
+            Value::Integer(v) => Ok(*v as f64),
+            Value::Float(v) => Ok(v.into_inner()),
+            _ => Err(Error::Coerce(self.vrl_kind(), Kind::Float)),
+        }
+    }
+
     fn try_bytes(self) -> Result<Bytes, Error> {
         match self {
             Value::Bytes(v) => Ok(v),

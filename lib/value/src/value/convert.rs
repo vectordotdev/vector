@@ -56,6 +56,13 @@ impl Value {
             _ => None,
         }
     }
+    /// Checks if the Value is a `Value::Integer`
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            Value::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
 
     /// Returns the value as `NotNan`<f64> only if the type is `Value::Float`, otherwise returns None
     pub fn as_boolean(&self) -> Option<bool> {
@@ -69,14 +76,6 @@ impl Value {
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {
             Value::Map(map) => Some(map),
-            _ => None,
-        }
-    }
-
-    /// Checks if the Value is a `Value::Integer`
-    pub fn as_int(&self) -> Option<i64> {
-        match self {
-            Value::Integer(i) => Some(*i),
             _ => None,
         }
     }

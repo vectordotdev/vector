@@ -65,7 +65,7 @@ impl VrlValueArithmetic for Value {
             Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(as_usize(lhv)).into(),
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv * rhs.try_integer().map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv * rhs.try_float().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv * rhs.coerce_f64().map_err(|_| err())?).into(),
             Value::Bytes(lhv) if rhs.is_integer() => {
                 lhv.repeat(as_usize(rhs.try_integer()?)).into()
             }
@@ -78,14 +78,14 @@ impl VrlValueArithmetic for Value {
     fn try_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Div(self.vrl_kind(), rhs.vrl_kind());
 
-        let rhv = rhs.as_float().ok_or_else(err)?;
+        let rhv = rhs.coerce_f64().map_err(|_| err())?;
 
         if rhv == 0.0 {
             return Err(Error::DivideByZero);
         }
 
         let value = match self {
-            Value::Integer(lhv) => Value::try_from_f64(lhv as f64 / rhv.into_inner())?,
+            Value::Integer(lhv) => Value::try_from_f64(lhv as f64 / rhv)?,
             Value::Float(lhv) => (lhv / rhv).into(),
             _ => return Err(err()),
         };
@@ -247,12 +247,14 @@ impl VrlValueArithmetic for Value {
     fn eq_lossy(&self, rhs: &Self) -> bool {
         use Value::*;
 
+        println!("EQ Lossy: {:?} == {:?}", self, rhs);
+
         match self {
             Integer(lhv) => rhs
-                .as_float()
-                .map(|rhv| (*lhv as f64) == rhv.into_inner())
+                .coerce_f64()
+                .map(|rhv| (*lhv as f64) == rhv)
                 .unwrap_or(false),
-            Float(lhv) => rhs.as_float().map(|rhv| *lhv == rhv).unwrap_or(false),
+            Float(lhv) => rhs.coerce_f64().map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
         }
     }
