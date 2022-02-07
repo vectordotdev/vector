@@ -29,7 +29,7 @@ fn to_timestamp(value: Value) -> Resolved {
         Bytes(v) => Conversion::Timestamp(TimeZone::Local)
             .convert::<Value>(v)
             .map_err(|err| err.to_string())?,
-        v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
+        v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.vrl_kind()).into()),
     };
     Ok(value)
 }

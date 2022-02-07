@@ -10,7 +10,7 @@ fn to_string(value: Value) -> std::result::Result<Value, ExpressionError> {
         Boolean(v) => v.to_string().into(),
         Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Null => "".into(),
-        v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
+        v => return Err(format!(r#"unable to coerce {} into "string""#, v.vrl_kind()).into()),
     };
     Ok(value)
 }

@@ -13,7 +13,7 @@ fn to_int(value: Value) -> std::result::Result<Value, ExpressionError> {
             .convert(v)
             .map_err(|e| e.to_string().into()),
         Timestamp(v) => Ok(v.timestamp().into()),
-        v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
+        v => Err(format!(r#"unable to coerce {} into "integer""#, v.vrl_kind()).into()),
     }
 }
 
