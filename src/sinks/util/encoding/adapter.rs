@@ -10,18 +10,18 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 /// Trait used to migrate from a sink-specific `Codec` enum to the new
-/// `Box<dyn FramingConfig>`/`Box<dyn SerializerConfig>` encoding configuration.
+/// `FramingConfig`/`SerializerConfig` encoding configuration.
 pub trait EncodingConfigMigrator {
     /// The sink-specific encoding type to be migrated.
     type Codec;
 
     /// Returns the framing/serializer configuration that is functionally equivalent to the given
     /// legacy codec.
-    fn migrate(codec: &Self::Codec) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>);
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig);
 }
 
 /// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
-/// `Box<dyn FramingConfig>`/`Box<dyn SerializerConfig>` encoding configuration - while keeping
+/// `FramingConfig`/`SerializerConfig` encoding configuration - while keeping
 /// backwards-compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -46,10 +46,7 @@ where
         + Clone,
 {
     /// Create a new encoding configuration.
-    pub fn new(
-        framing: Option<Box<dyn FramingConfig>>,
-        encoding: Box<dyn SerializerConfig>,
-    ) -> Self {
+    pub fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
         Self::Encoding(EncodingConfig {
             framing,
             encoding: EncodingWithTransformationConfig {
@@ -128,30 +125,24 @@ where
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(&self) -> crate::Result<(Option<Box<dyn Framer>>, Box<dyn Serializer>)> {
+    pub fn encoding(self) -> (Option<Framer>, Serializer) {
         let (framer, serializer) = match self {
             Self::Encoding(config) => {
-                let framer = match &config.framing {
-                    Some(framing) => Some(framing.build()?),
-                    None => None,
-                };
-                let serializer = config.encoding.encoding.build()?;
+                let framer = config.framing.clone().map(FramingConfig::build);
+                let serializer = config.encoding.encoding.build();
 
                 (framer, serializer)
             }
             Self::LegacyEncodingConfig(config) => {
                 let migration = Migrator::migrate(config.encoding.codec());
-                let framer = match migration.0 {
-                    Some(framing) => Some(framing.build()?),
-                    None => None,
-                };
-                let serializer = migration.1.build()?;
+                let framer = migration.0.map(FramingConfig::build);
+                let serializer = migration.1.build();
 
                 (framer, serializer)
             }
         };
 
-        Ok((framer, serializer))
+        (framer, serializer)
     }
 }
 
@@ -164,14 +155,14 @@ pub struct LegacyEncodingConfigWrapper<EncodingConfig, Migrator> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodingConfig {
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Option<FramingConfig>,
     encoding: EncodingWithTransformationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodingWithTransformationConfig {
     #[serde(flatten)]
-    encoding: Box<dyn SerializerConfig>,
+    encoding: SerializerConfig,
     #[serde(flatten)]
     filter: Option<OnlyOrExceptFieldsConfig>,
     timestamp_format: Option<TimestampFormat>,
@@ -239,7 +230,7 @@ mod tests {
         let string = r#"
             {
                 "encoding": {
-                    "codec": "text",
+                    "codec": "raw_message",
                     "timestamp_format": "unix",
                     "except_fields": ["ignore_me"]
                 }
@@ -273,14 +264,12 @@ mod tests {
         impl EncodingConfigMigrator for Migrator {
             type Codec = LegacyEncoding;
 
-            fn migrate(
-                _: &Self::Codec,
-            ) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>) {
+            fn migrate(_: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
                 panic!()
             }
         }
 
-        let string = r#"{ "encoding": { "codec": "text" } }"#;
+        let string = r#"{ "encoding": { "codec": "raw_message" } }"#;
 
         let config = serde_json::from_str::<
             EncodingConfigAdapter<crate::sinks::util::EncodingConfig<LegacyEncoding>, Migrator>,
@@ -292,7 +281,7 @@ mod tests {
             EncodingConfigAdapter::LegacyEncodingConfig(_) => panic!(),
         };
 
-        assert_eq!(encoding.typetag_name(), "text");
+        assert!(matches!(encoding, SerializerConfig::RawMessage));
     }
 
     #[test]
@@ -309,9 +298,7 @@ mod tests {
         impl EncodingConfigMigrator for Migrator {
             type Codec = LegacyEncoding;
 
-            fn migrate(
-                _: &Self::Codec,
-            ) -> (Option<Box<dyn FramingConfig>>, Box<dyn SerializerConfig>) {
+            fn migrate(_: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
                 panic!()
             }
         }

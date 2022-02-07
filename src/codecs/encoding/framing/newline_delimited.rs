@@ -2,7 +2,7 @@ use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
-use super::{BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, FramingConfig};
+use super::{BoxedFramingError, CharacterDelimitedEncoder};
 
 /// Config used to build a `NewlineDelimitedEncoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -13,12 +13,10 @@ impl NewlineDelimitedEncoderConfig {
     pub fn new() -> Self {
         Default::default()
     }
-}
 
-#[typetag::serde(name = "newline_delimited")]
-impl FramingConfig for NewlineDelimitedEncoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(NewlineDelimitedEncoder::new()))
+    /// Build the `NewlineDelimitedEncoder` from this configuration.
+    pub const fn build(&self) -> NewlineDelimitedEncoder {
+        NewlineDelimitedEncoder::new()
     }
 }
 
