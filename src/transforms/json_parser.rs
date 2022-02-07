@@ -6,7 +6,7 @@ use crate::{
         log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
-    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
+    internal_events::{JsonParserError, JsonParserTargetExistsError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -87,7 +87,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(&JsonParserFailedParse {
+                        emit!(&JsonParserError {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -110,7 +110,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&JsonParserTargetExists { target_field })
+                        emit!(&JsonParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);
