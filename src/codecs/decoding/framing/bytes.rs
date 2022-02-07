@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::{BoxedFramer, BoxedFramingError, FramingConfig};
 
 /// Config used to build a `BytesDecoderConfig`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
