@@ -59,7 +59,7 @@ impl Expression for Variable {
             .variable(&self.ident)
             .cloned()
             .map(|d| d.type_def)
-            .unwrap_or_else(|| TypeDef::new().null().infallible())
+            .unwrap_or_else(|| TypeDef::null().infallible())
     }
 
     fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {

@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn object(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Object(_) => Ok(v),
-        v => Err(format!(r#"expected "object", got {}"#, v.kind()).into()),
+        v => Err(format!("expected object, got {}", v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for Object {
                 title: "invalid",
                 source: "object!(true)",
                 result: Err(
-                    r#"function call error for "object" at (0:13): expected "object", got "boolean""#,
+                    r#"function call error for "object" at (0:13): expected object, got boolean"#,
                 ),
             },
         ]
@@ -72,9 +72,14 @@ impl Expression for ObjectFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Object)
-            .restrict_object()
+        let type_def = self.value.type_def(state);
+        let fallible = !type_def.is_object();
+
+        let collection = match type_def.as_object() {
+            Some(object) => object.clone(),
+            None => Collection::any(),
+        };
+
+        TypeDef::object(collection).with_fallibility(fallible)
     }
 }

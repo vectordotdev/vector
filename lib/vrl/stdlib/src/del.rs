@@ -1,3 +1,4 @@
+use value::kind::remove;
 use vrl::prelude::*;
 
 fn del(
@@ -166,14 +167,23 @@ impl Expression for DelFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().unknown()
+        TypeDef::any()
     }
 
     fn update_state(
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        self.query.delete_type_def(state);
+        // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
+        // supported.
+        if self.query.is_external() {
+            match self.query.delete_type_def(state) {
+                Err(remove::Error::RootPath)
+                | Err(remove::Error::CoalescedPath)
+                | Err(remove::Error::NegativeIndexPath) => { /* TODO: handle removal errors */ }
+                Ok(_) => {}
+            }
+        }
         Ok(())
     }
 }

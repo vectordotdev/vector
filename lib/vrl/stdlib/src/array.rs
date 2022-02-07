@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn array(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Array(_) => Ok(v),
-        v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
+        v => Err(format!("expected array, got {}", v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for Array {
                 title: "invalid",
                 source: "array!(true)",
                 result: Err(
-                    r#"function call error for "array" at (0:12): expected "array", got "boolean""#,
+                    r#"function call error for "array" at (0:12): expected array, got boolean"#,
                 ),
             },
         ]
@@ -72,9 +72,14 @@ impl Expression for ArrayFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Array)
-            .restrict_array()
+        let type_def = self.value.type_def(state);
+        let fallible = !type_def.is_array();
+
+        let collection = match type_def.as_array() {
+            Some(array) => array.clone(),
+            None => Collection::any(),
+        };
+
+        TypeDef::array(collection).with_fallibility(fallible)
     }
 }

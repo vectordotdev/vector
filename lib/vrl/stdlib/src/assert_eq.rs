@@ -1,4 +1,4 @@
-use vrl::{diagnostic::Note, prelude::*};
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct AssertEq;
@@ -83,32 +83,21 @@ impl Expression for AssertEqFn {
         if left == right {
             Ok(true.into())
         } else {
-            let message = self
+            Err(self
                 .message
                 .as_ref()
                 .map(|m| {
                     m.resolve(ctx)
                         .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
                 })
-                .transpose()?;
-
-            if let Some(message) = message {
-                Err(ExpressionError::Error {
-                    message: message.clone(),
-                    labels: vec![],
-                    notes: vec![Note::UserErrorMessage(message)],
-                })
-            } else {
-                Err(ExpressionError::from(format!(
-                    "assertion failed: {} == {}",
-                    left, right
-                )))
-            }
+                .transpose()?
+                .unwrap_or_else(|| format!("assertion failed: {} == {}", left, right))
+                .into())
         }
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().boolean()
+        TypeDef::boolean().fallible()
     }
 }
 
@@ -122,19 +111,19 @@ mod tests {
         pass {
             args: func_args![left: "foo", right: "foo"],
             want: Ok(true),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
 
         fail {
             args: func_args![left: "foo", right: "bar"],
             want: Err(r#"assertion failed: "foo" == "bar""#),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
 
         message {
             args: func_args![left: "foo", right: "bar", message: "failure!"],
             want: Err("failure!"),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
     ];
 }

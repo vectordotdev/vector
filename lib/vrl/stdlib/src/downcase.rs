@@ -57,7 +57,7 @@ impl Expression for DowncaseFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -71,7 +71,7 @@ mod tests {
         simple {
             args: func_args![value: "FOO 2 bar"],
             want: Ok(value!("foo 2 bar")),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
     ];
 }

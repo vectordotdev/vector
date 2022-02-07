@@ -6,9 +6,13 @@ use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
 ///
 /// This state allows the compiler to track certain invariants during
 /// compilation, which in turn drives our progressive type checking system.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Compiler {
-    /// stored external target type definition
+    /// stored external target type definitions
+    //
+    // TODO(Jean): Change this to point to a `value::Collection<Field>` type, to ensure the target
+    // is always an object. Although we probably also need to support arrays, in which case we
+    // should wrap it in an enum to also support `value::Collection<Index>`.
     target: Option<assignment::Details>,
 
     /// stored internal variable type definitions

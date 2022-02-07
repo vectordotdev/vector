@@ -64,7 +64,7 @@ impl Expression for FormatTimestampFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -92,21 +92,21 @@ mod tests {
             args: func_args![value: Utc.timestamp(10, 0),
                              format: "%Q INVALID"],
             want: Err("invalid format"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid_secs {
             args: func_args![value: Utc.timestamp(10, 0),
                              format: "%s"],
             want: Ok(value!("10")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         date {
             args: func_args![value: Utc.timestamp(10, 0),
                              format: "%+"],
             want: Ok(value!("1970-01-01T00:00:10+00:00")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }
