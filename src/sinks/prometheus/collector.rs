@@ -54,65 +54,8 @@ pub(super) trait MetricCollector {
                 MetricValue::Set { values } => {
                     self.emit_value(timestamp, name, "", values.len() as f64, tags, None);
                 }
-                MetricValue::Distribution {
-                    samples,
-                    statistic: StatisticKind::Histogram,
-                } => {
-                    // convert distributions into aggregated histograms
-                    let (buckets, count, sum) = samples_to_buckets(samples, buckets);
-                    for bucket in buckets {
-                        self.emit_value(
-                            timestamp,
-                            name,
-                            "_bucket",
-                            bucket.count as f64,
-                            tags,
-                            Some(("le", bucket.upper_limit.to_string())),
-                        );
-                    }
-                    self.emit_value(
-                        timestamp,
-                        name,
-                        "_bucket",
-                        count as f64,
-                        tags,
-                        Some(("le", "+Inf".to_string())),
-                    );
-                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
-                    self.emit_value(timestamp, name, "_count", count as f64, tags, None);
-                }
-                MetricValue::Distribution {
-                    samples,
-                    statistic: StatisticKind::Summary,
-                } => {
-                    if let Some(statistic) = DistributionStatistic::from_samples(samples, quantiles)
-                    {
-                        for (q, v) in statistic.quantiles.iter() {
-                            self.emit_value(
-                                timestamp,
-                                name,
-                                "",
-                                *v,
-                                tags,
-                                Some(("quantile", q.to_string())),
-                            );
-                        }
-                        self.emit_value(timestamp, name, "_sum", statistic.sum, tags, None);
-                        self.emit_value(
-                            timestamp,
-                            name,
-                            "_count",
-                            statistic.count as f64,
-                            tags,
-                            None,
-                        );
-                        self.emit_value(timestamp, name, "_min", statistic.min, tags, None);
-                        self.emit_value(timestamp, name, "_max", statistic.max, tags, None);
-                        self.emit_value(timestamp, name, "_avg", statistic.avg, tags, None);
-                    } else {
-                        self.emit_value(timestamp, name, "_sum", 0.0, tags, None);
-                        self.emit_value(timestamp, name, "_count", 0.0, tags, None);
-                    }
+                MetricValue::Distribution { .. } => {
+                    unreachable!("distributions have been normalized to histograms or sketches")
                 }
                 MetricValue::AggregatedHistogram {
                     buckets,
