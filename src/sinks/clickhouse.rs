@@ -104,7 +104,7 @@ impl SinkConfig for ClickhouseConfig {
 #[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
     type Input = Bytes;
-    type Output = Bytes;
+    type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
@@ -142,7 +142,7 @@ impl HttpSink for ClickhouseConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        let mut request = builder.body(events).unwrap();
+        let mut request = builder.body(events.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);

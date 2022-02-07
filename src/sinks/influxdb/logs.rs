@@ -163,7 +163,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
     type Input = Bytes;
-    type Output = Bytes;
+    type Output = BytesMut;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
@@ -207,7 +207,7 @@ impl HttpSink for InfluxDbLogsSink {
         Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
-            .body(events)
+            .body(events.freeze())
             .map_err(Into::into)
     }
 }

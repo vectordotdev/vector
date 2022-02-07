@@ -77,7 +77,7 @@ impl Buffer {
 
 impl Batch for Buffer {
     type Input = Bytes;
-    type Output = Bytes;
+    type Output = BytesMut;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
@@ -107,13 +107,12 @@ impl Batch for Buffer {
 
     fn finish(self) -> Self::Output {
         match self.inner {
-            Some(InnerBuffer::Plain(inner)) => inner.into_inner().freeze(),
+            Some(InnerBuffer::Plain(inner)) => inner.into_inner(),
             Some(InnerBuffer::Gzip(inner)) => inner
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec")
-                .into_inner()
-                .freeze(),
-            None => Bytes::new(),
+                .into_inner(),
+            None => BytesMut::new(),
         }
     }
 

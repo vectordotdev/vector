@@ -3,7 +3,7 @@ use std::{
     mem,
 };
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value};
 use smallvec::SmallVec;
@@ -31,6 +31,12 @@ pub trait ByteSizeOf {
 }
 
 impl ByteSizeOf for Bytes {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ByteSizeOf for BytesMut {
     fn allocated_bytes(&self) -> usize {
         self.len()
     }

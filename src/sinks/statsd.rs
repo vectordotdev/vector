@@ -241,7 +241,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Bytes> 
     Some(body.freeze())
 }
 
-impl Service<Bytes> for StatsdSvc {
+impl Service<BytesMut> for StatsdSvc {
     type Response = ();
     type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
@@ -250,7 +250,7 @@ impl Service<Bytes> for StatsdSvc {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, frame: Bytes) -> Self::Future {
+    fn call(&mut self, frame: BytesMut) -> Self::Future {
         self.inner.call(frame).err_into().boxed()
     }
 }

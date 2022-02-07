@@ -174,7 +174,7 @@ impl SinkConfig for HttpSinkConfig {
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
     type Input = Bytes;
-    type Output = Bytes;
+    type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
@@ -231,15 +231,14 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Text => "text/plain",
             Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
-                let mut buffer = BytesMut::new();
-                buffer.put_u8(b'[');
+                let message = body.split();
+                body.put_u8(b'[');
                 // TODO: Prepend before building a request to eliminate the
                 // additional copy here.
-                buffer.extend_from_slice(&body);
+                body.unsplit(message);
                 // remove trailing comma from last record
-                buffer.truncate(buffer.len() - 1);
-                buffer.put_u8(b']');
-                body = buffer.freeze();
+                body.truncate(body.len() - 1);
+                body.put_u8(b']');
                 "application/json"
             }
         };
@@ -256,11 +255,7 @@ impl HttpSink for HttpSinkConfig {
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w
-                    .finish()
-                    .expect("Writing to Vec can't fail")
-                    .into_inner()
-                    .freeze();
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
             Compression::None => {}
         }
@@ -269,7 +264,7 @@ impl HttpSink for HttpSinkConfig {
             builder = builder.header(header.as_str(), value.as_str());
         }
 
-        let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(body.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
