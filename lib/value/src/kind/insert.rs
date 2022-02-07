@@ -88,7 +88,17 @@ impl LeafConflict {
 /// The strategy to use when a given path contains a coalesced segment.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CoalescedPath {
-    /// Insert the required `Kind` into *all* coalesced paths.
+    /// Insert the required `Kind` into all *valid* coalesced fields.
+    ///
+    /// This insertion strategy takes into account what the runtime behavior will be of querying
+    /// the given path.
+    ///
+    /// That is, for path `.(foo | bar)`, with a boolean `Kind`, after insertion, a query for
+    /// `.foo` will *always* match (and return a boolean), and thus the second `bar` field will
+    /// never trigger, and thus no type information is inserted.
+    InsertValid,
+
+    /// Insert the required `Kind` into *all* coalesced fields.
     ///
     /// Meaning, for path `.foo.(bar | baz).qux and a boolean `Kind`, the result will be:
     ///
@@ -104,6 +114,12 @@ pub enum CoalescedPath {
 }
 
 impl CoalescedPath {
+    /// Check if the active strategy is "insert valid".
+    #[must_use]
+    pub const fn is_insert_valid(&self) -> bool {
+        matches!(self, Self::InsertValid)
+    }
+
     /// Check if the active strategy is "insert all".
     #[must_use]
     pub const fn is_insert_all(&self) -> bool {
@@ -298,15 +314,67 @@ impl Kind {
 
                             // There are no more path segments to follow, so we insert and return.
                             None => match strategy.leaf_conflict {
-                                LeafConflict::Merge(_) => return merge(Some(segment)),
-                                LeafConflict::Replace => return replace(self_kind, Some(segment)),
+                                LeafConflict::Merge(_) => return merge(None),
+                                LeafConflict::Replace => return replace(self_kind, None),
                                 LeafConflict::Reject => return Err(Error::LeafConflict),
                             },
                         }
                     }
                 },
 
-                // If the configured strategy disallows coalesced paths, return an error.
+                // Coalesced path segments are rather complex to grok, so what follows is
+                // a detailed description of what happens in different situations.
+                //
+                // 1. The most straight-forward resolution is when a coalesced path segment exists,
+                //    but the `CoalescedPath` strategy is set to `Reject`. In that case, the method
+                //    returns the `CoalescedPathSegment` error.
+                //
+                // 2. Next, if the first field in a coalesced segment points to an existing field
+                //    in the `Kind`, _and_ that field can never be `null`, then we know the
+                //    coalescing is similar to a regular field segment.
+                //
+                //    Take this example, given the path `.(foo | bar)` and `Kind`:
+                //
+                //    ```
+                //    { object => { "foo": bytes, "bar": integer } }
+                //    ```
+                //
+                //    In this case, because the top-level kind is an object, and it has a field
+                //    `foo` which cannot be `null`, we know that `.(foo | bar)` will always trigger
+                //    the `foo` field, and never trigger `bar`, because the first cannot return
+                //    `null`.
+                //
+                // 3. What is in the above example, the top-level kind could be something other
+                //    than an object?
+                //
+                //    ```
+                //    { bytes | object => { "foo": bytes, "bar": integer } }
+                //    ```
+                //
+                //    In this case, the call to `.(foo | bar)` can return `null`, because the
+                //    top-level kind might not be an object, and thus the field query wouldn't
+                //    return any data.
+                //
+                // 4. What if instead `foo` could be null?
+                //
+                //    ```
+                //    { object => { "foo": bytes | null, "bar": integer } }
+                //    ```
+                //
+                //    In this case, we would have to return a kind that can either be `bytes` or
+                //    `integer`, because querying `foo` might return `null`.
+                //
+                // 5. What if we kept the previous kind, but changed the path to `.(foo | baz)`?
+                //
+                //    In this case, `foo` can be null, but `baz` does not exist, so will never
+                //    return a kind. In this situation, we have to look at the "unknown" field kind
+                //    configured within the object. That is, if we don't know a `baz` field, but we
+                //    do know that "any unknown field can be a float", then the new kind would
+                //    either be `bytes` or `float`.
+                //
+                //    If no unknown kind is defined (i.e. it is `None`), then it means we are sure
+                //    that there are no fields other than the "known" ones configured, and so the
+                //    resolution would be either `bytes` or `null`.
                 Segment::Coalesce(_) if strategy.coalesced_path.is_reject() => {
                     return Err(Error::CoalescedPathSegment)
                 }
@@ -314,36 +382,33 @@ impl Kind {
                 // We're dealing with multiple fields in this segment. This requires us to
                 // recursively call this `insert_at_path` function for each field.
                 Segment::Coalesce(fields) => {
-                    debug_assert!(strategy.coalesced_path.is_insert_all());
-
-                    let mut merge = |merge_strategy| {
-                        self_kind.merge(Self::object(BTreeMap::default()), merge_strategy);
-                    };
-
-                    let replace =
-                        |self_kind: &mut Self| *self_kind = Self::object(BTreeMap::default());
-
-                    match iter.peek() {
-                        Some(segment) => match strategy.inner_conflict {
-                            InnerConflict::Merge(merge_strategy) => merge(merge_strategy),
-                            InnerConflict::Replace => replace(self_kind),
-                            InnerConflict::Reject => return Err(Error::InnerConflict),
-                        },
-
-                        None => match strategy.leaf_conflict {
-                            LeafConflict::Merge(merge_strategy) => merge(merge_strategy),
-                            LeafConflict::Replace => replace(self_kind),
-                            LeafConflict::Reject => return Err(Error::LeafConflict),
-                        },
-                    };
-
-                    return fields.iter().try_for_each(|field| {
+                    for field in fields {
                         let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
                         segments.push_front(Segment::Field(field.clone()));
                         let path = Lookup::from(segments);
 
-                        self_kind.insert_at_path(&path, kind.clone(), strategy)
-                    });
+                        self_kind.insert_at_path(&path, kind.clone(), strategy)?;
+
+                        let is_nullable = self_kind
+                            .as_object()
+                            .unwrap()
+                            .known()
+                            .get(&(field.into()))
+                            .unwrap()
+                            .contains_null();
+
+                        // The above-inserted `kind` cannot be `null` at runtime, so we are
+                        // guaranteed that this field will always match for the coalesced segment,
+                        // there's no need to iterate the subsequent fields in the segment.
+                        //
+                        // This only applies for the "insert valid" strategy, the "insert all"
+                        // strategy will continue to insert *all* fields in the coalesced segment.
+                        if strategy.coalesced_path.is_insert_valid() && !is_nullable {
+                            break;
+                        }
+                    }
+
+                    return Ok(());
                 }
 
                 // Try finding the index in an existing array.
@@ -557,6 +622,122 @@ mod tests {
 
             assert_eq!(got.is_ok(), updated, "updated: {}", title);
             assert_eq!(this, mutated, "mutated: {}", title);
+        }
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_coalesced_path() {
+        struct TestCase {
+            this: Kind,
+            path: LookupBuf,
+            kind: Kind,
+            strategy: Strategy,
+            mutated: Kind,
+            result: Result<(), Error>,
+        }
+
+        for (
+            title,
+            TestCase {
+                mut this,
+                path,
+                kind,
+                strategy,
+                mutated,
+                result,
+            },
+        ) in HashMap::from([
+            (
+                "reject strategy",
+                TestCase {
+                    this: Kind::boolean(),
+                    path: LookupBuf::from_str(".(fitz | foo)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Replace,
+                        leaf_conflict: LeafConflict::Replace,
+                        coalesced_path: CoalescedPath::Reject,
+                    },
+                    mutated: Kind::boolean(),
+                    result: Err(Error::CoalescedPathSegment),
+                },
+            ),
+            (
+                "single coalesced path / two variants / insert_valid",
+                TestCase {
+                    this: Kind::boolean(),
+                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        leaf_conflict: LeafConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        coalesced_path: CoalescedPath::InsertValid,
+                    },
+                    mutated: Kind::object(BTreeMap::from([("foo".into(), Kind::timestamp())]))
+                        .or_boolean(),
+                    result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path, first field always matches",
+                TestCase {
+                    this: Kind::object(BTreeMap::from([("foo".into(), Kind::regex())])),
+                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        leaf_conflict: LeafConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        coalesced_path: CoalescedPath::InsertValid,
+                    },
+                    mutated: Kind::object(BTreeMap::from([(
+                        "foo".into(),
+                        Kind::regex().or_timestamp(),
+                    )])),
+                    result: Ok(()),
+                },
+            ),
+            (
+                "coalesced path, first field can be null",
+                TestCase {
+                    this: Kind::object(BTreeMap::from([("foo".into(), Kind::null())])),
+                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
+                    kind: Kind::timestamp(),
+                    strategy: Strategy {
+                        inner_conflict: InnerConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        leaf_conflict: LeafConflict::Merge(merge::Strategy {
+                            depth: merge::Depth::Shallow,
+                            indices: merge::Indices::Keep,
+                        }),
+                        coalesced_path: CoalescedPath::InsertValid,
+                    },
+                    mutated: Kind::object(BTreeMap::from([
+                        ("foo".into(), Kind::null().or_timestamp()),
+                        ("bar".into(), Kind::timestamp()),
+                    ])),
+                    result: Ok(()),
+                },
+            ),
+        ]) {
+            let got = this.insert_at_path(&path.to_lookup(), kind, strategy);
+
+            assert_eq!(got, result, "{}", title);
+            assert_eq!(this, mutated, "{}", title);
         }
     }
 

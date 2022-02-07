@@ -1,12 +1,14 @@
 //! The `kind` module has all relevant types related to progressive type checking.
 
-mod accessor;
 mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+pub mod find;
 pub mod insert;
 pub mod merge;
+pub mod nest;
+pub mod remove;
 
 pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index};

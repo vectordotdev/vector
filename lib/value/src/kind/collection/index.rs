@@ -2,6 +2,20 @@
 #[derive(Debug, Clone, Default, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Index(usize);
 
+impl std::fmt::Display for Index {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Index {
+    /// Get the [`usize`] value of the index.
+    #[must_use]
+    pub const fn to_usize(self) -> usize {
+        self.0
+    }
+}
+
 impl From<usize> for Index {
     fn from(index: usize) -> Self {
         (&index).into()

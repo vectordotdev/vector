@@ -2,6 +2,12 @@
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Field(lookup::FieldBuf);
 
+impl std::fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl Field {
     /// Get a `str` representation of the field.
     #[must_use]
