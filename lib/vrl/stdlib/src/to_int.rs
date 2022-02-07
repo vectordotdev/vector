@@ -1,6 +1,22 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
+fn to_int(value: Value) -> std::result::Result<Value, ExpressionError> {
+    use Value::*;
+
+    match value {
+        Integer(_) => Ok(value),
+        Float(v) => Ok(Integer(v.into_inner() as i64)),
+        Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
+        Null => Ok(0.into()),
+        Bytes(v) => Conversion::Integer
+            .convert(v)
+            .map_err(|e| e.to_string().into()),
+        Timestamp(v) => Ok(v.timestamp().into()),
+        v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToInt;
 
@@ -95,6 +111,12 @@ impl Function for ToInt {
 
         Ok(Box::new(ToIntFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        to_int(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -104,21 +126,9 @@ struct ToIntFn {
 
 impl Expression for ToIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
         let value = self.value.resolve(ctx)?;
 
-        match value {
-            Integer(_) => Ok(value),
-            Float(v) => Ok(Integer(v.into_inner() as i64)),
-            Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
-            Null => Ok(0.into()),
-            Bytes(v) => Conversion::Integer
-                .convert(v)
-                .map_err(|e| e.to_string().into()),
-            Timestamp(v) => Ok(v.timestamp().into()),
-            v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
-        }
+        to_int(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
