@@ -1,9 +1,6 @@
-use crate::{
-    codecs::encoding::{BoxedSerializer, SerializerConfig},
-    config::log_schema,
-    event::Event,
-};
-use bytes::BufMut;
+use crate::{config::log_schema, event::Event};
+
+use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
@@ -16,12 +13,10 @@ impl RawMessageSerializerConfig {
     pub const fn new() -> Self {
         Self
     }
-}
 
-#[typetag::serde(name = "text")]
-impl SerializerConfig for RawMessageSerializerConfig {
-    fn build(&self) -> crate::Result<BoxedSerializer> {
-        Ok(Box::new(RawMessageSerializer))
+    /// Build the `RawMessageSerializer` from this configuration.
+    pub const fn build(&self) -> RawMessageSerializer {
+        RawMessageSerializer
     }
 }
 
@@ -39,7 +34,7 @@ impl RawMessageSerializer {
 impl Encoder<Event> for RawMessageSerializer {
     type Error = crate::Error;
 
-    fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let bytes = match event {
             Event::Log(log) => log
                 .get(log_schema().message_key())

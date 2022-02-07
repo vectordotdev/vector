@@ -1,8 +1,8 @@
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
-use crate::codecs::{decoding, encoding, CharacterDelimitedDecoder, CharacterDelimitedEncoder};
+use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -11,7 +11,8 @@ pub struct NewlineDelimitedDecoderConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    newline_delimited: NewlineDelimitedDecoderOptions,
+    /// Options for the newline delimited decoder.
+    pub newline_delimited: NewlineDelimitedDecoderOptions,
 }
 
 /// Options for building a `NewlineDelimitedDecoder`.
@@ -46,17 +47,13 @@ impl NewlineDelimitedDecoderConfig {
             newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
         }
     }
-}
 
-#[typetag::serde(name = "newline_delimited")]
-impl decoding::FramingConfig for NewlineDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<decoding::BoxedFramer> {
+    /// Build the `NewlineDelimitedDecoder` from this configuration.
+    pub const fn build(&self) -> NewlineDelimitedDecoder {
         if let Some(max_length) = self.newline_delimited.max_length {
-            Ok(Box::new(NewlineDelimitedDecoder::new_with_max_length(
-                max_length,
-            )))
+            NewlineDelimitedDecoder::new_with_max_length(max_length)
         } else {
-            Ok(Box::new(NewlineDelimitedDecoder::new()))
+            NewlineDelimitedDecoder::new()
         }
     }
 }
@@ -89,7 +86,7 @@ impl Default for NewlineDelimitedDecoder {
 
 impl Decoder for NewlineDelimitedDecoder {
     type Item = Bytes;
-    type Error = decoding::BoxedFramingError;
+    type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.0.decode(src)
@@ -97,43 +94,6 @@ impl Decoder for NewlineDelimitedDecoder {
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.0.decode_eof(src)
-    }
-}
-
-/// Config used to build a `NewlineDelimitedEncoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
-pub struct NewlineDelimitedEncoderConfig;
-
-impl NewlineDelimitedEncoderConfig {
-    /// Creates a new `NewlineDelimitedEncoderConfig`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-#[typetag::serde(name = "newline_delimited")]
-impl encoding::FramingConfig for NewlineDelimitedEncoderConfig {
-    fn build(&self) -> crate::Result<encoding::BoxedFramer> {
-        Ok(Box::new(NewlineDelimitedEncoder::new()))
-    }
-}
-
-/// A codec for handling bytes that are delimited by (a) newline(s).
-#[derive(Debug, Clone)]
-pub struct NewlineDelimitedEncoder(CharacterDelimitedEncoder);
-
-impl NewlineDelimitedEncoder {
-    /// Creates a new `NewlineDelimitedEncoder`.
-    pub const fn new() -> Self {
-        Self(CharacterDelimitedEncoder::new(b'\n'))
-    }
-}
-
-impl Encoder<()> for NewlineDelimitedEncoder {
-    type Error = encoding::BoxedFramingError;
-
-    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-        self.0.encode((), dst)
     }
 }
 

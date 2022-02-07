@@ -272,6 +272,25 @@ pub enum TimestampFormat {
     Rfc3339,
 }
 
+fn deserialize_path_components<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<Vec<PathComponent<'static>>>>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let fields: Option<Vec<&str>> = serde::de::Deserialize::deserialize(deserializer)?;
+    Ok(fields.map(|fields| {
+        fields
+            .iter()
+            .map(|only| {
+                PathIter::new(only)
+                    .map(|component| component.into_static())
+                    .collect()
+            })
+            .collect()
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;

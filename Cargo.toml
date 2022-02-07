@@ -125,11 +125,11 @@ tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 console-subscriber = { version = "0.1.1", optional = true }
 
 # Tracing
-tracing = { version = "0.1.29", default-features = false }
+tracing = { version = "0.1.30", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
-tracing-subscriber = { version = "0.3.7", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
+tracing-subscriber = { version = "0.3.8", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -188,12 +188,12 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.28", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.29", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.28", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.22.1", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.23.0", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.17.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -224,7 +224,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
-dashmap = { version = "5.0.0", default-features = false }
+dashmap = { version = "5.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
@@ -232,7 +232,7 @@ encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
-futures-util = { version = "0.3.19", default-features = false }
+futures-util = { version = "0.3.21", default-features = false }
 getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
@@ -281,7 +281,7 @@ redis = { version = "0.21.5", default-features = false, features = ["connection-
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.8.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
-semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.5", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", optional = true, features = ["union"] }
 snafu = { version = "0.7.0", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
@@ -309,7 +309,7 @@ schannel = "0.1.19"
 windows-service = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.6.0"
+security-framework = "2.6.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"

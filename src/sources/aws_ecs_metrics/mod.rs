@@ -5,6 +5,7 @@ use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
@@ -144,10 +145,8 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        let byte_size = body.len();
-
                         emit!(&HttpBytesReceived {
-                            byte_size,
+                            byte_size: body.len(),
                             protocol: "http",
                             http_path: uri.path(),
                         });
@@ -156,7 +155,7 @@ async fn aws_ecs_metrics(
                             Ok(metrics) => {
                                 let count = metrics.len();
                                 emit!(&AwsEcsMetricsEventsReceived {
-                                    byte_size,
+                                    byte_size: metrics.size_of(),
                                     count,
                                     http_path: uri.path(),
                                 });

@@ -1,14 +1,29 @@
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::Decoder;
 
-use crate::codecs::{decoding, encoding};
+use super::BoxedFramingError;
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
-    character_delimited: CharacterDelimitedDecoderOptions,
+    /// Options for the character delimited decoder.
+    pub character_delimited: CharacterDelimitedDecoderOptions,
+}
+
+impl CharacterDelimitedDecoderConfig {
+    /// Build the `CharacterDelimitedDecoder` from this configuration.
+    pub const fn build(&self) -> CharacterDelimitedDecoder {
+        if let Some(max_length) = self.character_delimited.max_length {
+            CharacterDelimitedDecoder::new_with_max_length(
+                self.character_delimited.delimiter,
+                max_length,
+            )
+        } else {
+            CharacterDelimitedDecoder::new(self.character_delimited.delimiter)
+        }
+    }
 }
 
 /// Options for building a `CharacterDelimitedDecoder`.
@@ -22,22 +37,6 @@ pub struct CharacterDelimitedDecoderOptions {
     /// This length does *not* include the trailing delimiter.
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
-}
-
-#[typetag::serde(name = "character_delimited")]
-impl decoding::FramingConfig for CharacterDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<decoding::BoxedFramer> {
-        if let Some(max_length) = self.character_delimited.max_length {
-            Ok(Box::new(CharacterDelimitedDecoder::new_with_max_length(
-                self.character_delimited.delimiter,
-                max_length,
-            )))
-        } else {
-            Ok(Box::new(CharacterDelimitedDecoder::new(
-                self.character_delimited.delimiter,
-            )))
-        }
-    }
 }
 
 /// A decoder for handling bytes that are delimited by (a) chosen character(s).
@@ -76,7 +75,7 @@ impl CharacterDelimitedDecoder {
 
 impl Decoder for CharacterDelimitedDecoder {
     type Item = Bytes;
-    type Error = decoding::BoxedFramingError;
+    type Error = BoxedFramingError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         loop {
@@ -136,74 +135,19 @@ impl Decoder for CharacterDelimitedDecoder {
     }
 }
 
-/// Config used to build a `CharacterDelimitedEncoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CharacterDelimitedEncoderConfig {
-    character_delimited: CharacterDelimitedEncoderOptions,
-}
-
-/// Options for building a `CharacterDelimitedEncoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct CharacterDelimitedEncoderOptions {
-    /// The character that delimits byte sequences.
-    delimiter: u8,
-}
-
-#[typetag::serde(name = "character_delimited")]
-impl encoding::FramingConfig for CharacterDelimitedEncoderConfig {
-    fn build(&self) -> crate::Result<encoding::BoxedFramer> {
-        Ok(Box::new(CharacterDelimitedEncoder::new(
-            self.character_delimited.delimiter,
-        )))
-    }
-}
-
-/// An encoder for handling bytes that are delimited by (a) chosen character(s).
-#[derive(Debug, Clone)]
-pub struct CharacterDelimitedEncoder {
-    delimiter: u8,
-}
-
-impl CharacterDelimitedEncoder {
-    /// Creates a `CharacterDelimitedEncoder` with the specified delimiter.
-    pub const fn new(delimiter: u8) -> Self {
-        Self { delimiter }
-    }
-}
-
-impl Encoder<()> for CharacterDelimitedEncoder {
-    type Error = encoding::BoxedFramingError;
-
-    fn encode(&mut self, _: (), buf: &mut BytesMut) -> Result<(), encoding::BoxedFramingError> {
-        buf.put_u8(self.delimiter);
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use bytes::BufMut;
+    use indoc::indoc;
     use std::collections::HashMap;
 
-    use indoc::indoc;
-
-    use super::*;
-
     #[test]
-    fn character_delimited_decode() {
+    fn decode() {
         let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
         buf.put_slice(b"abc\n");
         assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
-    }
-
-    #[test]
-    fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedEncoder::new(b'\n');
-
-        let mut buf = BytesMut::from("abc");
-        codec.encode((), &mut buf).unwrap();
-
-        assert_eq!(b"abc\n", &buf[..]);
     }
 
     #[test]
@@ -232,7 +176,7 @@ mod tests {
     // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
     // Derived from https://github.com/tokio-rs/tokio/issues/1483
     #[test]
-    fn decoder_discard_repeat() {
+    fn decode_discard_repeat() {
         const MAX_LENGTH: usize = 1;
 
         let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
