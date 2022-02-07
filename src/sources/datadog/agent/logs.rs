@@ -132,7 +132,6 @@ pub(crate) fn decode_log_body(
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
 #[derive(Deserialize, Clone, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,

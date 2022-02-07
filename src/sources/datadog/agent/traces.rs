@@ -88,7 +88,10 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v0.2" / "stats" / ..))
         .and_then(|| {
-            warn!(message = "/api/v0.2/stats route is yet not supported.");
+            warn!(
+                message = "/api/v0.2/stats route is yet not supported.",
+                internal_log_rate_secs = 60
+            );
             let response: Result<Response, Rejection> = Ok(warp::reply().into_response());
             future::ready(response)
         })
