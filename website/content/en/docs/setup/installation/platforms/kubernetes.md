@@ -5,7 +5,8 @@ weight: 2
 ---
 
 {{< requirement title="Minimum Kubernetes version" >}}
-Vector must be installed on Kubernetes version **1.15** or higher.
+Vector must be installed on Kubernetes version **1.15** or higher. Vector is
+tested with Kubernetes versions **1.19** or higher.
 {{< /requirement >}}
 
 [Kubernetes], also known as **k8s**, is an open source container orchestration system for automating application deployment, scaling, and management. This page covers installing and managing Vector on the Kubernetes platform.

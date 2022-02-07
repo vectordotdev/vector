@@ -15,6 +15,7 @@ use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
@@ -24,10 +25,10 @@ use crate::{
         self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
     },
     internal_events::{
-        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
-        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
-        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
-        DockerLogsTimestampParseFailed,
+        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventsReceived,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -405,31 +406,27 @@ impl DockerLogsSource {
             tokio::select! {
                 value = self.main_recv.recv() => {
                     match value {
-                        Some(message) => {
-                            match message {
-                                Ok(info) => {
-                                    let state = self
-                                        .containers
-                                        .get_mut(&info.id)
-                                        .expect("Every ContainerLogInfo has it's ContainerState");
-                                    if state.return_info(info) {
-                                        self.esb.restart(state);
-                                    }
-                                },
-                                Err((id,persistence)) => {
-                                    let state = self
-                                        .containers
-                                        .remove(&id)
-                                        .expect("Every started ContainerId has it's ContainerState");
-                                    match persistence{
-                                        ErrorPersistence::Transient => if state.is_running() {
-                                            let backoff= Some(self.backoff_duration);
-                                            self.containers.insert(id.clone(), self.esb.start(id, backoff));
-                                        }
-                                        // Forget the container since the error is permanent.
-                                        ErrorPersistence::Permanent => (),
-                                    }
+                        Some(Ok(info)) => {
+                            let state = self
+                                .containers
+                                .get_mut(&info.id)
+                                .expect("Every ContainerLogInfo has it's ContainerState");
+                            if state.return_info(info) {
+                                self.esb.restart(state);
+                            }
+                        },
+                        Some(Err((id,persistence))) => {
+                            let state = self
+                                .containers
+                                .remove(&id)
+                                .expect("Every started ContainerId has it's ContainerState");
+                            match persistence{
+                                ErrorPersistence::Transient => if state.is_running() {
+                                    let backoff= Some(self.backoff_duration);
+                                    self.containers.insert(id.clone(), self.esb.start(id, backoff));
                                 }
+                                // Forget the container since the error is permanent.
+                                ErrorPersistence::Permanent => (),
                             }
                         }
                         None => {
@@ -534,12 +531,12 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(&DockerLogsTimestampParseFailed {
+                    Err(error) => emit!(&DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(&DockerLogsContainerMetadataFetchFailed {
+                Err(error) => emit!(&DockerLogsContainerMetadataFetchError {
                     error,
                     container_id: id.as_str()
                 }),
@@ -596,7 +593,7 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(&DockerLogsLoggingDriverUnsupported {
+                                emit!(&DockerLogsLoggingDriverUnsupportedError {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
@@ -635,7 +632,10 @@ impl EventStreamBuilder {
         let result = {
             let mut stream =
                 events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
-            self.out.send_all(&mut stream).await
+            self.out.send_all(&mut stream).await.map_err(|error| {
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
+            })
         };
 
         // End of stream
@@ -645,9 +645,7 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(crate::source_sender::ClosedError), _) => {
-                Err((info.id, ErrorPersistence::Permanent))
-            }
+            (Err(()), _) => Err((info.id, ErrorPersistence::Permanent)),
             (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
@@ -794,7 +792,11 @@ impl ContainerLogInfo {
             LogOutput::StdIn { message: _ } => return None,
         };
 
-        let byte_size = bytes_message.len();
+        emit!(&BytesReceived {
+            byte_size: bytes_message.len(),
+            protocol: "http"
+        });
+
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -830,7 +832,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(&DockerLogsTimestampParseFailed {
+                emit!(&DockerLogsTimestampParseError {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -953,8 +955,8 @@ impl ContainerLogInfo {
         // other cases were handled earlier.
         let event = Event::Log(log_event);
 
-        emit!(&DockerLogsEventReceived {
-            byte_size,
+        emit!(&DockerLogsEventsReceived {
+            byte_size: event.size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });

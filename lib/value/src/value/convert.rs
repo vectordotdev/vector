@@ -57,6 +57,14 @@ impl Value {
         }
     }
 
+    /// Returns the value as `NotNan`<f64> only if the type is `Value::Float`, otherwise returns None
+    pub fn as_boolean(&self) -> Option<bool> {
+        match self {
+            Value::Boolean(f) => Some(*f),
+            _ => None,
+        }
+    }
+
     /// Returns the value as BTreeMap<String, Value> only if the type is `Value::Map`, otherwise returns None
     pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
         match self {

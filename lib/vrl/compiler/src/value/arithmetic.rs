@@ -57,14 +57,18 @@ impl VrlValueArithmetic for Value {
     fn try_mul(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Mul(self.vrl_kind(), rhs.vrl_kind());
 
+        // When multiplying a string by an integer, if the number is negative we set it to zero to
+        // return an empty string.
+        let as_usize = |num| if num < 0 { 0 } else { num as usize };
+
         let value = match self {
-            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
-            Value::Integer(lhv) if rhs.is_float() => {
-                Value::try_from_f64(lhv as f64 * rhs.try_float()?)?
+            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(as_usize(lhv)).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
+            Value::Integer(lhv) => (lhv * rhs.try_integer().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv * rhs.try_float().map_err(|_| err())?).into(),
+            Value::Bytes(lhv) if rhs.is_integer() => {
+                lhv.repeat(as_usize(rhs.try_integer()?)).into()
             }
-            Value::Integer(lhv) => (lhv * rhs.as_int().ok_or_else(err)?).into(),
-            Value::Float(lhv) => (lhv * rhs.as_float().ok_or_else(err)?).into(),
-            Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
             _ => return Err(err()),
         };
 

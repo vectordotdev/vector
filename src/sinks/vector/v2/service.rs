@@ -101,6 +101,7 @@ impl tower::Service<VectorRequest> for VectorService {
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let events_count = list.events.len();
+        let events_byte_size = list.events_byte_size;
 
         let request = proto_vector::PushEventsRequest {
             events: list.events,
@@ -118,7 +119,7 @@ impl tower::Service<VectorRequest> for VectorService {
                     });
                     VectorResponse {
                         events_count,
-                        events_byte_size: 0,
+                        events_byte_size,
                     }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())

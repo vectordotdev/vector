@@ -5,6 +5,7 @@ use std::{
 
 use serde_json::value::RawValue;
 use serde_json::Value as JsonValue;
+use smallvec::SmallVec;
 use value::Value;
 
 pub trait ByteSizeOf {
@@ -58,6 +59,15 @@ where
 impl<T> ByteSizeOf for Vec<T>
 where
     T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl<A: smallvec::Array> ByteSizeOf for SmallVec<A>
+where
+    A::Item: ByteSizeOf,
 {
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()

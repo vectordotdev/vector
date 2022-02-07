@@ -10,8 +10,8 @@ pub trait VrlValueConvert {
     fn try_bytes(self) -> Result<Bytes, Error>;
     // TODO: rename to "try_coerce_string_lossy"
     fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error>;
-    fn try_float(self) -> Result<f64, Error>;
-    fn try_integer(self) -> Result<i64, Error>;
+    fn try_float(&self) -> Result<f64, Error>;
+    fn try_integer(&self) -> Result<i64, Error>;
     fn try_boolean(self) -> Result<bool, Error>;
     fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
     fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
@@ -47,7 +47,7 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_float(self) -> Result<f64, Error> {
+    fn try_float(&self) -> Result<f64, Error> {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
@@ -112,9 +112,9 @@ impl VrlValueConvert for Value {
     //     }
     // >>>>>>> jean/value-lib
 
-    fn try_integer(self) -> Result<i64, Error> {
+    fn try_integer(&self) -> Result<i64, Error> {
         match self {
-            Value::Integer(v) => Ok(v),
+            Value::Integer(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.vrl_kind(),
                 expected: Kind::Integer,

@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
+    vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -53,6 +54,26 @@ impl Expression for Object {
         let fallible = type_defs.values().any(TypeDef::is_fallible);
 
         TypeDef::new().object(type_defs).with_fallibility(fallible)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        for (key, value) in &self.inner {
+            // Write the key as a constant
+            let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(keyidx);
+
+            // Write the value
+            value.compile_to_vm(vm)?;
+        }
+
+        vm.write_opcode(OpCode::CreateObject);
+
+        // Write the number of key/value pairs in the object so the machine knows
+        // how many pairs to suck into the created object.
+        vm.write_primitive(self.inner.len());
+
+        Ok(())
     }
 }
 

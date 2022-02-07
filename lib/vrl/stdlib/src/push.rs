@@ -1,5 +1,11 @@
 use vrl::prelude::*;
 
+fn push(list: Value, item: Value) -> std::result::Result<Value, ExpressionError> {
+    let mut list = list.try_array()?;
+    list.push(item);
+    Ok(list.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Push;
 
@@ -49,6 +55,13 @@ impl Function for Push {
 
         Ok(Box::new(PushFn { value, item }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let list = args.required("value");
+        let item = args.required("item");
+
+        push(list, item)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -59,12 +72,10 @@ struct PushFn {
 
 impl Expression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
 
-        list.push(item);
-
-        Ok(list.into())
+        push(list, item)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

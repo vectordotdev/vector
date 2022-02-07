@@ -5,6 +5,7 @@ use diagnostic::{DiagnosticError, Label};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
+    vm::{self, OpCode, Vm},
     Context, Expression, Span, State, TypeDef, Value,
 };
 
@@ -59,6 +60,17 @@ impl Expression for Variable {
             .cloned()
             .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::new().null().infallible())
+    }
+
+    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
+        vm.write_opcode(OpCode::GetPath);
+
+        // Store the required path in the targets list, write its index to the vm.
+        let variable = vm::Variable::Internal(self.ident().clone(), None);
+        let target = vm.get_target(&variable);
+        vm.write_primitive(target);
+
+        Ok(())
     }
 }
 

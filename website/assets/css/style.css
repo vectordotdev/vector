@@ -45,7 +45,7 @@
   display: none !important;
 }
 
-// Some rules that Tailwind can't really cover
+/* Some rules that Tailwind can't really cover */
 .jump + .jump,
 .admonition + .admonition {
   margin-top: 0.5rem;
@@ -56,7 +56,15 @@
   height: auto;
 }
 
-// Algolia search
+footer ion-icon[name="logo-github"]:hover {
+  @apply dark:text-gray-500;
+}
+
+a[type="button"] {
+  -webkit-appearance: unset;
+}
+
+/* Algolia search */
 :root {
   --docsearch-key-shadow: inset 0 -2px 0 0 rgb(205, 205, 230),
     inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
@@ -69,6 +77,16 @@
 
 .aa-Form:focus-within {
   box-shadow: none;
+}
+
+@media screen and (max-width: 1279px) {
+  .aa-Autocomplete .aa-DetachedSearchButton {
+    @apply border-0;
+  }
+
+  .aa-Autocomplete .aa-DetachedSearchButtonPlaceholder {
+    @apply hidden;
+  }
 }
 
 .aa-DetachedSearchButton:hover .aa-DetachedSearchButtonIcon {
@@ -255,10 +273,11 @@
   border-color: transparent;
 }
 
-[data-autocomplete-source-id="queryResults"] .aa-Item[aria-selected=true] {
+[data-autocomplete-source-id="queryResults"] .aa-Item[aria-selected="true"] {
   background-color: rgba(var(--purple-v-rgb), 0.25);
 }
 
+/* Docs Search */
 .DocSearch-Commands {
   color: var(--docsearch-muted-color);
   display: flex;
@@ -289,10 +308,67 @@
   width: 20px;
 }
 
-footer ion-icon[name="logo-github"]:hover {
-  @apply dark:text-gray-500
+/* Marketo Forms */
+form.mktoForm.flex.flex-col * {
+  font-weight: 400 !important;
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+  @apply dark:text-gray-300 text-gray-700;
 }
 
-a[type='button'] {
-  -webkit-appearance: unset;
+form.mktoForm.flex.flex-col .mktoErrorMsg {
+  @apply text-gray-300;
+}
+
+form.mktoForm.flex.flex-col .mktoFormCol {
+  width: 100% !important;
+  margin-bottom: 12px !important;
+}
+
+form.mktoForm.flex.flex-col .mktoGutter,
+form.mktoForm.flex.flex-col .mktoOffset,
+form.mktoForm.flex.flex-col .mktoAsterix {
+  display: none;
+}
+
+form.mktoForm.flex.flex-col .mktoFieldWrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+form.mktoForm.flex.flex-col label.mktoLabel {
+  width: 100% !important;
+  display: block;
+}
+
+form.mktoForm.flex.flex-col input.mktoField,
+form.mktoForm.flex.flex-col select.mktoField {
+  width: 100% !important;
+  @apply border dark:border-gray-700 rounded-md h-9;
+}
+
+form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText {
+  width: 100% !important;
+}
+
+form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span {
+  font-size: 0.85rem !important;
+  line-height: 1.25rem !important;
+}
+
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span,
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span a {
+  color: rgb(212, 212, 216) !important;
+}
+
+form.mktoForm.flex.flex-col .mktoButtonRow span.mktoButtonWrap {
+  display: block;
+  width: 100%;
+  margin: 0 !important;
+}
+
+form.mktoForm.flex.flex-col .mktoButtonRow button.mktoButton {
+  display: flex !important;
+  @apply py-2 md:px-10 text-dark bg-gray-200 justify-center items-center w-full border border-dark hover:text-dark hover:border-dark hover:bg-primary rounded md:w-max md:m-auto select-none;
 }

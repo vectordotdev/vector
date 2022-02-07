@@ -2,6 +2,7 @@ use std::{fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
+    vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
@@ -53,6 +54,22 @@ impl Expression for Array {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         TypeDef::new().array(type_defs).with_fallibility(fallible)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Evaluate each of the elements of the array, the result of each
+        // will be added to the stack.
+        for value in self.inner.iter().rev() {
+            value.compile_to_vm(vm)?;
+        }
+
+        vm.write_opcode(OpCode::CreateArray);
+
+        // Add the length of the array as a primitive so the VM knows how
+        // many elements to move into the array.
+        vm.write_primitive(self.inner.len());
+
+        Ok(())
     }
 }
 

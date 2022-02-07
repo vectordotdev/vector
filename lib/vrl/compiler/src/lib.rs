@@ -9,6 +9,7 @@ pub mod function;
 pub mod state;
 pub mod type_def;
 pub mod value;
+pub mod vm;
 
 pub use ::value::Value;
 pub use context::Context;

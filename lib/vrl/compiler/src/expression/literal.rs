@@ -7,9 +7,8 @@ use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use regex::Regex;
 
+use crate::{expression::Resolved, vm::OpCode, Context, Expression, Span, State, TypeDef, Value};
 use value::ValueRegex;
-
-use crate::{expression::Resolved, Context, Expression, Span, State, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -109,6 +108,14 @@ impl Expression for Literal {
         };
 
         type_def.infallible()
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Add the literal as a constant.
+        let constant = vm.add_constant(self.to_value());
+        vm.write_opcode(OpCode::Constant);
+        vm.write_primitive(constant);
+        Ok(())
     }
 }
 
