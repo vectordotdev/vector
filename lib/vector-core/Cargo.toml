@@ -17,7 +17,7 @@ dyn-clone = { version = "1.0.4", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.3", default-features = false }
 float_eq = { version = "0.7", default-features = false }
-futures = { version = "0.3.19", default-features = false, features = ["std"] }
+futures = { version = "0.3.21", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
 getset = { version = "0.1.2", default-features = false }
 http = { version = "0.2.6", default-features = false }
