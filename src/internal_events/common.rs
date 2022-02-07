@@ -115,13 +115,11 @@ impl InternalEvent for StreamClosedError {
             "error_type" => "stream_closed",
             "stage" => "sending",
         );
-        if self.count > 0 {
-            counter!(
-                "component_discarded_events_total", self.count as u64,
-                "error" => self.error.to_string(),
-                "error_type" => "stream_closed",
-                "stage" => "sending",
-            );
-        }
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error" => self.error.to_string(),
+            "error_type" => "stream_closed",
+            "stage" => "sending",
+        );
     }
 }
