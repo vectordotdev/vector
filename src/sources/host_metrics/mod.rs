@@ -14,6 +14,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 #[cfg(unix)]
 use vector_common::btreemap;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
@@ -21,7 +22,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::HostMetricsEventReceived,
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -142,8 +143,17 @@ impl HostMetricsConfig {
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
+            emit!(&BytesReceived {
+                byte_size: 0,
+                protocol: "none"
+            });
             let metrics = generator.capture_metrics().await;
+            let (count, _) = metrics.size_hint();
             if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
+                emit!(&StreamClosedError {
+                    count,
+                    error: error.clone()
+                });
                 error!(message = "Error sending host metrics.", %error);
                 return Err(());
             }
@@ -228,8 +238,9 @@ impl HostMetrics {
                 metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
-        emit!(&HostMetricsEventReceived {
-            count: metrics.len()
+        emit!(&EventsReceived {
+            count: metrics.len(),
+            byte_size: metrics.size_of(),
         });
         metrics.into_iter().map(Into::into)
     }

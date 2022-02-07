@@ -141,6 +141,11 @@ name = "Blog"
 url = "/blog"
 weight = 5
 
+[[languages.en.menus.navbar]]
+name = "Support"
+url = "/support-services"
+weight = 6
+
 # Footer menu
 [[languages.en.menus.footer]]
 name = "About"

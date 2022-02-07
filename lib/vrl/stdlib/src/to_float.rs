@@ -1,6 +1,21 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
+fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {
+    use Value::*;
+    match value {
+        Float(_) => Ok(value),
+        Integer(v) => Ok((v as f64).into()),
+        Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
+        Null => Ok(0.0.into()),
+        Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
+        Bytes(v) => Conversion::Float
+            .convert(v)
+            .map_err(|e| e.to_string().into()),
+        v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToFloat;
 
@@ -95,6 +110,12 @@ impl Function for ToFloat {
 
         Ok(Box::new(ToFloatFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        to_float(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -104,21 +125,9 @@ struct ToFloatFn {
 
 impl Expression for ToFloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
         let value = self.value.resolve(ctx)?;
 
-        match value {
-            Float(_) => Ok(value),
-            Integer(v) => Ok((v as f64).into()),
-            Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
-            Null => Ok(0.0.into()),
-            Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
-            Bytes(v) => Conversion::Float
-                .convert(v)
-                .map_err(|e| e.to_string().into()),
-            v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),
-        }
+        to_float(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
