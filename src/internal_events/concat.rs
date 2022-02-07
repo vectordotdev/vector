@@ -16,16 +16,26 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Substring error.",
-            self.condition,
-            self.source,
-            self.start,
-            self.end,
-            self.length,
-            internal_log_rate_secs = 30
+            error = "Substring error.",
+            error_type = "parser_failed",
+            stage = "processing",
+            condition = self.condition,
+            source = self.source,
+            start = self.start,
+            end = self.end,
+            length = self.length,
+            internal_log_rate_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => "Substring error.",
+            "error_type" => "parser_failed",
+            "stage" => "processing",
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }
