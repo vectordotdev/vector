@@ -9,7 +9,7 @@ publish = false
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
-value = { path = "../../value" }
+value = { path = "../../value", features = ["json"] }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 
 bitflags = "1"
