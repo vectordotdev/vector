@@ -296,13 +296,13 @@ async fn tap_handler(
 
 #[cfg(test)]
 mod tests {
-    use crate::api::schema::events::create_events_stream;
+    use crate::api::schema::events::{create_events_stream, log, metric};
     use crate::config::Config;
+    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::SinkExt;
     use tokio::sync::watch;
 
     use super::*;
-    use crate::api::schema::events::log::Log;
     use crate::api::schema::events::notification::{EventNotification, EventNotificationType};
     use crate::api::schema::events::output::OutputEventsPayload;
     use crate::event::{Metric, MetricKind, MetricValue};
@@ -406,7 +406,7 @@ mod tests {
         }
     }
 
-    fn assert_log(payload: OutputEventsPayload) -> Log {
+    fn assert_log(payload: OutputEventsPayload) -> log::Log {
         if let OutputEventsPayload::Log(log) = payload {
             log
         } else {
@@ -414,8 +414,16 @@ mod tests {
         }
     }
 
+    fn assert_metric(payload: OutputEventsPayload) -> metric::Metric {
+        if let OutputEventsPayload::Metric(metric) = payload {
+            metric
+        } else {
+            panic!("Expected payload to be a Metric")
+        }
+    }
+
     #[tokio::test]
-    async fn integration_test_source() {
+    async fn integration_test_source_log() {
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -447,6 +455,56 @@ mod tests {
             EventNotification::new("in".to_string(), EventNotificationType::Matched)
         );
         let _log = assert_log(source_tap_events[1][0].clone());
+    }
+
+    #[tokio::test]
+    async fn integration_test_source_metric() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["1".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "to_metric",
+            &["in"],
+            LogToMetricConfig {
+                metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                    field: "message".to_string(),
+                    name: None,
+                    namespace: None,
+                    tags: None,
+                })],
+            },
+        );
+        config.add_sink(
+            "out",
+            &["to_metric"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let source_tap_stream =
+            create_events_stream(topology.watch(), vec!["to_metric".to_string()], 500, 100);
+
+        let source_tap_events: Vec<_> = source_tap_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(source_tap_events[0][0].clone()),
+            EventNotification::new("to_metric".to_string(), EventNotificationType::Matched)
+        );
+        assert_metric(source_tap_events[1][0].clone());
     }
 
     #[tokio::test]
