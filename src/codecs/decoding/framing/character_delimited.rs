@@ -3,12 +3,27 @@ use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-use super::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::BoxedFramingError;
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
-    character_delimited: CharacterDelimitedDecoderOptions,
+    /// Options for the character delimited decoder.
+    pub character_delimited: CharacterDelimitedDecoderOptions,
+}
+
+impl CharacterDelimitedDecoderConfig {
+    /// Build the `CharacterDelimitedDecoder` from this configuration.
+    pub const fn build(&self) -> CharacterDelimitedDecoder {
+        if let Some(max_length) = self.character_delimited.max_length {
+            CharacterDelimitedDecoder::new_with_max_length(
+                self.character_delimited.delimiter,
+                max_length,
+            )
+        } else {
+            CharacterDelimitedDecoder::new(self.character_delimited.delimiter)
+        }
+    }
 }
 
 /// Options for building a `CharacterDelimitedDecoder`.
@@ -22,22 +37,6 @@ pub struct CharacterDelimitedDecoderOptions {
     /// This length does *not* include the trailing delimiter.
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
-}
-
-#[typetag::serde(name = "character_delimited")]
-impl FramingConfig for CharacterDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        if let Some(max_length) = self.character_delimited.max_length {
-            Ok(Box::new(CharacterDelimitedDecoder::new_with_max_length(
-                self.character_delimited.delimiter,
-                max_length,
-            )))
-        } else {
-            Ok(Box::new(CharacterDelimitedDecoder::new(
-                self.character_delimited.delimiter,
-            )))
-        }
-    }
 }
 
 /// A decoder for handling bytes that are delimited by (a) chosen character(s).

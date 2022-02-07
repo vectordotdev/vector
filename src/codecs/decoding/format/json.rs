@@ -5,17 +5,17 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
-use super::{BoxedDeserializer, Deserializer, DeserializerConfig};
+use super::Deserializer;
 use crate::{config::log_schema, event::Event};
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct JsonDeserializerConfig;
 
-#[typetag::serde(name = "json")]
-impl DeserializerConfig for JsonDeserializerConfig {
-    fn build(&self) -> crate::Result<BoxedDeserializer> {
-        Ok(Box::new(Into::<JsonDeserializer>::into(self)))
+impl JsonDeserializerConfig {
+    /// Build the `JsonDeserializer` from this configuration.
+    pub fn build(&self) -> JsonDeserializer {
+        Into::<JsonDeserializer>::into(self)
     }
 }
 

@@ -27,9 +27,9 @@ pub struct StdinConfig {
     pub max_length: usize,
     pub host_key: Option<String>,
     #[serde(default = "default_framing_stream_based")]
-    pub framing: Box<dyn FramingConfig>,
+    pub framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 impl Default for StdinConfig {
@@ -87,7 +87,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding.clone()).build()?;
+    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
