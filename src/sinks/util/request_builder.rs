@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use std::io;
 
 use super::{encoding::Encoder, Compression, Compressor};
@@ -7,7 +8,7 @@ pub trait RequestBuilder<Input> {
     type Metadata;
     type Events;
     type Encoder: Encoder<Self::Events>;
-    type Payload: From<Vec<u8>>;
+    type Payload: From<Bytes>;
     type Request;
     type Error: From<io::Error>;
 
@@ -27,8 +28,8 @@ pub trait RequestBuilder<Input> {
         let mut compressor = Compressor::from(self.compression());
         let _ = self.encoder().encode_input(events, &mut compressor)?;
 
-        let payload = compressor.into_inner().into();
-        Ok(payload)
+        let payload = compressor.into_inner().freeze();
+        Ok(payload.into())
     }
 
     /// Builds a request for the given metadata and payload.

@@ -159,6 +159,12 @@ pub trait ElementCount {
     fn element_count(&self) -> usize;
 }
 
+impl ElementCount for Bytes {
+    fn element_count(&self) -> usize {
+        1
+    }
+}
+
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()

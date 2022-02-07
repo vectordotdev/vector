@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
@@ -180,7 +181,7 @@ impl HttpSink for LogdnaConfig {
         Some(PartitionInnerBuffer::new(map.into(), key))
     }
 
-    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let (events, key) = output.into_parts();
         let mut query = url::form_urlencoded::Serializer::new(String::new());
 
@@ -207,10 +208,17 @@ impl HttpSink for LogdnaConfig {
 
         let query = query.finish();
 
-        let body = serde_json::to_vec(&json!({
-            "lines": events,
-        }))
-        .unwrap();
+        let body = {
+            let mut buffer = BytesMut::new();
+            serde_json::to_writer(
+                (&mut buffer).writer(),
+                &json!({
+                    "lines": events,
+                }),
+            )
+            .unwrap();
+            buffer.freeze()
+        };
 
         let uri = self.build_uri(&query);
 

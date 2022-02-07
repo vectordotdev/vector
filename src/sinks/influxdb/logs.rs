@@ -3,6 +3,7 @@ use std::{
     num::NonZeroU64,
 };
 
+use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
@@ -161,8 +162,8 @@ impl SinkConfig for InfluxDbLogsConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = Bytes;
+    type Output = Bytes;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
@@ -186,7 +187,7 @@ impl HttpSink for InfluxDbLogsSink {
             }
         });
 
-        let mut output = String::new();
+        let mut output = BytesMut::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
@@ -199,10 +200,10 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes())
+        Some(output.freeze())
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -222,10 +223,14 @@ impl HttpSink for StackdriverSink {
         Some(json!(entry))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let events = serde_json::json!({ "entries": events });
 
-        let body = serde_json::to_vec(&events).unwrap();
+        let body = {
+            let mut buffer = BytesMut::new();
+            serde_json::to_writer((&mut buffer).writer(), &events).unwrap();
+            buffer.freeze()
+        };
 
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")

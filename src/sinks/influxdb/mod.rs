@@ -3,6 +3,7 @@ pub mod metrics;
 
 use std::collections::{BTreeMap, HashMap};
 
+use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
@@ -175,7 +176,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
-    line_protocol: &mut String,
+    line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
     // Fields
     let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
@@ -185,88 +186,88 @@ pub(in crate::sinks) fn influx_line_protocol(
     }
 
     encode_string(measurement, line_protocol);
-    line_protocol.push(',');
+    line_protocol.put_u8(b',');
 
     // Tags
     let unwrapped_tags = tags.unwrap_or_default();
     encode_tags(unwrapped_tags, line_protocol);
-    line_protocol.push(' ');
+    line_protocol.put_u8(b' ');
 
     // Fields
     encode_fields(protocol_version, unwrapped_fields, line_protocol);
-    line_protocol.push(' ');
+    line_protocol.put_u8(b' ');
 
     // Timestamp
-    line_protocol.push_str(&timestamp.to_string());
-    line_protocol.push('\n');
+    line_protocol.put_slice(&timestamp.to_string().into_bytes());
+    line_protocol.put_u8(b'\n');
     Ok(())
 }
 
-fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
+fn encode_tags(tags: BTreeMap<String, String>, output: &mut BytesMut) {
     // `tags` is already sorted
     for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
             continue;
         }
         encode_string(&key, output);
-        output.push('=');
+        output.put_u8(b'=');
         encode_string(&value, output);
-        output.push(',');
+        output.put_u8(b',');
     }
 
     // remove last ','
-    output.pop();
+    output.truncate(output.len() - 1);
 }
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
     fields: HashMap<String, Field>,
-    output: &mut String,
+    output: &mut BytesMut,
 ) {
     for (key, value) in fields.into_iter() {
         encode_string(&key, output);
-        output.push('=');
+        output.put_u8(b'=');
         match value {
             Field::String(s) => {
-                output.push('"');
+                output.put_u8(b'"');
                 for c in s.chars() {
                     if "\\\"".contains(c) {
-                        output.push('\\');
+                        output.put_u8(b'\\');
                     }
-                    output.push(c);
+                    c.encode_utf8(output);
                 }
-                output.push('"');
+                output.put_u8(b'"');
             }
-            Field::Float(f) => output.push_str(&f.to_string()),
+            Field::Float(f) => output.put_slice(&f.to_string().into_bytes()),
             Field::UnsignedInt(i) => {
-                output.push_str(&i.to_string());
+                output.put_slice(&i.to_string().into_bytes());
                 let c = match protocol_version {
                     ProtocolVersion::V1 => 'i',
                     ProtocolVersion::V2 => 'u',
                 };
-                output.push(c);
+                c.encode_utf8(output);
             }
             Field::Int(i) => {
-                output.push_str(&i.to_string());
-                output.push('i');
+                output.put_slice(&i.to_string().into_bytes());
+                output.put_u8(b'i');
             }
             Field::Bool(b) => {
-                output.push_str(&b.to_string());
+                output.put_slice(&b.to_string().into_bytes());
             }
         };
-        output.push(',');
+        output.put_u8(b',');
     }
 
     // remove last ','
-    output.pop();
+    output.truncate(output.len() - 1);
 }
 
-fn encode_string(key: &str, output: &mut String) {
+fn encode_string(key: &str, output: &mut BytesMut) {
     for c in key.chars() {
         if "\\, =".contains(c) {
-            output.push('\\');
+            output.put_u8(b'\\');
         }
-        output.push(c);
+        c.encode_utf8(output);
     }
 }
 
@@ -618,7 +619,7 @@ mod tests {
 
     #[test]
     fn test_encode_tags() {
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_tags(tags(), &mut value);
 
         assert_eq!(value, "normal_tag=value,true_tag=true");
@@ -632,7 +633,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_tags(tags_to_escape, &mut value);
         assert_eq!(
             value,
@@ -642,7 +643,7 @@ mod tests {
 
     #[test]
     fn tags_order() {
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_tags(
             vec![
                 ("a", "value"),
@@ -680,8 +681,9 @@ mod tests {
         .into_iter()
         .collect();
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_fields(ProtocolVersion::V1, fields, &mut value);
+        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
             value,
             [
@@ -719,8 +721,9 @@ mod tests {
         .into_iter()
         .collect();
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_fields(ProtocolVersion::V2, fields, &mut value);
+        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
             value,
             [
@@ -739,19 +742,19 @@ mod tests {
 
     #[test]
     fn test_encode_string() {
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_string("measurement_name", &mut value);
         assert_eq!(value, "measurement_name");
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_string("measurement name", &mut value);
         assert_eq!(value, "measurement\\ name");
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_string("measurement=name", &mut value);
         assert_eq!(value, "measurement\\=name");
 
-        let mut value = String::new();
+        let mut value = BytesMut::new();
         encode_string("measurement,name", &mut value);
         assert_eq!(value, "measurement\\,name");
     }

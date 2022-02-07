@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -172,19 +173,19 @@ impl SinkConfig for HttpSinkConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = Bytes;
+    type Output = Bytes;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
-        let body = match &self.encoding.codec() {
+        let mut body = BytesMut::new();
+        match &self.encoding.codec() {
             Encoding::Text => {
                 if let Some(v) = event.get(crate::config::log_schema().message_key()) {
-                    let mut b = v.to_string_lossy().into_bytes();
-                    b.push(b'\n');
-                    b
+                    body.put_slice(&v.to_string_lossy().into_bytes());
+                    body.put_u8(b'\n');
                 } else {
                     emit!(&HttpEventMissingMessage);
                     return None;
@@ -192,19 +193,17 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event)
+                serde_json::to_writer((&mut body).writer(), &event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b'\n');
-                b
+                body.put_u8(b'\n');
             }
 
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event)
+                serde_json::to_writer((&mut body).writer(), &event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b',');
-                b
+                body.put_u8(b',');
             }
         };
 
@@ -212,10 +211,10 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(body)
+        Some(body.freeze())
     }
 
-    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
@@ -232,9 +231,15 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Text => "text/plain",
             Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
-                body.insert(0, b'[');
-                body.pop(); // remove trailing comma from last record
-                body.push(b']');
+                let mut buffer = BytesMut::new();
+                buffer.put_u8(b'[');
+                // TODO: Prepend before building a request to eliminate the
+                // additional copy here.
+                buffer.extend_from_slice(&body);
+                // remove trailing comma from last record
+                buffer.truncate(buffer.len() - 1);
+                buffer.put_u8(b']');
+                body = buffer.freeze();
                 "application/json"
             }
         };
@@ -248,9 +253,14 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let mut w = GzEncoder::new(Vec::new(), level);
+                let buffer = BytesMut::new();
+                let mut w = GzEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w.finish().expect("Writing to Vec can't fail");
+                body = w
+                    .finish()
+                    .expect("Writing to Vec can't fail")
+                    .into_inner()
+                    .freeze();
             }
             Compression::None => {}
         }

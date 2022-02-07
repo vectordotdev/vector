@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use bytes::{BufMut, BytesMut};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
@@ -187,8 +188,12 @@ impl HecAckClient {
         request_body: &HecAckStatusRequest,
     ) -> Result<HecAckStatusResponse, HecAckApiError> {
         self.decrement_retries();
-        let request_body_bytes =
-            serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let request_body_bytes = {
+            let mut buffer = BytesMut::new();
+            serde_json::to_writer((&mut buffer).writer(), request_body)
+                .map_err(|_| HecAckApiError::ClientBuildRequest)?;
+            buffer.freeze()
+        };
         let request = self
             .http_request_builder
             .build_request(request_body_bytes, "/services/collector/ack", None)
