@@ -435,6 +435,28 @@ mod tests {
                     ])))),
                 },
             ),
+            (
+                "coalesced segment null arms",
+                TestCase {
+                    kind: Kind::object(BTreeMap::from([
+                        ("foo".into(), Kind::null()),
+                        ("bar".into(), Kind::null()),
+                    ])),
+                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
+                    want: Ok(Some(Kind::null())),
+                },
+            ),
+            (
+                "no matching arms",
+                TestCase {
+                    kind: Kind::object(BTreeMap::from([
+                        ("foo".into(), Kind::null()),
+                        ("bar".into(), Kind::null()),
+                    ])),
+                    path: LookupBuf::from_str(".(baz | qux)").unwrap(),
+                    want: Ok(Some(Kind::null())),
+                },
+            ),
         ]) {
             assert_eq!(
                 kind.find_at_path(&path.to_lookup())
