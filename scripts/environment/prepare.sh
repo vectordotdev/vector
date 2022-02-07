@@ -10,7 +10,7 @@ cd scripts
 bundle install
 cd ..
 
-sudo npm -g install markdownlint-cli
+sudo npm -g install markdownlint-cli@0.30
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2
