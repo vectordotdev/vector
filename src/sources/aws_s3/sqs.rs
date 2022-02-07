@@ -493,7 +493,7 @@ impl IngestorProcess {
                     Ok(_) => None,
                     Err(error) => {
                         // count is set to 0 to have no discarded events considering
-                        // the events are not yet aknoledged and will be retried in
+                        // the events are not yet acknowledged and will be retried in
                         // case of error
                         emit!(&StreamClosedError { error, count: 0 });
                         Some(crate::source_sender::ClosedError)

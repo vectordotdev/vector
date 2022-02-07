@@ -158,7 +158,7 @@ pub mod source {
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = "Unable to delete some of the messages.",
-                error_type = "deletion_failed",
+                error_type = "acknowledgment_failed",
                 stage = "processing",
             );
         }
@@ -167,7 +167,7 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => "Unable to delete SQS message.",
-                "error_type" => "acknowledgement_failed",
+                "error_type" => "acknowledgment_failed",
                 "stage" => "processing",
             );
             // deprecated
