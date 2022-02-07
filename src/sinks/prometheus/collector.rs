@@ -3,11 +3,11 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
+use vector_core::event::metric::{MetricSketch, Quantile};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    sinks::util::{encode_namespace, statistic::DistributionStatistic},
+    sinks::util::encode_namespace,
 };
 
 pub(super) trait MetricCollector {
