@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -18,9 +19,7 @@ use crate::{
     template::{Template, TemplateRenderingError},
 };
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://logs.logdna.com");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"));
 
 const PATH: &str = "/logs/ingest";
 

@@ -6,7 +6,6 @@ use std::{
 };
 
 use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
@@ -43,9 +42,8 @@ use crate::{
     SourceSender,
 };
 
-lazy_static! {
-    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
-}
+static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
+    Lazy::new(enrichment::TableRegistry::default);
 
 pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 

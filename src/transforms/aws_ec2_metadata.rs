@@ -10,6 +10,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
@@ -38,22 +39,23 @@ const SUBNET_ID_KEY: &str = "subnet-id";
 const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 
-lazy_static::lazy_static! {
-    static ref AMI_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/ami-id");
-    static ref AVAILABILITY_ZONE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/placement/availability-zone");
-    static ref INSTANCE_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-id");
-    static ref INSTANCE_TYPE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-type");
-    static ref LOCAL_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-hostname");
-    static ref LOCAL_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-ipv4");
-    static ref PUBLIC_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-hostname");
-    static ref PUBLIC_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-ipv4");
-    static ref REGION: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/region");
-    static ref SUBNET_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/subnet-id");
-    static ref VPC_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/vpc-id");
-    static ref ROLE_NAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/");
-    static ref MAC: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/mac");
-    static ref DYNAMIC_DOCUMENT: PathAndQuery = PathAndQuery::from_static("/latest/dynamic/instance-identity/document");
-    static ref DEFAULT_FIELD_WHITELIST: Vec<String> = vec![
+static AVAILABILITY_ZONE: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static LOCAL_HOSTNAME: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
+static LOCAL_IPV4: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
+static PUBLIC_HOSTNAME: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
+static PUBLIC_IPV4: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
+static ROLE_NAME: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
+static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
+static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
+    Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
+static DEFAULT_FIELD_WHITELIST: Lazy<Vec<String>> = Lazy::new(|| {
+    vec![
         AMI_ID_KEY.to_string(),
         AVAILABILITY_ZONE_KEY.to_string(),
         INSTANCE_ID_KEY.to_string(),
@@ -66,11 +68,11 @@ lazy_static::lazy_static! {
         SUBNET_ID_KEY.to_string(),
         VPC_ID_KEY.to_string(),
         ROLE_NAME_KEY.to_string(),
-    ];
-    static ref API_TOKEN: PathAndQuery = PathAndQuery::from_static("/latest/api/token");
-    static ref TOKEN_HEADER: Bytes = Bytes::from("X-aws-ec2-metadata-token");
-    static ref HOST: Uri = Uri::from_static("http://169.254.169.254");
-}
+    ]
+});
+static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/api/token"));
+static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Ec2Metadata {
