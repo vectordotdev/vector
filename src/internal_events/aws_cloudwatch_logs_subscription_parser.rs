@@ -9,7 +9,7 @@ pub struct AwsCloudwatchLogsSubscriptionParserError {
 impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
     fn emit_logs(&self) {
         error!(
-            message = "Event failed to parse as a CloudWatch Logs subscirption JSON message.",
+            message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             error = ?self.error,
             error_type = "parser_failed",
             stage = "processing",
