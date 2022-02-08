@@ -9,7 +9,7 @@ use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 use super::{request::HecRequest, service::HttpRequestBuilder};
 use crate::{
     http::HttpClient,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{http::HttpBatchService, SinkBatchSettings},
@@ -100,7 +100,7 @@ pub fn render_template_string<'a>(
     template
         .render_string(event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(&TemplateRenderingError {
                 error,
                 field: Some(field_name),
                 drop_event: false

@@ -32,7 +32,7 @@ use crate::{
     aws::rusoto::{self, AwsAuthentication},
     config::SinkDescription,
     event::{EventRef, LogEvent},
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
 };
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
@@ -115,7 +115,7 @@ impl ElasticSearchCommonMode {
             Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -135,7 +135,7 @@ impl ElasticSearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(&TemplateRenderingError {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
