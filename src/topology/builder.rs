@@ -13,6 +13,7 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
+use tracing_futures::Instrument;
 use vector_core::{
     buffers::{
         topology::{
@@ -628,7 +629,7 @@ impl Runner {
                                 }
 
                                 outputs_buf
-                            });
+                            }.in_current_span());
                             in_flight.push(task);
                         }
                         None => {
