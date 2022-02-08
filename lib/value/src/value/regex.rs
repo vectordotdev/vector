@@ -11,6 +11,7 @@ pub struct ValueRegex(regex::Regex);
 impl ValueRegex {
     /// Returns the raw Regex type that is being wrapped
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn into_inner(self) -> regex::Regex {
         self.0
     }

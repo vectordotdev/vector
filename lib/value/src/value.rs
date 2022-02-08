@@ -81,10 +81,10 @@ pub enum Value {
     Timestamp(DateTime<Utc>),
 
     /// A map of values
-    Map(BTreeMap<String, Value>),
+    Map(BTreeMap<String, Self>),
 
     /// A sequential list of values
-    Array(Vec<Value>),
+    Array(Vec<Self>),
 
     /// A Regex. In the context of Vector, this is treated the same as Bytes. It means something more in VRL
     Regex(ValueRegex),
@@ -134,7 +134,7 @@ impl fmt::Display for Value {
 
 impl Value {
     /// Returns a string representation of the type of data represented
-    pub fn kind(&self) -> &str {
+    pub const fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
@@ -148,56 +148,56 @@ impl Value {
     }
 
     /// Checks if the Value is a `Value::Float`
-    pub fn is_float(&self) -> bool {
+    pub const fn is_float(&self) -> bool {
         matches!(self, Self::Float(_))
     }
 
     /// Checks if the Value is a `Value::Bytes`
-    pub fn is_bytes(&self) -> bool {
+    pub const fn is_bytes(&self) -> bool {
         matches!(self, Self::Bytes(_))
     }
 
     /// Checks if the Value is a `Value::Timestamp`
-    pub fn is_timestamp(&self) -> bool {
+    pub const fn is_timestamp(&self) -> bool {
         matches!(self, Self::Timestamp(_))
     }
 
     /// Checks if the Value is a `Value::Regex`
-    pub fn is_regex(&self) -> bool {
+    pub const fn is_regex(&self) -> bool {
         matches!(self, Self::Regex(_))
     }
 
     /// Checks if the Value is a `Value::Map`
-    pub fn is_map(&self) -> bool {
+    pub const fn is_map(&self) -> bool {
         matches!(self, Self::Map(_))
     }
 
     /// Checks if the Value is a `Value::Boolean`
-    pub fn is_boolean(&self) -> bool {
+    pub const fn is_boolean(&self) -> bool {
         matches!(self, Self::Boolean(_))
     }
 
     /// Checks if the Value is a `Value::Null`
-    pub fn is_null(&self) -> bool {
+    pub const fn is_null(&self) -> bool {
         matches!(self, Self::Null)
     }
 
     /// Checks if the Value is a `Value::Integer`
-    pub fn is_integer(&self) -> bool {
+    pub const fn is_integer(&self) -> bool {
         matches!(self, Self::Integer(_))
     }
 
     /// Checks if the Value is a `Value::Array`
-    pub fn is_array(&self) -> bool {
-        matches!(self, Value::Array(_))
+    pub const fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
     }
 
     /// Merges `incoming` value into self.
     ///
     /// Will concatenate `Bytes` and overwrite the rest value kinds.
-    pub fn merge(&mut self, incoming: Value) {
+    pub fn merge(&mut self, incoming: Self) {
         match (self, incoming) {
-            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+            (Self::Bytes(self_bytes), Self::Bytes(ref incoming)) => {
                 let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
                 bytes.extend_from_slice(&self_bytes[..]);
                 bytes.extend_from_slice(&incoming[..]);
@@ -217,23 +217,23 @@ impl Value {
                 SegmentBuf::Field(FieldBuf { name, .. }) => {
                     let mut map = BTreeMap::default();
                     map.insert(name.as_str().to_owned(), self);
-                    self = Value::Map(map);
+                    self = Self::Map(map);
                 }
                 SegmentBuf::Coalesce(fields) => {
                     let field = fields.last().expect("at least 1 field");
                     let mut map = BTreeMap::default();
                     map.insert(field.as_str().to_owned(), self);
-                    self = Value::Map(map);
+                    self = Self::Map(map);
                 }
                 SegmentBuf::Index(index) => {
                     let mut array = vec![];
 
                     if *index > 0 {
-                        array.resize(*index as usize, Value::Null);
+                        array.resize(*index as usize, Self::Null);
                     }
 
                     array.push(self);
-                    self = Value::Array(array);
+                    self = Self::Array(array);
                 }
             }
         }
@@ -269,7 +269,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> std::result::Result<Option<Value>, ValueError> {
+    ) -> std::result::Result<Option<Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("remove", lookup = %working_lookup, %prune);
         let _guard = span.enter();
@@ -477,7 +477,7 @@ impl Value {
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> std::result::Result<Option<&Value>, ValueError> {
+    ) -> std::result::Result<Option<&Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -576,7 +576,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> std::result::Result<Option<&mut Value>, ValueError> {
+    ) -> std::result::Result<Option<&mut Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
@@ -665,8 +665,8 @@ impl Value {
     pub fn insert(
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
-        value: impl Into<Value> + Debug,
-    ) -> std::result::Result<Option<Value>, ValueError> {
+        value: impl Into<Self> + Debug,
+    ) -> std::result::Result<Option<Self>, ValueError> {
         let mut working_lookup: LookupBuf = lookup.into();
         let value = value.into();
         let span = trace_span!("insert", lookup = %working_lookup);
@@ -686,13 +686,13 @@ impl Value {
             // if the type is one of the following, the field is modified to be a map.
             (
                 Some(segment),
-                Value::Boolean(_)
-                | Value::Bytes(_)
-                | Value::Regex(_)
-                | Value::Timestamp(_)
-                | Value::Float(_)
-                | Value::Integer(_)
-                | Value::Null,
+                Self::Boolean(_)
+                | Self::Bytes(_)
+                | Self::Regex(_)
+                | Self::Timestamp(_)
+                | Self::Float(_)
+                | Self::Integer(_)
+                | Self::Null,
             ) => {
                 trace!("Encountered descent into a primitive.");
                 Err(ValueError::PrimitiveDescent {
@@ -707,7 +707,7 @@ impl Value {
             }
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
-                Value::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
+                Self::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
             }
             // Descend into a map
             (
@@ -715,17 +715,17 @@ impl Value {
                     ref name,
                     ref requires_quoting,
                 })),
-                Value::Map(ref mut map),
-            ) => Value::insert_map(name, *requires_quoting, working_lookup, map, value),
-            (Some(SegmentBuf::Index(_)), Value::Map(_)) => {
+                Self::Map(ref mut map),
+            ) => Self::insert_map(name, *requires_quoting, working_lookup, map, value),
+            (Some(SegmentBuf::Index(_)), Self::Map(_)) => {
                 trace!("Mismatched index trying to access map.");
                 Ok(None)
             }
             // Descend into an array
-            (Some(SegmentBuf::Index(i)), Value::Array(ref mut array)) => {
-                Value::insert_array(i, working_lookup, array, value)
+            (Some(SegmentBuf::Index(i)), Self::Array(ref mut array)) => {
+                Self::insert_array(i, working_lookup, array, value)
             }
-            (Some(SegmentBuf::Field(FieldBuf { .. })), Value::Array(_)) => {
+            (Some(SegmentBuf::Field(FieldBuf { .. })), Self::Array(_)) => {
                 trace!("Mismatched field trying to access array.");
                 Ok(None)
             }
@@ -736,9 +736,9 @@ impl Value {
     fn insert_array(
         i: isize,
         mut working_lookup: LookupBuf,
-        array: &mut Vec<Value>,
-        value: Value,
-    ) -> std::result::Result<Option<Value>, ValueError> {
+        array: &mut Vec<Self>,
+        value: Self,
+    ) -> std::result::Result<Option<Self>, ValueError> {
         let index = if i.is_negative() {
             array.len() as isize + i
         } else {
@@ -755,7 +755,7 @@ impl Value {
 
         if let Some(inner) = item {
             if let Some(next_segment) = working_lookup.get(0) {
-                Value::correct_type(inner, next_segment);
+                Self::correct_type(inner, next_segment);
             }
 
             inner.insert(working_lookup, value).map_err(|mut e| {
@@ -779,16 +779,16 @@ impl Value {
                 let abs = i.abs() as usize - 1;
                 let len = array.len();
 
-                array.resize(abs, Value::Null);
+                array.resize(abs, Self::Null);
                 array.rotate_right(abs - len);
             } else {
                 // Fill the vector to the index.
-                array.resize(i as usize, Value::Null);
+                array.resize(i as usize, Self::Null);
             }
             let mut retval = Ok(None);
             let next_val = match working_lookup.get(0) {
                 Some(SegmentBuf::Index(next_len)) => {
-                    let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                    let mut inner = Self::Array(Vec::with_capacity(next_len.abs() as usize));
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
                         if let ValueError::PrimitiveDescent {
                             original_target,
@@ -808,7 +808,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Value::Map(BTreeMap::default());
+                    let mut inner = Self::Map(BTreeMap::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -832,7 +832,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Value::Map(BTreeMap::default());
+                        let mut inner = Self::Map(BTreeMap::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {
@@ -864,9 +864,9 @@ impl Value {
         name: &str,
         requires_quoting: bool,
         mut working_lookup: LookupBuf,
-        map: &mut BTreeMap<String, Value>,
-        value: Value,
-    ) -> std::result::Result<Option<Value>, ValueError> {
+        map: &mut BTreeMap<String, Self>,
+        value: Self,
+    ) -> std::result::Result<Option<Self>, ValueError> {
         let next_segment = match working_lookup.get(0) {
             Some(segment) => segment,
             None => {
@@ -875,16 +875,16 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|entry| Value::correct_type(entry, next_segment))
+            .and_modify(|entry| Self::correct_type(entry, next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
                 match next_segment {
                     SegmentBuf::Index(next_len) => {
-                        Value::Array(Vec::with_capacity(next_len.abs() as usize))
+                        Self::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Value::Map(BTreeMap::default())
+                        Self::Map(BTreeMap::default())
                     }
                 }
             })
@@ -910,9 +910,9 @@ impl Value {
     fn insert_coalesce(
         sub_segments: Vec<FieldBuf>,
         working_lookup: &LookupBuf,
-        sub_value: &mut Value,
-        value: Value,
-    ) -> std::result::Result<Option<Value>, ValueError> {
+        sub_value: &mut Self,
+        value: Self,
+    ) -> std::result::Result<Option<Self>, ValueError> {
         // Creating a needle with a back out of the loop is very important.
         let mut needle = None;
         for sub_segment in sub_segments {
@@ -933,16 +933,16 @@ impl Value {
 
     /// Ensures the value is the correct type for the given segment.
     /// An Index needs the value to be an Array, the others need it to be a Map.
-    fn correct_type(value: &mut Value, segment: &SegmentBuf) {
+    fn correct_type(value: &mut Self, segment: &SegmentBuf) {
         match segment {
             SegmentBuf::Index(next_len) if !matches!(value, Value::Array(_)) => {
-                *value = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                *value = Self::Array(Vec::with_capacity(next_len.abs() as usize));
             }
             SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(BTreeMap::default());
+                *value = Self::Map(BTreeMap::default());
             }
             SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(BTreeMap::default());
+                *value = Self::Map(BTreeMap::default());
             }
             _ => (),
         }
@@ -973,7 +973,7 @@ impl Hash for Value {
                 // * otherwise transmute to u64 and hash
                 if v.is_finite() {
                     v.is_sign_negative().hash(state);
-                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc().to_bits()) };
+                    let trunc: u64 = v.trunc().to_bits();
                     trunc.hash(state);
                 } else if !v.is_nan() {
                     v.is_sign_negative().hash(state);
@@ -995,8 +995,8 @@ impl Hash for Value {
     }
 }
 
-impl PartialEq<Value> for Value {
-    fn eq(&self, other: &Value) -> bool {
+impl PartialEq<Self> for Value {
+    fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Array(a), Value::Array(b)) => a.eq(b),
             (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),

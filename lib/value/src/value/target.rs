@@ -59,13 +59,13 @@ impl Value {
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
     ///
-    pub fn get_by_path(&self, path: &LookupBuf) -> Option<&Value> {
+    pub fn get_by_path(&self, path: &LookupBuf) -> Option<&Self> {
         self.get_by_segments(path.as_segments().iter())
     }
 
     /// Similar to [`Value::get_by_path`], but returns a mutable reference to
     /// the value.
-    pub fn get_by_path_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+    pub fn get_by_path_mut(&mut self, path: &LookupBuf) -> Option<&mut Self> {
         self.get_by_segments_mut(path.as_segments().iter())
     }
 
@@ -116,7 +116,7 @@ impl Value {
     /// )
     /// ```
     ///
-    pub fn insert_by_path(&mut self, path: &LookupBuf, new: Value) {
+    pub fn insert_by_path(&mut self, path: &LookupBuf, new: Self) {
         self.insert_by_segments(path.as_segments().iter().peekable(), new);
     }
 
@@ -135,7 +135,7 @@ impl Value {
         self.remove_by_segments(path.as_segments().iter().peekable(), compact);
     }
 
-    fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Value>
+    fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Self>
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
@@ -148,7 +148,7 @@ impl Value {
             .and_then(|value| value.get_by_segments(segments))
     }
 
-    fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Value> {
+    fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Self> {
         match segment {
             SegmentBuf::Field(FieldBuf { name, .. }) => {
                 self.as_map().and_then(|map| map.get(name.as_str()))
@@ -169,7 +169,7 @@ impl Value {
         }
     }
 
-    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<&mut Value>
+    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<&mut Self>
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
@@ -182,7 +182,7 @@ impl Value {
             .and_then(|value| value.get_by_segments_mut(segments))
     }
 
-    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Value> {
+    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Self> {
         match segment {
             SegmentBuf::Field(FieldBuf { name, .. }) => {
                 self.as_map_mut().and_then(|map| map.get_mut(name.as_str()))
@@ -214,9 +214,9 @@ impl Value {
             Some(segments) => segments,
             None => {
                 return match self {
-                    Value::Map(v) => v.clear(),
-                    Value::Array(v) => v.clear(),
-                    _ => *self = Value::Null,
+                    Self::Map(v) => v.clear(),
+                    Self::Array(v) => v.clear(),
+                    _ => *self = Self::Null,
                 }
             }
         };
@@ -229,8 +229,8 @@ impl Value {
             value.remove_by_segments(segments, compact);
 
             match value {
-                Value::Map(v) if compact & v.is_empty() => self.remove_by_segment(segment),
-                Value::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                Self::Map(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                Self::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
                 _ => {}
             }
         }
@@ -263,7 +263,7 @@ impl Value {
         };
     }
 
-    fn insert_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
+    fn insert_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Self)
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
@@ -286,7 +286,7 @@ impl Value {
         };
     }
 
-    fn update_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
+    fn update_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Self)
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
@@ -300,12 +300,12 @@ impl Value {
 
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
-            if !matches!(self, Value::Map(_)) {
+            if !matches!(self, Self::Map(_)) {
                 *self = BTreeMap::default().into();
             }
 
             let map = match self {
-                Value::Map(map) => map,
+                Self::Map(map) => map,
                 _ => unreachable!("see invariant above"),
             };
 
@@ -320,7 +320,7 @@ impl Value {
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
                 Some(next) => match next {
-                    SegmentBuf::Index(_) => map.insert(key, Value::Array(vec![])),
+                    SegmentBuf::Index(_) => map.insert(key, Self::Array(vec![])),
                     _ => map.insert(key, BTreeMap::default().into()),
                 },
             };
@@ -347,9 +347,9 @@ impl Value {
             }
             SegmentBuf::Index(index) => {
                 let array = match self {
-                    Value::Array(array) => array,
+                    Self::Array(array) => array,
                     _ => {
-                        *self = Value::Array(vec![]);
+                        *self = Self::Array(vec![]);
                         self.as_array_mut().unwrap()
                     }
                 };
@@ -364,7 +364,7 @@ impl Value {
 
                     // left-padded with null values
                     for _ in 1..abs - array.len() {
-                        array.insert(0, Value::Null);
+                        array.insert(0, Self::Null);
                     }
 
                     match segments.peek() {
@@ -373,7 +373,7 @@ impl Value {
                             return;
                         }
                         Some(next) => match next {
-                            SegmentBuf::Index(_) => array.insert(0, Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.insert(0, Self::Array(vec![])),
                             _ => array.insert(0, BTreeMap::default().into()),
                         },
                     };
@@ -387,7 +387,7 @@ impl Value {
 
                     // right-padded with null values
                     if array.len() < index {
-                        array.resize(index, Value::Null);
+                        array.resize(index, Self::Null);
                     }
 
                     match segments.peek() {
@@ -396,7 +396,7 @@ impl Value {
                             return;
                         }
                         Some(next) => match next {
-                            SegmentBuf::Index(_) => array.push(Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.push(Self::Array(vec![])),
                             _ => array.push(BTreeMap::default().into()),
                         },
                     }

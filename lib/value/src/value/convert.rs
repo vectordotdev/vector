@@ -10,17 +10,17 @@ use std::collections::BTreeMap;
 
 impl Value {
     /// Returns the value as Vec<Value> only if the type is `Value::Array`, otherwise returns None
-    pub fn as_array(&self) -> Option<&[Value]> {
+    pub fn as_array(&self) -> Option<&[Self]> {
         match self {
-            Value::Array(v) => Some(v),
+            Self::Array(v) => Some(v),
             _ => None,
         }
     }
 
     /// Returns the value as Vec<Value> only if the type is `Value::Array`, otherwise returns None
-    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Self>> {
         match self {
-            Value::Array(v) => Some(v),
+            Self::Array(v) => Some(v),
             _ => None,
         }
     }
@@ -28,7 +28,7 @@ impl Value {
     /// Returns the value as `DateTime`<Utc> only if the type is `Value::Timestamp`, otherwise returns None
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
-            Value::Timestamp(ts) => Some(ts),
+            Self::Timestamp(ts) => Some(ts),
             _ => None,
         }
     }
@@ -36,15 +36,15 @@ impl Value {
     /// Returns the value as Bytes only if the type is `Value::Bytes`, otherwise returns None
     pub fn as_bytes(&self) -> Option<&Bytes> {
         match self {
-            Value::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
+            Self::Bytes(bytes) => Some(bytes), // cloning a Bytes is cheap
             _ => None,
         }
     }
 
     /// Returns the value as BTreeMap<String, Value> only if the type is `Value::Map`, otherwise returns None
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Self>> {
         match &self {
-            Value::Map(map) => Some(map),
+            Self::Map(map) => Some(map),
             _ => None,
         }
     }
@@ -52,14 +52,14 @@ impl Value {
     /// Returns the value as `NotNan`<f64> only if the type is `Value::Float`, otherwise returns None
     pub fn as_float(&self) -> Option<NotNan<f64>> {
         match self {
-            Value::Float(f) => Some(*f),
+            Self::Float(f) => Some(*f),
             _ => None,
         }
     }
     /// Checks if the Value is a `Value::Integer`
     pub fn as_int(&self) -> Option<i64> {
         match self {
-            Value::Integer(i) => Some(*i),
+            Self::Integer(i) => Some(*i),
             _ => None,
         }
     }
@@ -67,23 +67,23 @@ impl Value {
     /// Returns the value as `NotNan`<f64> only if the type is `Value::Float`, otherwise returns None
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
-            Value::Boolean(f) => Some(*f),
+            Self::Boolean(f) => Some(*f),
             _ => None,
         }
     }
 
     /// Returns the value as BTreeMap<String, Value> only if the type is `Value::Map`, otherwise returns None
-    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
+    pub fn into_map(self) -> Option<BTreeMap<String, Self>> {
         match self {
-            Value::Map(map) => Some(map),
+            Self::Map(map) => Some(map),
             _ => None,
         }
     }
 
     /// Returns self as a mutable `BTreeMap<String, Value>`
-    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Self>> {
         match self {
-            Value::Map(ref mut m) => Some(m),
+            Self::Map(ref mut m) => Some(m),
             _ => None,
         }
     }
@@ -93,7 +93,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Map`.
-    pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn unwrap_map_mut(&mut self) -> &mut BTreeMap<String, Self> {
         self.as_map_mut()
             .expect("Tried to call `Value::unwrap_map_mut` on a non-map value.")
     }
@@ -103,7 +103,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Map`.
-    pub fn unwrap_map(&self) -> &BTreeMap<String, Value> {
+    pub fn unwrap_map(&self) -> &BTreeMap<String, Self> {
         self.as_map()
             .expect("Tried to call `Value::unwrap_map` on a non-map value.")
     }
@@ -113,7 +113,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn unwrap_array(&self) -> &[Value] {
+    pub fn unwrap_array(&self) -> &[Self] {
         self.as_array()
             .expect("Tried to call `Value::unwrap_array` on a non-array value.")
     }
@@ -125,87 +125,87 @@ impl Value {
     /// couldn't in future should the need arise.
     pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
         match self {
-            Value::Bytes(bytes) => Ok(bytes.clone()),
-            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
-            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
-            Value::Boolean(b) => Ok(if *b {
+            Self::Bytes(bytes) => Ok(bytes.clone()),
+            Self::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
+            Self::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
+            Self::Boolean(b) => Ok(if *b {
                 Bytes::copy_from_slice(&[1_u8])
             } else {
                 Bytes::copy_from_slice(&[0_u8])
             }),
-            Value::Map(_o) => Err("cannot convert object to bytes.".to_string()),
-            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
-            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
-            Value::Regex(r) => Ok(r.to_string().into()),
-            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+            Self::Map(_o) => Err("cannot convert object to bytes.".to_string()),
+            Self::Array(_a) => Err("cannot convert array to bytes.".to_string()),
+            Self::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
+            Self::Regex(r) => Ok(r.to_string().into()),
+            Self::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
         }
     }
 }
 
-impl<T: Into<Value>> From<Vec<T>> for Value {
+impl<T: Into<Self>> From<Vec<T>> for Value {
     fn from(v: Vec<T>) -> Self {
-        Value::Array(v.into_iter().map(Into::into).collect::<Vec<_>>())
+        Self::Array(v.into_iter().map(Into::into).collect::<Vec<_>>())
     }
 }
 
-impl FromIterator<Value> for Value {
-    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        Value::Array(iter.into_iter().collect::<Vec<_>>())
+impl FromIterator<Self> for Value {
+    fn from_iter<I: IntoIterator<Item = Self>>(iter: I) -> Self {
+        Self::Array(iter.into_iter().collect::<Vec<_>>())
     }
 }
 
 impl From<NotNan<f32>> for Value {
     fn from(value: NotNan<f32>) -> Self {
-        Value::Float(NotNan::<f64>::from(value))
+        Self::Float(NotNan::<f64>::from(value))
     }
 }
 
 impl From<NotNan<f64>> for Value {
     fn from(value: NotNan<f64>) -> Self {
-        Value::Float(value)
+        Self::Float(value)
     }
 }
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::Bytes(Vec::from(s.as_bytes()).into())
+        Self::Bytes(Vec::from(s.as_bytes()).into())
     }
 }
 
 impl From<DateTime<Utc>> for Value {
     fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
+        Self::Timestamp(timestamp)
     }
 }
 
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
+        Self::Bytes(bytes)
     }
 }
 
 impl From<String> for Value {
     fn from(string: String) -> Self {
-        Value::Bytes(string.into())
+        Self::Bytes(string.into())
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Map(value)
+impl From<BTreeMap<String, Self>> for Value {
+    fn from(value: BTreeMap<String, Self>) -> Self {
+        Self::Map(value)
     }
 }
 
 impl From<()> for Value {
     fn from(_: ()) -> Self {
-        Value::Null
+        Self::Null
     }
 }
 
-impl<T: Into<Value>> From<Option<T>> for Value {
+impl<T: Into<Self>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
         match value {
-            None => Value::Null,
+            None => Self::Null,
             Some(v) => v.into(),
         }
     }
@@ -215,11 +215,12 @@ impl<T: Into<Value>> From<Option<T>> for Value {
 // TODO: this exists to satisfy the `vector_common::Convert` utility.
 //
 // We'll have to fix that so that we can remove this impl.
+#[allow(clippy::fallible_impl_from)]
 impl From<f64> for Value {
     fn from(v: f64) -> Self {
         let v = if v.is_nan() { 0.0 } else { v };
 
-        Value::Float(NotNan::new(v).unwrap())
+        Self::Float(NotNan::new(v).unwrap())
     }
 }
 
@@ -251,19 +252,19 @@ impl From<Regex> for Value {
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        Value::Boolean(value)
+        Self::Boolean(value)
     }
 }
 
-impl FromIterator<(String, Value)> for Value {
-    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+impl FromIterator<(String, Self)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, Self)>>(iter: I) -> Self {
+        Self::Map(iter.into_iter().collect::<BTreeMap<String, Self>>())
     }
 }
 
 impl From<&[u8]> for Value {
     fn from(v: &[u8]) -> Self {
-        Value::Bytes(Bytes::copy_from_slice(v))
+        Self::Bytes(Bytes::copy_from_slice(v))
     }
 }
 

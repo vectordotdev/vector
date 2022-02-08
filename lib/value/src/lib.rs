@@ -28,6 +28,7 @@
     clippy::cast_possible_wrap,
     clippy::module_name_repetitions,
     clippy::multiple_crate_versions,
+    clippy::missing_const_for_fn,
     unreachable_code,
     unused_variables
 )]
