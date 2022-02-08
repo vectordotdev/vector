@@ -231,11 +231,12 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Text => "text/plain",
             Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
+                // TODO(https://github.com/vectordotdev/vector/issues/11253):
+                // Prepend before building a request body to eliminate the
+                // additional copy here.
                 let message = body.split();
                 body.put_u8(b'[');
                 if !message.is_empty() {
-                    // TODO: Prepend before building a request to eliminate the
-                    // additional copy here.
                     body.unsplit(message);
                     // remove trailing comma from last record
                     body.truncate(body.len() - 1);
