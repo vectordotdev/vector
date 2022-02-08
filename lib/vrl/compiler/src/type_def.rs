@@ -96,7 +96,7 @@ impl TypeDef {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
-            .unwrap_or_else(|_| self.kind);
+            .unwrap_or(self.kind);
 
         Self { fallible, kind }
     }
