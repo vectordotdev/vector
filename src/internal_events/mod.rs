@@ -102,6 +102,7 @@ mod open;
     feature = "transforms-logfmt_parser",
     feature = "transforms-regex_parser",
     feature = "transforms-split",
+    feature = "transforms-tokenizer",
 ))]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -139,8 +140,6 @@ mod tcp;
 mod template;
 #[cfg(feature = "transforms-throttle")]
 mod throttle;
-#[cfg(feature = "transforms-tokenizer")]
-mod tokenizer;
 mod udp;
 mod unix;
 mod vector;
@@ -253,6 +252,7 @@ pub(crate) use self::nginx_metrics::*;
     feature = "transforms-logfmt_parser",
     feature = "transforms-regex_parser",
     feature = "transforms-split",
+    feature = "transforms-tokenizer",
 ))]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -282,8 +282,6 @@ pub use self::statsd_source::*;
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub use self::throttle::*;
-#[cfg(feature = "transforms-tokenizer")]
-pub(crate) use self::tokenizer::*;
 #[cfg(windows)]
 pub use self::windows::*;
 pub use self::{
