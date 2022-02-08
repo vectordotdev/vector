@@ -261,7 +261,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -288,7 +288,7 @@ pub async fn build_pieces(
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::Memory { .. } => "memory",
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
