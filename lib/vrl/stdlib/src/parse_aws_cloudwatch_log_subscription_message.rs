@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
+use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

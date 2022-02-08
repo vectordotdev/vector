@@ -14,8 +14,8 @@ nom = "7.1.0"
 num_enum = "0.5.6"
 prost = "0.9"
 prost-types = "0.9"
-shared = { path = "../shared", features = ["btreemap"] }
 snafu = { version = "0.7" }
+vector_common = { path = "../vector-common", features = ["btreemap"] }
 
 [build-dependencies]
 prost-build = "0.9"

@@ -3,8 +3,8 @@ use std::{collections::HashMap, str};
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::ResultExt;
+use vector_common::TimeZone;
 
 use crate::{
     config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},

@@ -3,7 +3,7 @@ use futures::{stream, StreamExt};
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
-use shared::btreemap;
+use vector_common::btreemap;
 
 use super::{filter_result, HostMetrics};
 use crate::event::metric::Metric;

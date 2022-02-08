@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use shared::TimeZone;
 use vector::{
     config::{DataType, Output},
     event::{Event, Value},
@@ -15,6 +14,7 @@ use vector::{
         SyncTransform, TransformOutputsBuf,
     },
 };
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 criterion_group!(

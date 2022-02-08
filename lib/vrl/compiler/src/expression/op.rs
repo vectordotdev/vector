@@ -5,7 +5,9 @@ use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
-    value, Context, Expression, State, TypeDef, Value,
+    value,
+    vm::OpCode,
+    Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Clone, PartialEq)]
@@ -184,7 +186,19 @@ impl Expression for Op {
                 .scalar(K::Boolean),
 
             // ... / ...
-            Div => TypeDef::new().fallible().float(),
+            Div => {
+                let td = TypeDef::new().float();
+
+                // Division is infallible if the rhs is a literal normal float or integer.
+                match self.rhs.as_value() {
+                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
+                        Value::Float(v) if v.is_normal() => td.infallible(),
+                        Value::Integer(v) if v != 0 => td.infallible(),
+                        _ => td.fallible(),
+                    },
+                    _ => td.fallible(),
+                }
+            }
 
             // "bar" + ...
             // ... + "bar"
@@ -238,6 +252,85 @@ impl Expression for Op {
                 .fallible()
                 .scalar(K::Integer | K::Float),
         }
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.lhs.compile_to_vm(vm)?;
+
+        // Note, not all opcodes want the RHS evaluated straight away, so we
+        // only compile the rhs in each branch as necessary.
+        match self.opcode {
+            ast::Opcode::Mul => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Multiply);
+            }
+            ast::Opcode::Div => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Divide);
+            }
+            ast::Opcode::Add => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Add);
+            }
+            ast::Opcode::Sub => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Subtract);
+            }
+            ast::Opcode::Rem => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Rem);
+            }
+            ast::Opcode::Or => {
+                // Or is rewritten as an if statement to allow short circuiting.
+                let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
+                vm.write_opcode(OpCode::Pop);
+                self.rhs.compile_to_vm(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::And => {
+                // And is rewritten as an if statement to allow short circuiting
+                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
+                vm.write_opcode(OpCode::Pop);
+                self.rhs.compile_to_vm(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::Err => {
+                // Err is rewritten as an if statement to allow short circuiting
+                let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
+                vm.write_opcode(OpCode::ClearError);
+                self.rhs.compile_to_vm(vm)?;
+                vm.patch_jump(if_jump);
+            }
+            ast::Opcode::Ne => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::NotEqual);
+            }
+            ast::Opcode::Eq => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Equal);
+            }
+            ast::Opcode::Ge => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::GreaterEqual);
+            }
+            ast::Opcode::Gt => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Greater);
+            }
+            ast::Opcode::Le => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::LessEqual);
+            }
+            ast::Opcode::Lt => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Less);
+            }
+            ast::Opcode::Merge => {
+                self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Merge);
+            }
+        };
+        Ok(())
     }
 }
 
@@ -351,17 +444,16 @@ impl DiagnosticError for Error {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-
-    use ast::Opcode::*;
-    use ordered_float::NotNan;
-
     use super::*;
     use crate::{
-        expression::{Block, IfStatement, Literal, Predicate},
+        expression::{Block, IfStatement, Literal, Predicate, Variable},
         test_type_def,
         value::Kind,
     };
+    use ast::Ident;
+    use ast::Opcode::*;
+    use ordered_float::NotNan;
+    use std::convert::TryInto;
 
     fn op(
         opcode: ast::Opcode,
@@ -522,18 +614,46 @@ mod tests {
             want: TypeDef::new().fallible().integer().add_float(),
         }
 
-        divide_integer {
+        divide_integer_literal {
             expr: |_| op(Div, 1, 1),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::new().infallible().float(),
         }
 
-        divide_float {
+        divide_float_literal {
             expr: |_| op(Div, 1.0, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        divide_mixed_literal {
+            expr: |_| op(Div, 1, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        divide_float_zero_literal {
+            expr: |_| op(Div, 1, 0.0),
             want: TypeDef::new().fallible().float(),
         }
 
-        divide_mixed {
-            expr: |_| op(Div, 1, 1.0),
+        divide_integer_zero_literal {
+            expr: |_| op(Div, 1, 0),
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_lhs_literal_wrong_rhs {
+            expr: |_| Op {
+                lhs: Box::new(Literal::from(true).into()),
+                rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
+                opcode: Div,
+            },
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_dynamic_rhs {
+            expr: |_| Op {
+                lhs: Box::new(Literal::from(1).into()),
+                rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
+                opcode: Div,
+            },
             want: TypeDef::new().fallible().float(),
         }
 
@@ -689,12 +809,12 @@ mod tests {
             expr: |_| Op {
                 lhs: Box::new(Op {
                     lhs: Box::new(Literal::from("foo").into()),
-                    rhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Literal::from(true).into()),
-                    rhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
                 }.into()),
                 opcode: Err,

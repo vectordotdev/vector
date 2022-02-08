@@ -262,15 +262,15 @@ target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	rm -rf target/scratch/vector-${TRIPLE} || true
 	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		target/${TRIPLE}/${PROFILE}/vector \
 		target/scratch/vector-${TRIPLE}/bin/vector
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		README.md \
 		LICENSE \
 		config \
 		target/scratch/vector-${TRIPLE}/
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		distribution/systemd \
 		target/scratch/vector-${TRIPLE}/etc/
 	tar --create \

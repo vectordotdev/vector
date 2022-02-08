@@ -164,6 +164,39 @@ pub struct ComponentSentEventsThroughputsSubscription;
 )]
 pub struct ComponentSentEventsTotalsSubscription;
 
+impl component_sent_events_totals_subscription::ComponentSentEventsTotalsSubscriptionComponentSentEventsTotals {
+    pub fn outputs(&self) -> Vec<(String, i64)> {
+        self.outputs
+            .iter()
+            .map(|output| {
+                (
+                    output.output_id.clone(),
+                    output
+                        .sent_events_total
+                        .as_ref()
+                        .map(|p| p.sent_events_total as i64)
+                        .unwrap_or(0),
+                )
+            })
+            .collect()
+    }
+}
+
+impl component_sent_events_throughputs_subscription::ComponentSentEventsThroughputsSubscriptionComponentSentEventsThroughputs {
+    pub fn outputs(&self) -> Vec<(String, i64)> {
+        self.outputs
+            .iter()
+            .map(|output| {
+                (
+                    output.output_id.clone(),
+                    output.throughput as i64,
+                )
+            })
+            .collect()
+    }
+
+}
+
 /// Extension methods for metrics subscriptions
 pub trait MetricsSubscriptionExt {
     /// Executes an uptime metrics subscription.

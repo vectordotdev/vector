@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, Program, Runtime, Value};
 
 use crate::{

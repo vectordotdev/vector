@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(

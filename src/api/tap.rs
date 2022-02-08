@@ -595,22 +595,41 @@ mod tests {
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-        let transform_tap_all_outputs_stream =
+        let mut transform_tap_all_outputs_stream =
             create_events_stream(topology.watch(), vec!["transform*".to_string()], 500, 100);
 
-        let transform_tap_events: Vec<_> = transform_tap_all_outputs_stream.take(2).collect().await;
+        let transform_tap_notifications = transform_tap_all_outputs_stream.next().await.unwrap();
         assert_eq!(
-            assert_notification(transform_tap_events[0][0].clone()),
+            assert_notification(transform_tap_notifications[0].clone()),
             EventNotification::new("transform*".to_string(), EventNotificationType::Matched)
         );
 
-        assert!(transform_tap_events[1]
-            .iter()
-            .map(|payload| assert_log(payload.clone()))
-            .any(|log| log.get_message().unwrap_or_default() == "test1"));
-        assert!(transform_tap_events[1]
-            .iter()
-            .map(|payload| assert_log(payload.clone()))
-            .any(|log| log.get_message().unwrap_or_default() == "test2"));
+        let mut default_output_found = false;
+        let mut dropped_output_found = false;
+        for _ in 0..2 {
+            if default_output_found && dropped_output_found {
+                break;
+            }
+
+            match transform_tap_all_outputs_stream.next().await {
+                Some(tap_events) => {
+                    if !default_output_found {
+                        default_output_found = tap_events
+                            .iter()
+                            .map(|payload| assert_log(payload.clone()))
+                            .any(|log| log.get_message().unwrap_or_default() == "test1");
+                    }
+                    if !dropped_output_found {
+                        dropped_output_found = tap_events
+                            .iter()
+                            .map(|payload| assert_log(payload.clone()))
+                            .any(|log| log.get_message().unwrap_or_default() == "test2");
+                    }
+                }
+                None => break,
+            }
+        }
+
+        assert!(default_output_found && dropped_output_found);
     }
 }

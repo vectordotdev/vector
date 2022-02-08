@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use crate::encoding::FixedEncodable;
+use crate::{encoding::FixedEncodable, EventCount};
 
 #[derive(Debug)]
 pub struct EncodeError;
@@ -42,6 +42,12 @@ impl Message {
 impl ByteSizeOf for Message {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+impl EventCount for Message {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 

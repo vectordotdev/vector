@@ -9,9 +9,9 @@ use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 use enumflags2::{bitflags, BitFlags, FromBitsError};
 use prost::Message;
-use shared::EventDataEq;
 use snafu::Snafu;
-use vector_buffers::encoding::{AsMetadata, Encodable};
+use vector_buffers::{encoding::AsMetadata, encoding::Encodable, EventCount};
+use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};
@@ -61,6 +61,12 @@ impl ByteSizeOf for Event {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
         }
+    }
+}
+
+impl EventCount for Event {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 

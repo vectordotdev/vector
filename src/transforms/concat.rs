@@ -1,4 +1,4 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -75,13 +75,12 @@ pub struct Substring {
     end: Option<i32>,
 }
 
+static SUBSTR_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$").unwrap()
+});
+
 impl Substring {
     fn new(input: String) -> Result<Substring, BuildError> {
-        lazy_static! {
-            static ref SUBSTR_REGEX: Regex =
-                Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$")
-                    .unwrap();
-        }
         let cap = match SUBSTR_REGEX.captures(input.as_bytes()) {
             None => {
                 return Err(BuildError::InvalidSubstring {

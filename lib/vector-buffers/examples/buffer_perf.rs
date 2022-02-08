@@ -22,7 +22,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, BufferType, Bufferable, WhenFull,
+    Acker, BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 
@@ -45,6 +45,12 @@ impl VariableMessage {
 impl ByteSizeOf for VariableMessage {
     fn allocated_bytes(&self) -> usize {
         self.payload.len()
+    }
+}
+
+impl EventCount for VariableMessage {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 

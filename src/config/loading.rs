@@ -5,15 +5,14 @@ use std::{
     sync::Mutex,
 };
 
-use glob::glob;
-use indexmap::IndexMap;
-use lazy_static::lazy_static;
-
 use super::{
     builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
     FormatHint, TransformOuter,
 };
 use crate::signal;
+use glob::glob;
+use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 
 #[cfg(not(windows))]
 fn default_config_paths() -> Vec<ConfigPath> {
@@ -34,9 +33,7 @@ fn default_config_paths() -> Vec<ConfigPath> {
     )]
 }
 
-lazy_static! {
-    pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
-}
+pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
 
 pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
     path.read_dir()
