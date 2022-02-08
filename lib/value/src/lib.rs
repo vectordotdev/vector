@@ -4,6 +4,7 @@
 #![deny(
     clippy::all,
     clippy::cargo,
+    clippy::nursery,
     clippy::pedantic,
     future_incompatible,
     missing_docs,
@@ -34,4 +35,5 @@ pub mod kind;
 mod value;
 
 pub use self::value::{Value, ValueRegex};
+
 pub use kind::Kind;

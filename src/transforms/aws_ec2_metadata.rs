@@ -21,7 +21,7 @@ use crate::{
     },
     event::Event,
     http::HttpClient,
-    internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
+    internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     transforms::{TaskTransform, Transform},
 };
 
@@ -270,7 +270,7 @@ impl MetadataClient {
                     emit!(&AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(&AwsEc2MetadataRefreshFailed { error });
+                    emit!(&AwsEc2MetadataRefreshError { error });
                 }
             }
 

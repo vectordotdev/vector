@@ -12,7 +12,7 @@ use crate::{
     buffer_usage_data::BufferUsageHandle,
     disk_v2::{Buffer, DiskBufferConfig, Reader, Writer},
     encoding::FixedEncodable,
-    Acker, Bufferable, WhenFull,
+    Acker, Bufferable, EventCount, WhenFull,
 };
 
 mod acknowledgements;
@@ -182,6 +182,12 @@ impl ByteSizeOf for SizedRecord {
     }
 }
 
+impl EventCount for SizedRecord {
+    fn event_count(&self) -> usize {
+        1
+    }
+}
+
 impl FixedEncodable for SizedRecord {
     type EncodeError = io::Error;
     type DecodeError = io::Error;
@@ -218,6 +224,12 @@ pub(crate) struct UndecodableRecord;
 impl ByteSizeOf for UndecodableRecord {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+impl EventCount for UndecodableRecord {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
