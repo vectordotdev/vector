@@ -21,21 +21,21 @@ pub enum VectorSinkError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::Event;
-    use crate::proto::vector as proto;
-    use crate::sinks::vector::v2::config::with_default_scheme;
-    use crate::{
-        config::SinkContext,
-        sinks::util::test::build_test_server_generic,
-        test_util::{components, next_addr, random_lines_with_stream},
-    };
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{channel::mpsc, StreamExt};
     use http::request::Parts;
     use hyper::Method;
     use prost::Message;
     use vector_core::event::{BatchNotifier, BatchStatus};
+
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        event::Event,
+        proto::vector as proto,
+        sinks::{util::test::build_test_server_generic, vector::v2::config::with_default_scheme},
+        test_util::{components, next_addr, random_lines_with_stream},
+    };
 
     // one byte for the compression flag plus four bytes for the length
     const GRPC_HEADER_SIZE: usize = 5;

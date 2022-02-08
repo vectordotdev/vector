@@ -1,13 +1,17 @@
-use crate::expression::{Expr, Literal, Resolved};
-use crate::parser::{
-    ast::{self, Ident},
-    Node,
-};
-use crate::{Context, Expression, Span, State, TypeDef, Value};
+use std::{convert::TryFrom, fmt};
+
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
-use std::convert::TryFrom;
-use std::fmt;
+
+use crate::{
+    expression::{Expr, Literal, Resolved},
+    parser::{
+        ast::{self, Ident},
+        Node,
+    },
+    vm::OpCode,
+    Context, Expression, Span, State, TypeDef, Value,
+};
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
@@ -19,7 +23,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         state: &mut State,
     ) -> Result<Self, Error> {
-        let (span, variant) = node.take();
+        let (_, variant) = node.take();
 
         let variant = match variant {
             Variant::Single { target, expr } => {
@@ -35,7 +39,6 @@ impl Assignment {
                             target.to_string(),
                             expr.to_string(),
                         ),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -45,7 +48,6 @@ impl Assignment {
                 if matches!(target.as_ref(), ast::AssignmentTarget::Noop) {
                     return Err(Error {
                         variant: ErrorVariant::UnnecessaryNoop(target_span),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -82,7 +84,6 @@ impl Assignment {
                             ok_span,
                             err_span,
                         ),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -95,7 +96,6 @@ impl Assignment {
                 if ok_noop && err_noop {
                     return Err(Error {
                         variant: ErrorVariant::UnnecessaryNoop(ok_span),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -151,6 +151,10 @@ impl Expression for Assignment {
 
     fn type_def(&self, state: &State) -> TypeDef {
         self.variant.type_def(state)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.variant.compile_to_vm(vm)
     }
 }
 
@@ -323,7 +327,6 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
-                            span,
                             expr_span: span,
                             assignment_span: span,
                         })
@@ -400,6 +403,45 @@ where
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
     }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        match self {
+            Variant::Single { target, expr } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+
+                vm.write_opcode(OpCode::SetPath);
+
+                // Add the target to the list of targets, write its index as a primitive for the
+                //  `SetPath` opcode to retrieve.
+                let target = vm.get_target(&target.into());
+                vm.write_primitive(target);
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::SetPathInfallible);
+
+                // Write the target for the `Ok` path.
+                let target = vm.get_target(&ok.into());
+                vm.write_primitive(target);
+
+                // Write the target for the `Error` path.
+                let target = vm.get_target(&err.into());
+                vm.write_primitive(target);
+
+                // Add the default value (the value to set to the `Ok` target should we have an error).
+                let default = vm.add_constant(default.clone());
+                vm.write_primitive(default);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<T, U> fmt::Display for Variant<T, U>
@@ -430,7 +472,6 @@ pub(crate) struct Details {
 #[derive(Debug)]
 pub struct Error {
     variant: ErrorVariant,
-    span: Span,
     expr_span: Span,
     assignment_span: Span,
 }

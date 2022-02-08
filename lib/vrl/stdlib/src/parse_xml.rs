@@ -1,11 +1,11 @@
-use vrl::prelude::*;
-
-use regex::{Regex, RegexBuilder};
-use roxmltree::{Document, Node, NodeType};
 use std::{
     borrow::Cow,
     collections::{btree_map::Entry, BTreeMap},
 };
+
+use regex::{Regex, RegexBuilder};
+use roxmltree::{Document, Node, NodeType};
+use vrl::prelude::*;
 
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,

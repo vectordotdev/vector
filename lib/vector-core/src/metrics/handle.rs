@@ -1,6 +1,12 @@
+use std::{
+    slice,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
+};
+
 use metrics::GaugeValue;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::{slice, sync::Arc};
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -25,7 +31,7 @@ impl AtomicF64 {
     {
         let res = self.inner.fetch_update(set_order, fetch_order, |x| {
             let opt: Option<f64> = f(f64::from_bits(x));
-            opt.map(|i| i.to_bits())
+            opt.map(f64::to_bits)
         });
 
         res.map(f64::from_bits).map_err(f64::from_bits)
@@ -227,8 +233,9 @@ impl Gauge {
 
 #[cfg(test)]
 mod test {
-    use crate::metrics::handle::{Counter, Histogram};
     use quickcheck::{QuickCheck, TestResult};
+
+    use crate::metrics::handle::{Counter, Histogram};
 
     // Adapted from https://users.rust-lang.org/t/assert-eq-for-float-numbers/7034/4?u=blt
     fn nearly_equal(a: f64, b: f64) -> bool {

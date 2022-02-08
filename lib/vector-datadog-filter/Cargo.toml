@@ -1,0 +1,21 @@
+[package]
+name = "vector-datadog-filter"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+
+# Vector
+vector_core = { path = "../vector-core" }
+
+# Datadog
+datadog-search-syntax = { path = "../datadog/search-syntax" }
+datadog-filter = { path = "../datadog/filter" }
+
+# Libs
+bytes = { version = "1.1.0", default-features = false }
+
+[dev-dependencies]
+datadog-filter-test = { path = "../datadog/filter-test" }

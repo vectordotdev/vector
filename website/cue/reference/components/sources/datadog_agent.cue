@@ -59,6 +59,16 @@ components: sources: datadog_agent: {
 	configuration: {
 		acknowledgements: configuration._acknowledgements
 		address:          sources.http.configuration.address
+		multiple_outputs: {
+			common: false
+			description: """
+				If this setting is set to `true` metrics and logs will be sent to different ouputs. For a source component
+				named `agent` the received logs and metrics can then be accessed by specifying `agent.logs` and `agent.metrics`,
+				respectively, as the input to another component.
+				"""
+			required: false
+			type: bool: default: false
+		}
 		store_api_key: {
 			common:      false
 			description: "When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event metadata and will be used if the event is sent to a Datadog sink."
@@ -66,6 +76,27 @@ components: sources: datadog_agent: {
 			type: bool: default: true
 		}
 	}
+
+	outputs: [
+		{
+			name: components._default_output.name
+			description: """
+				Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks. Only active if [multiple_outputs](#multiple_outputs) is disabled.
+				"""
+		},
+		{
+			name: "logs"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "metrics"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
+				"""
+		},
+	]
 
 	output: {
 		logs: line: {
@@ -136,6 +167,8 @@ components: sources: datadog_agent: {
 	}
 
 	telemetry: metrics: {
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total

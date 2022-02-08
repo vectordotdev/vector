@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
+
+use super::{PathComponent, PathIter, Value};
 
 /// Checks whether a field specified by a given path is present.
 pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
@@ -36,9 +37,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn contains_simple() {

@@ -1,5 +1,6 @@
-use metrics::{counter, histogram};
 use std::time::Instant;
+
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

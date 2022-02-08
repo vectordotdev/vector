@@ -1,9 +1,11 @@
 // ## skip check-events ##
 
-use crate::template::TemplateParseError;
-use metrics::counter;
 use std::num::ParseFloatError;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use crate::template::TemplateParseError;
 
 pub struct LogToMetricFieldNull<'a> {
     pub field: &'a str,

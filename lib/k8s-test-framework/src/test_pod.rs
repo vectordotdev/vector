@@ -1,9 +1,11 @@
 //! Manage test pods.
 
+use std::process::{Command, Stdio};
+
+use k8s_openapi::api::core::v1::Pod;
+
 use super::{resource_file::ResourceFile, Result};
 use crate::up_down;
-use k8s_openapi::api::core::v1::Pod;
-use std::process::{Command, Stdio};
 
 /// A config that holds a test `Pod` resource file.
 #[derive(Debug)]

@@ -3,16 +3,20 @@
 
 mod test_enrichment;
 
+use std::str::FromStr;
+
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use glob::glob;
-use shared::TimeZone;
-use std::str::FromStr;
 use structopt::StructOpt;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
-
 use vrl_tests::{docs, Test};
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -28,9 +32,6 @@ pub struct Cmd {
 
     #[structopt(short, long)]
     no_diff: bool,
-
-    #[structopt(long)]
-    skip_functions: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
@@ -136,7 +137,7 @@ fn main() {
         }
 
         let state = state::Runtime::default();
-        let mut runtime = Runtime::new(state);
+        let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
         let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
@@ -148,7 +149,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program, &timezone);
+                let result = run_vrl(runtime, functions, program, &mut test, timezone);
 
                 match result {
                     Ok(got) => {
@@ -304,6 +305,29 @@ fn main() {
     }
 
     print_result(failed_count)
+}
+
+#[cfg(feature = "vrl-vm")]
+fn run_vrl(
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
+    program: vrl::Program,
+    test: &mut Test,
+    timezone: TimeZone,
+) -> Result<Value, Terminate> {
+    let vm = runtime.compile(functions, &program).unwrap();
+    runtime.run_vm(&vm, &mut test.object, &timezone)
+}
+
+#[cfg(not(feature = "vrl-vm"))]
+fn run_vrl(
+    mut runtime: Runtime,
+    _functions: Vec<Box<dyn vrl::Function>>,
+    program: vrl::Program,
+    test: &mut Test,
+    timezone: TimeZone,
+) -> Result<Value, Terminate> {
+    runtime.resolve(&mut test.object, &program, &timezone)
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {

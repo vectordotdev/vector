@@ -2263,6 +2263,11 @@ schema.id = "integer"
       .key = get_metadata_field("datadog_api_key")
       remove_metadata_field("datadog_api_key")
       .empty_key = get_metadata_field("datadog_api_key")
+
+      set_metadata_field("splunk_hec_token", "iamasplunkhectoken")
+      .splunk_hec_token = get_metadata_field("splunk_hec_token")
+      remove_metadata_field("splunk_hec_token")
+      .empty_splunk_hec_token = get_metadata_field("splunk_hec_token")
   '''
 [[tests]]
   name = "remap_metadata"
@@ -2275,5 +2280,6 @@ schema.id = "integer"
     [[tests.outputs.conditions]]
       "type" = "vrl"
       source = '''
-        .key == "iamanapikey" && .empty_key == null
+        .key == "iamanapikey" && .empty_key == null &&
+        .splunk_hec_token == "iamasplunkhectoken" && .empty_splunk_hec_token == null
       '''

@@ -1,0 +1,15 @@
+# result:
+#
+# error[E631]: unhandled fallible expression
+#   ┌─ :2:7
+#   │
+# 2 │ abort to_syslog_level(0)
+#   │       ^^^^^^^^^^^^^^^^^^
+#   │       │
+#   │       abort only accepts an infallible expression argument
+#   │       handle errors before using the expression as an abort message
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+
+abort to_syslog_level(0)

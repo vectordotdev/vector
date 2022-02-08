@@ -1,10 +1,11 @@
+use tokio_stream::StreamExt;
+use url::Url;
+use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
+
 use crate::{
     config,
     signal::{SignalRx, SignalTo},
 };
-use tokio_stream::StreamExt;
-use url::Url;
-use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.

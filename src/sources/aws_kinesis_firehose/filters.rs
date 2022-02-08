@@ -1,5 +1,13 @@
+use std::{convert::Infallible, io};
+
+use bytes::{Buf, Bytes};
+use chrono::Utc;
+use flate2::read::MultiGzDecoder;
+use snafu::ResultExt;
+use warp::{http::StatusCode, Filter};
+
 use super::{
-    errors::{Parse, RequestError},
+    errors::{ParseSnafu, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
     Compression,
@@ -7,14 +15,8 @@ use super::{
 use crate::{
     codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
-    Pipeline,
+    SourceSender,
 };
-use bytes::{Buf, Bytes};
-use chrono::Utc;
-use flate2::read::MultiGzDecoder;
-use snafu::ResultExt;
-use std::{convert::Infallible, io};
-use warp::{http::StatusCode, Filter};
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
@@ -22,7 +24,7 @@ pub fn firehose(
     record_compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    out: Pipeline,
+    out: SourceSender,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
         .and(emit_received())
@@ -75,7 +77,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                 }
                 .and_then(|r| {
                     serde_json::from_reader(r)
-                        .context(Parse {
+                        .context(ParseSnafu {
                             request_id: request_id.clone(),
                         })
                         .map_err(warp::reject::custom)
@@ -151,6 +153,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     emit!(&AwsKinesisFirehoseRequestError {
         request_id,
         error: message.as_str(),
+        code,
     });
 
     let json = warp::reply::json(&FirehoseResponse {

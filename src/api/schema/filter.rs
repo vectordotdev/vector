@@ -1,5 +1,6 @@
-use super::components::{source, ComponentKind};
 use async_graphql::{InputObject, InputType};
+
+use super::components::{source, ComponentKind};
 
 /// Takes an &Option<bool> and returns early if false
 #[macro_export]

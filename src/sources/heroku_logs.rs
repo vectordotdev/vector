@@ -1,11 +1,25 @@
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader},
+    net::SocketAddr,
+    str::FromStr,
+};
+
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use tokio_util::codec::Decoder;
+use warp::http::{HeaderMap, StatusCode};
+
 use crate::{
     codecs::{
         self,
         decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     },
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -15,19 +29,6 @@ use crate::{
     },
     tls::TlsConfig,
 };
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-    net::SocketAddr,
-    str::FromStr,
-};
-use tokio_util::codec::Decoder;
-
-use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
@@ -37,9 +38,9 @@ pub struct LogplexConfig {
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -91,7 +92,7 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
@@ -107,8 +108,8 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -131,8 +132,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn source_type(&self) -> &'static str {
@@ -276,18 +277,20 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
+    use chrono::{DateTime, Utc};
+    use futures::Stream;
+    use pretty_assertions::assert_eq;
+    use vector_core::event::{Event, EventStatus, Value};
+
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
         test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
-        Pipeline,
+        SourceSender,
     };
-    use chrono::{DateTime, Utc};
-    use futures::Stream;
-    use pretty_assertions::assert_eq;
-    use std::net::SocketAddr;
-    use vector_core::event::{Event, EventStatus, Value};
 
     #[test]
     fn generate_config() {
@@ -301,7 +304,7 @@ mod tests {
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender);
         tokio::spawn(async move {

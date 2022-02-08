@@ -1,13 +1,14 @@
-use super::{Error, Kind, Regex, Value};
-use crate::expression::{container, Container, Expr, Literal};
-use crate::Expression;
+use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
+
+use super::{Error, Kind, Regex, Value};
+use crate::{
+    expression::{container, Container, Expr, Literal},
+    Expression,
+};
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -178,7 +179,7 @@ impl TryFrom<&Value> for f64 {
     }
 }
 
-// TODO: this exists to satisfy the `shared::Convert` utility.
+// TODO: this exists to satisfy the `vector_common::Convert` utility.
 //
 // We'll have to fix that so that we can remove this impl.
 impl From<f64> for Value {

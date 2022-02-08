@@ -19,6 +19,11 @@ remap: functions: remove_metadata_field: {
 
 					This field will be used by the  `datadog_*` sinks as the API key to send the events with.
 					"""
+				splunk_hec_token: """
+					The Splunk HEC token.
+
+					This field will be used by the  `splunk_*` sinks as the token to send the events with.
+					"""
 			}
 			type: ["string"]
 		},

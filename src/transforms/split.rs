@@ -1,15 +1,16 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
-    internal_events::{SplitConvertFailed, SplitFieldMissing},
-    transforms::{FunctionTransform, Transform},
-    types::{parse_check_conversion_map, Conversion},
-};
+use std::{collections::HashMap, str};
+
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
+use vector_common::TimeZone;
+
+use crate::{
+    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, Value},
+    internal_events::{SplitConvertFailed, SplitFieldMissing},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+    types::{parse_check_conversion_map, Conversion},
+};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -57,8 +58,8 @@ impl TransformConfig for SplitConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -100,7 +101,7 @@ impl Split {
 }
 
 impl FunctionTransform for Split {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -141,8 +142,10 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::TransformConfig;
-    use crate::event::{Event, LogEvent, Value};
+    use crate::{
+        config::TransformConfig,
+        event::{Event, LogEvent, Value},
+    };
 
     #[test]
     fn generate_config() {
@@ -195,7 +198,7 @@ mod tests {
         let parser = parser.as_function();
 
         let metadata = event.metadata().clone();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);

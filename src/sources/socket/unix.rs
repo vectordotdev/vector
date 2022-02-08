@@ -1,3 +1,9 @@
+use std::path::PathBuf;
+
+use bytes::Bytes;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -12,12 +18,8 @@ use crate::{
         util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
-    Pipeline,
+    SourceSender,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -26,9 +28,9 @@ pub struct UnixConfig {
     pub max_length: Option<usize>,
     pub host_key: Option<String>,
     #[serde(default)]
-    pub framing: Option<Box<dyn FramingConfig>>,
+    pub framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 impl UnixConfig {
@@ -77,7 +79,7 @@ pub(super) fn unix_datagram(
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     build_unix_datagram_source(
         path,
@@ -96,7 +98,7 @@ pub(super) fn unix_stream(
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     build_unix_stream_source(
         path,

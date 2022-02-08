@@ -1,8 +1,11 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
+    event::Event,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EventType {
@@ -88,8 +91,8 @@ impl TransformConfig for EventRouterConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        self.filter.data_type()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.filter.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -115,8 +118,8 @@ impl TransformConfig for EventFilterConfig {
         DataType::Any
     }
 
-    fn output_type(&self) -> DataType {
-        self.inner.data_type()
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.inner.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -125,7 +128,7 @@ impl TransformConfig for EventFilterConfig {
 }
 
 impl FunctionTransform for EventFilterConfig {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.inner.validate(&event) {
             output.push(event);
         }

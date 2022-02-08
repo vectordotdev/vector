@@ -1,12 +1,16 @@
-use crate::event::{Event, Finalizable, Value};
-use crate::internal_events::KafkaHeaderExtractionFailed;
-use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
-use crate::sinks::util::encoding::{Encoder, EncodingConfig, StandardEncodings};
-use crate::template::Template;
 use bytes::Bytes;
 use rdkafka::message::OwnedHeaders;
-use vector_core::config::LogSchema;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogSchema, ByteSizeOf};
+
+use crate::{
+    event::{Event, Finalizable, Value},
+    internal_events::KafkaHeaderExtractionFailed,
+    sinks::{
+        kafka::service::{KafkaRequest, KafkaRequestMetadata},
+        util::encoding::{Encoder, EncodingConfig, StandardEncodings},
+    },
+    template::Template,
+};
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
@@ -90,10 +94,12 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::BTreeMap;
+
     use bytes::Bytes;
     use rdkafka::message::Headers;
-    use std::collections::BTreeMap;
+
+    use super::*;
 
     #[test]
     fn kafka_get_headers() {

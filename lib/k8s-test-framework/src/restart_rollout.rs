@@ -1,9 +1,11 @@
 //! Restart a resource rollout.
 
+use std::{ffi::OsStr, process::Stdio};
+
+use tokio::process::Command;
+
 use super::Result;
 use crate::util::run_command;
-use std::{ffi::OsStr, process::Stdio};
-use tokio::process::Command;
 
 /// Restart a rollout of a `resource` within a `namespace` to complete
 /// via the specified `kubectl_command`.

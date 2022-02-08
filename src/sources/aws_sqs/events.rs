@@ -1,5 +1,4 @@
-use aws_sdk_sqs::error::DeleteMessageBatchError;
-use aws_sdk_sqs::SdkError;
+use aws_sdk_sqs::{error::DeleteMessageBatchError, SdkError};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 

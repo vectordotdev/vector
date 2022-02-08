@@ -1,7 +1,8 @@
-use crate::{Target, Value};
+use std::{collections::BTreeMap, iter::Peekable};
+
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
-use std::collections::BTreeMap;
-use std::iter::Peekable;
+
+use crate::{Target, Value};
 
 impl Target for Value {
     fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {

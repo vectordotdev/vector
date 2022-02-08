@@ -26,6 +26,7 @@ interpreted as described in [RFC 2119].
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
+1. [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
@@ -166,6 +167,9 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 * Properties
   * `count` - The count of Vector events.
   * `byte_size` - The cumulative in-memory byte size of all events sent.
+  * `output` - For components that can use multiple outputs, the name of the
+    output that events were sent to. For events sent to the default output, this
+    value MUST be `_default`.
 * Metrics
   * MUST increment the `component_sent_events_total` counter by the defined value with the
     defined properties as metric tags.
@@ -227,14 +231,35 @@ implement since errors are specific to the component.
 * Metrics
   * MUST increment the `component_errors_total` counter by 1 with the defined properties
     as metric tags.
-  * MUST increment the `component_discarded_events_total` counter by the number of Vector
-    events discarded if the error resulted in discarding (dropping) events.
+  * MUST increment the `component_discarded_events_total` counter by the number
+    of Vector events discarded if the error resulted in discarding (dropping)
+    acknowledged events. For sources, only increment this metric if incoming
+    events were consumed (and acknowledged if applicable) and discarded. The
+    metric MUST not include events that will be re-ingested. For sinks, this
+    means only incrementing this metric if the error resulted in the sink
+    dropping the events, and thus acknowledging them. Retried events MUST not be
+    included in the metric.
 * Logs
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+## Health checks
+
+All sink components SHOULD define a health check. These checks are executed at
+boot and as part of `vector validate`. This health check SHOULD, as closely as
+possible, emulate the sink's normal operation to give the best possible signal
+that Vector is configured correctly.
+
+These checks SHOULD NOT query the health of external systems, but MAY fail due
+to external system being unhealthy. For example, a health check for the `aws_s3`
+sink might fail if AWS is unhealthy, but the check itself should not query for
+AWS's status.
+
+See the [development documentation][health checks] for more context guidance.
+
 [Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/

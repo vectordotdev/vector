@@ -1,3 +1,14 @@
+use std::{num::NonZeroU64, task};
+
+use bytes::{Bytes, BytesMut};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use http::Uri;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
+
 use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
@@ -17,16 +28,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::Uri;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::num::NonZeroU64;
-use std::task;
-use tower::ServiceBuilder;
-use vector_core::ByteSizeOf;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrometheusRemoteWriteDefaultBatchSettings;
@@ -81,7 +82,7 @@ impl SinkConfig for RemoteWriteConfig {
         &self,
         cx: config::SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
-        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
+        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
@@ -111,7 +112,7 @@ impl SinkConfig for RemoteWriteConfig {
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
-                    stream::iter(normalizer.apply(event).map(|event| {
+                    stream::iter(normalizer.apply(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
@@ -136,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
-        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> config::DataType {
@@ -165,10 +166,12 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
         other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
+
+#[derive(Default)]
 pub struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -191,7 +194,6 @@ impl RemoteWriteService {
                 self.default_namespace.as_deref(),
                 &self.buckets,
                 &self.quantiles,
-                false,
                 &metric,
             );
         }
@@ -248,6 +250,11 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
+
     use super::*;
     use crate::{
         config::SinkContext,
@@ -255,10 +262,6 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util,
     };
-    use futures::StreamExt;
-    use http::HeaderMap;
-    use indoc::indoc;
-    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
@@ -394,7 +397,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         drop(trigger);
 
@@ -448,18 +451,17 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::tests::*;
-    use super::*;
+    use std::{collections::HashMap, ops::Range};
+
+    use serde_json::Value;
+
+    use super::{tests::*, *};
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::MetricValue,
-        event::Event,
+        event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         tls::{self, TlsOptions},
     };
-    use futures::stream;
-    use serde_json::Value;
-    use std::{collections::HashMap, ops::Range};
 
     const HTTP_URL: &str = "http://localhost:8086";
     const HTTPS_URL: &str = "https://localhost:8087";
@@ -492,7 +494,7 @@ mod integration_tests {
         let events = create_events(0..5, |n| n * 11.0);
 
         let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let result = query(url, &format!("show series on {}", database)).await;
 

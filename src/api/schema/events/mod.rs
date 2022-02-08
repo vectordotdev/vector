@@ -1,19 +1,18 @@
 mod encoding;
-mod log;
-mod notification;
-mod output;
+pub mod log;
+pub mod notification;
+pub mod output;
 
+use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use output::OutputEventsPayload;
-
-use crate::{api::tap::TapController, topology::WatchRx};
-
-use async_graphql::{validators::IntRange, Context, Subscription};
 use futures::Stream;
 use itertools::Itertools;
+use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{api::tap::TapController, topology::WatchRx};
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -26,7 +25,7 @@ impl EventsSubscription {
         ctx: &'a Context<'a>,
         patterns: Vec<String>,
         #[graphql(default = 500)] interval: u32,
-        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
+        #[graphql(default = 100, validator(minimum = 1, maximum = 10_000))] limit: u32,
     ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 
@@ -38,7 +37,7 @@ impl EventsSubscription {
 /// Creates an events stream based on component ids, and a provided interval. Will emit
 /// control messages that bubble up the application if the sink goes away. The stream contains
 /// all matching events; filtering should be done at the caller level.
-fn create_events_stream(
+pub(crate) fn create_events_stream(
     watch_rx: WatchRx,
     component_id_patterns: Vec<String>,
     interval: u64,

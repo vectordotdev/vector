@@ -1,10 +1,12 @@
-use super::{sink, source, transform, Component};
-use crate::config::{ComponentKey, OutputId};
-use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
 };
+
+use lazy_static::lazy_static;
+
+use super::{sink, source, transform, Component};
+use crate::config::{ComponentKey, OutputId};
 
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 

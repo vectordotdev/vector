@@ -1,17 +1,3 @@
-use crate::paths_provider::PathsProvider;
-use crate::{
-    checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::FileWatcher,
-    fingerprinter::{FileFingerprint, Fingerprinter},
-    FileSourceInternalEvents, ReadFrom,
-};
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
-use futures::{
-    future::{select, Either, FutureExt},
-    stream, Future, Sink, SinkExt,
-};
-use indexmap::IndexMap;
 use std::{
     cmp,
     collections::{BTreeMap, HashSet},
@@ -20,8 +6,24 @@ use std::{
     sync::Arc,
     time::{self, Duration},
 };
+
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use futures::{
+    future::{select, Either, FutureExt},
+    stream, Future, Sink, SinkExt,
+};
+use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    checkpointer::{Checkpointer, CheckpointsView},
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    paths_provider::PathsProvider,
+    FileSourceInternalEvents, ReadFrom,
+};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As

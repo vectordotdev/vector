@@ -1,19 +1,20 @@
 //! Watch and cache the remote Kubernetes API resources.
 
-use super::{
-    resource_version, state,
-    watcher::{self, Watcher},
-};
-use crate::internal_events::kubernetes::reflector as internal_events;
+use std::{convert::Infallible, time::Duration};
+
 use futures::{pin_mut, stream::StreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
     Metadata, WatchOptional,
 };
 use snafu::Snafu;
-use std::convert::Infallible;
-use std::time::Duration;
 use tokio::{select, time::sleep};
+
+use super::{
+    resource_version, state,
+    watcher::{self, Watcher},
+};
+use crate::internal_events::kubernetes::reflector as internal_events;
 
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
@@ -238,6 +239,15 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use futures::{channel::mpsc, SinkExt, StreamExt};
+    use k8s_openapi::{
+        api::core::v1::Pod,
+        apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
+        Metadata,
+    };
+
     use super::{Error, Reflector};
     use crate::{
         kubernetes::{
@@ -248,13 +258,6 @@ mod tests {
         },
         test_util::trace_init,
     };
-    use futures::{channel::mpsc, SinkExt, StreamExt};
-    use k8s_openapi::{
-        api::core::v1::Pod,
-        apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-        Metadata,
-    };
-    use std::time::Duration;
 
     /// A helper function to simplify assertion on the `evmap` state.
     fn gather_state<T>(handle: &evmap::ReadHandle<String, state::evmap::Value<T>>) -> Vec<T>
@@ -302,6 +305,7 @@ mod tests {
     }
 
     // A helper enum to encode expected mock watcher stream.
+    #[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
     enum ExpStmRes {
         Item(WatchEvent<Pod>),
         Desync,

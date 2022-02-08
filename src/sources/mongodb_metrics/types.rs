@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use mongodb::bson::DateTime;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Type of mongo instance.
 /// Can be determined with `isMaster` command, see `CommandIsMaster`.

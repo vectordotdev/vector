@@ -1,6 +1,8 @@
-use crate::*;
 use std::{fs, io::Read, path::Path};
+
 use tracing::trace;
+
+use crate::*;
 
 const SUFFICIENTLY_COMPLEX: &str = r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].00numericstart.nested_lookup[0][0]"#;
 

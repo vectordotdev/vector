@@ -1,13 +1,15 @@
-use crate::event::PathComponent;
-use crate::event::{EventFinalizers, Finalizable, LogEvent};
-use crate::internal_events::DatadogEventsProcessed;
-use crate::sinks::util::encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat};
-use crate::sinks::util::{Compression, ElementCount, RequestBuilder};
-use std::io;
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
-use vector_core::buffers::Ackable;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Ackable, ByteSizeOf};
+
+use crate::{
+    event::{EventFinalizers, Finalizable, LogEvent, PathComponent},
+    internal_events::DatadogEventsProcessed,
+    sinks::util::{
+        encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
+        Compression, ElementCount, RequestBuilder,
+    },
+};
 
 #[derive(Clone)]
 pub struct DatadogEventsRequest {

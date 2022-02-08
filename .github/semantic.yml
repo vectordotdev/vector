@@ -15,7 +15,8 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - docs                # A documentation change
+  - docs                # A documentation change.
+  - revert              # A revert of a previous change.
 
 scopes:
   - new source
@@ -23,7 +24,9 @@ scopes:
   - new sink
 
   # domains
+  - ARC # Anything related to adaptive request concurrency
   - administration # Anything related to administration/operation
+  - api # Anything related to Vector's GraphQL API
   - architecture # Anything related to architecture
   - auth # Anything related to authentication/authorization
   - buffers # Anything related to Vector's memory/disk buffers
@@ -34,14 +37,15 @@ scopes:
   - config # Anything related to configuring Vector
   - core # Anything related to core crates i.e. vector-core, core-common, etc
   - data model # Anything related to Vector's internal data model
+  - delivery # Anything related to delivering events within Vector such as end-to-end acknowledgements
+  - deployment # Anything related to deploying Vector
   - deps # Anything related to Vector's dependencies
   - dev # Anything related to Vector's development environment
+  - durability # Anything related to the durability of Vector events
   - enriching # Anything related to enriching Vector's events with context data
   - exceptions # Anything related to Vector's exception events.
-  - extensions # Anything related to extending Vector (WASM, plugins, etc.)
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector
-  - graphql api # Anything related to Vector's GraphQL API
   - healthchecks # Anything related to Vector's healtchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
@@ -50,14 +54,13 @@ scopes:
   - observability # Anything related to monitoring/observing Vector
   - parsing # Anything related to parsing within Vector
   - performance # Anything related to Vector's performance
-  - pipelines # Anything related to Vector's pipelines
   - platforms # Anything related to Vector's supported platforms
   - privacy # Anything related to privacy/compliance
   - processing # Anything related to processing Vector's events (parsing, merging, reducing, etc.)
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - rfc # Anything related to Vector RFCs
+  - replay # Anything related to replaying data
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -121,7 +124,9 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - aws_sqs source # Anything `aws_sqs` source related
   - datadog_agent source # Anything `datadog_agent` source related
+  - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related

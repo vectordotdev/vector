@@ -46,6 +46,13 @@ components: sinks: _splunk_hec: {
 				}
 			}
 		}
+		default_token: {
+			description: "Default Splunk HEC token. If an event has a token set in its metadata, it will prevail over the one set here."
+			required:    true
+			type: string: {
+				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+			}
+		}
 	}
 	how_it_works: {
 		indexer_acknowledgements: {

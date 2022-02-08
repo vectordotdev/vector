@@ -1,3 +1,21 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+    path::PathBuf,
+};
+
+use async_trait::async_trait;
+use component::ComponentDescription;
+use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
+use serde::{Deserialize, Serialize};
+use vector_buffers::{Acker, BufferConfig, BufferType};
+pub use vector_core::{
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    transform::{ExpandType, TransformConfig, TransformContext},
+};
+
 use crate::{
     conditions,
     event::Metric,
@@ -5,20 +23,8 @@ use crate::{
     sinks::{self, util::UriSerde},
     sources,
     transforms::noop::Noop,
-    Pipeline,
+    SourceSender,
 };
-use async_trait::async_trait;
-use component::ComponentDescription;
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
-use std::hash::Hash;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use vector_core::buffers::{Acker, BufferConfig, BufferType};
-pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
 mod builder;
@@ -46,10 +52,9 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use unit_test::build_unit_tests_main as build_unit_tests;
+pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::proxy::ProxyConfig;
-pub use vector_core::config::{log_schema, LogSchema};
+pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
@@ -150,17 +155,6 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
     #[serde(
@@ -186,7 +180,7 @@ impl SourceOuter {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
-    fn output_type(&self) -> DataType;
+    fn outputs(&self) -> Vec<Output>;
 
     fn source_type(&self) -> &'static str;
 
@@ -200,7 +194,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
-    pub out: Pipeline,
+    pub out: SourceSender,
     pub proxy: ProxyConfig,
 }
 
@@ -208,7 +202,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
         key: &ComponentKey,
-        out: Pipeline,
+        out: SourceSender,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(key);
@@ -225,7 +219,7 @@ impl SourceContext {
     }
 
     #[cfg(test)]
-    pub fn new_test(out: Pipeline) -> Self {
+    pub fn new_test(out: SourceSender) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
@@ -277,14 +271,14 @@ impl<T> SinkOuter<T> {
         }
     }
 
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::Memory { .. } => {}
-                #[cfg(feature = "disk-buffer")]
-                BufferType::Disk { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
+                    resources.push(Resource::DiskBuffer(id.to_string()))
+                }
             }
         }
         resources
@@ -380,17 +374,17 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub(super) acker: Acker,
-    pub(super) healthcheck: SinkHealthcheckOptions,
-    pub(super) globals: GlobalOptions,
-    pub(super) proxy: ProxyConfig,
+    pub acker: Acker,
+    pub healthcheck: SinkHealthcheckOptions,
+    pub globals: GlobalOptions,
+    pub proxy: ProxyConfig,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::Null,
+            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
@@ -625,15 +619,80 @@ impl Display for Resource {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition {
+pub struct TestDefinition<T = OutputId> {
     pub name: String,
     pub input: Option<TestInput>,
     #[serde(default)]
     pub inputs: Vec<TestInput>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput>,
+    pub outputs: Vec<TestOutput<T>>,
     #[serde(default)]
-    pub no_outputs_from: Vec<ComponentKey>,
+    pub no_outputs_from: Vec<T>,
+}
+
+impl TestDefinition<String> {
+    fn resolve_outputs(self, graph: &graph::Graph) -> TestDefinition<OutputId> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+
+        let output_map = graph.input_map().expect("ambiguous outputs");
+
+        let outputs = outputs
+            .into_iter()
+            .map(|old| TestOutput {
+                extract_from: output_map.get(&old.extract_from).unwrap().clone(),
+                conditions: old.conditions,
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from
+            .into_iter()
+            .map(|o| output_map.get(&o).unwrap().clone())
+            .collect();
+
+        TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        }
+    }
+}
+
+impl TestDefinition<OutputId> {
+    fn stringify(self) -> TestDefinition<String> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+
+        let outputs = outputs
+            .into_iter()
+            .map(|old| TestOutput {
+                extract_from: old.extract_from.to_string(),
+                conditions: old.conditions,
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from.iter().map(ToString::to_string).collect();
+
+        TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -662,8 +721,8 @@ fn default_test_input_type() -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput {
-    pub extract_from: ComponentKey,
+pub struct TestOutput<T = OutputId> {
+    pub extract_from: T,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -690,9 +749,11 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
-    use indoc::indoc;
     use std::path::PathBuf;
+
+    use indoc::indoc;
+
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
 
     #[test]
     fn default_data_dir() {
@@ -707,7 +768,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -730,7 +791,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -763,7 +824,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -785,7 +846,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -814,7 +875,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -843,7 +904,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -864,7 +925,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -896,7 +957,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -929,7 +990,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -973,7 +1034,7 @@ mod test {
                     target = "stdout"
                     encoding.codec = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -1007,7 +1068,7 @@ mod test {
                 [api]
                     enabled = true
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -1017,10 +1078,14 @@ mod test {
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::{load_from_str, Format, Resource};
+    use std::{
+        collections::{HashMap, HashSet},
+        net::{Ipv4Addr, SocketAddr},
+    };
+
     use indoc::indoc;
-    use std::collections::{HashMap, HashSet};
-    use std::net::{Ipv4Addr, SocketAddr};
+
+    use super::{load_from_str, Format, Resource};
 
     fn localhost(port: u16) -> Resource {
         Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
@@ -1147,7 +1212,7 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .is_err());
     }
@@ -1161,8 +1226,9 @@ mod resource_tests {
     feature = "transforms-filter"
 ))]
 mod pipelines_tests {
-    use super::{load_from_str, Format};
     use indoc::indoc;
+
+    use super::{load_from_str, Format};
 
     #[test]
     fn forbid_pipeline_nesting() {
@@ -1193,7 +1259,7 @@ mod pipelines_tests {
                   inputs = ["processing"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         );
         assert!(res.is_err(), "should error");
     }

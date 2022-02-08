@@ -1,10 +1,12 @@
-use crate::file_watcher::tests::*;
-use crate::file_watcher::FileWatcher;
-use crate::ReadFrom;
+use std::{fs, io::Write};
+
 use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
-use std::fs;
-use std::io::Write;
+
+use crate::{
+    file_watcher::{tests::*, FileWatcher},
+    ReadFrom,
+};
 
 // Interpret all FWActions, excluding truncation
 //

@@ -1,9 +1,10 @@
-use crate::internal_events::KafkaStatisticsReceived;
-use crate::tls::TlsOptions;
+use std::path::{Path, PathBuf};
+
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::{Path, PathBuf};
+
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsOptions};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {

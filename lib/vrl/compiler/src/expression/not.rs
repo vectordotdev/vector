@@ -1,8 +1,14 @@
-use crate::expression::{Expr, Noop, Resolved};
-use crate::parser::Node;
-use crate::{value::Kind, Context, Expression, Span, State, TypeDef};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+
+use crate::{
+    expression::{Expr, Noop, Resolved},
+    parser::Node,
+    value::Kind,
+    vm::OpCode,
+    Context, Expression, Span, State, TypeDef,
+};
 
 pub type Result = std::result::Result<Not, Error>;
 
@@ -43,6 +49,13 @@ impl Expression for Not {
 
     fn type_def(&self, state: &State) -> TypeDef {
         self.inner.type_def(state).boolean()
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
+        self.inner.compile_to_vm(vm)?;
+        vm.write_opcode(OpCode::Not);
+
+        Ok(())
     }
 }
 

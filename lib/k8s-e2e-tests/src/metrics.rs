@@ -21,15 +21,17 @@ fn metrics_regex() -> regex::Regex {
     .expect("invalid regex")
 }
 
-/// This helper function extracts the sum of `processed_events`-ish metrics
+/// This helper function extracts the sum of `component_sent_events_total`-ish metrics
 /// across all labels.
-pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
+pub fn extract_component_sent_events_total_sum(
+    metrics: &str,
+) -> Result<u64, Box<dyn std::error::Error>> {
     metrics_regex()
         .captures_iter(metrics)
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
-            if !metric_name.contains("processed_events") {
+            if !metric_name.contains("component_sent_events_total") {
                 return None;
             }
             Some(value.to_owned())
@@ -51,10 +53,10 @@ pub fn extract_vector_started(metrics: &str) -> bool {
 }
 
 /// This helper function performs an HTTP request to the specified URL and
-/// extracts the sum of `processed_events`-ish metrics across all labels.
-pub async fn get_processed_events(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
+/// extracts the sum of `component_sent_events_total`-ish metrics across all labels.
+pub async fn get_component_sent_events_total(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    extract_processed_events_sum(&metrics)
+    extract_component_sent_events_total_sum(&metrics)
 }
 
 /// This helper function performs an HTTP request to the specified URL and
@@ -123,25 +125,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_processed_events_sum() {
+    fn test_extract_component_sent_events_total_sum() {
         let cases = vec![
             (vec![r#""#], 0),
-            (vec![r#"processed_events 123"#], 123),
-            (vec![r#"processed_events{} 123"#], 123),
-            (vec![r#"processed_events{method="POST"} 456"#], 456),
-            (vec![r#"processed_events{a="b",c="d"} 456"#], 456),
+            (vec![r#"component_sent_events_total 123"#], 123),
+            (vec![r#"component_sent_events_total{} 123"#], 123),
+            (
+                vec![r#"component_sent_events_total{method="POST"} 456"#],
+                456,
+            ),
+            (vec![r#"component_sent_events_total{a="b",c="d"} 456"#], 456),
             (
                 vec![
-                    r#"processed_events 123"#,
-                    r#"processed_events{method="POST"} 456"#,
+                    r#"component_sent_events_total 123"#,
+                    r#"component_sent_events_total{method="POST"} 456"#,
                 ],
                 123 + 456,
             ),
             (vec![r#"other{} 789"#], 0),
             (
                 vec![
-                    r#"processed_events{} 123"#,
-                    r#"processed_events{method="POST"} 456"#,
+                    r#"component_sent_events_total{} 123"#,
+                    r#"component_sent_events_total{method="POST"} 456"#,
                     r#"other{} 789"#,
                 ],
                 123 + 456,
@@ -149,28 +154,24 @@ mod tests {
             // Prefixes and suffixes
             (
                 vec![
-                    r#"processed_events 1"#,
-                    r#"processed_events_total 2"#,
-                    r#"vector_processed_events 3"#,
-                    r#"vector_processed_events_total 4"#,
+                    r#"component_sent_events_total 1"#,
+                    r#"vector_component_sent_events_total 3"#,
                 ],
-                1 + 2 + 3 + 4,
+                1 + 3,
             ),
             // Prefixes and suffixes with timestamps
             (
                 vec![
-                    r#"processed_events 1 1607985729161"#,
-                    r#"processed_events_total 2 1607985729161"#,
-                    r#"vector_processed_events 3 1607985729161"#,
-                    r#"vector_processed_events_total 4 1607985729161"#,
+                    r#"component_sent_events_total 1 1607985729161"#,
+                    r#"vector_component_sent_events_total 3 1607985729161"#,
                 ],
-                1 + 2 + 3 + 4,
+                1 + 3,
             ),
         ];
 
         for (input, expected_value) in cases {
             let input = input.join("\n");
-            let actual_value = extract_processed_events_sum(&input).unwrap();
+            let actual_value = extract_component_sent_events_total_sum(&input).unwrap();
             assert_eq!(expected_value, actual_value);
         }
     }

@@ -8,6 +8,7 @@ use std::fs::File;
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::{mem::zeroed, ptr};
+
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]

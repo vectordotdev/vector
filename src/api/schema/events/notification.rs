@@ -9,7 +9,7 @@ pub enum EventNotificationType {
     NotMatched,
 }
 
-#[derive(Debug, SimpleObject)]
+#[derive(Debug, SimpleObject, Clone, PartialEq)]
 /// A notification regarding events observation
 pub struct EventNotification {
     /// Pattern that raised the event

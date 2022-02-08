@@ -1,8 +1,7 @@
+use std::{fmt, iter::Peekable, str::CharIndices};
+
 use diagnostic::{DiagnosticError, Label, Span};
 use ordered_float::NotNan;
-use std::fmt;
-use std::iter::Peekable;
-use std::str::CharIndices;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
@@ -1186,8 +1185,7 @@ fn unescape_string_literal(mut s: &str) -> String {
 mod test {
     #![allow(clippy::print_stdout)] // tests
 
-    use super::StringLiteral;
-    use super::*;
+    use super::{StringLiteral, *};
     use crate::lex::Token::*;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
