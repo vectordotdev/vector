@@ -132,16 +132,8 @@ fn type_def() -> TypeDef {
         .add_integer()
         .add_float()
         .add_null()
-        .add_array({
-            let mut v = Collection::from(BTreeMap::default());
-            v.set_unknown(inner_kind());
-            v
-        })
-        .add_object({
-            let mut v = Collection::from(BTreeMap::default());
-            v.set_unknown(inner_kind());
-            v
-        })
+        .add_array(Collection::from_unknown(inner_kind()))
+        .add_object(Collection::from_unknown(inner_kind()))
 }
 
 #[cfg(test)]
