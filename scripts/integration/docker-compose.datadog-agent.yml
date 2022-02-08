@@ -14,6 +14,17 @@ services:
     volumes:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
 
+  datadog-trace-agent:
+    image: datadog/agent:7.33.0
+    network_mode: host
+    environment:
+      - DD_API_KEY=${CI_TEST_DATADOG_API_KEY}
+      - DD_APM_ENABLED=true
+      - DD_APM_DD_URL=http://0.0.0.0:8080
+      - DD_HEALTH_PORT=8183
+    volumes:
+      - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
+
   runner:
     build:
       context: ${PWD}
@@ -35,6 +46,7 @@ services:
       - "--nocapture"
     depends_on:
       - datadog-agent
+      - datadog-trace-agent
     volumes:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
