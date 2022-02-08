@@ -72,14 +72,9 @@ impl Expression for ArrayFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let type_def = self.value.type_def(state);
-        let fallible = !type_def.is_array();
-
-        let collection = match type_def.as_array() {
-            Some(array) => array.clone(),
-            None => Collection::any(),
-        };
-
-        TypeDef::array(collection).with_fallibility(fallible)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::array(Collection::any()))
+            .restrict_array()
     }
 }

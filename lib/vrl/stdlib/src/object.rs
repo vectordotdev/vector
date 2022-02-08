@@ -72,14 +72,9 @@ impl Expression for ObjectFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let type_def = self.value.type_def(state);
-        let fallible = !type_def.is_object();
-
-        let collection = match type_def.as_object() {
-            Some(object) => object.clone(),
-            None => Collection::any(),
-        };
-
-        TypeDef::object(collection).with_fallibility(fallible)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::object(Collection::any()))
+            .restrict_object()
     }
 }
