@@ -103,7 +103,7 @@ impl SinkConfig for ClickhouseConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
-    type Input = Bytes;
+    type Input = BytesMut;
     type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
@@ -115,7 +115,7 @@ impl HttpSink for ClickhouseConfig {
             serde_json::to_writer((&mut buffer).writer(), &log)
                 .expect("Events should be valid json!");
             buffer.put_u8(b'\n');
-            buffer.freeze()
+            buffer
         };
 
         Some(body)

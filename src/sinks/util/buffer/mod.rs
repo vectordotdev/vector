@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use flate2::write::GzEncoder;
 
 use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
@@ -76,7 +76,7 @@ impl Buffer {
 }
 
 impl Batch for Buffer {
-    type Input = Bytes;
+    type Input = BytesMut;
     type Output = BytesMut;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
@@ -128,7 +128,7 @@ mod test {
         sync::{Arc, Mutex},
     };
 
-    use bytes::{Buf, Bytes};
+    use bytes::{Buf, BytesMut};
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
     use vector_buffers::Acker;
@@ -161,7 +161,7 @@ mod test {
             acker,
         );
 
-        let input = std::iter::repeat(Bytes::from(
+        let input = std::iter::repeat(BytesMut::from(
             "It's going down, I'm yelling timber, You better move, you better dance",
         ))
         .take(100_000);

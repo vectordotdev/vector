@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
@@ -185,7 +185,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Bytes> {
+fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMut> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -238,7 +238,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Bytes> 
     body.put_slice(&message.into_bytes());
     body.put_u8(b'\n');
 
-    Some(body.freeze())
+    Some(body)
 }
 
 impl Service<BytesMut> for StatsdSvc {

@@ -162,7 +162,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
-    type Input = Bytes;
+    type Input = BytesMut;
     type Output = BytesMut;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
@@ -200,7 +200,7 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.freeze())
+        Some(output)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {

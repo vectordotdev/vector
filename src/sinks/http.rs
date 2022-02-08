@@ -173,7 +173,7 @@ impl SinkConfig for HttpSinkConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
-    type Input = Bytes;
+    type Input = BytesMut;
     type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
@@ -211,7 +211,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(body.freeze())
+        Some(body)
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
