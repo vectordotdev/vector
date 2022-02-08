@@ -20,4 +20,4 @@
 .a = sha3(.result[0].an)
 
 .result
-# "can't work since all array access is error prone"
+"can't work since all array access is error prone"
