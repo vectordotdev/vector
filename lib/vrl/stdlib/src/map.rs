@@ -18,7 +18,18 @@ impl Function for Map {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[/* TODO */]
+        &[
+            Example {
+                title: "adding numbers in array",
+                source: r#"map([1,2,3]) -> |index, value| {  value + 1 }"#,
+                result: Ok("[2,3,4]"),
+            },
+            Example {
+                title: "enumerating object",
+                source: r#"map({"a" : 1, "b" : 2, "c" : 3}) -> |key, value| { [key, value + 1] }"#,
+                result: Ok(r#"{"a" :2, "b" : 3, "c" :4}"#),
+            },
+        ]
     }
 
     fn compile(
