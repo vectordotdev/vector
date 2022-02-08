@@ -44,11 +44,8 @@ impl Metric {
     }
 
     /// Metric kind
-    async fn kind(&self) -> &str {
-        match self.event.kind() {
-            event::MetricKind::Incremental => "incremental",
-            event::MetricKind::Absolute => "absolute",
-        }
+    async fn kind(&self) -> event::MetricKind {
+        self.event.kind()
     }
 
     /// Metric type
