@@ -24,18 +24,18 @@ pub fn default_max_length() -> usize {
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_framing_message_based() -> Box<dyn FramingConfig> {
-    Box::new(BytesDecoderConfig::new())
+pub fn default_framing_message_based() -> FramingConfig {
+    BytesDecoderConfig::new().into()
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
-    Box::new(NewlineDelimitedDecoderConfig::new())
+pub fn default_framing_stream_based() -> FramingConfig {
+    NewlineDelimitedDecoderConfig::new().into()
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_decoding() -> Box<dyn DeserializerConfig> {
-    Box::new(BytesDeserializerConfig::new())
+pub fn default_decoding() -> DeserializerConfig {
+    BytesDeserializerConfig::new().into()
 }
 
 pub fn to_string(value: impl serde::Serialize) -> String {

@@ -6,11 +6,11 @@ pub mod framing;
 
 pub use format::{
     BoxedSerializer, JsonSerializer, JsonSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig, Serializer, SerializerConfig,
+    RawMessageSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    Framer, FramingConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
 
 use crate::{
@@ -47,18 +47,147 @@ impl From<std::io::Error> for Error {
     }
 }
 
+/// Configuration for building a `Framer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum FramingConfig {
+    /// Configures the `CharacterDelimitedEncoder`.
+    CharacterDelimited {
+        /// Options for the character delimited encoder.
+        character_delimited: CharacterDelimitedEncoderOptions,
+    },
+    /// Configures the `NewlineDelimitedEncoder`.
+    NewlineDelimited,
+}
+
+impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
+    fn from(config: CharacterDelimitedEncoderConfig) -> Self {
+        Self::CharacterDelimited {
+            character_delimited: config.character_delimited,
+        }
+    }
+}
+
+impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
+    fn from(_: NewlineDelimitedEncoderConfig) -> Self {
+        Self::NewlineDelimited
+    }
+}
+
+impl FramingConfig {
+    /// Build the `Framer` from this configuration.
+    pub const fn build(self) -> Framer {
+        match self {
+            FramingConfig::CharacterDelimited {
+                character_delimited,
+            } => Framer::CharacterDelimited(
+                CharacterDelimitedEncoderConfig {
+                    character_delimited,
+                }
+                .build(),
+            ),
+            FramingConfig::NewlineDelimited => {
+                Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
+            }
+        }
+    }
+}
+
+/// Produce a byte stream from byte frames.
+#[derive(Debug, Clone)]
+pub enum Framer {
+    /// Uses a `CharacterDelimitedEncoder` for framing.
+    CharacterDelimited(CharacterDelimitedEncoder),
+    /// Uses a `NewlineDelimitedEncoder` for framing.
+    NewlineDelimited(NewlineDelimitedEncoder),
+    /// Uses an opaque `Encoder` implementation for framing.
+    Boxed(BoxedFramer),
+}
+
+impl tokio_util::codec::Encoder<()> for Framer {
+    type Error = BoxedFramingError;
+
+    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+        match self {
+            Framer::CharacterDelimited(framer) => framer.encode((), dst),
+            Framer::NewlineDelimited(framer) => framer.encode((), dst),
+            Framer::Boxed(framer) => framer.encode((), dst),
+        }
+    }
+}
+
+/// Configuration for building a `Serializer`.
+// Unfortunately, copying options of the nested enum variants is necessary
+// since `serde` doesn't allow `flatten`ing these:
+// https://github.com/serde-rs/serde/issues/1402.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+pub enum SerializerConfig {
+    /// Configures the `JsonSerializer`.
+    Json,
+    /// Configures the `RawMessageSerializer`.
+    RawMessage,
+}
+
+impl From<JsonSerializerConfig> for SerializerConfig {
+    fn from(_: JsonSerializerConfig) -> Self {
+        Self::Json
+    }
+}
+
+impl From<RawMessageSerializerConfig> for SerializerConfig {
+    fn from(_: RawMessageSerializerConfig) -> Self {
+        Self::RawMessage
+    }
+}
+
+impl SerializerConfig {
+    /// Build the `Serializer` from this configuration.
+    pub const fn build(&self) -> Serializer {
+        match self {
+            SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
+            SerializerConfig::RawMessage => {
+                Serializer::RawMessage(RawMessageSerializerConfig.build())
+            }
+        }
+    }
+}
+
+/// Serialize structured events as bytes.
+#[derive(Debug, Clone)]
+pub enum Serializer {
+    /// Uses a `JsonSerializer` for deserialization.
+    Json(JsonSerializer),
+    /// Uses a `RawMessageSerializer` for deserialization.
+    RawMessage(RawMessageSerializer),
+}
+
+impl tokio_util::codec::Encoder<Event> for Serializer {
+    type Error = crate::Error;
+
+    fn encode(&mut self, item: Event, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        match self {
+            Serializer::Json(serializer) => serializer.encode(item, dst),
+            Serializer::RawMessage(serializer) => serializer.encode(item, dst),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// An encoder that can encode structured events into byte frames.
 pub struct Encoder {
-    framer: BoxedFramer,
-    serializer: BoxedSerializer,
+    framer: Framer,
+    serializer: Serializer,
 }
 
 impl Default for Encoder {
     fn default() -> Self {
         Self {
-            framer: Box::new(NewlineDelimitedEncoder::new()),
-            serializer: Box::new(RawMessageSerializer::new()),
+            framer: Framer::NewlineDelimited(NewlineDelimitedEncoder::new()),
+            serializer: Serializer::RawMessage(RawMessageSerializer::new()),
         }
     }
 }
@@ -67,7 +196,7 @@ impl Encoder {
     /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
     /// from a structured event, and the `Framer` to wrap these into a byte
     /// frame.
-    pub fn new(framer: BoxedFramer, serializer: BoxedSerializer) -> Self {
+    pub const fn new(framer: Framer, serializer: Serializer) -> Self {
         Self { framer, serializer }
     }
 }
@@ -104,27 +233,27 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EncodingConfig {
     /// The framing config.
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     /// The encoding config.
-    encoding: Box<dyn SerializerConfig>,
+    encoding: SerializerConfig,
 }
 
 impl EncodingConfig {
     /// Creates a new `EncodingConfig` with the provided `FramingConfig` and
     /// `SerializerConfig`.
-    pub fn new(framing: Box<dyn FramingConfig>, encoding: Box<dyn SerializerConfig>) -> Self {
+    pub const fn new(framing: FramingConfig, encoding: SerializerConfig) -> Self {
         Self { framing, encoding }
     }
 
     /// Builds an `Encoder` from the provided configuration.
-    pub fn build(&self) -> crate::Result<Encoder> {
+    pub const fn build(self) -> Encoder {
         // Build the framer.
-        let framer: BoxedFramer = self.framing.build()?;
+        let framer = self.framing.build();
 
         // Build the serializer.
-        let serializer: BoxedSerializer = self.encoding.build()?;
+        let serializer = self.encoding.build();
 
-        Ok(Encoder::new(framer, serializer))
+        Encoder::new(framer, serializer)
     }
 }
 
@@ -193,8 +322,8 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::new(
-            Box::new(ParenEncoder::new()),
-            Box::new(RawMessageSerializer::new()),
+            Framer::Boxed(Box::new(ParenEncoder::new())),
+            Serializer::RawMessage(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -212,8 +341,8 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::new(
-            Box::new(ParenEncoder::new()),
-            Box::new(RawMessageSerializer::new()),
+            Framer::Boxed(Box::new(ParenEncoder::new())),
+            Serializer::RawMessage(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),
@@ -231,8 +360,8 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::new(
-            Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
-            Box::new(RawMessageSerializer::new()),
+            Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
+            Serializer::RawMessage(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -251,8 +380,8 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::new(
-            Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1)),
-            Box::new(RawMessageSerializer::new()),
+            Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
+            Serializer::RawMessage(RawMessageSerializer::new()),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),
