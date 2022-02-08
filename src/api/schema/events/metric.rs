@@ -1,6 +1,5 @@
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
-use vector_core::event::metric::MetricTags;
 
 use super::EventEncodingType;
 use crate::{
@@ -17,6 +16,24 @@ pub struct Metric {
 impl Metric {
     pub const fn new(output_id: OutputId, event: event::Metric) -> Self {
         Self { output_id, event }
+    }
+}
+
+struct MetricTag {
+    key: String,
+    value: String,
+}
+
+#[Object]
+impl MetricTag {
+    /// Metric tag key
+    async fn key(&self) -> &str {
+        self.key.as_ref()
+    }
+
+    /// Metric tag value
+    async fn value(&self) -> &str {
+        self.value.as_ref()
     }
 }
 
@@ -59,8 +76,15 @@ impl Metric {
     }
 
     /// Metric tags
-    async fn tags(&self) -> Option<&MetricTags> {
-        self.event.tags()
+    async fn tags(&self) -> Option<Vec<MetricTag>> {
+        self.event.tags().map(|tags| {
+            tags.iter()
+                .map(|(key, value)| MetricTag {
+                    key: key.to_owned(),
+                    value: value.to_owned(),
+                })
+                .collect()
+        })
     }
 
     /// Metric event as an encoded string format
