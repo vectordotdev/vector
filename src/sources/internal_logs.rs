@@ -1,12 +1,13 @@
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::{future, stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
+    internal_events::{InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
@@ -64,26 +65,28 @@ async fn run(
         .chain(tokio_stream::wrappers::BroadcastStream::new(
             subscription.receiver,
         ))
+        .filter_map(|log| future::ready(log.ok()))
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
-    while let Some(res) = rx.next().await {
-        match res {
-            Ok(mut log) => {
-                if let Ok(hostname) = &hostname {
-                    log.insert(host_key.clone(), hostname.to_owned());
-                }
-                log.insert(pid_key.clone(), pid);
-                log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
-                log.try_insert(log_schema().timestamp_key(), Utc::now());
-                if let Err(error) = out.send(Event::from(log)).await {
-                    error!(message = "Error sending log.", %error);
-                    return Err(());
-                }
-            }
-            Err(BroadcastStreamRecvError::Lagged(_)) => (),
+    while let Some(mut log) = rx.next().await {
+        // This event doesn't emit any log
+        emit!(&InternalLogsEventsReceived {
+            count: 1,
+            byte_size: log.size_of(),
+        });
+        if let Ok(hostname) = &hostname {
+            log.insert(host_key.clone(), hostname.to_owned());
+        }
+        log.insert(pid_key.clone(), pid);
+        log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
+        log.try_insert(log_schema().timestamp_key(), Utc::now());
+        if let Err(error) = out.send(Event::from(log)).await {
+            // this wont trigger any infinite loop considering it stops the component
+            emit!(&StreamClosedError { error, count: 1 });
+            return Err(());
         }
     }
 
