@@ -100,7 +100,8 @@ mod open;
     feature = "transforms-json_parser",
     feature = "transforms-key_value_parser",
     feature = "transforms-logfmt_parser",
-    feature = "transforms-regex_parser"
+    feature = "transforms-regex_parser",
+    feature = "transforms-split",
 ))]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -124,7 +125,6 @@ mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
-mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
@@ -252,6 +252,7 @@ pub(crate) use self::nginx_metrics::*;
     feature = "transforms-key_value_parser",
     feature = "transforms-logfmt_parser",
     feature = "transforms-regex_parser",
+    feature = "transforms-split",
 ))]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -288,8 +289,8 @@ pub use self::windows::*;
 pub use self::{
     adaptive_concurrency::*, add_fields::*, add_tags::*, aggregate::*, ansi_stripper::*, batch::*,
     blackhole::*, common::*, conditions::*, elasticsearch::*, encoding_transcode::*, heartbeat::*,
-    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, split::*, stdin::*, syslog::*,
-    tcp::*, template::*, udp::*, unix::*, vector::*,
+    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, stdin::*, syslog::*, tcp::*,
+    template::*, udp::*, unix::*, vector::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
