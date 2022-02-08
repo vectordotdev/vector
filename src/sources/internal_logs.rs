@@ -7,9 +7,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{
-        BytesReceived, InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError,
-    },
+    internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
