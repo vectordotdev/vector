@@ -203,7 +203,7 @@ async fn tap_handler(
 
                 // Borrow and clone the latest outputs to register sinks. Since this blocks the
                 // watch channel and the returned ref isn't `Send`, this requires a clone.
-                let outputs = watch_rx.borrow().clone();
+                let outputs = watch_rx.borrow().clone().outputs;
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
