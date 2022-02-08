@@ -578,6 +578,26 @@ pub async fn start_topology(
         .unwrap()
 }
 
+pub async fn start_topology_new(
+    mut config: Config,
+    require_healthy: impl Into<Option<bool>>,
+) -> (bool, String) {
+    config.healthchecks.set_require_healthy(require_healthy);
+    let diff = ConfigDiff::initial(&config);
+    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+        .await
+        .unwrap();
+    let result = topology::start_validated(config, diff, pieces).await;
+    if result.is_none() {
+        return (false, "health check for sink failed".to_string());
+    }
+
+    let (topology, _crash) = result.unwrap();
+    topology.sources_finished().await;
+    topology.stop().await;
+    (true, String::new())
+}
+
 /// Collect the first `n` events from a stream while a future is spawned
 /// in the background. This is used for tests where the collect has to
 /// happen concurrent with the sending process (ie the stream is
