@@ -266,7 +266,9 @@ fn encode_events(
         };
     }
 
-    output.truncate(output.len() - 1);
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
     EncodedEvent::new(output.freeze(), byte_size)
 }
 

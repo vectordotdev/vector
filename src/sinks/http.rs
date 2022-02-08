@@ -233,11 +233,13 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Json => {
                 let message = body.split();
                 body.put_u8(b'[');
-                // TODO: Prepend before building a request to eliminate the
-                // additional copy here.
-                body.unsplit(message);
-                // remove trailing comma from last record
-                body.truncate(body.len() - 1);
+                if !message.is_empty() {
+                    // TODO: Prepend before building a request to eliminate the
+                    // additional copy here.
+                    body.unsplit(message);
+                    // remove trailing comma from last record
+                    body.truncate(body.len() - 1);
+                }
                 body.put_u8(b']');
                 "application/json"
             }

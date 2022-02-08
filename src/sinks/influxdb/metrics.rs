@@ -278,7 +278,9 @@ fn encode_events(
     }
 
     // remove last '\n'
-    output.truncate(output.len() - 1);
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
     output
 }
 

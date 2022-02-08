@@ -204,6 +204,7 @@ pub(in crate::sinks) fn influx_line_protocol(
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut BytesMut) {
+    let original_len = output.len();
     // `tags` is already sorted
     for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
@@ -216,7 +217,9 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut BytesMut) {
     }
 
     // remove last ','
-    output.truncate(output.len() - 1);
+    if output.len() > original_len {
+        output.truncate(output.len() - 1);
+    }
 }
 
 fn encode_fields(
@@ -224,6 +227,7 @@ fn encode_fields(
     fields: HashMap<String, Field>,
     output: &mut BytesMut,
 ) {
+    let original_len = output.len();
     for (key, value) in fields.into_iter() {
         encode_string(&key, output);
         output.put_u8(b'=');
@@ -261,7 +265,9 @@ fn encode_fields(
     }
 
     // remove last ','
-    output.truncate(output.len() - 1);
+    if output.len() > original_len {
+        output.truncate(output.len() - 1);
+    }
 }
 
 fn encode_string(key: &str, output: &mut BytesMut) {
