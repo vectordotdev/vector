@@ -234,7 +234,8 @@ fn encode_fields(
                     if "\\\"".contains(c) {
                         output.put_u8(b'\\');
                     }
-                    c.encode_utf8(output);
+                    let mut c_buffer: [u8; 4] = [0; 4];
+                    output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
                 }
                 output.put_u8(b'"');
             }
@@ -245,7 +246,8 @@ fn encode_fields(
                     ProtocolVersion::V1 => 'i',
                     ProtocolVersion::V2 => 'u',
                 };
-                c.encode_utf8(output);
+                let mut c_buffer: [u8; 4] = [0; 4];
+                output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
             }
             Field::Int(i) => {
                 output.put_slice(&i.to_string().into_bytes());
@@ -267,7 +269,8 @@ fn encode_string(key: &str, output: &mut BytesMut) {
         if "\\, =".contains(c) {
             output.put_u8(b'\\');
         }
-        c.encode_utf8(output);
+        let mut c_buffer: [u8; 4] = [0; 4];
+        output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
     }
 }
 
