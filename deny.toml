@@ -52,3 +52,9 @@ ignore = [
     # https://github.com/vectordotdev/vector/issues/10862
     "RUSTSEC-2022-0002"
 ]
+
+[bans]
+deny = [
+    # https://github.com/vectordotdev/vector/issues/11257
+    { name = "tokio-util", version = ">=0.6.9" },
+]
