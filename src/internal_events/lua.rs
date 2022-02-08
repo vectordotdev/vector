@@ -21,10 +21,29 @@ pub struct LuaScriptError {
 
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
+        error!(
+            message = "Error in lua script; discarding event.",
+            error = ?self.error,
+            error_type = "script_failed",
+            stage = "processing",
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => "processing",
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => "processing",
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }
@@ -36,10 +55,29 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
+        error!(
+            message = "Error in lua script; discarding event.",
+            error = ?self.error,
+            error_type = "script_failed",
+            stage = "processing",
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => "processing",
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => "processing",
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }
