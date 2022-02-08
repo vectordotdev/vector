@@ -16,7 +16,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Substring error.",
-            error = "Substring error.",
+            error = "Unable to split string.",
             error_type = "parser_failed",
             stage = "processing",
             condition = self.condition,
