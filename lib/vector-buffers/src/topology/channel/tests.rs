@@ -221,8 +221,11 @@ async fn test_buffer_metrics_drop_newest() {
     // Send three items through, and make sure the buffer usage stats reflect that.
     assert_current_send_capacity(&mut tx, Some(2), None);
     assert_send_ok_with_capacities(&mut tx, 7, Some(1), None).await;
+    println!("sent 1");
     assert_send_ok_with_capacities(&mut tx, 8, Some(0), None).await;
+    println!("sent 1");
     assert_send_ok_with_capacities(&mut tx, 2, Some(0), None).await;
+    println!("sent 1");
 
     let snapshot = handle.snapshot();
     assert_eq!(2, snapshot.received_event_count);
