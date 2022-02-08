@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::num::ParseFloatError;
 
 use metrics::counter;
@@ -7,42 +5,34 @@ use vector_core::internal_event::InternalEvent;
 
 use crate::template::TemplateParseError;
 
-pub struct LogToMetricFieldNull<'a> {
+pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
 }
 
-impl<'a> InternalEvent for LogToMetricFieldNull<'a> {
+impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Field is null.",
+            error = "Unable to convert null field",
+            error_type = "condition_failed",
+            stage = "processing",
             null_field = %self.field,
             internal_log_rate_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "field_null",
+        counter!(
+            "component_errors_total", 1,
+            "error" => "Unable to convert null field",
+            "error_type" => "condition_failed",
+            "stage" => "processing",
+            "null_field" => self.field.to_string(),
         );
-    }
-}
-
-pub struct LogToMetricFieldNotFound<'a> {
-    pub field: &'a str,
-}
-
-impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Field not found.",
-            missing_field = %self.field,
-            internal_log_rate_secs = 30
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "field_not_found",
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "field_null",
         );
     }
 }
@@ -54,17 +44,28 @@ pub struct LogToMetricParseFloatError<'a> {
 
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Failed to parse field as float.",
             field = %self.field,
             error = %self.error,
+            error_type = "parser_failed",
+            stage = "processing",
             internal_log_rate_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "parse_error",
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "parser_failed",
+            "stage" => "processing",
+            "field" => self.field.to_string(),
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "parse_error",
         );
     }
 }
@@ -75,12 +76,26 @@ pub struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse template.", error = ?self.error, internal_log_rate_secs = 30);
+        error!(
+            message = "Failed to parse template.",
+            error = ?self.error,
+            error_type = "template_failed",
+            stage = "processing",
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "template_error",
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "template_failed",
+            "stage" => "processing",
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "template_error",
         );
     }
 }
