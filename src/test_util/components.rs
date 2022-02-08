@@ -10,7 +10,7 @@
 use std::env;
 
 use futures::{stream, SinkExt, Stream, StreamExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use vector_core::event_test_util;
 
 use crate::{
@@ -47,42 +47,37 @@ pub struct ComponentTests {
     untagged_counters: &'static [&'static str],
 }
 
-lazy_static! {
-    /// The component test specification for all sources
-    pub static ref SOURCE_TESTS: ComponentTests = ComponentTests {
-        events: &["BytesReceived", "EventsReceived", "EventsSent"],
-        tagged_counters: &[
-            "component_received_bytes_total",
-        ],
-        untagged_counters: &[
-            "component_received_events_total",
-            "component_received_event_bytes_total",
-            "component_sent_events_total",
-            "component_sent_event_bytes_total",
-        ],
-    };
-    /// The component test specification for all sinks
-    pub static ref SINK_TESTS: ComponentTests = ComponentTests {
+/// The component test specification for all sources
+pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["BytesReceived", "EventsReceived", "EventsSent"],
+    tagged_counters: &["component_received_bytes_total"],
+    untagged_counters: &[
+        "component_received_events_total",
+        "component_received_event_bytes_total",
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+});
+/// The component test specification for all sinks
+pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+    ComponentTests {
         events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
-        tagged_counters: &[
-            "component_sent_bytes_total",
-        ],
+        tagged_counters: &["component_sent_bytes_total"],
         untagged_counters: &[
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
-    };
-    /// The component test specification for components with multiple outputs
-    pub static ref COMPONENT_MULTIPLE_OUTPUTS_TESTS: ComponentTests = ComponentTests {
-        events: &["EventsSent"],
-        tagged_counters: &[
-            "component_sent_events_total",
-            "component_sent_event_bytes_total",
-        ],
-        untagged_counters: &[
-        ],
-    };
-}
+    }
+});
+/// The component test specification for components with multiple outputs
+pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["EventsSent"],
+    tagged_counters: &[
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+    untagged_counters: &[],
+});
 
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed
