@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -53,7 +54,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             message = "Failed to annotate event with pod metadata.",
             error_type = "event_annotation",
             event = ?self.event,
-            stage = "processing",
+            stage = error_stage::PROCESSING,
         );
     }
 
@@ -62,7 +63,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             "component_errors_total", 1,
             "error" => "Failed to annotate event with pod metadata.",
             "error_type" => "event_annotation",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_annotation_failures_total", 1);
     }
@@ -79,7 +80,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             message = "Failed to annotate event with namespace metadata.",
             error_type = "event_annotation",
             event = ?self.event,
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -89,7 +90,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             "component_errors_total", 1,
             "error" => "Failed to annotate event with namespace metadata.",
             "error_type" => "event_annotation",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_namespace_annotation_failures_total", 1);
     }
@@ -124,7 +125,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             message = "Failed to parse log line in docker format.",
             error = %self.error,
             error_type = "parser",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -134,7 +135,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "parser",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_docker_format_parse_failures_total", 1);
     }
@@ -154,7 +155,7 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
             message = self.message,
             error = %self.error,
             error_type = "kubernetes_lifecycle",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -164,7 +165,7 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "kubernetes_lifecycle",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
     }
 }
