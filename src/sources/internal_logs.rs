@@ -7,7 +7,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{InternalLogsEventsReceived, StreamClosedError},
+    internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace, SourceSender,
 };
@@ -72,10 +72,12 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
+        let byte_size = log.size_of();
         // This event doesn't emit any log
+        emit!(&InternalLogsBytesReceived { byte_size });
         emit!(&InternalLogsEventsReceived {
             count: 1,
-            byte_size: log.size_of(),
+            byte_size,
         });
         if let Ok(hostname) = &hostname {
             log.insert(host_key.clone(), hostname.to_owned());
