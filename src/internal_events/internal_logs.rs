@@ -9,7 +9,7 @@ pub struct InternalLogsEventsReceived {
 
 impl InternalEvent for InternalLogsEventsReceived {
     fn emit_logs(&self) {
-        // should not be implemented to avoid an infinite log loop
+        // MUST not emit logs here to avoid an infinite log loop
     }
 
     fn emit_metrics(&self) {
