@@ -1,9 +1,5 @@
-use super::service::S3Service;
-use crate::aws::rusoto;
-use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::ProxyConfig;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::Healthcheck;
+use std::{collections::BTreeMap, convert::TryInto, time::Duration};
+
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::client;
@@ -11,9 +7,16 @@ use rusoto_core::RusotoError;
 use rusoto_s3::{HeadBucketRequest, PutObjectError, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryInto, time::Duration};
 
-use super::service::S3Response;
+use super::service::{S3Response, S3Service};
+use crate::{
+    aws::{
+        rusoto,
+        rusoto::{AwsAuthentication, RegionOrEndpoint},
+    },
+    config::ProxyConfig,
+    sinks::{util::retries::RetryLogic, Healthcheck},
+};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct S3Options {

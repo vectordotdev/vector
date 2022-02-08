@@ -1,8 +1,10 @@
-use crate::event::{LogEvent, Value};
+use std::collections::HashSet;
+
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::event::{LogEvent, Value};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -587,9 +589,10 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::event::Event;
-    use serde_json::json;
 
     #[test]
     fn initial_values() {
@@ -829,8 +832,8 @@ mod test {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
         let mut output = Event::new_empty_log();
-        let mut output = output.as_mut_log();
-        merger.insert_into("out".into(), &mut output)?;
+        let output = output.as_mut_log();
+        merger.insert_into("out".into(), output)?;
         Ok(output.remove("out").unwrap())
     }
 }

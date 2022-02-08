@@ -1,19 +1,25 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use super::{Error, Value};
 use crate::ExpressionError;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
     pub fn try_mul(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Mul(self.kind(), rhs.kind());
 
+        // When multiplying a string by an integer, if the number is negative we set it to zero to
+        // return an empty string.
+        let as_usize = |num| if num < 0 { 0 } else { num as usize };
+
         let value = match self {
-            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
+            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(as_usize(lhv)).into(),
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv * f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
+            Value::Bytes(lhv) if rhs.is_integer() => {
+                lhv.repeat(as_usize(rhs.try_integer()?)).into()
+            }
             _ => return Err(err()),
         };
 
@@ -84,7 +90,7 @@ impl Value {
         self,
         mut rhs: impl FnMut() -> Result<Self, ExpressionError>,
     ) -> Result<Self, Error> {
-        let err = |err| Error::Or(err);
+        let err = Error::Or;
 
         match self {
             Value::Null => rhs().map_err(err),

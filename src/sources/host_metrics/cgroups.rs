@@ -1,16 +1,22 @@
-use super::{filter_result_sync, FilterList, HostMetrics};
-use crate::event::metric::Metric;
+use std::{
+    io::{self, Read},
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use shared::btreemap;
 use snafu::{ResultExt, Snafu};
-use std::io::{self, Read};
-use std::num::ParseIntError;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use tokio::fs::{self, File};
-use tokio::io::AsyncReadExt;
+use tokio::{
+    fs::{self, File},
+    io::AsyncReadExt,
+};
+use vector_common::btreemap;
+
+use super::{filter_result_sync, FilterList, HostMetrics};
+use crate::event::metric::Metric;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -244,12 +250,12 @@ impl CGroup {
         let filename = self.make_path(filename);
         File::open(&filename)
             .await
-            .with_context(|| Opening {
+            .with_context(|_| OpeningSnafu {
                 filename: filename.clone(),
             })?
             .read_to_string(buffer)
             .await
-            .with_context(|| Reading {
+            .with_context(|_| ReadingSnafu {
                 filename: filename.clone(),
             })?;
         Ok(filename)
@@ -261,7 +267,10 @@ impl CGroup {
         buffer: &mut String,
     ) -> CGroupsResult<T> {
         let filename = self.open_read(filename, buffer).await?;
-        buffer.trim().parse().with_context(|| Parsing { filename })
+        buffer
+            .trim()
+            .parse()
+            .with_context(|_| ParsingSnafu { filename })
     }
 
     async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
@@ -292,11 +301,11 @@ impl CGroup {
 fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
     let mut buffer = String::new();
     std::fs::File::open(&filename)
-        .with_context(|| Opening {
+        .with_context(|_| OpeningSnafu {
             filename: filename.to_path_buf(),
         })?
         .read_to_string(&mut buffer)
-        .with_context(|| Reading {
+        .with_context(|_| ReadingSnafu {
             filename: filename.to_path_buf(),
         })?;
     Ok(buffer.trim().split(' ').map(Into::into).collect())
@@ -381,11 +390,17 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{count_name, count_tag};
-    use super::super::{HostMetrics, HostMetricsConfig};
-    use super::{join_name, join_path};
-    use pretty_assertions::assert_eq;
     use std::path::{Path, PathBuf};
+
+    use pretty_assertions::assert_eq;
+
+    use super::{
+        super::{
+            tests::{count_name, count_tag},
+            HostMetrics, HostMetricsConfig,
+        },
+        join_name, join_path,
+    };
 
     #[test]
     fn joins_names_and_paths() {

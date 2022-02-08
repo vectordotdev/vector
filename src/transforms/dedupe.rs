@@ -1,17 +1,19 @@
+use std::{future::ready, pin::Pin};
+
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
     transforms::{TaskTransform, Transform},
 };
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
-use std::{future::ready, pin::Pin};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -81,15 +83,15 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(Dedupe::new(self.clone())))
+        Ok(Transform::event_task(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -193,7 +195,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl TaskTransform for Dedupe {
+impl TaskTransform<Event> for Dedupe {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -208,10 +210,13 @@ impl TaskTransform for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::{event::Event, event::Value};
     use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{Event, Value},
+        transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+    };
 
     #[test]
     fn generate_config() {

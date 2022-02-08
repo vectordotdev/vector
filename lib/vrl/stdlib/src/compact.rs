@@ -1,6 +1,8 @@
-use crate::util;
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
+
+use crate::util;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
@@ -240,8 +242,9 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
 
 #[cfg(test)]
 mod test {
+    use vector_common::btreemap;
+
     use super::*;
-    use shared::btreemap;
 
     #[test]
     fn test_compacted_array() {

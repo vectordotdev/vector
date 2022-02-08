@@ -1,10 +1,9 @@
-use super::data;
-use super::limiter;
-
 use std::time::Duration;
 
 use data::BatchData;
 use limiter::BatchLimiter;
+
+use super::{data, limiter};
 
 pub struct BatchConfigParts<L, D> {
     pub batch_limiter: L,

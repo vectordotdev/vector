@@ -1,17 +1,17 @@
-use crate::config::component::ComponentDescription;
-use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
+use crate::{config::component::ComponentDescription, event::Event};
+
 pub mod check_fields;
-#[cfg(feature = "transforms-filter")]
 pub mod datadog_search;
 pub mod is_log;
 pub mod is_metric;
 pub mod not;
 pub mod vrl;
 
-pub use self::vrl::VrlConfig;
 pub use check_fields::CheckFieldsConfig;
+
+pub use self::vrl::VrlConfig;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
@@ -83,8 +83,9 @@ impl AnyCondition {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[derive(Deserialize, Debug)]
     struct Test {

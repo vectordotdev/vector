@@ -1,13 +1,14 @@
-use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::{Event, Value},
-};
+use std::{net::IpAddr, str::FromStr};
+
 use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
-use std::str::FromStr;
+
+use crate::{
+    conditions::{Condition, ConditionConfig, ConditionDescription},
+    event::{Event, Value},
+};
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -549,13 +550,6 @@ impl ConditionConfig for CheckFieldsConfig {
 #[derive(Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
-}
-
-impl CheckFields {
-    #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
-    pub(crate) fn new(predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>) -> Self {
-        Self { predicates }
-    }
 }
 
 impl Condition for CheckFields {

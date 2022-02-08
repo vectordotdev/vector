@@ -1,3 +1,10 @@
+use std::time::SystemTime;
+
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -11,11 +18,6 @@ use crate::{
     },
     template::{Template, TemplateRenderingError},
 };
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::time::SystemTime;
 
 lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("https://logs.logdna.com");
@@ -96,7 +98,7 @@ impl SinkConfig for LogdnaConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -289,17 +291,20 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 
 #[cfg(test)]
 mod tests {
+    use futures::{channel::mpsc, StreamExt};
+    use http::{request::Parts, StatusCode};
+    use serde_json::json;
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
     use super::*;
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{next_addr, random_lines},
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            next_addr, random_lines,
+        },
     };
-    use futures::{channel::mpsc, stream, StreamExt};
-    use http::{request::Parts, StatusCode};
-    use serde_json::json;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     #[test]
     fn generate_config() {
@@ -399,7 +404,7 @@ mod tests {
         }
         drop(batch);
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }

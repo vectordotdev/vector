@@ -1,12 +1,16 @@
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
-    transforms::{FunctionTransform, Transform},
-};
+use std::collections::btree_map::Entry;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::btree_map::Entry;
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
+    event::Event,
+    internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -50,8 +54,8 @@ impl TransformConfig for AddTagsConfig {
         DataType::Metric
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -66,7 +70,7 @@ impl AddTags {
 }
 
 impl FunctionTransform for AddTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         if !self.tags.is_empty() {
             let metric = event.as_mut_metric();
 
@@ -93,12 +97,13 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         transforms::test::transform_one,
     };
-    use shared::btreemap;
 
     #[test]
     fn generate_config() {

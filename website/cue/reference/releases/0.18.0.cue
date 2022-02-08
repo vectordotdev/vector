@@ -14,141 +14,342 @@ releases: "0.18.0": {
 		See the [chart upgrade
 		guide](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/README.md#upgrading) for how to
 		transition from the old charts.
-
-		## Known Issues
-		- The `elasticsearch` sink incorrectly prints a message for each
-		  delivered event. Fixed in v0.18.1.
-		- A change to internal telemetry causes aggregated histograms emitted by
-		  the `prometheus_exporter` and `prometheus_remote_write` sinks to be
-		  incorrectly tallied. Fixed in v0.18.1.
-		- The new automatic namespacing feature broke running Vector from the
-		  published RPM due to it trying to load directories from `/etc/vector`
-		  that are not valid. Fixed in v0.18.1.
-		- The new `reroute_dropped` feature of `remap` always creates the
-		  `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.
-		- The `headers_key` option for the `kafka` sink was inadvertantly
-		  changed to `headers_field`.
-
-		## Features
-
-		- Initial support for routing failed events from transforms has been added,
-		  starting with the `remap` transform. See [the
-		  highlight](/highlights/2021-11-18-failed-event-routing) for more.
-		- Initial support for enriching events from external data sources has been
-		  added via a new Vector concept, enrichment tables. To start, we've added
-		  support for enriching events with data from a CSV file. See [the
-		  highlight](/highlights/2021-11-18-csv-enrichment) for more.
-		- A new `throttle` transform has been added for controlling costs. See [the
-		  highlight](/highlights/2021-11-12-event-throttle-transform) for more.
-		- Better support for breaking up Vector configuration into multiple files
-		  was added via deriving configuration from file and directory names. See
-		  [the highlight](/highlights/2021-11-18-implicit-namespacing) for more.
-		- A new `aws_sqs` source was added for consuming messages from AWS SQS as log
-		  events.
-
-		## Enhancements
-
-		- Instrumentation has been added to sink buffers to help give more visibility into
-		  their operation. The following metrics have been added:
-		  - `buffer_byte_size` (disk buffer only): The number of bytes in the buffer
-		  - `buffer_events` (in-memory buffer only): The number of events in the buffer
-		  - `buffer_received_event_bytes_total`: The number of bytes that have been
-			received by this buffer. This count does not include discarded events.
-		  - `buffer_sent_event_bytes_total`: The number of bytes that have been sent
-			from the buffer to its associated sink.
-		  - `buffer_received_events_total`: The number of events that have been received
-			by this buffer. This count does not include discarded events.
-		  - `buffer_sent_events_total`: The number of events that have been sent from
-			the buffer to its associated sink.
-		  - `buffer_discarded_events_total`: The number of events that have been
-			discarded from the buffer because it is full (relevant when `when_full` is
-			`drop_newest`)
-		- The `$LOG` environment variable for configuring the Vector log level has
-			been renamed to `$VECTOR_LOG`. `$LOG` is still also accepted for backwards
-			compatibility. This change makes logging configuration more in-line with
-			Vector's other environment variable based options, and isolates Vector from
-			being affected by other generic environment variables.
-		- VRL diagnostic error messages have been improved to suggest `null`, `true`, or
-		  `false` for undefined variables. This helps guide users to realize when they
-		  are trying to use a keyword like `nil` that doesn't actually exist in VRL.
-		- The `log_to_metric` transform now also allows emitting absolute counters
-		  in addition to relative counters via `kind = "absolute"`.
-		- (breaking!) The `status` tag for the `http_client_responses_total` internal
-		  metric was updated to be just the integer (e.g. `200`) rather than including
-		  the text portion of the HTTP response code (e.g. `200 OK`).
-		- The `kubernetes_logs` source now annotates logs with the `pod_owner` when
-		  available.
-		- The `papertrail` sink now allows `process` field to be set to a event field
-		  value the templatable `process` key.
-		- The `aws_s3` sink now has less connections terminated prematurely as it
-		  optimistically terminates connections before AWS's timeout.
-		- The `prometheus_exporter` now expires metrics that haven't been seen since the
-		  last flush (controlled by `flush_interval_secs`) to avoid holding onto stale
-		  metrics indefinitely and consuming increasing amounts of memory.
-		- Added support for end-to-end acknowledgements to the `aws_kinesis_firehose`
-		  source, `journald` source, and `file` sink.
-		- The `utilization` metric for most transforms no longer count time spent
-		  blocked on downstream components as busy. This means they should more
-		  accurately represent the time spent in that specific transform and require
-		  less interpretation to find bottlenecks.
-		- The `datadog_metrics` sink now supports sending distribution data to Datadog
-		  like histograms and aggregated samples.
-		- The `kubernetes_logs` source has been updated to be less demanding on the
-		  Kubernetes API server (and backing etcd cluster) by allowing for slightly
-		  stale data to be used for log enrichment rather than always requesting the
-		  most-up-to-date metadata.
-		- The `generator` source has been renamed to `demo_logs`. We feel this name
-		  better reflects the intent of the source. An alias has been added to maintain
-		  compatibility.
-		- The `framing` and `decoding` options are now available on `heroku_logs`
-		  source. See the [framing and decoding highlight from
-		  v0.17.0](/highlights/2021-10-06-source-codecs/) for more about this new source
-		  feature.
-		- (breaking!) The `upper_limit` field for aggregated summaries from the
-		  `metric_to_log` transform has been renamed to `q` which is a common shorthand
-		  for `quantile`.
-		- We have continued to add additional instrumentation to components with
-		  the goal of having them all match the [Component
-		  Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md#instrumentation).
-		  Once we have finished this we will post a highlight outlining all of
-		  the added metrics.
-
-		## Bug Fixes:
-
-		- Configuring the number of threads (via `--threads`) for Vector now actually
-		  takes effect again rather than it always using the number of available cores.
-		  This was a regression in v0.13.
-		- Vector no longer crashes when configuration was reloaded that include changes
-		  to both the order of inputs for a component and configuration of one of those
-		  inputs.
-		- (breaking!) The obsolete `event_per_line` configuration option was removed
-		  from the `exec` source. This option became non-functional in 0.17.0 but was
-		  left available to be configured. Instead, the new `framing` option can be used
-		  to choose between interpreting th e output of the subcommand as an event per
-		  line or all at once as one event.
-		- Fix regression in `v0.17.0` for `aws_s3` sink where it would add a `/` to the
-		  prefix provided. The sink no longer adds this `/` to replace previous
-		  behavior.
-		- Fix memory leak that occurred when using Vector as a Windows service.
-		- Fix lock-ups with the `aws_s3`, `loki`, and `datadog_logs` sinks.
-		- Fix naming of the VRL `compact` function's `object` argument to match the
-		  docs. This was incorrectly implemented named `map` in the implementation.
-		- The `component_sent_bytes_total` internal metric is now reported _after_
-		  events are successfully sent to HTTP-based sinks rather than before they are
-		  sent.
-		- The `influxdb_metrics` and `influxdb_logs` sinks now use `/ping` for
-		  heathchecks rather than `/health` to work with Influx DB 2 Cloud.
-
-		## Other changes
-
-		- The deprecated `batch.max_size` parameter has been removed in this release.
-		  See the [upgrade guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
-		- The deprecated `request.in_flight_limit` has been removed in this release.
-		  See the [upgrade guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
-		- The deprecated `host` and `namespace` field on the `datadog_metrics`
-		  sink has been removed. See the [upgrade
-		  guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
 		"""
+
+	known_issues: [
+		"The `elasticsearch` sink incorrectly prints a message for each delivered event. Fixed in v0.18.1.",
+		"A change to internal telemetry causes aggregated histograms emitted by the `prometheus_exporter` and `prometheus_remote_write` sinks to be incorrectly tallied. Fixed in v0.18.1.",
+		"The new automatic namespacing feature broke running Vector from the published RPM due to it trying to load directories from `/etc/vector` that are not valid. Fixed in v0.18.1.",
+		"The new `reroute_dropped` feature of `remap` always creates the `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.",
+		"The `headers_key` option for the `kafka` sink was inadvertantly changed to `headers_field`. Fixed in v0.19.0.",
+		"If `--config-dir` is used, Vector incorrectly tries to load files with unknown extensions. Fixed in v0.19.0.",
+	]
+
+	changelog: [
+		{
+			type: "feat"
+			scopes: ["remap transform", "config"]
+			description: """
+				Initial support for routing failed events from transforms has
+				been added, starting with the `remap` transform. See [the
+				highlight](/highlights/2021-11-18-failed-event-routing) for
+				more.
+				"""
+		},
+		{
+			type: "feat"
+			scopes: ["enrichment"]
+			description: """
+				Initial support for enriching events from external data sources has been
+				added via a new Vector concept, enrichment tables. To start, we've added
+				support for enriching events with data from a CSV file. See [the
+				highlight](/highlights/2021-11-18-csv-enrichment) for more.
+				"""
+		},
+		{
+			type: "feat"
+			scopes: ["new transform"]
+			description: """
+				A new `throttle` transform has been added for controlling costs. See [the
+				highlight](/highlights/2021-11-12-event-throttle-transform) for more.
+				"""
+		},
+		{
+			type: "feat"
+			scopes: ["config"]
+			description: """
+				Better support for breaking up Vector configuration into multiple files
+				was added via deriving configuration from file and directory names. See
+				[the highlight](/highlights/2021-11-18-implicit-namespacing) for more.
+				"""
+		},
+		{
+			type: "feat"
+			scopes: ["new source"]
+			description: """
+				A new `aws_sqs` source was added for consuming messages from AWS SQS as log
+				events.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["buffers", "observability"]
+			description: """
+				Instrumentation has been added to sink buffers to help give more visibility into
+				their operation. The following metrics have been added:
+
+				 - `buffer_byte_size` (disk buffer only): The number of bytes in the buffer
+				 - `buffer_events` (in-memory buffer only): The number of events in the buffer
+				 - `buffer_received_event_bytes_total`: The number of bytes that have been
+				   received by this buffer. This count does not include discarded events.
+				 - `buffer_sent_event_bytes_total`: The number of bytes that have been sent
+				   from the buffer to its associated sink.
+				 - `buffer_received_events_total`: The number of events that have been received
+				   by this buffer. This count does not include discarded events.
+				 - `buffer_sent_events_total`: The number of events that have been sent from
+				   the buffer to its associated sink.
+				 - `buffer_discarded_events_total`: The number of events that
+				   have been discarded from the buffer because it is full
+				   (relevant when `when_full` is `drop_newest`)
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["config"]
+			description: """
+				The `$LOG` environment variable for configuring the Vector log level has
+				been renamed to `$VECTOR_LOG`. `$LOG` is still also accepted for backwards
+				compatibility. This change makes logging configuration more in-line with
+				Vector's other environment variable based options, and isolates Vector from
+				being affected by other generic environment variables.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["vrl"]
+			description: """
+				VRL diagnostic error messages have been improved to suggest `null`, `true`, or
+				`false` for undefined variables. This helps guide users to realize when they
+				are trying to use a keyword like `nil` that doesn't actually exist in VRL.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["log_to_metric transform"]
+			description: """
+				The `log_to_metric` transform now also allows emitting absolute counters
+				in addition to relative counters via `kind = "absolute"`.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["observability"]
+			breaking: true
+			description: """
+				The `status` tag for the `http_client_responses_total` internal
+				metric was updated to be just the integer (e.g. `200`) rather
+				than including the text portion of the HTTP response code (e.g.
+				`200 OK`).
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["kubernetes_logs source"]
+			description: """
+				The `kubernetes_logs` source now annotates logs with the `pod_owner` when
+				available.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["papertrail sink"]
+			description: """
+				The `papertrail` sink now allows `process` field to be set to a event field
+				value the templatable `process` key.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["aws_s3 sink"]
+			description: """
+				The `aws_s3` sink now has less connections terminated prematurely as it
+				optimistically terminates connections before AWS's timeout.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["prometheus_exporter sink"]
+			description: """
+				The `prometheus_exporter` now expires metrics that haven't been seen since the
+				last flush (controlled by `flush_interval_secs`) to avoid holding onto stale
+				metrics indefinitely and consuming increasing amounts of memory.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["aws_kinesis_firehose source", "journald source", "file sink"]
+			description: """
+				Added support for end-to-end acknowledgements to the `aws_kinesis_firehose`
+				source, `journald` source, and `file` sink.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["observability"]
+			description: """
+				The `utilization` metric for most transforms no longer count time spent
+				blocked on downstream components as busy. This means they should more
+				accurately represent the time spent in that specific transform and require
+				less interpretation to find bottlenecks.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["datadog_metrics sink"]
+			description: """
+				The `datadog_metrics` sink now supports sending distribution data to Datadog
+				like histograms and aggregated samples.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["kubernetes_logs source"]
+			description: """
+				The `kubernetes_logs` source has been updated to be less demanding on the
+				Kubernetes API server (and backing etcd cluster) by allowing for slightly
+				stale data to be used for log enrichment rather than always requesting the
+				most-up-to-date metadata.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["generator source"]
+			description: """
+				The `generator` source has been renamed to `demo_logs`. We feel this name
+				better reflects the intent of the source. An alias has been added to maintain
+				compatibility.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["codecs", "heroku_logs source"]
+			description: """
+				The `framing` and `decoding` options are now available on `heroku_logs`
+				source. See the [framing and decoding highlight from
+				v0.17.0](/highlights/2021-10-06-source-codecs/) for more about this new source
+				feature.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["metric_to_log transform"]
+			breaking: true
+			description: """
+				 The `upper_limit` field for aggregated summaries from the
+				 `metric_to_log` transform has been renamed to `q` which is
+				 a common shorthand for `quantile`.
+				"""
+		},
+		{
+			type: "enhancement"
+			scopes: ["observability"]
+			description: """
+				We have continued to add additional instrumentation to
+				components with the goal of having them all match the [Component
+				Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md#instrumentation).
+				Once we have finished this we will post a highlight outlining
+				all of the added metrics.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["performance"]
+			description: """
+				Configuring the number of threads (via `--threads`) for Vector now actually
+				takes effect again rather than it always using the number of available cores.
+				This was a regression in v0.13.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["config", "reload"]
+			description: """
+				Vector no longer crashes when configuration was reloaded that include changes
+				to both the order of inputs for a component and configuration of one of those
+				inputs.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["exec source"]
+			breaking: true
+			description: """
+				The obsolete `event_per_line` configuration option was removed from
+				the `exec` source. This option became non-functional in 0.17.0 but
+				was left available to be configured. Instead, the new `framing`
+				option can be used to choose between interpreting th e output of the
+				subcommand as an event per line or all at once as one event.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["aws_s3 sink"]
+			description: """
+				Fix regression in `v0.17.0` for `aws_s3` sink where it would add
+				a `/` to the prefix provided. The sink no longer adds this `/` to
+				replace previous behavior.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["windows platform"]
+			description: """
+				Fix memory leak that occurred when using Vector as a Windows service.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["aws_s3 sink", "loki sink", "datadog_logs sink"]
+			description: """
+				Fix lock-ups with the `aws_s3`, `loki`, and `datadog_logs` sinks.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["vrl"]
+			description: """
+				Fix naming of the VRL `compact` function's `object` argument to match the
+				docs. This was incorrectly implemented named `map` in the implementation.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["observability"]
+			description: """
+				The `component_sent_bytes_total` internal metric is now reported _after_
+				events are successfully sent to HTTP-based sinks rather than before they are
+				sent.
+				"""
+		},
+		{
+			type: "fix"
+			scopes: ["influxdb_logs sink", "influxdb_metrics sink"]
+			description: """
+				The `influxdb_metrics` and `influxdb_logs` sinks now use `/ping` for
+				heathchecks rather than `/health` to work with Influx DB 2 Cloud.
+				"""
+		},
+		{
+			type:     "deprecation"
+			breaking: true
+			scopes: ["sinks"]
+			description: """
+				The deprecated `batch.max_size` parameter has been removed in
+				this release.  See the [upgrade
+				guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
+				"""
+		},
+		{
+			type:     "deprecation"
+			breaking: true
+			scopes: ["sinks"]
+			description: """
+				The deprecated `request.in_flight_limit` has been removed in
+				this release.  See the [upgrade
+				guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
+				"""
+		},
+		{
+			type:     "deprecation"
+			breaking: true
+			scopes: ["datadog_metrics sink"]
+			description: """
+				The deprecated `host` and `namespace` field on the `datadog_metrics`
+				sink has been removed. See the [upgrade
+				guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for more.
+				"""
+		},
+	]
 
 	whats_next: [
 		{

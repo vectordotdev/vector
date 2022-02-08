@@ -1,8 +1,9 @@
+use chrono::TimeZone;
+
 use crate::{
     event::{self, BTreeMap, WithMetadata},
     metrics::AgentDDSketch,
 };
-use chrono::TimeZone;
 
 include!(concat!(env!("OUT_DIR"), "/event.rs"));
 pub use event_wrapper::Event;

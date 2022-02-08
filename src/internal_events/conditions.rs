@@ -4,12 +4,15 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Copy, Clone)]
-pub struct VrlConditionExecutionError;
+pub struct VrlConditionExecutionError<'a> {
+    pub error: &'a str,
+}
 
-impl InternalEvent for VrlConditionExecutionError {
+impl<'a> InternalEvent for VrlConditionExecutionError<'a> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "VRL condition execution failed.",
+            error = %self.error,
             internal_log_rate_secs = 120
         )
     }

@@ -1,9 +1,11 @@
-#[cfg(feature = "sources-utils-http-prelude")]
-use super::error::ErrorMessage;
+use std::convert::TryFrom;
+
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use warp::http::HeaderMap;
+
+#[cfg(feature = "sources-utils-http-prelude")]
+use super::error::ErrorMessage;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HttpSourceAuthConfig {

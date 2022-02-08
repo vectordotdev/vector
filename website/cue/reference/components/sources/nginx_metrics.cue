@@ -91,7 +91,7 @@ components: sources: nginx_metrics: {
 		mod_status: {
 			title: "Module `ngx_http_stub_status_module`"
 			body:  """
-				The [ngx_http_stub_status_module]9\(urls.nginx_stub_status_module))
+				The [ngx_http_stub_status_module](\(urls.nginx_stub_status_module))
 				module provides access to basic status information. Basic status
 				information is a simple web page with text data.
 				"""

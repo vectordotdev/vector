@@ -1,31 +1,32 @@
+use std::{
+    collections::{btree_map::Entry, BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    fmt::{Debug, Display},
+    iter::FromIterator,
+    sync::Arc,
+};
+
+use bytes::Bytes;
+use chrono::Utc;
+use derivative::Derivative;
+use getset::{Getters, MutGetters};
+use serde::{Deserialize, Serialize, Serializer};
+use vector_common::EventDataEq;
+
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
     legacy_lookup::Segment,
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
 };
-use crate::event::MaybeAsLogMut;
-use crate::{config::log_schema, ByteSizeOf};
-use bytes::Bytes;
-use chrono::Utc;
-use derivative::Derivative;
-use getset::{Getters, MutGetters};
-use serde::{Deserialize, Serialize, Serializer};
-use shared::EventDataEq;
-use std::sync::Arc;
-use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
-    convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
-    iter::FromIterator,
-};
+use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
-    fields: Value,
+    fields: Arc<Value>,
 
     #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
@@ -35,7 +36,7 @@ pub struct LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
-            fields: Value::Map(BTreeMap::new()),
+            fields: Arc::new(Value::Map(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }
     }
@@ -57,7 +58,7 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Value::Map(Default::default()),
+            fields: Arc::new(Value::Map(Default::default())),
             metadata,
         }
     }
@@ -65,7 +66,10 @@ impl LogEvent {
     ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let fields = Value::Map(map);
-        Self { fields, metadata }
+        Self {
+            fields: Arc::new(fields),
+            metadata,
+        }
     }
 
     /// Convert a `LogEvent` into a tuple of its components
@@ -73,9 +77,11 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+        Arc::make_mut(&mut self.fields);
         (
-            self.fields
+            Arc::try_unwrap(self.fields)
+                .expect("already cloned")
                 .into_map()
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
@@ -157,7 +163,10 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
+            if let Some(val) = Arc::make_mut(&mut self.fields)
+                .as_map_mut()
+                .remove(from_key.as_ref())
+            {
                 self.insert_flat(to_key, val);
             }
         }
@@ -197,7 +206,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        match &self.fields {
+        match self.fields.as_ref() {
             Value::Map(map) => util::log::keys(map),
             _ => unreachable!(),
         }
@@ -215,7 +224,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match &self.fields {
+        match self.fields.as_ref() {
             Value::Map(map) => map,
             _ => unreachable!(),
         }
@@ -223,7 +232,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self.fields {
+        match Arc::make_mut(&mut self.fields) {
             Value::Map(ref mut map) => map,
             _ => unreachable!(),
         }
@@ -323,15 +332,16 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Value::Map(map),
+            fields: Arc::new(Value::Map(map)),
             metadata: EventMetadata::default(),
         }
     }
 }
 
 impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        match event.fields {
+    fn from(mut event: LogEvent) -> BTreeMap<String, Value> {
+        Arc::make_mut(&mut event.fields);
+        match Arc::try_unwrap(event.fields).expect("already cloned") {
             Value::Map(map) => map,
             _ => unreachable!(),
         }
@@ -341,7 +351,7 @@ impl From<LogEvent> for BTreeMap<String, Value> {
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            fields: map.into_iter().collect(),
+            fields: Arc::new(map.into_iter().collect()),
             metadata: EventMetadata::default(),
         }
     }
@@ -379,7 +389,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        Ok(serde_json::to_value(self.fields)?)
+        Ok(serde_json::to_value(self.fields.as_ref())?)
     }
 }
 
@@ -489,10 +499,12 @@ impl tracing::field::Visit for MakeLogEvent {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
+    use serde_json::json;
+
     use super::*;
     use crate::test_util::open_fixture;
-    use serde_json::json;
-    use std::str::FromStr;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.
@@ -806,10 +818,10 @@ mod test {
             log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
 
             log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
-            log.insert("merge_b", 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+            log.insert("merge_b", 123i64); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
 
             log.insert("a", true); // will remain as is since it's not selected for merge.
-            log.insert("b", 123); // will remain as is since it's not selected for merge.
+            log.insert("b", 123i64); // will remain as is since it's not selected for merge.
 
             // `c` is not present in the `current`, and not selected for merge,
             // so it won't be included in the final event.
@@ -823,12 +835,12 @@ mod test {
             log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
             log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
 
-            log.insert("merge_b", 456); // will be merged in as `456`.
+            log.insert("merge_b", 456i64); // will be merged in as `456`.
             log.insert("merge_c", false); // will be merged in as `false`.
 
             // `a` will remain as-is, since it's not marked for merge and
             // neither is it specified in the `incoming` event.
-            log.insert("b", 456); // `b` not marked for merge, will not change.
+            log.insert("b", 456i64); // `b` not marked for merge, will not change.
             log.insert("c", true); // `c` not marked for merge, will be ignored.
 
             log
@@ -842,13 +854,13 @@ mod test {
             log.insert("merge", "hello world");
             log.insert("do_not_merge", "my_first_value");
             log.insert("a", true);
-            log.insert("b", 123);
+            log.insert("b", 123i64);
             log.insert("merge_a", true);
-            log.insert("merge_b", 456);
+            log.insert("merge_b", 456i64);
             log.insert("merge_c", false);
             log
         };
 
-        shared::assert_event_data_eq!(merged, expected);
+        vector_common::assert_event_data_eq!(merged, expected);
     }
 }

@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use super::{AnyCondition, Condition, ConditionConfig};
 use crate::event::Event;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NotConfig(AnyCondition);

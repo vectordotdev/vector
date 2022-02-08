@@ -1,3 +1,19 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::ready,
+    num::NonZeroU64,
+    task::Poll,
+};
+
+use bytes::Bytes;
+use futures::{future::BoxFuture, stream, SinkExt};
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::{
+    event::metric::{MetricSketch, Quantile},
+    ByteSizeOf,
+};
+
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
@@ -22,18 +38,6 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
-use futures::{future::BoxFuture, stream, SinkExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    num::NonZeroU64,
-    task::Poll,
-};
-use tower::Service;
-use vector_core::event::metric::{MetricSketch, Quantile};
-use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct InfluxDbSvc {
@@ -158,13 +162,13 @@ impl InfluxDbSvc {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event)
+                        .apply(event.into_metric())
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
@@ -228,10 +232,11 @@ fn merge_tags(
     }
 }
 
+#[derive(Default)]
 pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
@@ -401,11 +406,14 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts},
+    };
 
     #[test]
     fn generate_config() {
@@ -888,29 +896,31 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use chrono::{SecondsFormat, Utc};
+    use pretty_assertions::assert_eq;
+
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::Event,
+        event::{
+            metric::{Metric, MetricKind, MetricValue},
+            Event,
+        },
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
             test_util::{
-                cleanup_v1, format_timestamp, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG,
-                TOKEN,
+                address_v1, address_v2, cleanup_v1, format_timestamp, onboarding_v1, onboarding_v2,
+                query_v1, BUCKET, ORG, TOKEN,
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
     };
-    use chrono::{SecondsFormat, Utc};
-    use futures::stream;
-    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
         insert_metrics_v1(
-            "https://localhost:8087",
+            address_v1(true).as_str(),
             Some(TlsOptions {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
@@ -921,7 +931,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_http() {
-        insert_metrics_v1("http://localhost:8086", None).await
+        insert_metrics_v1(address_v1(false).as_str(), None).await
     }
 
     async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
@@ -950,7 +960,7 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1019,12 +1029,13 @@ mod integration_tests {
     #[tokio::test]
     async fn influxdb2_metrics_put_data() {
         crate::test_util::trace_init();
-        onboarding_v2().await;
+        let endpoint = address_v2();
+        onboarding_v2(&endpoint).await;
 
         let cx = SinkContext::new_test();
 
         let config = InfluxDbConfig {
-            endpoint: "http://localhost:9999".to_string(),
+            endpoint,
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
@@ -1063,7 +1074,7 @@ mod integration_tests {
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
@@ -1075,7 +1086,7 @@ mod integration_tests {
             .unwrap();
 
         let res = client
-            .post("http://localhost:9999/api/v2/query?org=my-org")
+            .post(format!("{}/api/v2/query?org=my-org", address_v2()))
             .json(&body)
             .header("accept", "application/json")
             .header("Authorization", "Token my-token")

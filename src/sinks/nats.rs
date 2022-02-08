@@ -1,3 +1,11 @@
+use std::convert::TryFrom;
+
+use async_trait::async_trait;
+use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use vector_buffers::Acker;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -8,12 +16,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-use async_trait::async_trait;
-use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
-use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -71,7 +73,7 @@ impl SinkConfig for NatsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = NatsSink::new(self.clone(), cx.acker())?;
         let healthcheck = healthcheck(self.clone()).boxed();
-        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -126,7 +128,7 @@ impl NatsSink {
         Ok(NatsSink {
             options: (&config).into(),
             encoding: config.encoding,
-            subject: Template::try_from(config.subject).context(SubjectTemplate)?,
+            subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
             url: config.url,
             acker,
         })
@@ -150,7 +152,7 @@ impl From<&NatsSinkConfig> for NatsOptions {
 }
 
 #[async_trait]
-impl StreamSink for NatsSink {
+impl StreamSink<Event> for NatsSink {
     async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let nats_options: async_nats::Options = self.options.into();
 
@@ -206,8 +208,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::{encode_event, Encoding, EncodingConfig};
+    use super::{encode_event, Encoding, EncodingConfig, *};
     use crate::event::{Event, Value};
 
     #[test]
@@ -241,9 +242,11 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use std::{thread, time::Duration};
+
+    use super::*;
+    use crate::sinks::VectorSink;
+    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
 
     #[tokio::test]
     async fn nats_happy() {
@@ -268,12 +271,13 @@ mod integration_tests {
         let sub = consumer.subscribe(&subject).await.unwrap();
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
+        let (acker, ack_counter) = Acker::basic();
+        let sink = NatsSink::new(cnf.clone(), acker).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 
-        let _ = sink.run(Box::pin(events)).await.unwrap();
+        let _ = sink.run(events).await.unwrap();
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));

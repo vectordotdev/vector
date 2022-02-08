@@ -1,17 +1,18 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use vector_common::TimeZone;
+
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use shared::TimeZone;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -48,8 +49,12 @@ impl TransformConfig for MetricToLogConfig {
         DataType::Metric
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -111,7 +116,7 @@ impl MetricToLog {
 }
 
 impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
             .map(|log| log.into());
@@ -121,15 +126,19 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue, StatisticKind},
-        Metric, Value,
-    };
-    use crate::transforms::test::transform_one;
+    use std::collections::BTreeMap;
+
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{
+            metric::{MetricKind, MetricValue, StatisticKind},
+            Metric, Value,
+        },
+        transforms::test::transform_one,
+    };
 
     #[test]
     fn generate_config() {

@@ -1,12 +1,14 @@
-use crate::Error;
-#[cfg(unix)]
-use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{path::PathBuf, time::Duration};
 #[cfg(unix)]
 use std::{
     sync::mpsc::{channel, Receiver},
     thread,
 };
+
+#[cfg(unix)]
+use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
+
+use crate::Error;
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
 /// so to avoid receiving repetitions of previous events on macOS.
@@ -119,11 +121,12 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/timberio/vector/issues/5000
 mod tests {
+    use std::{fs::File, io::Write, time::Duration};
+
+    use tokio::signal::unix::{signal, SignalKind};
+
     use super::*;
     use crate::test_util::{temp_file, trace_init};
-    use std::time::Duration;
-    use std::{fs::File, io::Write};
-    use tokio::signal::unix::{signal, SignalKind};
 
     async fn test(file: &mut File, timeout: Duration) -> bool {
         let mut signal = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");

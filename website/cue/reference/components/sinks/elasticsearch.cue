@@ -65,7 +65,7 @@ components: sinks: elasticsearch: {
 	support: {
 		requirements: [
 			#"""
-				Elasticsearch's Data streams feature requires Vector to be configured with the `create` `bulk_action`.
+				Elasticsearch's Data streams feature requires Vector to be configured with the `create` `bulk.action`.
 				This is *not* enabled by default.
 				"""#,
 		]
@@ -125,20 +125,6 @@ components: sinks: elasticsearch: {
 						}
 					}
 				}
-			}
-		}
-		bulk_action: {
-			common:      false
-			description: """
-				Action to use when making requests to the [Elasticsearch Bulk API](\(urls.elasticsearch_bulk)).
-				Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
-				"""
-			required:    false
-			warnings: ["This option has been deprecated, the `bulk.action` option should be used."]
-			type: string: {
-				default: "index"
-				examples: ["index", "create", "{{ action }}"]
-				syntax: "template"
 			}
 		}
 		bulk: {
@@ -254,17 +240,6 @@ components: sinks: elasticsearch: {
 				examples: ["id", "_id"]
 			}
 		}
-		index: {
-			common:      true
-			description: "Index name to write events to."
-			required:    false
-			warnings: ["This option has been deprecated, the `bulk.index` option should be used."]
-			type: string: {
-				default: "vector-%F"
-				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
-				syntax: "template"
-			}
-		}
 		metrics: {
 			common:      false
 			description: "Options for metrics."
@@ -312,6 +287,17 @@ components: sinks: elasticsearch: {
 				options: {}
 			}
 		}
+		suppress_type_name: {
+			common: false
+			description: """
+				Stop Vector from sending the `type` to Elasticsearch, which was deprecated in Elasticsearch 7.x
+				and removed in Elasticsearch 8.x
+
+				If enabled the `doc_type` option will be ignored.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 
 	input: {
@@ -326,7 +312,7 @@ components: sinks: elasticsearch: {
 				Vector [batches](#buffers-and-batches) data and flushes it to Elasticsearch's
 				[`_bulk` API endpoint](\(urls.elasticsearch_bulk)). By default, all events are
 				inserted via the `index` action, which replaces documents if an existing
-				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch
+				one has the same `id`. If `bulk.action` is configured with `create`, Elasticsearch
 				does _not_ replace an existing document and instead returns a conflict error.
 				"""
 		}

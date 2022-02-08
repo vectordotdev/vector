@@ -1,23 +1,26 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::region::RegionOrEndpoint;
-use crate::config::log_schema;
-use crate::config::{SourceConfig, SourceContext};
-use crate::event::Event;
-use crate::sources::aws_sqs::config::AwsSqsConfig;
-use crate::test_util::random_string;
-use crate::Pipeline;
-use aws_sdk_sqs::output::CreateQueueOutput;
-use aws_sdk_sqs::Endpoint;
+use std::{collections::HashSet, str::FromStr, time::Duration};
+
+use aws_sdk_sqs::{output::CreateQueueOutput, Endpoint};
 use aws_types::region::Region;
 use futures::StreamExt;
 use http::Uri;
-use std::collections::HashSet;
-use std::str::FromStr;
-use std::time::Duration;
 use tokio::time::timeout;
+
+use crate::{
+    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    config::{log_schema, SourceConfig, SourceContext},
+    event::Event,
+    sources::aws_sqs::config::AwsSqsConfig,
+    test_util::random_string,
+    SourceSender,
+};
+
+fn sqs_address() -> String {
+    std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
 
 fn gen_queue_name() -> String {
     random_string(10).to_lowercase()
@@ -48,7 +51,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(AwsAuthentication::test_auth().credentials_provider().await)
         .endpoint_resolver(Endpoint::immutable(
-            Uri::from_str("http://localhost:4566").unwrap(),
+            Uri::from_str(sqs_address().as_str()).unwrap(),
         ))
         .region(Some(Region::new("us-east-1")))
         .build();
@@ -69,13 +72,13 @@ pub async fn test() {
     send_test_events(num_events, &queue_url, &sqs_client).await;
 
     let config = AwsSqsConfig {
-        region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
+        region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
         auth: AwsAuthentication::test_auth(),
         queue_url: queue_url.clone(),
         ..Default::default()
     };
 
-    let (tx, rx) = Pipeline::new_test();
+    let (tx, rx) = SourceSender::new_test();
     tokio::spawn(async move {
         config
             .build(SourceContext::new_test(tx))

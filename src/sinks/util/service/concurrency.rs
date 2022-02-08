@@ -1,6 +1,9 @@
-use serde::de::{self, Unexpected, Visitor};
-use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
+
+use serde::{
+    de::{self, Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
 pub enum Concurrency {

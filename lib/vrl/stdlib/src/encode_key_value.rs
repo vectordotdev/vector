@@ -1,5 +1,6 @@
-use shared::encode_key_value;
 use std::result::Result;
+
+use vector_common::encode_key_value;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -152,8 +153,9 @@ impl Expression for EncodeKeyValueFn {
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
-    use shared::btreemap;
 
     test_function![
         encode_key_value  => EncodeKeyValue;

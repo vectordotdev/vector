@@ -52,7 +52,7 @@ components: transforms: geoip: {
 		}
 		target: {
 			common:      true
-			description: "The default field to insert the resulting GeoIP data into. See [output](#output) for more info."
+			description: "The default field to insert the resulting GeoIP data into. See [output](#output-data) for more info."
 			required:    false
 			type: string: {
 				default: "geoip"

@@ -1,11 +1,16 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
-    internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
-    transforms::{FunctionTransform, Transform},
+    internal_events::{
+        AnsiStripperError, AnsiStripperFieldInvalidError, AnsiStripperFieldMissingError,
+    },
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,8 +44,8 @@ impl TransformConfig for AnsiStripperConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -54,21 +59,21 @@ pub struct AnsiStripper {
 }
 
 impl FunctionTransform for AnsiStripper {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(&AnsiStripperFieldMissing { field: &self.field }),
+            None => emit!(&AnsiStripperFieldMissingError { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(&AnsiStripperFailed {
+                    Err(error) => emit!(&AnsiStripperError {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(&AnsiStripperFieldInvalid { field: &self.field }),
+            _ => emit!(&AnsiStripperFieldInvalidError { field: &self.field }),
         }
 
         output.push(event);
@@ -78,8 +83,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
-    use crate::transforms::test::transform_one;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

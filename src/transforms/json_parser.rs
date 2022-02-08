@@ -1,11 +1,14 @@
-use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
-    transforms::{FunctionTransform, Transform},
-};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::{
+    config::{
+        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+    },
+    event::Event,
+    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -36,8 +39,12 @@ impl TransformConfig for JsonParserConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -71,7 +78,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl FunctionTransform for JsonParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 
@@ -132,9 +139,10 @@ impl FunctionTransform for JsonParser {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::{config::log_schema, event::Event, transforms::test::transform_one};
-    use serde_json::json;
 
     #[test]
     fn generate_config() {

@@ -1,3 +1,9 @@
+use bytes::Bytes;
+use chrono::Utc;
+use getset::{CopyGetters, Getters, Setters};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+
 use crate::{
     codecs::{
         self,
@@ -11,11 +17,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
-use bytes::Bytes;
-use chrono::Utc;
-use getset::{CopyGetters, Getters, Setters};
-use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
@@ -35,10 +36,11 @@ pub struct TcpConfig {
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
     #[getset(get = "pub", set = "pub")]
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
+    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -46,7 +48,7 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: Option<usize>,
@@ -54,8 +56,9 @@ impl TcpConfig {
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Box<dyn DeserializerConfig>,
+        framing: Option<FramingConfig>,
+        decoding: DeserializerConfig,
+        connection_limit: Option<u32>,
     ) -> Self {
         Self {
             address,
@@ -67,6 +70,7 @@ impl TcpConfig {
             receive_buffer_bytes,
             framing,
             decoding,
+            connection_limit,
         }
     }
 
@@ -81,6 +85,7 @@ impl TcpConfig {
             receive_buffer_bytes: None,
             framing: None,
             decoding: default_decoding(),
+            connection_limit: None,
         }
     }
 }
@@ -129,7 +134,7 @@ impl TcpSource for RawTcpSource {
         }
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }

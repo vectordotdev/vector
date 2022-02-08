@@ -1,12 +1,16 @@
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::Event,
     internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -73,8 +77,8 @@ impl TransformConfig for GeoipConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -124,7 +128,7 @@ struct City<'a> {
 }
 
 impl FunctionTransform for Geoip {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut isp: Isp = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();
@@ -205,6 +209,8 @@ impl FunctionTransform for Geoip {
 #[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{
         event::Event,
@@ -213,7 +219,6 @@ mod tests {
             test::transform_one,
         },
     };
-    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {

@@ -1,7 +1,8 @@
+use std::{convert::Infallible, time::Duration};
+
 use bytes::Bytes;
 use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
-use std::{convert::Infallible, time::Duration};
 use vector::{
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
@@ -10,7 +11,7 @@ use vector::{
     },
     test_util::{random_lines, runtime},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -37,7 +38,7 @@ fn benchmark_batch(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let rt = runtime();
-                    let (acker, _) = Acker::new_for_testing();
+                    let (acker, _) = Acker::basic();
                     let mut batch = BatchSettings::default();
                     batch.size.bytes = *batch_size;
                     batch.size.events = num_events;
@@ -71,7 +72,7 @@ fn benchmark_batch(c: &mut Criterion) {
                 b.iter_batched(
                     || {
                         let rt = runtime();
-                        let (acker, _) = Acker::new_for_testing();
+                        let (acker, _) = Acker::basic();
                         let mut batch = BatchSettings::default();
                         batch.size.bytes = *batch_size;
                         batch.size.events = num_events;

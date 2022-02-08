@@ -1,12 +1,13 @@
 //! A common suite of structs, functions et al that are useful for the
 //! benchmarking of vector transforms.
-use futures::task::noop_waker;
-use futures::Stream;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use vector::conditions::Condition;
-use vector::event::Event;
+use std::{
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{task::noop_waker, Stream};
+use vector::{conditions::Condition, event::Event};
 
 // == Conditions ==
 

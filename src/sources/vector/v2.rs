@@ -1,29 +1,32 @@
-use crate::{
-    config::SourceContext,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource},
-    internal_events::{EventsReceived, TcpBytesReceived},
-    proto::vector as proto,
-    serde::bool_or_struct,
-    shutdown::ShutdownSignalToken,
-    sources::{util::AfterReadExt as _, Source},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
-    Pipeline,
-};
-
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+use futures::{FutureExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
-use vector_core::ByteSizeOf;
+use tracing_futures::Instrument;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
+
+use crate::{
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
+    internal_events::{EventsReceived, StreamClosedError, TcpBytesReceived},
+    proto::vector as proto,
+    serde::bool_or_struct,
+    shutdown::ShutdownSignalToken,
+    sources::{util::AfterReadExt as _, Source},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
+    SourceSender,
+};
 
 #[derive(Debug, Clone)]
 pub struct Service {
-    pipeline: Pipeline,
+    pipeline: SourceSender,
     acknowledgements: bool,
 }
 
@@ -40,17 +43,21 @@ impl proto::Service for Service {
             .map(Event::from)
             .collect();
 
-        emit!(&EventsReceived {
-            count: events.len(),
-            byte_size: events.size_of(),
-        });
+        let count = events.len();
+        let byte_size = events.size_of();
+
+        emit!(&EventsReceived { count, byte_size });
 
         let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events).map(Ok))
-            .map_err(|err| Status::unavailable(err.to_string()))
+            .send_all(&mut futures::stream::iter(events))
+            .map_err(|error| {
+                let message = error.to_string();
+                emit!(&StreamClosedError { error, count });
+                Status::unavailable(message)
+            })
             .and_then(|_| handle_batch_status(receiver))
             .await?;
 
@@ -105,7 +112,7 @@ impl GenerateConfig for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -114,16 +121,17 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
-        let source = run(self.address, tls_settings, cx, self.acknowledgements).map_err(|error| {
+        let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
         Ok(Box::pin(source))
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -141,11 +149,11 @@ async fn run(
     cx: SourceContext,
     acknowledgements: AcknowledgementsConfig,
 ) -> crate::Result<()> {
-    let _span = crate::trace::current_span();
+    let span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: acknowledgements.enabled,
+        acknowledgements: acknowledgements.enabled(),
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
@@ -156,15 +164,17 @@ async fn run(
             socket.after_read(move |byte_size| {
                 emit!(&TcpBytesReceived {
                     byte_size,
-                    peer_addr
+                    peer_addr,
                 })
             })
         })
     });
 
     Server::builder()
+        .trace_fn(move |_| span.clone())
         .add_service(service)
         .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
+        .in_current_span()
         .await?;
 
     drop(rx.await);
@@ -200,12 +210,15 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
+    use vector_common::assert_event_data_eq;
+
     use super::*;
-    use crate::config::SinkContext;
-    use crate::sinks::vector::v2::VectorConfig as SinkConfig;
-    use crate::test_util::{self, components};
-    use crate::Pipeline;
-    use shared::assert_event_data_eq;
+    use crate::{
+        config::SinkContext,
+        sinks::vector::v2::VectorConfig as SinkConfig,
+        test_util::{self, components},
+        SourceSender,
+    };
 
     #[tokio::test]
     async fn receive_message() {
@@ -214,7 +227,7 @@ mod tests {
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         components::init_test();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
         test_util::wait_for_tcp(addr).await;

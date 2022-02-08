@@ -1,6 +1,6 @@
+use std::{iter::IntoIterator, ops::Deref};
+
 use crate::Expression;
-use std::iter::IntoIterator;
-use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct Program {

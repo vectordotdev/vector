@@ -1,11 +1,9 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-
-use rand::distributions::Distribution;
-use rand::distributions::Uniform;
-use rand::seq::SliceRandom;
-
-use vector::event::metric::Sample;
-use vector::sinks::util::statistic::DistributionStatistic;
+use rand::{
+    distributions::{Distribution, Uniform},
+    seq::SliceRandom,
+};
+use vector::{event::metric::Sample, sinks::util::statistic::DistributionStatistic};
 
 fn generate_samples(mut size: u32, max_bin_count: u32) -> Vec<Sample> {
     let mut rng = rand::thread_rng();

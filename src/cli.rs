@@ -1,14 +1,14 @@
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
+
 use structopt::{clap::AppSettings, StructOpt};
 
+#[cfg(windows)]
+use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-
-#[cfg(windows)]
-use crate::service;
+use crate::{config, generate, get_version, graph, list, unit_test, validate};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -36,7 +36,8 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
-            | Some(SubCommand::List(_)) => {
+            | Some(SubCommand::List(_))
+            | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {
@@ -194,7 +195,7 @@ pub enum SubCommand {
     #[cfg(feature = "api-client")]
     Top(top::Opts),
 
-    /// Observe log events from topology components
+    /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
     #[cfg(feature = "api-client")]
     Tap(tap::Opts),
 

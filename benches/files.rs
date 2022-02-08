@@ -1,8 +1,8 @@
+use std::{convert::TryInto, path::PathBuf};
+
 use bytes::Bytes;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{stream, SinkExt, StreamExt};
-use std::convert::TryInto;
-use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::fs::OpenOptions;
 use tokio_util::codec::{BytesCodec, FramedWrite};

@@ -1,14 +1,16 @@
 //! A state implementation backed by [`evmap`].
 
-use crate::kubernetes::{
-    debounce::Debounce,
-    hash_value::{HashKey, HashValue},
-};
+use std::time::Duration;
+
 use async_trait::async_trait;
 use evmap::WriteHandle;
 use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
-use std::time::Duration;
+
+use crate::kubernetes::{
+    debounce::Debounce,
+    hash_value::{HashKey, HashValue},
+};
 
 /// A [`WriteHandle`] wrapper that implements [`super::Write`].
 /// For use as a state writer implementation for
@@ -136,9 +138,10 @@ fn kv<T: Metadata<Ty = ObjectMeta>>(object: T, hash_key: HashKey) -> Option<(Str
 
 #[cfg(test)]
 mod tests {
+    use k8s_openapi::api::core::v1::Pod;
+
     use super::*;
     use crate::kubernetes::state::{MaintainedWrite, Write};
-    use k8s_openapi::api::core::v1::Pod;
 
     fn make_pod(uid: &str) -> Pod {
         Pod {

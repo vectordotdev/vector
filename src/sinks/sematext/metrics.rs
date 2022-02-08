@@ -1,3 +1,13 @@
+use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
+
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use http::{StatusCode, Uri};
+use hyper::{Body, Request};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::ByteSizeOf;
+
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
@@ -7,23 +17,17 @@ use crate::{
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
-    sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
-    sinks::util::{
-        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-        http::{HttpBatchService, HttpRetryLogic},
-        sink, BatchConfig, EncodedEvent, TowerRequestConfig,
+    sinks::{
+        influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
+        util::{
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+            http::{HttpBatchService, HttpRetryLogic},
+            sink, BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, VectorSink,
     },
-    sinks::{util::SinkBatchSettings, Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::{StatusCode, Uri};
-use hyper::{Body, Request};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
-use tower::Service;
-use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct SematextMetricsService {
@@ -163,13 +167,13 @@ impl SematextMetricsService {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event)
+                        .apply(event.into_metric())
                         .map(|item| Ok(EncodedEvent::new(item, byte_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
@@ -193,10 +197,11 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 }
 
+#[derive(Default)]
 struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
@@ -272,15 +277,16 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, Utc};
+    use futures::StreamExt;
+    use indoc::indoc;
+
     use super::*;
     use crate::{
         event::{metric::MetricKind, Event},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, test_generate_config, trace_init},
     };
-    use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
-    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -400,7 +406,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run(stream::iter(events)).await.unwrap();
+        let _ = sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, mem, str::Chars};
+
+use serde::{Deserialize, Serialize};
 use substring::Substring;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]

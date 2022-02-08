@@ -1,14 +1,17 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use vector_common::TimeZone;
+
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -81,8 +84,12 @@ impl TransformConfig for KeyValueConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -130,7 +137,7 @@ impl KeyValue {
 }
 
 impl FunctionTransform for KeyValue {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
@@ -188,6 +195,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     async fn parse_log(
@@ -221,7 +229,7 @@ mod tests {
 
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
         let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);

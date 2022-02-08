@@ -1,11 +1,14 @@
 pub mod v1;
 pub mod v2;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     transforms::Transform,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -73,10 +76,10 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
+    fn outputs(&self) -> Vec<Output> {
         match self {
-            LuaConfig::V1(v1) => v1.config.output_type(),
-            LuaConfig::V2(v2) => v2.config.output_type(),
+            LuaConfig::V1(v1) => v1.config.outputs(),
+            LuaConfig::V2(v2) => v2.config.outputs(),
         }
     }
 

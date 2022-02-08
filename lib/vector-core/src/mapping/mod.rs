@@ -1,6 +1,6 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use crate::event::{Event, Value};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 #[allow(clippy::upper_case_acronyms)]
 // some of the generated names, like NEWLINE, come from Pest itself https://github.com/pest-parser/pest/issues/49k0
@@ -143,6 +143,8 @@ impl Function for Noop {
 
 #[derive(Debug)]
 pub struct Mapping {
+    // this whole module needs to go away but I had trouble untangling it from what is _actually_ used by the legacy lookups
+    #[allow(dead_code)]
     assignments: Vec<Box<dyn Function>>,
 }
 

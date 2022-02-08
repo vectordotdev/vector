@@ -1,17 +1,21 @@
-use crate::serde::Fields;
+use std::convert::TryFrom;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use toml::value::Value as TomlValue;
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
     },
+    serde::Fields,
     template::Template,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -71,8 +75,8 @@ impl TransformConfig for AddFieldsConfig {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -102,7 +106,7 @@ impl AddFields {
 }
 
 impl FunctionTransform for AddFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (key, value_or_template) in self.fields.clone() {
             let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {
@@ -137,10 +141,10 @@ impl FunctionTransform for AddFields {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::LogEvent;
-    use crate::transforms::test::transform_one;
     use std::iter::FromIterator;
+
+    use super::*;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

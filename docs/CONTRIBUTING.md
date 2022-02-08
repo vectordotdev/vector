@@ -27,6 +27,7 @@ Vector team member will find this document useful.
          1. [Daily tests](#daily-tests)
       1. [Flakey tests](#flakey-tests)
          1. [Test harness](#test-harness)
+   1. [Deprecations](#deprecations)
 1. [Next steps](#next-steps)
 1. [Legal](#legal)
    1. [CLA](#contributor-license-agreement)
@@ -185,6 +186,10 @@ any pull request with:
 /test -t <name>
 ```
 
+### Deprecations
+
+When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+
 ## Next steps
 
 As discussed in the [`README`](README.md), you should continue to the following
@@ -192,6 +197,7 @@ documents:
 
 2. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
 3. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
+3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal
 
