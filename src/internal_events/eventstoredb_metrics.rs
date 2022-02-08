@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -35,14 +36,14 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
             message = "HTTP request processing error.",
             error = ?self.error,
             error_type = "http_error",
-            stage = "receiving",
+            stage = error_stage::RECEIVING,
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => "receiving",
+            "stage" => error_stage::RECEIVING,
             "error" => self.error.to_string(),
             "error_type" => "http_error",
         );
@@ -62,14 +63,14 @@ impl InternalEvent for EventStoreDbStatsParsingError {
             message = "JSON parsing error.",
             error = ?self.error,
             error_type = "parse_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "error" => self.error.to_string(),
             "error_type" => "parse_failed",
         );

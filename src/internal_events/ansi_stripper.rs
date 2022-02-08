@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -13,7 +14,7 @@ impl InternalEvent for AnsiStripperFieldMissingError<'_> {
             field = %self.field,
             error = "Field does not exist.",
             error_type = "field_missing",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
         );
     }
@@ -23,7 +24,7 @@ impl InternalEvent for AnsiStripperFieldMissingError<'_> {
             "component_errors_total", 1,
             "error" => "Field does not exist.",
             "error_type" => "field_missing",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "field_missing");
@@ -42,7 +43,7 @@ impl InternalEvent for AnsiStripperFieldInvalidError<'_> {
             field = %self.field,
             error = "Field value must be a string.",
             error_type = "value_invalid",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
     }
@@ -52,7 +53,7 @@ impl InternalEvent for AnsiStripperFieldInvalidError<'_> {
             "component_errors_total", 1,
             "error" => "Field value must be a string.",
             "error_type" => "value_invalid",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "value_invalid");
@@ -72,7 +73,7 @@ impl InternalEvent for AnsiStripperError<'_> {
             field = %self.field,
             error = ?self.error,
             error_type = "conversion_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
     }
@@ -82,7 +83,7 @@ impl InternalEvent for AnsiStripperError<'_> {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "conversion_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1);
