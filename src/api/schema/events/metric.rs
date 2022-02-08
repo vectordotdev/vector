@@ -117,13 +117,13 @@ impl Metric {
                 .expect("YAML serialization of metric event failed. Please report."),
             EventEncodingType::Logfmt => {
                 let json = serde_json::to_value(&self.event)
-                    .expect("LOGFMT serialization of metric event failed. Please report.");
+                    .expect("logfmt serialization of metric event failed. Please report.");
                 match json {
                     Value::Object(map) => encode_logfmt::to_string(
                         map.into_iter().collect::<BTreeMap<String, Value>>(),
                     )
-                    .expect("LOGFMT serialization of metric event failed. Please report."),
-                    _ => panic!("LOGFMT serialization of metric event failed. Please report."),
+                    .expect("logfmt serialization of metric event failed. Please report."),
+                    _ => panic!("logfmt serialization of metric event failed. Please report."),
                 }
             }
         }
