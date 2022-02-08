@@ -10,7 +10,7 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Pattern failed to match.",
-            error = "Pattern failed to match.",
+            error = "Failed to match pattern",
             error_type = "condition_failed",
             stage = "processing",
             field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
@@ -21,7 +21,7 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Pattern failed to match.",
+            "error" => "Failed to match pattern",
             "error_type" => "condition_failed",
             "stage" => "processing",
         );
@@ -40,7 +40,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         error!(
             message = "Field does not exist.",
             field = %self.field,
-            error = "Field does not exist.",
+            error = "Field not found",
             error_type = "condition_failed",
             stage = "processing",
             internal_log_rate_secs = 10
@@ -50,7 +50,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Field does not exist.",
+            "error" => "Field not found",
             "error_type" => "condition_failed",
             "stage" => "processing",
             "field" => self.field.to_string(),
@@ -69,7 +69,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Target field already exists.",
-            error = "Target field already exists.",
+            error = "Target field already exists",
             error_type = "condition_failed",
             stage = "processing",
             target_field = %self.target_field,
@@ -80,7 +80,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Target field already exists.",
+            "error" => "Target field already exists",
             "error_type" => "condition_failed",
             "stage" => "processing",
             "target_field" => self.target_field.to_string(),

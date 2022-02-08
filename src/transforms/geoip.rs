@@ -7,7 +7,7 @@ use crate::{
         DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
     },
     event::Event,
-    internal_events::{GeoipFieldDoesNotExistError, GeoipIpAddressParseError},
+    internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -188,7 +188,7 @@ impl FunctionTransform for Geoip {
                 emit!(&GeoipIpAddressParseError { address: ipaddress });
             }
         } else {
-            emit!(&GeoipFieldDoesNotExistError {
+            emit!(&ParserMissingFieldError {
                 field: &self.source
             });
         };
