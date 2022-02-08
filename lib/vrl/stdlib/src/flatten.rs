@@ -14,7 +14,7 @@ fn flatten(value: Value) -> Resolved {
         )),
         value => Err(value::Error::Expected {
             got: value.kind(),
-            expected: Kind::array(BTreeMap::default()) | Kind::object(BTreeMap::default()),
+            expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
         }
         .into()),
     }

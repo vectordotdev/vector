@@ -156,7 +156,7 @@ impl Expression for RemoveFn {
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::array(BTreeMap::default()),
+                    expected: Kind::array(Collection::any()),
                 }
                 .into())
             }

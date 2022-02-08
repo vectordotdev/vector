@@ -84,7 +84,7 @@ impl Expression for ParseQueryStringFn {
 }
 
 fn inner_kind() -> Collection<Field> {
-    Collection::from_unknown(Kind::bytes().or_array(BTreeMap::default()))
+    Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
 }
 
 #[cfg(test)]

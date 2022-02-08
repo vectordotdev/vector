@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterat
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
+use value::kind::Collection;
 
 use super::{Error, Kind, Regex, Value};
 use crate::{
@@ -424,7 +425,7 @@ impl Value {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::array(BTreeMap::default()),
+                expected: Kind::array(Collection::any()),
             }),
         }
     }
@@ -468,7 +469,7 @@ impl Value {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::object(BTreeMap::default()),
+                expected: Kind::object(Collection::any()),
             }),
         }
     }

@@ -79,8 +79,8 @@ fn inner_kinds() -> Kind {
         | Kind::bytes()
         | Kind::float()
         | Kind::boolean()
-        | Kind::array(BTreeMap::default())
-        | Kind::object(BTreeMap::default())
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
