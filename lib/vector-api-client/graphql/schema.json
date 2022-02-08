@@ -2860,20 +2860,20 @@
         {
           "kind": "ENUM",
           "name": "MetricKind",
-          "description": "A metric may be an incremental value, updating the previous value of\nthe metric, or absolute, which sets the reference for future\nincrements.",
+          "description": null,
           "fields": null,
           "inputFields": null,
           "interfaces": null,
           "enumValues": [
             {
               "name": "INCREMENTAL",
-              "description": null,
+              "description": "Incremental metrics update previous values",
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "ABSOLUTE",
-              "description": null,
+              "description": "Absolute metrics set the reference value for future updates",
               "isDeprecated": false,
               "deprecationReason": null
             }

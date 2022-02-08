@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
 };
 
-use async_graphql::Enum;
 use chrono::{DateTime, Utc};
 use float_eq::FloatEq;
 use getset::{Getters, MutGetters};
@@ -116,7 +115,7 @@ impl ByteSizeOf for MetricData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize, Enum)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A metric may be an incremental value, updating the previous value of
 /// the metric, or absolute, which sets the reference for future

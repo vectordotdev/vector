@@ -1,4 +1,4 @@
-use async_graphql::Object;
+use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 
 use super::EventEncodingType;
@@ -16,6 +16,23 @@ pub struct Metric {
 impl Metric {
     pub const fn new(output_id: OutputId, event: event::Metric) -> Self {
         Self { output_id, event }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Enum)]
+enum MetricKind {
+    /// Incremental metrics update previous values
+    Incremental,
+    /// Absolute metrics set the reference value for future updates
+    Absolute,
+}
+
+impl From<event::MetricKind> for MetricKind {
+    fn from(kind: event::MetricKind) -> Self {
+        match kind {
+            event::MetricKind::Incremental => Self::Incremental,
+            event::MetricKind::Absolute => Self::Absolute,
+        }
     }
 }
 
@@ -61,8 +78,8 @@ impl Metric {
     }
 
     /// Metric kind
-    async fn kind(&self) -> event::MetricKind {
-        self.event.kind()
+    async fn kind(&self) -> MetricKind {
+        self.event.kind().into()
     }
 
     /// Metric type
