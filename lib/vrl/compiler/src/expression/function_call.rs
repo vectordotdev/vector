@@ -812,7 +812,7 @@ mod tests {
         }
 
         fn type_def(&self, _state: &crate::State) -> TypeDef {
-            TypeDef::new().infallible()
+            TypeDef::null().infallible()
         }
     }
 
