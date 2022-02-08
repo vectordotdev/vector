@@ -630,12 +630,12 @@ mod tests {
 
         divide_float_zero_literal {
             expr: |_| op(Div, 1, 0.0),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_integer_zero_literal {
             expr: |_| op(Div, 1, 0),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_lhs_literal_wrong_rhs {
@@ -644,7 +644,7 @@ mod tests {
                 rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
                 opcode: Div,
             },
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_dynamic_rhs {
@@ -653,7 +653,7 @@ mod tests {
                 rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
                 opcode: Div,
             },
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_other {
