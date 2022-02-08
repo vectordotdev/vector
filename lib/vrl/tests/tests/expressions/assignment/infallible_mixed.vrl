@@ -1,5 +1,5 @@
-# result: [{ "ok": 1.0 }, null]
+# object: { "foo": 1 }
+# result: [{ "foo": 1, "ok": 1.0 }, null]
 
-foo = 1
-.ok, err = 1 / foo
+.ok, err = 1 / .foo
 [., err]

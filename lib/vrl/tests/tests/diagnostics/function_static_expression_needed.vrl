@@ -1,16 +1,16 @@
+# object: { "foo": { "type": "credit_card" }}
 # result:
 #
 # error[E610]: function compilation error: error[E402] this argument must be a static expression
-#   ┌─ :3:1
+#   ┌─ :2:1
 #   │
-# 3 │ redact("hello 4916155524184782 world", [foo])
-#   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# 2 │ redact("hello 4916155524184782 world", [.foo])
+#   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #   │ │
 #   │ expected static expression for argument "filters"
-#   │ received: variable call
+#   │ received: query
 #   │
 #   = learn more about error code 402 at https://errors.vrl.dev/402
 #   = see language documentation at https://vrl.dev
 
-foo = { "type": "credit_card" }
-redact("hello 4916155524184782 world", [foo])
+redact("hello 4916155524184782 world", [.foo])

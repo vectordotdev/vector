@@ -3,4 +3,4 @@
 thing = 2
 thang = 2.5
 
-thing / thang
+thang / thing
