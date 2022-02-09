@@ -227,7 +227,7 @@ impl AzureMonitorLogsSink {
     }
 
     fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
-        let body = crate::serde_json::to_bytes(&events).unwrap().freeze();
+        let body = crate::serde::to_bytes(&events).unwrap().freeze();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body)?;

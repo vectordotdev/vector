@@ -200,7 +200,7 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = crate::serde_json::to_bytes(&series).unwrap().freeze();
+        let body = crate::serde::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",

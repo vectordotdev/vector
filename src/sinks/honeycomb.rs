@@ -122,7 +122,7 @@ impl HttpSink for HoneycombConfig {
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
-        let body = crate::serde_json::to_bytes(&events).unwrap().freeze();
+        let body = crate::serde::to_bytes(&events).unwrap().freeze();
 
         request.body(body).map_err(Into::into)
     }

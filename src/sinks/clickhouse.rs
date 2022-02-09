@@ -110,7 +110,7 @@ impl HttpSink for ClickhouseConfig {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
-        let mut body = crate::serde_json::to_bytes(&log).expect("Events should be valid json!");
+        let mut body = crate::serde::to_bytes(&log).expect("Events should be valid json!");
         body.put_u8(b'\n');
 
         Some(body)

@@ -59,7 +59,6 @@ pub mod list;
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
-pub mod serde_json;
 #[cfg(windows)]
 pub mod service;
 pub mod shutdown;
