@@ -171,7 +171,7 @@ async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
-    patterns: TapPatterns,
+    mut patterns: TapPatterns,
     tx: TapSender,
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
@@ -182,9 +182,6 @@ async fn tap_handler(
     // a shutdown trigger for sending a remove control message when matching sinks change.
     let mut sinks: HashMap<OutputId, _> = HashMap::new();
 
-    // TODO: remove this, only here for in-progress compilation
-    let component_id_patterns = patterns.for_outputs.clone();
-
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
@@ -192,12 +189,29 @@ async fn tap_handler(
                 // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
                 let mut matched = HashSet::new();
 
-                // Borrow and clone the latest outputs to register sinks. Since this blocks the
+                // Borrow and clone the latest resources to register sinks. Since this blocks the
                 // watch channel and the returned ref isn't `Send`, this requires a clone.
                 let TapResource {
                     outputs,
                     inputs,
                 } = watch_rx.borrow().clone();
+
+                // Matching an input pattern is equivalent to matching the outputs of the component's inputs
+                for (key, related_inputs) in inputs.iter() {
+                    match patterns.for_inputs.iter().filter(|pattern| pattern.matches_glob(&key.to_string())).collect_vec() {
+                        found if !found.is_empty() => {
+                            debug!(message = "Component matched.", ?key, ?patterns.for_inputs);
+                            patterns.for_outputs.extend(related_inputs.into_iter().map(|id| id.to_string()));
+                        }
+                        _ => {
+                            debug!(
+                                message="Component not matched.", ?key, ?patterns.for_inputs
+                            );
+                        }
+                    }
+                }
+
+                let component_id_patterns = patterns.for_outputs.clone();
 
                 // Get the patterns that matched on the last iteration, to compare with the latest
                 // round of matches when sending notifications.
@@ -292,7 +306,7 @@ async fn tap_handler(
         }
     }
 
-    debug!(message = "Stopped tap.", patterns = ?component_id_patterns);
+    debug!(message = "Stopped tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 }
 
 #[cfg(test)]
