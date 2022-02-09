@@ -91,11 +91,6 @@ impl Event {
         Event::Log(LogEvent::default())
     }
 
-    #[must_use]
-    pub fn new_empty_trace() -> Self {
-        Event::Trace(TraceEvent::default())
-    }
-
     /// Return self as a `LogEvent`
     ///
     /// # Panics

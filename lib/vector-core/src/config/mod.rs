@@ -29,7 +29,7 @@ impl fmt::Display for DataType {
         self.contains(DataType::Log).then(|| t.push("Log"));
         self.contains(DataType::Metric).then(|| t.push("Metric"));
         self.contains(DataType::Trace).then(|| t.push("Trace"));
-        write!(f, "{}", t.join(","))
+        f.write_str(&t.join(","))
     }
 }
 

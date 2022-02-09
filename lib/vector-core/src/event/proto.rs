@@ -47,7 +47,7 @@ impl From<Log> for event::LogEvent {
     }
 }
 
-impl From<Trace> for event::LogEvent {
+impl From<Trace> for event::TraceEvent {
     fn from(trace: Trace) -> Self {
         let fields = trace
             .fields
@@ -152,8 +152,8 @@ impl From<event::LogEvent> for Log {
     }
 }
 
-impl From<event::LogEvent> for Trace {
-    fn from(trace: event::LogEvent) -> Self {
+impl From<event::TraceEvent> for Trace {
+    fn from(trace: event::TraceEvent) -> Self {
         WithMetadata::<Self>::from(trace).data
     }
 }
@@ -171,8 +171,8 @@ impl From<event::LogEvent> for WithMetadata<Log> {
     }
 }
 
-impl From<event::LogEvent> for WithMetadata<Trace> {
-    fn from(trace: event::LogEvent) -> Self {
+impl From<event::TraceEvent> for WithMetadata<Trace> {
+    fn from(trace: event::TraceEvent) -> Self {
         let (fields, metadata) = trace.into_parts();
         let fields = fields
             .into_iter()
