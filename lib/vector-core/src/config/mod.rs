@@ -77,11 +77,6 @@ impl Output {
             schema_definition: schema::Definition,
         }
     }
-
-    /// Check if the `Output` is a default output
-    pub fn is_default(&self) -> bool {
-        self.port.is_none() && self.schema_definition.is_empty()
-    }
 }
 
 impl<T: Into<String>> From<(T, DataType)> for Output {
