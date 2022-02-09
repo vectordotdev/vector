@@ -26,6 +26,13 @@ pub struct TapPatterns {
 }
 
 impl TapPatterns {
+    pub fn new(for_outputs: HashSet<String>, for_inputs: HashSet<String>) -> Self {
+        Self {
+            for_outputs,
+            for_inputs,
+        }
+    }
+
     /// Get all user-specified patterns
     pub fn all_patterns(&self) -> HashSet<String> {
         self.for_outputs

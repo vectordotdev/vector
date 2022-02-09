@@ -387,18 +387,25 @@ mod tests {
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
         outputs.insert(id.clone(), control_tx);
+        let tap_resource = TapResource {
+            outputs,
+            inputs: HashMap::new(),
+        };
 
-        let (watch_tx, watch_rx) = watch::channel(HashMap::new());
+        let (watch_tx, watch_rx) = watch::channel(TapResource::default());
         let (sink_tx, mut sink_rx) = tokio_mpsc::channel(10);
 
         let _controller = TapController::new(
             watch_rx,
             sink_tx,
-            &[pattern_matched.to_string(), pattern_not_matched.to_string()],
+            TapPatterns::new(
+                HashSet::from_iter([pattern_matched.to_string(), pattern_not_matched.to_string()]),
+                HashSet::new(),
+            ),
         );
 
         // Add the outputs to trigger a change event.
-        watch_tx.send(outputs).unwrap();
+        watch_tx.send(tap_resource).unwrap();
 
         // First two events should contain a notification that one pattern matched, and
         // one that didn't.
@@ -493,8 +500,12 @@ mod tests {
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-        let source_tap_stream =
-            create_events_stream(topology.watch(), vec!["in".to_string()], 500, 100);
+        let source_tap_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(HashSet::from(["in".to_string()]), HashSet::new()),
+            500,
+            100,
+        );
 
         let source_tap_events: Vec<_> = source_tap_stream.take(2).collect().await;
 
@@ -543,8 +554,12 @@ mod tests {
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-        let source_tap_stream =
-            create_events_stream(topology.watch(), vec!["to_metric".to_string()], 500, 100);
+        let source_tap_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(HashSet::from(["to_metric".to_string()]), HashSet::new()),
+            500,
+            100,
+        );
 
         let source_tap_events: Vec<_> = source_tap_stream.take(2).collect().await;
 
@@ -586,8 +601,12 @@ mod tests {
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-        let transform_tap_stream =
-            create_events_stream(topology.watch(), vec!["transform".to_string()], 500, 100);
+        let transform_tap_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(HashSet::from(["transform".to_string()]), HashSet::new()),
+            500,
+            100,
+        );
 
         let transform_tap_events: Vec<_> = transform_tap_stream.take(2).collect().await;
 
@@ -636,7 +655,10 @@ mod tests {
 
         let transform_tap_remap_dropped_stream = create_events_stream(
             topology.watch(),
-            vec!["transform.dropped".to_string()],
+            TapPatterns::new(
+                HashSet::from(["transform.dropped".to_string()]),
+                HashSet::new(),
+            ),
             500,
             100,
         );
@@ -707,8 +729,12 @@ mod tests {
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-        let mut transform_tap_all_outputs_stream =
-            create_events_stream(topology.watch(), vec!["transform*".to_string()], 500, 100);
+        let mut transform_tap_all_outputs_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(HashSet::from(["transform*".to_string()]), HashSet::new()),
+            500,
+            100,
+        );
 
         let transform_tap_notifications = transform_tap_all_outputs_stream.next().await.unwrap();
         assert_eq!(
