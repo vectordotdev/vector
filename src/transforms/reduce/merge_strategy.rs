@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
 use crate::event::{LogEvent, Value};
@@ -321,7 +322,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
 #[derive(Debug, Clone)]
 enum NumberMergerValue {
     Int(i64),
-    Float(f64),
+    Float(NotNan<f64>),
 }
 
 impl From<i64> for NumberMergerValue {
@@ -330,8 +331,8 @@ impl From<i64> for NumberMergerValue {
     }
 }
 
-impl From<f64> for NumberMergerValue {
-    fn from(v: f64) -> Self {
+impl From<NotNan<f64>> for NumberMergerValue {
+    fn from(v: NotNan<f64>) -> Self {
         NumberMergerValue::Float(v)
     }
 }
@@ -356,7 +357,9 @@ impl ReduceValueMerger for AddNumbersMerger {
         match v {
             Value::Integer(i) => match self.v {
                 NumberMergerValue::Int(j) => self.v = NumberMergerValue::Int(i + j),
-                NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(i as f64 + j),
+                NumberMergerValue::Float(j) => {
+                    self.v = NumberMergerValue::Float(NotNan::new(i as f64).unwrap() + j)
+                }
             },
             Value::Float(f) => match self.v {
                 NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
@@ -407,7 +410,7 @@ impl ReduceValueMerger for MaxNumberMerger {
                         }
                     }
                     NumberMergerValue::Float(f2) => {
-                        let f = i as f64;
+                        let f = NotNan::new(i as f64).unwrap();
                         if f > f2 {
                             self.v = NumberMergerValue::Float(f);
                         }
@@ -416,7 +419,7 @@ impl ReduceValueMerger for MaxNumberMerger {
             }
             Value::Float(f) => {
                 let f2 = match self.v {
-                    NumberMergerValue::Int(i2) => i2 as f64,
+                    NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
                     NumberMergerValue::Float(f2) => f2,
                 };
                 if f > f2 {
@@ -468,7 +471,7 @@ impl ReduceValueMerger for MinNumberMerger {
                         }
                     }
                     NumberMergerValue::Float(f2) => {
-                        let f = i as f64;
+                        let f = NotNan::new(i as f64).unwrap();
                         if f < f2 {
                             self.v = NumberMergerValue::Float(f);
                         }
@@ -477,7 +480,7 @@ impl ReduceValueMerger for MinNumberMerger {
             }
             Value::Float(f) => {
                 let f2 = match self.v {
-                    NumberMergerValue::Int(i2) => i2 as f64,
+                    NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
                     NumberMergerValue::Float(f2) => f2,
                 };
                 if f < f2 {

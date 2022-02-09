@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, convert::TryInto};
 
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use vector_core::event::Value;
 
@@ -147,8 +148,18 @@ impl From<FluentValue> for Value {
                 // unwrap large numbers to string similar to how
                 // `From<serde_json::Value> for Value` handles it
                 .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
-            rmpv::Value::F32(f) => Value::Float(f.into()),
-            rmpv::Value::F64(f) => Value::Float(f),
+            rmpv::Value::F32(f) => {
+                // serde_json converts NaN to Null, so we model that behavior here
+                NotNan::new(f as f64)
+                    .map(|f| Value::Float(f))
+                    .unwrap_or(Value::Null)
+            }
+            rmpv::Value::F64(f) => {
+                // serde_json converts NaN to Null, so we model that behavior here
+                NotNan::new(f)
+                    .map(|f| Value::Float(f))
+                    .unwrap_or(Value::Null)
+            }
             rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
             rmpv::Value::Array(values) => Value::Array(

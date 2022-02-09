@@ -8424,6 +8424,7 @@ dependencies = [
  "derivative",
  "metrics",
  "nom 7.1.0",
+ "ordered-float",
  "serde",
  "serde_json",
  "smallvec",
