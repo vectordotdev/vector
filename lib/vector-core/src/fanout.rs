@@ -78,9 +78,9 @@ impl Fanout {
 
             {
                 let mut jobs = FuturesUnordered::new();
-                let mut clone_army: Vec<Vec<Event>> =
-                    Vec::with_capacity(self.sinks.iter().filter(|x| x.1.is_some()).count());
-                for _ in 0..(self.sinks.len() - 1) {
+                let count = self.sinks.iter().filter(|x| x.1.is_some()).count();
+                let mut clone_army: Vec<Vec<Event>> = Vec::with_capacity(count);
+                for _ in 0..(count - 1) {
                     clone_army.push(events.clone());
                 }
                 clone_army.push(events);
