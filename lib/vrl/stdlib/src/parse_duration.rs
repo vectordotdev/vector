@@ -1,21 +1,24 @@
 use std::{collections::HashMap, str::FromStr};
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(
+static RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r"(?ix)                        # i: case-insensitive, x: ignore whitespace + comments
             \A
             (?P<value>[0-9]*\.?[0-9]+) # value: integer or float
             \s?                        # optional space between value and unit
             (?P<unit>[µa-z]{1,2})      # unit: one or two letters
-            \z"
+            \z",
     )
-    .unwrap();
-    static ref UNITS: HashMap<String, Decimal> = vec![
+    .unwrap()
+});
+
+static UNITS: Lazy<HashMap<String, Decimal>> = Lazy::new(|| {
+    vec![
         ("ns", Decimal::new(1, 9)),
         ("us", Decimal::new(1, 6)),
         ("µs", Decimal::new(1, 6)),
@@ -29,8 +32,8 @@ lazy_static! {
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v))
-    .collect();
-}
+    .collect()
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseDuration;

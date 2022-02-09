@@ -134,7 +134,7 @@ impl Expression for EncodeKeyValueFn {
         let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
 
         Ok(encode_key_value::to_string(
-            object,
+            &object,
             &fields[..],
             &key_value_delimiter,
             &field_delimiter,

@@ -5,13 +5,15 @@ use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        AwsEcsMetricsHttpError, AwsEcsMetricsParseError, AwsEcsMetricsRequestCompleted,
-        AwsEcsMetricsResponseError, HttpBytesReceived, HttpEventsReceived, StreamClosedError,
+        AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -143,10 +145,8 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        let byte_size = body.len();
-
                         emit!(&HttpBytesReceived {
-                            byte_size,
+                            byte_size: body.len(),
                             protocol: "http",
                             http_path: uri.path(),
                         });
@@ -154,11 +154,10 @@ async fn aws_ecs_metrics(
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
-                                emit!(&HttpEventsReceived {
-                                    byte_size,
-                                    protocol: "http",
+                                emit!(&AwsEcsMetricsEventsReceived {
+                                    byte_size: metrics.size_of(),
+                                    count,
                                     http_path: uri.path(),
-                                    count
                                 });
 
                                 let mut events = stream::iter(metrics).map(Event::Metric);

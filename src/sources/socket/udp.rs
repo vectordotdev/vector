@@ -38,10 +38,10 @@ pub struct UdpConfig {
     receive_buffer_bytes: Option<usize>,
     #[serde(default = "default_framing_message_based")]
     #[get = "pub"]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[get = "pub"]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 impl UdpConfig {

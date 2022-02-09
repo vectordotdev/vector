@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
@@ -18,8 +19,8 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
-        NginxMetricsStubStatusParseError,
+        BytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
+        NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -106,6 +107,7 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
+                let count = metrics.len();
                 emit!(&NginxMetricsCollectCompleted {
                     start,
                     end: Instant::now()
@@ -117,7 +119,7 @@ impl SourceConfig for NginxMetricsConfig {
                     .map(Event::Metric);
 
                 if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending mongodb metrics.", %error);
+                    emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -178,10 +180,13 @@ impl NginxMetrics {
             Err(()) => (0.0, vec![]),
         };
 
+        let byte_size = metrics.size_of();
+
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
         emit!(&NginxMetricsEventsReceived {
             count: metrics.len(),
+            byte_size,
             uri: &self.endpoint
         });
 
@@ -195,6 +200,10 @@ impl NginxMetrics {
                 endpoint: &self.endpoint,
             })
         })?;
+        emit!(&BytesReceived {
+            byte_size: response.len(),
+            protocol: "http",
+        });
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {

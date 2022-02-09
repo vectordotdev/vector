@@ -15,7 +15,7 @@ use super::util::SinkBatchSettings;
 use crate::{
     config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
+    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -226,7 +226,7 @@ fn encode_event(
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(&TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,

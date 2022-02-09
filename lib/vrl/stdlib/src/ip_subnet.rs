@@ -1,12 +1,10 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"/(?P<subnet>\d*)").unwrap();
-}
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"/(?P<subnet>\d*)").unwrap());
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpSubnet;
