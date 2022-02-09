@@ -570,8 +570,7 @@ impl Value {
 
     pub fn kind(&self) -> &str {
         match self {
-            Value::Bytes(_) => "string",
-            Value::Regex(_) => "string",
+            Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
