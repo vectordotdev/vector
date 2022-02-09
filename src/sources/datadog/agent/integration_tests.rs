@@ -20,7 +20,8 @@ fn agent_address() -> String {
 }
 
 fn trace_agent_url() -> String {
-    std::env::var("TRACE_AGENT_URL").unwrap_or_else(|_| "http://0.0.0.0:8126/".to_owned())
+    std::env::var("TRACE_AGENT_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:8126/v0.4/traces".to_owned())
 }
 
 fn agent_health_address(port: Option<u16>) -> String {
@@ -86,7 +87,10 @@ async fn wait_for_traces() {
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let context = SourceContext::new_test(sender);
     tokio::spawn(async move {
-        let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
+        let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
+                address = "0.0.0.0:8081"
+            "#})
+        .unwrap();
         config.build(context).await.unwrap().await.unwrap()
     });
     let events = spawn_collect_n(
@@ -113,10 +117,16 @@ async fn wait_for_traces() {
     let spans = trace.get("spans").unwrap().as_array();
     assert_eq!(spans.len(), 1);
     let span = spans.get(0).unwrap();
-    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a name")));
-    assert_eq!(span.get("service").unwrap(), Some(&Value::from("a service")));
-    assert_eq!(span.get("resource").unwrap(), Some(&Value::from("a resource")));
-    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a name")));
+    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a_name")));
+    assert_eq!(
+        span.get("service").unwrap(),
+        Some(&Value::from("a_service"))
+    );
+    assert_eq!(
+        span.get("resource").unwrap(),
+        Some(&Value::from("a_resource"))
+    );
+    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a_name")));
     assert_eq!(span.get("trace_id").unwrap(), Some(&Value::Integer(123)));
     assert_eq!(span.get("span_id").unwrap(), Some(&Value::Integer(456)));
     assert_eq!(span.get("parent_id").unwrap(), Some(&Value::Integer(789)));
@@ -128,9 +138,9 @@ fn get_simple_trace() -> String {
         [
             [
                 {{
-                "service": "a service",
-                "name": "a name",
-                "resource": "a resource",
+                "service": "a_service",
+                "name": "a_name",
+                "resource": "a_resource",
                 "trace_id": 123,
                 "span_id": 456,
                 "parent_id": 789,
