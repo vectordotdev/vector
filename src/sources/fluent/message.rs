@@ -151,14 +151,12 @@ impl From<FluentValue> for Value {
             rmpv::Value::F32(f) => {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f as f64)
-                    .map(|f| Value::Float(f))
+                    .map(Value::Float)
                     .unwrap_or(Value::Null)
             }
             rmpv::Value::F64(f) => {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
-                NotNan::new(f)
-                    .map(|f| Value::Float(f))
-                    .unwrap_or(Value::Null)
+                NotNan::new(f).map(Value::Float).unwrap_or(Value::Null)
             }
             rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
