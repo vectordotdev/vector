@@ -120,7 +120,7 @@ impl Metric {
                     .expect("logfmt serialization of metric event failed. Please report.");
                 match json {
                     Value::Object(map) => encode_logfmt::to_string(
-                        map.into_iter().collect::<BTreeMap<String, Value>>(),
+                        &map.into_iter().collect::<BTreeMap<String, Value>>(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),
                     _ => panic!("logfmt serialization of metric event failed. Please report."),
