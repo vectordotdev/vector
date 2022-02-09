@@ -15,11 +15,11 @@ use tokio::sync::{
 use uuid::Uuid;
 use vector_core::event::Metric;
 
-use super::{ShutdownRx, ShutdownTx};
+use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
 use crate::{
     config::{ComponentKey, OutputId},
     event::{Event, LogEvent},
-    topology::{fanout, fanout::ControlChannel, WatchRx},
+    topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
 };
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
@@ -128,15 +128,10 @@ impl TapController {
     /// Creates a new tap sink, and spawns a handler for watching for topology changes
     /// and a separate inner handler for events. Uses a oneshot channel to trigger shutdown
     /// of handlers when the `TapSink` drops out of scope.
-    pub fn new(watch_rx: WatchRx, tap_tx: TapSender, component_id_patterns: &[String]) -> Self {
+    pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: TapPatterns) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
-        tokio::spawn(tap_handler(
-            component_id_patterns.iter().cloned().collect(),
-            tap_tx,
-            watch_rx,
-            shutdown_rx,
-        ));
+        tokio::spawn(tap_handler(patterns, tap_tx, watch_rx, shutdown_rx));
 
         Self { _shutdown }
     }
@@ -176,34 +171,40 @@ async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
-    component_id_patterns: HashSet<String>,
+    patterns: TapPatterns,
     tx: TapSender,
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
 ) {
-    debug!(message = "Started tap.", patterns = ?component_id_patterns);
+    debug!(message = "Started tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
     let mut sinks: HashMap<OutputId, _> = HashMap::new();
 
+    // TODO: remove this, only here for in-progress compilation
+    let component_id_patterns = patterns.for_outputs.clone();
+
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
             Ok(_) = watch_rx.changed() => {
+                // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
+                let mut matched = HashSet::new();
+
+                // Borrow and clone the latest outputs to register sinks. Since this blocks the
+                // watch channel and the returned ref isn't `Send`, this requires a clone.
+                let TapResource {
+                    outputs,
+                    inputs,
+                } = watch_rx.borrow().clone();
+
                 // Get the patterns that matched on the last iteration, to compare with the latest
                 // round of matches when sending notifications.
                 let last_matches = component_id_patterns
                     .iter()
                     .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(&id.to_string())))
                     .collect::<HashSet<_>>();
-
-                // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
-                let mut matched = HashSet::new();
-
-                // Borrow and clone the latest outputs to register sinks. Since this blocks the
-                // watch channel and the returned ref isn't `Send`, this requires a clone.
-                let outputs = watch_rx.borrow().clone().outputs;
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.

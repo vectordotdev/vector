@@ -43,9 +43,24 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         }
     };
 
+    // If no patterns are provided, tap all components' outputs
+    let outputs_patterns = if opts.component_id_patterns.is_empty()
+        && opts.outputs_of.is_empty()
+        && opts.inputs_of.is_empty()
+    {
+        vec!["*".to_string()]
+    } else {
+        opts.outputs_of
+            .iter()
+            .cloned()
+            .chain(opts.component_id_patterns.iter().cloned())
+            .collect()
+    };
+
     // Issue the 'tap' request, printing to stdout.
     let res = subscription_client.output_events_by_component_id_patterns_subscription(
-        opts.component_id_patterns.clone(),
+        outputs_patterns,
+        opts.inputs_of.clone(),
         opts.format,
         opts.limit as i64,
         opts.interval as i64,
