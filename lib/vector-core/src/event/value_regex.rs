@@ -37,7 +37,7 @@ impl PartialEq for ValueRegex {
 
 impl Hash for ValueRegex {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.as_str().hash(state)
+        self.0.as_str().hash(state);
     }
 }
 
