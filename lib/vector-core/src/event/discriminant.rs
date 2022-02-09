@@ -121,6 +121,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
     match value {
         // Trivial.
         Value::Bytes(val) => val.hash(hasher),
+        Value::Regex(val) => val.as_bytes_slice().hash(hasher),
         Value::Boolean(val) => val.hash(hasher),
         Value::Integer(val) => val.hash(hasher),
         Value::Timestamp(val) => val.hash(hasher),

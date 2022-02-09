@@ -12,12 +12,20 @@ use std::{
 pub struct ValueRegex(regex::Regex);
 
 impl ValueRegex {
+    pub fn new(regex: regex::Regex) -> Self {
+        Self(regex)
+    }
+
     pub fn as_bytes(&self) -> Bytes {
         bytes::Bytes::copy_from_slice(self.as_bytes_slice())
     }
 
     pub fn as_bytes_slice(&self) -> &[u8] {
         self.as_str().as_bytes()
+    }
+
+    pub fn into_inner(self) -> regex::Regex {
+        self.0
     }
 }
 

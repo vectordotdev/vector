@@ -366,6 +366,7 @@ fn encode_value(value: event::Value) -> Value {
     Value {
         kind: match value {
             event::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            event::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
             event::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,
