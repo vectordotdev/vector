@@ -6,7 +6,7 @@ use futures::{
     stream, StreamExt,
 };
 use mongodb::{
-    bson::{self, doc, from_document},
+    bson::{self, doc, from_document, Bson, Document},
     error::Error as MongoError,
     options::ClientOptions,
     Client,
@@ -24,8 +24,8 @@ use crate::{
         Event,
     },
     internal_events::{
-        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
-        MongoDbMetricsRequestError, StreamClosedError,
+        BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
@@ -280,6 +280,11 @@ impl MongoDbMetrics {
             .run_command(command, None)
             .await
             .map_err(CollectError::Mongo)?;
+        let byte_size = document_size(&doc);
+        emit!(&BytesReceived {
+            protocol: "tcp",
+            byte_size,
+        });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
         // asserts_total
@@ -958,6 +963,38 @@ impl MongoDbMetrics {
 
         Ok(metrics)
     }
+}
+
+fn bson_size(value: &Bson) -> usize {
+    match value {
+        Bson::Double(value) => value.size_of(),
+        Bson::String(value) => value.size_of(),
+        Bson::Array(value) => value.iter().map(bson_size).sum(),
+        Bson::Document(value) => document_size(value),
+        Bson::Boolean(_) => std::mem::size_of::<bool>(),
+        Bson::RegularExpression(value) => value.pattern.size_of(),
+        Bson::JavaScriptCode(value) => value.size_of(),
+        Bson::JavaScriptCodeWithScope(value) => value.code.size_of() + document_size(&value.scope),
+        Bson::Int32(value) => value.size_of(),
+        Bson::Int64(value) => value.size_of(),
+        Bson::Timestamp(value) => value.time.size_of() + value.increment.size_of(),
+        Bson::Binary(value) => value.bytes.size_of(),
+        Bson::ObjectId(value) => value.bytes().size_of(),
+        Bson::DateTime(_) => std::mem::size_of::<i64>(),
+        Bson::Symbol(value) => value.size_of(),
+        Bson::Decimal128(value) => value.bytes().size_of(),
+        Bson::DbPointer(_) => {
+            // DbPointer parts are not public and cannot be evaludated
+            0
+        }
+        Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
+    }
+}
+
+fn document_size(doc: &Document) -> usize {
+    doc.into_iter()
+        .map(|(key, value)| key.size_of() + bson_size(value))
+        .sum()
 }
 
 /// Remove credentials from endpoint.
