@@ -23,15 +23,15 @@ impl fmt::Display for Parameters {
 fn benchmark_kind_display(c: &mut Criterion) {
     let mut group = c.benchmark_group("vrl_compiler/value::kind::display");
     for param in &PARAMETERS {
-        group.bench_with_input(BenchmarkId::from_parameter(param), &param, |b, &param| {
-            let parameter = vrl_compiler::Parameter {
-                keyword: "",
-                kind: param.basis,
-                required: false,
-            };
+        let parameter = vrl_compiler::Parameter {
+            keyword: "",
+            kind: param.basis,
+            required: false,
+        };
 
-            let kind = parameter.kind();
+        let kind = parameter.kind();
 
+        group.bench_with_input(BenchmarkId::from_parameter(param), &kind, |b, kind| {
             b.iter(|| format!("{}", kind))
         });
     }

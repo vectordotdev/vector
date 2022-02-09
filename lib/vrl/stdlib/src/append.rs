@@ -78,7 +78,7 @@ mod tests {
         both_arrays_empty {
             args: func_args![value: value!([]), items: value!([])],
             want: Ok(value!([])),
-            tdef: TypeDef::array(BTreeMap::default()),
+            tdef: TypeDef::array(Collection::empty()),
         }
 
         one_array_empty {

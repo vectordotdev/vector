@@ -132,7 +132,7 @@ impl Expression for SetFn {
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::array(BTreeMap::default()) | Kind::bytes(),
+                    expected: Kind::array(Collection::any()) | Kind::bytes(),
                 }
                 .into())
             }

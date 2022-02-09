@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
@@ -103,7 +104,7 @@ impl InternalEvent for StreamClosedError {
             message = "Failed to forward event(s), downstream is closed.",
             error = %self.error,
             error_type = "stream_closed",
-            stage = "sending",
+            stage = error_stage::SENDING,
             count = %self.count,
         );
     }
@@ -113,13 +114,13 @@ impl InternalEvent for StreamClosedError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "stream_closed",
-            "stage" => "sending",
+            "stage" => error_stage::SENDING,
         );
         counter!(
             "component_discarded_events_total", self.count as u64,
             "error" => self.error.to_string(),
             "error_type" => "stream_closed",
-            "stage" => "sending",
+            "stage" => error_stage::SENDING,
         );
     }
 }

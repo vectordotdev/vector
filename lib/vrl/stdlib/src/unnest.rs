@@ -104,7 +104,7 @@ impl Expression for UnnestFn {
             .cloned()
             .ok_or(value::Error::Expected {
                 got: Kind::null(),
-                expected: Kind::array(BTreeMap::default()),
+                expected: Kind::array(Collection::any()),
             })?
             .try_array()?;
 

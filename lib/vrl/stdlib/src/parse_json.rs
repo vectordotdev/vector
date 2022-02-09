@@ -121,8 +121,8 @@ fn inner_kind() -> Kind {
         | Kind::integer()
         | Kind::float()
         | Kind::boolean()
-        | Kind::array(BTreeMap::default())
-        | Kind::object(BTreeMap::default())
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 fn type_def() -> TypeDef {

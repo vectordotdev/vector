@@ -8,17 +8,17 @@ use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
 /// compilation, which in turn drives our progressive type checking system.
 #[derive(Default, Debug)]
 pub struct Compiler {
-    /// stored external target type definitions
+    /// Stored external target type definitions.
     //
     // TODO(Jean): Change this to point to a `value::Collection<Field>` type, to ensure the target
     // is always an object. Although we probably also need to support arrays, in which case we
     // should wrap it in an enum to also support `value::Collection<Index>`.
     target: Option<assignment::Details>,
 
-    /// stored internal variable type definitions
+    /// Stored internal variable type definitions.
     variables: HashMap<Ident, assignment::Details>,
 
-    /// context passed between the client program and a VRL function.
+    /// Context passed between the client program and a VRL function.
     external_context: Option<Box<dyn Any>>,
 
     /// On request, the compiler can store its state in this field, which can

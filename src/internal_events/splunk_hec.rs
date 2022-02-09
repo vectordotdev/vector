@@ -5,6 +5,7 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
+    use crate::internal_events::prelude::error_stage;
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
@@ -25,13 +26,13 @@ mod sink {
                 message = "Error encoding Splunk HEC event to JSON.",
                 error = ?self.error,
                 error_type = "encode_failed",
-                stage = "processing",
+                stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 30,
             );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
+            counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => error_stage::PROCESSING);
         }
     }
 
@@ -50,13 +51,13 @@ mod sink {
                 value = ?self.value,
                 kind = ?self.kind,
                 error_type = "invalid_metric",
-                stage = "processing",
+                stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 30,
             )
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "stage" => "processing", "error_type" => "invalid_metric");
+            counter!("component_errors_total", 1, "stage" => error_stage::PROCESSING, "error_type" => "invalid_metric");
             counter!("component_discarded_events_total", 1);
         }
     }
@@ -88,13 +89,13 @@ mod sink {
                 message = self.message,
                 error = ?self.error,
                 error_type = "acknowledgements_error",
-                stage = "sending",
+                stage = error_stage::SENDING,
                 internal_log_rate_secs = 30,
             );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => "sending");
+            counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => error_stage::SENDING);
         }
     }
 
@@ -134,6 +135,7 @@ mod source {
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
+    use crate::internal_events::prelude::error_stage;
     use crate::sources::splunk_hec::ApiError;
 
     #[derive(Debug)]
@@ -166,13 +168,13 @@ mod source {
                 message = "Invalid request body.",
                 error = ?self.error,
                 error_type = "parse_failed",
-                stage = "processing",
+                stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => "processing")
+            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => error_stage::PROCESSING)
         }
     }
 
@@ -187,14 +189,14 @@ mod source {
                 message = "Error processing request.",
                 error = ?self.error,
                 error_type = "http_error",
-                stage = "receiving",
+                stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
             counter!("http_request_errors_total", 1);
-            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => "receiving")
+            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => error_stage::RECEIVING);
         }
     }
 }

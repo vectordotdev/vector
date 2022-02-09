@@ -65,8 +65,8 @@ impl Expression for LengthFn {
             Bytes(v) => Ok(v.len().into()),
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::array(BTreeMap::default())
-                    | Kind::object(BTreeMap::default())
+                expected: Kind::array(Collection::any())
+                    | Kind::object(Collection::any())
                     | Kind::bytes(),
             }
             .into()),

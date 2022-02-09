@@ -102,11 +102,12 @@ impl From<Vec<Expr>> for Array {
 mod tests {
     use super::*;
     use crate::{expr, test_type_def, value::Kind, TypeDef};
+    use value::kind::Collection;
 
     test_type_def![
         empty_array {
             expr: |_| expr!([]),
-            want: TypeDef::array(BTreeMap::default()),
+            want: TypeDef::array(Collection::empty()),
         }
 
         scalar_array {

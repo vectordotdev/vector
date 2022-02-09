@@ -37,7 +37,7 @@ fn slice(
             .map(Value::from),
         value => Err(value::Error::Expected {
             got: value.kind(),
-            expected: Kind::bytes() | Kind::array(BTreeMap::default()),
+            expected: Kind::bytes() | Kind::array(Collection::any()),
         }
         .into()),
     }

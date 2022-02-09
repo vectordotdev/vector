@@ -5,15 +5,13 @@ use std::{
     str::Utf8Error,
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
-lazy_static! {
-    static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
-    static ref NONALPHANUM: Regex = Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap();
-}
+static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
+static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
 
 pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     // https://docs.datadoghq.com/developers/dogstatsd/datagram_shell/#datagram-format

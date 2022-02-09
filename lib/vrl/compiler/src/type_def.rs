@@ -212,6 +212,27 @@ impl TypeDef {
         self
     }
 
+    /// Convert the [`TypeDef`]s [`Kind`] to an array.
+    ///
+    /// If `Kind` already has the array state, all other states are removed. If it does not yet
+    /// have an array, then equally all existing states are removed, and an "any" array state is
+    /// added.
+    ///
+    /// `TypeDef`s fallibility is kept unmodified.
+    #[inline]
+    pub fn restrict_array(self) -> Self {
+        let fallible = self.fallible;
+        let collection = match self.kind.into_array() {
+            Some(array) => array,
+            None => Collection::any(),
+        };
+
+        Self {
+            fallible,
+            kind: Kind::array(collection),
+        }
+    }
+
     #[inline]
     pub fn object(collection: impl Into<Collection<Field>>) -> Self {
         Kind::object(collection).into()
@@ -221,6 +242,27 @@ impl TypeDef {
     pub fn add_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
         self.kind.add_object(collection);
         self
+    }
+
+    /// Convert the [`TypeDef`]s [`Kind`] to an object.
+    ///
+    /// If `Kind` already has the object state, all other states are removed. If it does not yet
+    /// have an object, then equally all existing states are removed, and an "any" object state is
+    /// added.
+    ///
+    /// `TypeDef`s fallibility is kept unmodified.
+    #[inline]
+    pub fn restrict_object(self) -> Self {
+        let fallible = self.fallible;
+        let collection = match self.kind.into_object() {
+            Some(object) => object,
+            None => Collection::any(),
+        };
+
+        Self {
+            fallible,
+            kind: Kind::object(collection),
+        }
     }
 
     #[inline]

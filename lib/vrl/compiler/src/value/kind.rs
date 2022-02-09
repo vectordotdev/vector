@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{TimeZone, Utc};
 use regex::Regex;
 
@@ -92,9 +94,123 @@ impl From<&Value> for Kind {
             Value::Regex(_) => Kind::regex(),
             Value::Null => Kind::null(),
 
-            // TODO: build more exact type information from nested info.
-            Value::Object(_) => Kind::object(Collection::any()),
-            Value::Array(_) => Kind::array(Collection::any()),
+            Value::Object(object) => Kind::object(
+                object
+                    .iter()
+                    .map(|(k, v)| (k.clone().into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+
+            Value::Array(array) => Kind::array(
+                array
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+        }
+    }
+}
+
+impl From<Value> for Kind {
+    fn from(value: Value) -> Self {
+        (&value).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_from_value() {
+        struct TestCase {
+            value: Value,
+            want: Kind,
+        }
+
+        for (title, TestCase { value, want }) in HashMap::from([
+            (
+                "bytes",
+                TestCase {
+                    value: value!("foo"),
+                    want: Kind::bytes(),
+                },
+            ),
+            (
+                "integer",
+                TestCase {
+                    value: value!(3),
+                    want: Kind::integer(),
+                },
+            ),
+            (
+                "float",
+                TestCase {
+                    value: value!(3.3),
+                    want: Kind::float(),
+                },
+            ),
+            (
+                "boolean",
+                TestCase {
+                    value: value!(true),
+                    want: Kind::boolean(),
+                },
+            ),
+            (
+                "timestamp",
+                TestCase {
+                    value: Utc::now().into(),
+                    want: Kind::timestamp(),
+                },
+            ),
+            (
+                "regex",
+                TestCase {
+                    value: Regex::new("").unwrap().into(),
+                    want: Kind::regex(),
+                },
+            ),
+            (
+                "null",
+                TestCase {
+                    value: value!(null),
+                    want: Kind::null(),
+                },
+            ),
+            (
+                "object",
+                TestCase {
+                    value: value!({ "foo": { "bar": 12 }, "baz": true }),
+                    want: Kind::object(BTreeMap::from([
+                        (
+                            "foo".into(),
+                            Kind::object(BTreeMap::from([("bar".into(), Kind::integer())])),
+                        ),
+                        ("baz".into(), Kind::boolean()),
+                    ])),
+                },
+            ),
+            (
+                "array",
+                TestCase {
+                    value: value!([12, true, "foo", { "bar": null }]),
+                    want: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::boolean()),
+                        (2.into(), Kind::bytes()),
+                        (
+                            3.into(),
+                            Kind::object(BTreeMap::from([("bar".into(), Kind::null())])),
+                        ),
+                    ])),
+                },
+            ),
+        ]) {
+            assert_eq!(Kind::from(value), want, "{}", title);
         }
     }
 }
