@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -131,7 +130,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             message = "Failed decompressing payload.",
             encoding= %self.encoding,
             error = %self.error,
-            stage = error_stage::RECEIVING,
+            stage = "receiving",
             internal_log_rate_secs = 10
         );
     }
@@ -141,7 +140,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_type" => "parse_failed",
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
             "encoding" => self.encoding.to_string(),
         );
     }

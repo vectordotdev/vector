@@ -7,7 +7,6 @@ pub mod source {
     };
     use vector_core::internal_event::InternalEvent;
 
-    use crate::internal_events::prelude::error_stage;
     use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
@@ -47,7 +46,7 @@ pub mod source {
                 message = "Failed to fetch SQS events.",
                 error = %self.error,
                 error_type = "request_failed",
-                stage = error_stage::RECEIVING,
+                stage = "receiving",
             );
         }
 
@@ -56,7 +55,7 @@ pub mod source {
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
                 "error_type" => "request_failed",
-                "stage" => error_stage::RECEIVING,
+                "stage" => "receiving",
             );
             // deprecated
             counter!("sqs_message_receive_failed_total", 1);
@@ -107,7 +106,7 @@ pub mod source {
                 message_id = %self.message_id,
                 error = %self.error,
                 error_type = "processing_failed",
-                stage = error_stage::PROCESSING,
+                stage = "processing",
             );
         }
 
@@ -116,7 +115,7 @@ pub mod source {
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
                 "error_type" => "processing_failed",
-                "stage" => error_stage::PROCESSING,
+                "stage" => "processing",
             );
             // deprecated
             counter!("sqs_message_processing_failed_total", 1);
@@ -160,7 +159,7 @@ pub mod source {
                     .join(", "),
                 error = "Unable to delete some of the messages.",
                 error_type = "acknowledgment_failed",
-                stage = error_stage::PROCESSING,
+                stage = "processing",
             );
         }
 
@@ -169,7 +168,7 @@ pub mod source {
                 "component_errors_total", 1,
                 "error" => "Unable to delete SQS message.",
                 "error_type" => "acknowledgment_failed",
-                "stage" => error_stage::PROCESSING,
+                "stage" => "processing",
             );
             // deprecated
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
@@ -192,7 +191,7 @@ pub mod source {
                     .join(", "),
                 error = %self.error,
                 error_type = "deletion_failed",
-                stage = error_stage::PROCESSING,
+                stage = "processing",
             );
         }
 
@@ -201,7 +200,7 @@ pub mod source {
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
                 "error_type" => "deletion_failed",
-                "stage" => error_stage::PROCESSING,
+                "stage" => "processing",
             );
             // deprecated
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);

@@ -1,4 +1,3 @@
-use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -13,7 +12,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
             message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             error = ?self.error,
             error_type = "parser_failed",
-            stage = error_stage::PROCESSING,
+            stage = "processing",
             internal_log_rate_secs = 30
         )
     }
@@ -23,7 +22,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "parser_failed",
-            "stage" => error_stage::PROCESSING,
+            "stage" => "processing",
         );
         // deprecated
         counter!("processing_errors_total", 1,

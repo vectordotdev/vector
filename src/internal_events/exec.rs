@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use super::prelude::error_stage;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
@@ -56,7 +55,7 @@ impl InternalEvent for ExecFailedError<'_> {
             command = %self.command,
             error = ?self.error,
             error_type = "command_failed",
-            stage = error_stage::RECEIVING,
+            stage = "receiving",
         );
     }
 
@@ -66,7 +65,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
             "error_type" => "command_failed",
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
         );
         // deprecated
         counter!(
@@ -74,7 +73,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
             "error_type" => "command_failed",
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
         );
     }
 }
@@ -94,7 +93,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             elapsed_seconds = %self.elapsed_seconds,
             error = %self.error,
             error_type = "timed_out",
-            stage = error_stage::RECEIVING,
+            stage = "receiving",
         );
     }
 
@@ -112,7 +111,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
             "error_type" => "timed_out",
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
         );
     }
 }

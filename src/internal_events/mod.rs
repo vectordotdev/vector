@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-pub mod prelude;
-
 mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;

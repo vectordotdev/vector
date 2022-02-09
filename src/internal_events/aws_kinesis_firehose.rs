@@ -1,4 +1,3 @@
-use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -39,7 +38,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             error = ?self.error,
             error_type = "http_error",
             error_code = %self.code,
-            stage = error_stage::RECEIVING,
+            stage = "receiving",
             internal_log_rate_secs = 10
         );
     }
@@ -47,7 +46,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
             "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
             "error_code" => self.code.to_string(),
             "error_type" => "http_error",
@@ -68,7 +67,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
         error!(
             message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
             error = ?self.error,
-            stage = error_stage::PROCESSING,
+            stage = "processing",
             error_type = "decoding_error",
             internal_log_rate_secs = 10
         );
@@ -77,7 +76,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => error_stage::PROCESSING,
+            "stage" => "processing",
             "error" => self.error.to_string(),
             "error_type" => "decoding_error",
         );

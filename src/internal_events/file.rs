@@ -46,7 +46,6 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use crate::internal_events::prelude::error_stage;
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -144,7 +143,7 @@ mod source {
                 file = %self.file.display(),
                 error_type = "read_failed",
                 error = %self.error,
-                stage = error_stage::RECEIVING,
+                stage = "receiving",
             );
         }
 
@@ -157,7 +156,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "read_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING,
+                "stage" => "receiving",
             );
         }
     }
@@ -187,7 +186,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "delete_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING
+                "stage" => "receiving"
             );
         }
     }
@@ -247,7 +246,7 @@ mod source {
                 file = %self.file.display(),
                 error_type = "watch_failed",
                 error = %self.error,
-                stage = error_stage::RECEIVING,
+                stage = "receiving"
             );
         }
 
@@ -260,7 +259,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "watch_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING
+                "stage" => "receiving"
             );
         }
     }
@@ -340,7 +339,7 @@ mod source {
                 message = "Failed writing checkpoints.",
                 error_type = "write_error",
                 error = %self.error,
-                stage = error_stage::RECEIVING
+                stage = "receiving"
             );
         }
 
@@ -349,7 +348,7 @@ mod source {
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "write_error",
-                "stage" => error_stage::RECEIVING
+                "stage" => "receiving"
             );
         }
     }
@@ -367,7 +366,7 @@ mod source {
                 path = %self.path.display(),
                 error_type = "glob_failed",
                 error = %self.error,
-                stage = error_stage::RECEIVING
+                stage = "receiving"
             );
         }
 
@@ -380,7 +379,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "glob_failed",
                 "path" => self.path.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING
+                "stage" => "receiving"
             );
         }
     }

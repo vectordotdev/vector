@@ -1,6 +1,5 @@
 // ## skip check-events ##
 
-use super::prelude::error_stage;
 use metrics::counter;
 use prost::DecodeError;
 use vector_core::internal_event::InternalEvent;
@@ -42,7 +41,7 @@ impl<'a> InternalEvent for VectorProtoDecodeError<'a> {
             message = "Failed to decode protobuf message.",
             error = ?self.error,
             error_type = "parser_failed",
-            stage = error_stage::PROCESSING,
+            stage = "processing",
         );
     }
 
@@ -51,7 +50,7 @@ impl<'a> InternalEvent for VectorProtoDecodeError<'a> {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "parser_failed",
-            "stage" => error_stage::PROCESSING,
+            "stage" => "processing",
         );
         // decoding
         counter!("protobuf_decode_errors_total", 1);

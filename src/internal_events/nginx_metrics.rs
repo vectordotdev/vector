@@ -2,7 +2,6 @@
 
 use std::time::Instant;
 
-use super::prelude::error_stage;
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -71,7 +70,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             endpoint = %self.endpoint,
             error = %self.error,
             error_type = "request_failed",
-            stage = error_stage::RECEIVING,
+            stage = "receiving",
         );
     }
 
@@ -81,7 +80,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             "endpoint" => self.endpoint.to_owned(),
             "error" => self.error.to_string(),
             "error_type" => "request_failed",
-            "stage" => error_stage::RECEIVING,
+            "stage" => "receiving",
         );
         // deprecated
         counter!("http_request_errors_total", 1);
@@ -100,7 +99,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             endpoint = %self.endpoint,
             error = %self.error,
             error_type = "parse_failed",
-            stage = error_stage::PROCESSING,
+            stage = "processing",
         );
     }
 
@@ -110,7 +109,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             "endpoint" => self.endpoint.to_owned(),
             "error" => self.error.to_string(),
             "error_type" => "parse_failed",
-            "stage" => error_stage::PROCESSING,
+            "stage" => "processing",
         );
         // deprecated
         counter!("parse_errors_total", 1);
