@@ -13,6 +13,7 @@ use tracing::field;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
 
+use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
     codecs,
@@ -71,7 +72,14 @@ pub fn build_unix_stream_source(
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
-            let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
+            let stream = socket
+                .after_read(|byte_size| {
+                    emit!(&BytesReceived {
+                        protocol: "unix",
+                        byte_size,
+                    });
+                })
+                .allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone());
 
             let connection_open = connection_open.clone();
@@ -84,10 +92,6 @@ pub fn build_unix_stream_source(
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((mut events, byte_size)) => {
-                                emit!(&BytesReceived {
-                                    protocol: "unix",
-                                    byte_size,
-                                });
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.size_of(),
@@ -116,7 +120,7 @@ pub fn build_unix_stream_source(
 
                     info!("Finished sending.");
 
-                    let socket: &mut UnixStream = stream.get_mut().get_mut();
+                    let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut_ref();
                     if let Err(error) = socket.shutdown().await {
                         error!(message = "Failed shutting down socket.", %error);
                     }
