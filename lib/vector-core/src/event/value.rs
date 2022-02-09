@@ -327,13 +327,6 @@ impl From<f64> for Value {
     }
 }
 
-#[cfg(any(test, feature = "test"))]
-impl From<f32> for Value {
-    fn from(f: f32) -> Self {
-        NotNan::new(f as f64).unwrap().into()
-    }
-}
-
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
@@ -1503,10 +1496,10 @@ mod test {
             assert!(Value::Integer(0).eq(&Value::Integer(0)));
             assert!(!Value::Integer(0).eq(&Value::Integer(1)));
             assert!(!Value::Boolean(true).eq(&Value::Integer(2)));
-            assert!(Value::Float(1.2).eq(&Value::Float(1.4)));
-            assert!(!Value::Float(1.2).eq(&Value::Float(-1.2)));
-            assert!(!Value::Float(-0.0).eq(&Value::Float(0.0)));
-            assert!(!Value::Float(f64::NEG_INFINITY).eq(&Value::Float(f64::INFINITY)));
+            assert!(Value::from(1.2).eq(&Value::from(1.4)));
+            assert!(!Value::from(1.2).eq(&Value::from(-1.2)));
+            assert!(!Value::from(-0.0).eq(&Value::from(0.0)));
+            assert!(!Value::from(f64::NEG_INFINITY).eq(&Value::from(f64::INFINITY)));
             assert!(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
                 .eq(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
             assert!(!Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
@@ -1529,12 +1522,12 @@ mod test {
             assert_eq!(hash(&Value::Integer(0)), hash(&Value::Integer(0)));
             assert_ne!(hash(&Value::Integer(0)), hash(&Value::Integer(1)));
             assert_ne!(hash(&Value::Boolean(true)), hash(&Value::Integer(2)));
-            assert_eq!(hash(&Value::Float(1.2)), hash(&Value::Float(1.4)));
-            assert_ne!(hash(&Value::Float(1.2)), hash(&Value::Float(-1.2)));
-            assert_ne!(hash(&Value::Float(-0.0)), hash(&Value::Float(0.0)));
+            assert_eq!(hash(&Value::from(1.2)), hash(&Value::from(1.4)));
+            assert_ne!(hash(&Value::from(1.2)), hash(&Value::from(-1.2)));
+            assert_ne!(hash(&Value::from(-0.0)), hash(&Value::from(0.0)));
             assert_ne!(
-                hash(&Value::Float(f64::NEG_INFINITY)),
-                hash(&Value::Float(f64::INFINITY))
+                hash(&Value::from(f64::NEG_INFINITY)),
+                hash(&Value::from(f64::INFINITY))
             );
             assert_eq!(
                 hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),

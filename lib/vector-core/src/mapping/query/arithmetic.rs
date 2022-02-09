@@ -287,7 +287,7 @@ mod tests {
                     event.as_mut_log().insert("bar", Value::Integer(10));
                     event
                 },
-                Ok(Value::Float(2.0)),
+                Ok(Value::from(2.0)),
                 Arithmetic::new(
                     Box::new(Path::from("bar")),
                     Box::new(Path::from("foo")),
@@ -345,9 +345,9 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::Float(17.0)),
+                Ok(Value::from(17.0)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(20.0))),
+                    Box::new(Literal::from(Value::from(20.0))),
                     Box::new(Literal::from(Value::Integer(3))),
                     Operator::Subtract,
                 ),
@@ -356,7 +356,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(20.0))),
+                    Box::new(Literal::from(Value::from(20.0))),
                     Box::new(Literal::from(Value::Integer(20))),
                     Operator::Equal,
                 ),
@@ -374,7 +374,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(21.0))),
+                    Box::new(Literal::from(Value::from(21.0))),
                     Box::new(Literal::from(Value::Integer(18))),
                     Operator::Greater,
                 ),
@@ -383,7 +383,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Box::new(Literal::from(Value::Integer(18))),
                     Operator::Greater,
                 ),
@@ -393,7 +393,7 @@ mod tests {
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(17))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::GreaterOrEqual,
                 ),
             ),
@@ -402,7 +402,7 @@ mod tests {
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::GreaterOrEqual,
                 ),
             ),
@@ -411,7 +411,7 @@ mod tests {
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::Less,
                 ),
             ),
@@ -420,7 +420,7 @@ mod tests {
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::LessOrEqual,
                 ),
             ),
