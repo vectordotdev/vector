@@ -53,6 +53,6 @@ impl Expression for RemoveMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().null()
+        TypeDef::null().infallible()
     }
 }

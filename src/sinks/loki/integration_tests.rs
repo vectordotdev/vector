@@ -132,8 +132,7 @@ async fn logfmt() {
     let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
     assert_eq!(lines.len(), outputs.len());
     for (i, output) in outputs.iter().enumerate() {
-        let expected_logfmt =
-            encode_logfmt::to_string(lines[i].clone().into_log().into_parts().0).unwrap();
+        let expected_logfmt = encode_logfmt::to_string(lines[i].as_log().as_map()).unwrap();
         assert_eq!(output, &expected_logfmt);
     }
 }

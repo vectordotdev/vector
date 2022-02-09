@@ -39,7 +39,7 @@ impl Expression for UuidV4Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -51,7 +51,7 @@ mod tests {
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },
-        want: TypeDef::new().infallible().bytes(),
+        want: TypeDef::bytes().infallible(),
     }];
 
     #[test]

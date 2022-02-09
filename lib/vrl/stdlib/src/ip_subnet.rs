@@ -97,7 +97,7 @@ impl Expression for IpSubnetFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -164,35 +164,35 @@ mod tests {
             args: func_args![value: "192.168.10.23",
                              subnet: "255.255.0.0"],
             want: Ok(value!("192.168.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6 {
             args: func_args![value: "2404:6800:4003:c02::64",
                              subnet: "ff00::"],
             want: Ok(value!("2400::")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_subnet {
             args: func_args![value: "192.168.10.23",
                              subnet: "/16"],
             want: Ok(value!("192.168.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_smaller_subnet {
             args: func_args![value: "192.168.10.23",
                              subnet: "/12"],
             want: Ok(value!("192.160.0.0")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6_subnet {
             args: func_args![value: "2404:6800:4003:c02::64",
                              subnet: "/32"],
             want: Ok(value!("2404:6800::")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

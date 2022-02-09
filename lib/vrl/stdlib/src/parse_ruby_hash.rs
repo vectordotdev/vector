@@ -70,18 +70,17 @@ impl Expression for ParseRubyHashFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        type_def()
+        TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }
 
-fn kinds() -> Kind {
-    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Object
-}
-
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .add_object::<(), Kind>(map! { (): kinds() })
+fn inner_kinds() -> Kind {
+    Kind::null()
+        | Kind::bytes()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
@@ -400,7 +399,7 @@ mod tests {
                     testBool: true
                 }
             })),
-            tdef: type_def(),
+            tdef: TypeDef::object(Collection::from_unknown(inner_kinds())).fallible(),
         }
     ];
 }

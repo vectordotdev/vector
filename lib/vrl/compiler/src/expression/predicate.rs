@@ -30,7 +30,7 @@ impl Predicate {
 
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind()),
+                variant: ErrorVariant::NonBoolean(type_def.into()),
                 span,
             });
         }
@@ -66,7 +66,7 @@ impl Expression for Predicate {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
 
         type_def.with_fallibility(fallible)
     }
