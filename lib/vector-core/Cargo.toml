@@ -52,6 +52,7 @@ tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.3.8", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
+value = { path ="../value", default-features = false }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }

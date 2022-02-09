@@ -13,6 +13,7 @@ use snafu::Snafu;
 use vector_buffers::{encoding::AsMetadata, encoding::Encodable, EventCount};
 use vector_common::EventDataEq;
 
+pub use self::value::Value;
 use crate::ByteSizeOf;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};
 pub use finalization::{
@@ -24,7 +25,6 @@ pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use util::log::{PathComponent, PathIter};
-pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
