@@ -9,7 +9,6 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
@@ -125,7 +124,7 @@ impl HttpSink for LogdnaConfig {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,

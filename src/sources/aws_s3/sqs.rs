@@ -15,16 +15,18 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
     internal_events::aws_s3::source::{
-        SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
-        SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored, SqsS3EventsReceived,
     },
+    internal_events::{BytesReceived, StreamClosedError},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -259,7 +261,7 @@ impl IngestorProcess {
                 messages
             })
             .map_err(|err| {
-                emit!(&SqsMessageReceiveFailed { error: &err });
+                emit!(&SqsMessageReceiveError { error: &err });
                 err
             })
             .unwrap_or_default();
@@ -295,7 +297,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageProcessingFailed {
+                    emit!(&SqsMessageProcessingError {
                         message_id: &message_id,
                         error: &err,
                     });
@@ -317,13 +319,13 @@ impl IngestorProcess {
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(&SqsMessageDeletePartialFailure {
+                        emit!(&SqsMessageDeletePartialError {
                             entries: result.failed
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageDeleteBatchFailed {
+                    emit!(&SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -432,7 +434,14 @@ impl IngestorProcess {
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
                     FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                         .map(|res| {
-                            res.map_err(|err| {
+                            res.map(|bytes| {
+                                emit!(&BytesReceived {
+                                    byte_size: bytes.len(),
+                                    protocol: "http",
+                                });
+                                bytes
+                            })
+                            .map_err(|err| {
                                 read_error = Some(err);
                             })
                             .ok()
@@ -457,10 +466,6 @@ impl IngestorProcess {
                 let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
                 let mut stream = lines.filter_map(move |line| {
-                    emit!(&SqsS3EventReceived {
-                        byte_size: line.len()
-                    });
-
                     let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
 
                     log.insert_flat("bucket", bucket_name.clone());
@@ -475,12 +480,24 @@ impl IngestorProcess {
                         }
                     }
 
-                    ready(Some(log.into()))
+                    let event: Event = log.into();
+
+                    emit!(&SqsS3EventsReceived {
+                        byte_size: event.size_of()
+                    });
+
+                    ready(Some(event))
                 });
 
                 let send_error = match self.out.send_all(&mut stream).await {
                     Ok(_) => None,
-                    Err(_) => Some(crate::source_sender::ClosedError),
+                    Err(error) => {
+                        // count is set to 0 to have no discarded events considering
+                        // the events are not yet acknowledged and will be retried in
+                        // case of error
+                        emit!(&StreamClosedError { error, count: 0 });
+                        Some(crate::source_sender::ClosedError)
+                    }
                 };
 
                 // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
@@ -508,7 +525,7 @@ impl IngestorProcess {
                             BatchStatus::Rejected => {
                                 error!(
                                     message = "Sink reported events were rejected.",
-                                    internal_log_rate_secs = 5
+                                    internal_log_rate_secs = 5,
                                 );
                                 // Failed events cannot be retried, so continue to delete the SQS source message.
                                 Ok(())

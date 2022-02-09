@@ -22,7 +22,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
+        LokiOutOfOrderEventRewritten, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -49,7 +49,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,

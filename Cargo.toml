@@ -81,6 +81,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/lookup",
+  "lib/value",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
