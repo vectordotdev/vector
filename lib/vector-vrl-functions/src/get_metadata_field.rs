@@ -55,6 +55,6 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().add_null().infallible()
+        TypeDef::new().infallible().bytes().add_null()
     }
 }

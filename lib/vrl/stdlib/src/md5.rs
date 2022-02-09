@@ -50,7 +50,7 @@ impl Expression for Md5Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -64,7 +64,7 @@ mod tests {
         md5 {
             args: func_args![value: "foo"],
             want: Ok(value!("acbd18db4cc2f85cedef654fccc4a4d8")),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }

@@ -56,7 +56,7 @@ impl Expression for IpAtonFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::integer().fallible()
+        TypeDef::new().fallible().integer()
     }
 }
 
@@ -70,13 +70,13 @@ mod tests {
         invalid {
             args: func_args![value: "i am not an ipaddress"],
             want: Err("unable to parse IPv4 address: invalid IP address syntax"),
-            tdef: TypeDef::integer().fallible(),
+            tdef: TypeDef::new().fallible().integer(),
         }
 
         valid {
             args: func_args![value: "1.2.3.4"],
             want: Ok(value!(16909060)),
-            tdef: TypeDef::integer().fallible(),
+            tdef: TypeDef::new().fallible().integer(),
         }
     ];
 }

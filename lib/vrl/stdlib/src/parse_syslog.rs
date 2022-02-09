@@ -89,7 +89,7 @@ impl Expression for ParseSyslogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind()).fallible()
+        TypeDef::new().fallible().object(type_def())
     }
 }
 
@@ -158,18 +158,18 @@ fn message_to_value(message: Message<&str>) -> Value {
     result.into()
 }
 
-fn inner_kind() -> BTreeMap<Field, Kind> {
-    BTreeMap::from([
-        ("message".into(), Kind::bytes()),
-        ("hostname".into(), Kind::bytes().or_null()),
-        ("severity".into(), Kind::bytes().or_null()),
-        ("facility".into(), Kind::bytes().or_null()),
-        ("appname".into(), Kind::bytes().or_null()),
-        ("msgid".into(), Kind::bytes().or_null()),
-        ("timestamp".into(), Kind::timestamp().or_null()),
-        ("procid".into(), Kind::bytes().or_integer().or_null()),
-        ("version".into(), Kind::integer().or_null()),
-    ])
+fn type_def() -> BTreeMap<&'static str, TypeDef> {
+    map! {
+        "message": Kind::Bytes,
+        "hostname": Kind::Bytes | Kind::Null,
+        "severity": Kind::Bytes | Kind::Null,
+        "facility": Kind::Bytes | Kind::Null,
+        "appname": Kind::Bytes | Kind::Null,
+        "msgid": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp | Kind::Null,
+        "procid": Kind::Bytes | Kind::Integer | Kind::Null,
+        "version": Kind::Integer | Kind::Null
+    }
 }
 
 #[cfg(test)]
@@ -198,13 +198,13 @@ mod tests {
                 "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
                 "version" => 1,
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         invalid {
             args: func_args![value: "not much of a syslog message"],
             want: Err("unable to parse input as valid syslog message".to_string()),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         haproxy {
@@ -217,7 +217,7 @@ mod tests {
                     "appname" => "haproxy",
                     "procid" => 73411,
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         missing_pri {
@@ -228,7 +228,7 @@ mod tests {
                 "appname" => "haproxy",
                 "procid" => 73411,
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         empty_sd_element {
@@ -244,7 +244,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         non_empty_sd_element {
@@ -261,7 +261,7 @@ mod tests {
                 "version" => 1,
                 "non_empty.x" => "1",
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         non_structured_data_in_message {
@@ -274,7 +274,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(chrono::Utc::now().year(), 6, 8).and_hms_milli(11, 54, 8, 0),
                 "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         escapes_in_structured_data_quote {
@@ -290,7 +290,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         escapes_in_structured_data_slash {
@@ -306,7 +306,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         escapes_in_structured_data_bracket {
@@ -322,7 +322,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003,10,11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def()),
         }
     ];
 }

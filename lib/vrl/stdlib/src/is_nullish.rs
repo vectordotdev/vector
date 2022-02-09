@@ -49,7 +49,7 @@ impl Expression for IsNullishFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -62,63 +62,63 @@ mod tests {
         empty_string {
             args: func_args![value: value!("")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         single_space_string {
             args: func_args![value: value!(" ")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         multi_space_string {
             args: func_args![value: value!("     ")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         newline_string {
             args: func_args![value: value!("\n")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         carriage_return_string {
             args: func_args![value: value!("\r")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         dash_string {
             args: func_args![value: value!("-")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         null {
             args: func_args![value: value!(null)],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         non_empty_string {
             args: func_args![value: value!("hello world")],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         // Shows that a non-string/null literal returns false
         integer {
             args: func_args![value: value!(427)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         // Shows that a non-literal type returns false
         array {
             args: func_args![value: value!([1, 2, 3])],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }

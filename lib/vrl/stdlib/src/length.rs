@@ -65,16 +65,14 @@ impl Expression for LengthFn {
             Bytes(v) => Ok(v.len().into()),
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::array(Collection::any())
-                    | Kind::object(Collection::any())
-                    | Kind::bytes(),
+                expected: Kind::Array | Kind::Object | Kind::Bytes,
             }
             .into()),
         }
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::integer().infallible()
+        TypeDef::new().infallible().integer()
     }
 }
 
@@ -88,37 +86,37 @@ mod tests {
         non_empty_object_value {
             args: func_args![value: value!({"foo": "bar", "baz": true, "baq": [1, 2, 3]})],
             want: Ok(value!(3)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         empty_object_value {
             args: func_args![value: value!({})],
             want: Ok(value!(0)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         nested_object_value {
             args: func_args![value: value!({"nested": {"foo": "bar"}})],
             want: Ok(value!(1)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         non_empty_array_value {
             args: func_args![value: value!([1, 2, 3, 4, true, "hello"])],
             want: Ok(value!(6)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         empty_array_value {
             args: func_args![value: value!([])],
             want: Ok(value!(0)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         string_value {
             args: func_args![value: value!("hello world")],
             want: Ok(value!(11)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
     ];
 }

@@ -8563,7 +8563,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing 0.1.30",
- "value",
  "vector_common",
  "vrl-diagnostic",
  "vrl-parser",

@@ -45,22 +45,22 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-pub(crate) fn regex_kind(
+pub(crate) fn regex_type_def(
     regex: &regex::Regex,
-) -> std::collections::BTreeMap<vrl::value::kind::Field, vrl::value::Kind> {
+) -> std::collections::BTreeMap<String, vrl::value::Kind> {
     let mut inner_type = std::collections::BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
         inner_type.insert(
-            num.to_string().into(),
-            vrl::value::Kind::bytes() | vrl::value::Kind::null(),
+            num.to_string(),
+            vrl::value::Kind::Bytes | vrl::value::Kind::Null,
         );
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().flatten() {
-        inner_type.insert(name.to_owned().into(), vrl::value::Kind::bytes());
+        inner_type.insert(name.to_owned(), vrl::value::Kind::Bytes);
     }
 
     inner_type

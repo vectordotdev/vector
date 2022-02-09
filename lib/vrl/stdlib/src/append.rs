@@ -61,16 +61,13 @@ impl Expression for AppendFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .merge_append(self.items.type_def(state))
+        self.value.type_def(state).merge(self.items.type_def(state))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vector_common::btreemap;
 
     test_function![
         append => Append;
@@ -78,42 +75,42 @@ mod tests {
         both_arrays_empty {
             args: func_args![value: value!([]), items: value!([])],
             want: Ok(value!([])),
-            tdef: TypeDef::array(Collection::empty()),
+            tdef: TypeDef::new().array::<TypeDef>(vec![]),
         }
 
         one_array_empty {
             args: func_args![value: value!([]), items: value!([1, 2, 3])],
             want: Ok(value!([1, 2, 3])),
-            tdef: TypeDef::array(btreemap! {
-                Index::from(0) => Kind::integer(),
-                Index::from(1) => Kind::integer(),
-                Index::from(2) => Kind::integer(),
+            tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: Kind::Integer,
+                2: Kind::Integer,
             }),
         }
 
         neither_array_empty {
             args: func_args![value: value!([1, 2, 3]), items: value!([4, 5, 6])],
             want: Ok(value!([1, 2, 3, 4, 5, 6])),
-            tdef: TypeDef::array(btreemap! {
-                Index::from(0) => Kind::integer(),
-                Index::from(1) => Kind::integer(),
-                Index::from(2) => Kind::integer(),
-                Index::from(3) => Kind::integer(),
-                Index::from(4) => Kind::integer(),
-                Index::from(5) => Kind::integer(),
+            tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: Kind::Integer,
+                2: Kind::Integer,
+                3: Kind::Integer,
+                4: Kind::Integer,
+                5: Kind::Integer,
             }),
         }
 
         mixed_array_types {
             args: func_args![value: value!([1, 2, 3]), items: value!([true, 5.0, "bar"])],
             want: Ok(value!([1, 2, 3, true, 5.0, "bar"])),
-            tdef: TypeDef::array(btreemap! {
-                Index::from(0) => Kind::integer(),
-                Index::from(1) => Kind::integer(),
-                Index::from(2) => Kind::integer(),
-                Index::from(3) => Kind::boolean(),
-                Index::from(4) => Kind::float(),
-                Index::from(5) => Kind::bytes(),
+            tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: Kind::Integer,
+                2: Kind::Integer,
+                3: Kind::Boolean,
+                4: Kind::Float,
+                5: Kind::Bytes,
             }),
         }
     ];

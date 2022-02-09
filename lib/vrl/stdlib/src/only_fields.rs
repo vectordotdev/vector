@@ -59,7 +59,7 @@ impl Expression for OnlyFieldsFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
             fallible: true,
-            kind: value::Kind::null(),
+            kind: value::Kind::Null,
             ..Default::default()
         }
     }
@@ -75,7 +75,7 @@ mod tests {
         },
         def: TypeDef {
             fallible: true,
-            kind: value::Kind::null(),
+            kind: value::Kind::Null,
             ..Default::default()
         },
     }];

@@ -57,7 +57,7 @@ impl Expression for UpcaseFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -71,7 +71,7 @@ mod tests {
         simple {
             args: func_args![value: "FOO 2 bar"],
             want: Ok(value!("FOO 2 BAR")),
-            tdef: TypeDef::bytes(),
+            tdef: TypeDef::new().bytes(),
         }
     ];
 }

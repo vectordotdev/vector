@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn string(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Bytes(_) => Ok(v),
-        v => Err(format!("expected string, got {}", v.kind()).into()),
+        v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for String {
                 title: "invalid",
                 source: "string!(true)",
                 result: Err(
-                    r#"function call error for "string" at (0:13): expected string, got boolean"#,
+                    r#"function call error for "string" at (0:13): expected "string", got "boolean""#,
                 ),
             },
         ]
@@ -68,8 +68,9 @@ impl Expression for StringFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let non_bytes = !self.value.type_def(state).is_bytes();
-
-        TypeDef::bytes().with_fallibility(non_bytes)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Bytes)
+            .bytes()
     }
 }

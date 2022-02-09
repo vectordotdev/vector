@@ -121,14 +121,14 @@ impl Expression for ReplaceFn {
             }
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::regex() | Kind::bytes(),
+                expected: Kind::Regex | Kind::Bytes,
             }
             .into()),
         })
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -146,7 +146,7 @@ mod test {
                               with: "o"
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_string2 {
@@ -156,7 +156,7 @@ mod test {
                               count: -1
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_string3 {
@@ -166,7 +166,7 @@ mod test {
                               count: 0
              ],
              want: Ok("I like apples and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_string4 {
@@ -176,7 +176,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_string5 {
@@ -186,7 +186,7 @@ mod test {
                               count: 2
              ],
              want: Ok("I like opples ond bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
 
@@ -196,7 +196,7 @@ mod test {
                               with: "o"
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
 
@@ -207,7 +207,7 @@ mod test {
                               count: -1
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_regex3 {
@@ -217,7 +217,7 @@ mod test {
                               count: 0
              ],
              want: Ok("I like apples and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_regex4 {
@@ -227,7 +227,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_regex5 {
@@ -237,7 +237,7 @@ mod test {
                               count: 2
              ],
              want: Ok("I like opples ond bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_other {
@@ -246,7 +246,7 @@ mod test {
                              with: "biscuits"
             ],
              want: Ok( "I like biscuits and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_other2 {
@@ -256,7 +256,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         replace_other3 {
@@ -265,7 +265,7 @@ mod test {
                              with: "biscuits"
             ],
             want: Ok("I like biscuits and bananas"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }

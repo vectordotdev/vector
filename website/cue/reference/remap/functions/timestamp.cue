@@ -32,7 +32,7 @@ remap: functions: timestamp: {
 			source: #"""
 				ok, err = timestamp(.timestamp)
 				"""#
-			return: "function call error for \"timestamp\" at (10:31): expected timestamp, got string"
+			return: "function call error for \"timestamp\" at (10:31): expected \"timestamp\", got \"string\""
 		},
 	]
 }

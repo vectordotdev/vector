@@ -189,7 +189,7 @@ impl Expression for StartsWithFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -205,7 +205,7 @@ mod tests {
                              substring: "bar"
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         subset {
@@ -213,7 +213,7 @@ mod tests {
                              substring: "foobar"
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         total {
@@ -221,7 +221,7 @@ mod tests {
                              substring: "foo"
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         middle {
@@ -229,7 +229,7 @@ mod tests {
                              substring: "oba"
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         start {
@@ -237,7 +237,7 @@ mod tests {
                              substring: "foo"
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         end {
@@ -245,7 +245,7 @@ mod tests {
                              substring: "bar"
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
 
@@ -254,7 +254,7 @@ mod tests {
                              substring: "FOO"
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         case_sensitive_different_case {
@@ -262,7 +262,7 @@ mod tests {
                              substring: "FOO"
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         case_insensitive_different_case {
@@ -271,7 +271,7 @@ mod tests {
                              case_sensitive: false
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         unicode_same_case {
@@ -280,7 +280,7 @@ mod tests {
                              case_sensitive: true
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         unicode_sensitive_different_case {
@@ -289,7 +289,7 @@ mod tests {
                              case_sensitive: true
             ],
             want: Ok(false),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         unicode_insensitive_different_case {
@@ -298,7 +298,7 @@ mod tests {
                              case_sensitive: false
             ],
             want: Ok(true),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }
