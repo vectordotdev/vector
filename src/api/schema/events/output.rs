@@ -4,6 +4,7 @@ use super::{
     log::Log,
     metric::Metric,
     notification::{EventNotification, EventNotificationType},
+    trace::Trace,
 };
 use crate::api::tap::{TapNotification, TapPayload};
 
@@ -18,6 +19,9 @@ pub enum OutputEventsPayload {
 
     // Notification
     Notification(EventNotification),
+
+    /// Trace event
+    Trace(Trace),
 }
 
 /// Convert an `api::TapPayload` to the equivalent GraphQL type.
@@ -36,6 +40,7 @@ impl From<TapPayload> for OutputEventsPayload {
                     EventNotificationType::NotMatched,
                 )),
             },
+            TapPayload::Trace(output_id, ev) => Self::Trace(Trace::new(output_id, ev)),
         }
     }
 }
