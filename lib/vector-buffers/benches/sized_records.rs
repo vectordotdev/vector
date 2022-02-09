@@ -81,15 +81,8 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     }
 }
 
-fn create_in_memory_v1_variant(max_events: usize, _max_size: u64) -> BufferType {
-    BufferType::MemoryV1 {
-        max_events,
-        when_full: WhenFull::DropNewest,
-    }
-}
-
-fn create_in_memory_v2_variant(max_events: usize, _max_size: u64) -> BufferType {
-    BufferType::MemoryV2 {
+fn create_in_memory_variant(max_events: usize, _max_size: u64) -> BufferType {
+    BufferType::Memory {
         max_events,
         when_full: WhenFull::DropNewest,
     }
@@ -167,19 +160,10 @@ fn write_then_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-in-memory-v1",
-        "write-then-read",
-        wtr_measurement,
-        create_in_memory_v1_variant
-    );
-
-    experiment!(
-        c,
-        [32, 64, 128, 256, 512, 1024],
         "buffer-in-memory-v2",
         "write-then-read",
         wtr_measurement,
-        create_in_memory_v2_variant
+        create_in_memory_variant
     );
 }
 
@@ -206,19 +190,10 @@ fn write_and_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-in-memory-v1",
-        "write-and-read",
-        war_measurement,
-        create_in_memory_v1_variant
-    );
-
-    experiment!(
-        c,
-        [32, 64, 128, 256, 512, 1024],
         "buffer-in-memory-v2",
         "write-and-read",
         war_measurement,
-        create_in_memory_v2_variant
+        create_in_memory_variant
     );
 }
 

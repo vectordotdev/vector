@@ -5,7 +5,7 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
@@ -99,7 +99,7 @@ fn encode_event(
         .and_then(|t| {
             t.render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("process"),
                         drop_event: false,

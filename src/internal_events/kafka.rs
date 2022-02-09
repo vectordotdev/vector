@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::{counter, gauge};
 
 use vector_core::{internal_event::InternalEvent, update_counter};
@@ -40,7 +41,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             message = "Unable to update consumer offset.",
             error = %self.error,
             error_type = "kafka_offset_update",
-            stage = "sending",
+            stage = error_stage::SENDING,
         );
     }
 
@@ -49,7 +50,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "kafka_offset_update",
-            "stage" => "sending",
+            "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("consumer_offset_updates_failed_total", 1);
@@ -67,7 +68,7 @@ impl InternalEvent for KafkaReadError {
             message = "Failed to read message.",
             error = %self.error,
             error_type = "kafka_read",
-            stage = "receiving",
+            stage = error_stage::RECEIVING,
         );
     }
 
@@ -76,7 +77,7 @@ impl InternalEvent for KafkaReadError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "kafka_read",
-            "stage" => "receiving",
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("events_failed_total", 1);

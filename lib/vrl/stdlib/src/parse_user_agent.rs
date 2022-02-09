@@ -1,16 +1,14 @@
 use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use uaparser::UserAgentParser as UAParser;
 use vrl::{function::Error, prelude::*};
 use woothee::parser::Parser as WootheeParser;
 
-lazy_static! {
-    static ref UA_PARSER: UAParser = {
-        let regexes = include_bytes!("./../data/user_agent_regexes.yaml");
-        UAParser::from_bytes(regexes).expect("Regex file is not valid.")
-    };
-}
+static UA_PARSER: Lazy<UAParser> = Lazy::new(|| {
+    let regexes = include_bytes!("./../data/user_agent_regexes.yaml");
+    UAParser::from_bytes(regexes).expect("Regex file is not valid.")
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUserAgent;

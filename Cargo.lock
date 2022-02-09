@@ -1872,7 +1872,7 @@ name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
  "itertools",
- "lazy_static",
+ "once_cell",
  "ordered-float",
  "pest",
  "pest_derive",
@@ -3746,7 +3746,7 @@ dependencies = [
  "inherent",
  "lalrpop",
  "lalrpop-util",
- "lazy_static",
+ "once_cell",
  "quickcheck",
  "regex",
  "serde",
@@ -7180,9 +7180,9 @@ checksum = "13a4ec180a2de59b57434704ccfad967f789b12737738798fa08798cd5824c16"
 
 [[package]]
 name = "test-case"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8f1ba037d0131884df7ba77277080b8dd1b9669c26eb902df9ecf1c0ba50ff9"
+checksum = "e9e5f048404b43e8ae66dce036163515b6057024cf58c6377be501f250bd3c6a"
 dependencies = [
  "cfg-if 1.0.0",
  "proc-macro2 1.0.32",
@@ -7501,9 +7501,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.9"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
+checksum = "08d3725d3efa29485e87311c5b699de63cde14b00ed4d256b8318aa30ca452cd"
 dependencies = [
  "bytes 1.1.0",
  "futures-core",
@@ -8117,6 +8117,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
+name = "value"
+version = "0.1.0"
+dependencies = [
+ "lookup",
+]
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8200,7 +8207,6 @@ dependencies = [
  "inventory 0.1.11",
  "itertools",
  "k8s-openapi",
- "lazy_static",
  "libc",
  "libz-sys",
  "listenfd",
@@ -8447,7 +8453,6 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
- "lazy_static",
  "lookup",
  "metrics",
  "metrics-tracing-context",
@@ -8526,7 +8531,7 @@ dependencies = [
  "bytes 1.1.0",
  "exitcode",
  "indoc",
- "lazy_static",
+ "once_cell",
  "prettytable-rs",
  "regex",
  "rustyline",
@@ -8605,10 +8610,10 @@ dependencies = [
  "hex",
  "hostname",
  "indexmap",
- "lazy_static",
  "lookup",
  "md-5 0.10.0",
  "nom 7.1.0",
+ "once_cell",
  "percent-encoding",
  "regex",
  "roxmltree",

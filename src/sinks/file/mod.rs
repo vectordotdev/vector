@@ -19,7 +19,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
+    internal_events::{FileBytesSent, FileOpen, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -173,7 +173,7 @@ impl FileSink {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("path"),
                     drop_event: true,

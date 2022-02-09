@@ -5,7 +5,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -60,16 +60,15 @@ pub enum Encoding {
     Default,
 }
 
-lazy_static! {
-    static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
-    static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
-    static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
-    static ref X_MS_AZURE_RESOURCE_HEADER: HeaderName =
-        HeaderName::from_static("x-ms-azureresourceid");
-    static ref TIME_GENERATED_FIELD_HEADER: HeaderName =
-        HeaderName::from_static("time-generated-field");
-    static ref CONTENT_TYPE_VALUE: HeaderValue = HeaderValue::from_static(CONTENT_TYPE);
-}
+static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
+static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));
+static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("x-ms-azureresourceid"));
+static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("time-generated-field"));
+static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
+
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }

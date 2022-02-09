@@ -5,7 +5,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use super::{CloudwatchLogsError, TemplateRenderingFailed};
+use super::{CloudwatchLogsError, TemplateRenderingError};
 use crate::{
     config::LogSchema,
     event::{Event, Value},
@@ -51,7 +51,7 @@ impl CloudwatchRequestBuilder {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("group"),
                     drop_event: true,
@@ -63,7 +63,7 @@ impl CloudwatchRequestBuilder {
         let stream = match self.stream_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("stream"),
                     drop_event: true,
