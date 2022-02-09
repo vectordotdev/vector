@@ -13,7 +13,7 @@ use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingError},
     sinks::util::{
@@ -136,8 +136,8 @@ impl SinkConfig for RedisSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

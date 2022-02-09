@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{DataType, Output},
+    config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     transforms::{TaskTransform, Transform},
@@ -36,8 +36,8 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Log
+    pub fn input(&self) -> Input {
+        Input::log()
     }
 
     pub fn outputs(&self) -> Vec<Output> {

@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::BuildError;
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
@@ -55,8 +56,8 @@ impl TransformConfig for ConcatConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {

@@ -28,6 +28,7 @@ pub mod event;
 pub mod fanout;
 pub mod mapping;
 pub mod metrics;
+pub mod schema;
 pub mod sink;
 pub mod source;
 #[cfg(test)]

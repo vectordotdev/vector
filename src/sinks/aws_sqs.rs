@@ -20,7 +20,7 @@ use super::util::SinkBatchSettings;
 use crate::{
     aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingError},
@@ -123,8 +123,8 @@ impl SinkConfig for SqsSinkConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -5,7 +5,7 @@ use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
@@ -45,8 +45,8 @@ impl TransformConfig for MetricToLogConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn outputs(&self) -> Vec<Output> {

@@ -23,7 +23,7 @@ use vector_core::{buffers::Acker, event::metric::MetricSeries};
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, Resource, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricData, MetricKind, MetricValue},
         Event,
@@ -128,8 +128,8 @@ impl SinkConfig for PrometheusExporterConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -156,8 +156,8 @@ impl SinkConfig for PrometheusCompatConfig {
         self.config.build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.config.input_type()
+    fn input(&self) -> Input {
+        self.config.input()
     }
 
     fn sink_type(&self) -> &'static str {

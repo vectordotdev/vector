@@ -5,7 +5,8 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
@@ -83,8 +84,8 @@ impl TransformConfig for RouteConfig {
         Ok(Transform::synchronous(route))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -110,8 +111,8 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
     fn outputs(&self) -> Vec<Output> {

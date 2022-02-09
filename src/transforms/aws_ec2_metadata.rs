@@ -18,7 +18,8 @@ use tracing_futures::Instrument;
 
 use crate::{
     config::{
-        DataType, Output, ProxyConfig, TransformConfig, TransformContext, TransformDescription,
+        DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     http::HttpClient,
@@ -174,8 +175,8 @@ impl TransformConfig for Ec2Metadata {
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {

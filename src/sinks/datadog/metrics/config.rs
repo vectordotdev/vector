@@ -13,7 +13,7 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
-    config::{DataType, SinkConfig, SinkContext},
+    config::{Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
@@ -126,8 +126,8 @@ impl SinkConfig for DatadogMetricsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
