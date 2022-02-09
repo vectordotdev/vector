@@ -11,7 +11,7 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Pattern failed to match.",
-            error = "Failed to match pattern",
+            error = "No match found in specified field",
             error_type = "condition_failed",
             stage = error_stage::PROCESSING,
             field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
@@ -22,7 +22,7 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Failed to match pattern",
+            "error" => "No match found in specified field",
             "error_type" => "condition_failed",
             "stage" => error_stage::PROCESSING,
         );
@@ -69,7 +69,7 @@ pub struct ParserTargetExistsError<'a> {
 impl<'a> InternalEvent for ParserTargetExistsError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "Target field already exists.",
+            message = format!("Target field {:?} already exists.", self.target_field).as_str(),
             error = "Target field already exists",
             error_type = "condition_failed",
             stage = error_stage::PROCESSING,

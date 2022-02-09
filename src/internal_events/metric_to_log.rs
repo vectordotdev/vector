@@ -10,7 +10,7 @@ pub struct MetricToLogSerializeError {
 
 impl<'a> InternalEvent for MetricToLogSerializeError {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Metric failed to serialize as JSON.",
             error = ?self.error,
             error_type = "serialize_failed",
