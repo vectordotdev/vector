@@ -123,17 +123,17 @@ here. Each minor release bump will include an upgrade guide in the
 [configuration schema]: https://vector.dev/docs/reference/configuration/
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 [data model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
-[Github repository]: https://github.com/timberio/vector
+[Github repository]: https://github.com/vectordotdev/vector
 [GraphQL API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
 [`internal_logs_` source]: https://vector.dev/docs/reference/configuration/sources/internal_logs/
 [`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
-[`master` branch]: https://github.com/timberio/vector/tree/master
+[`master` branch]: https://github.com/vectordotdev/vector/tree/master
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
-[release policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[release policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [`vector` command]: https://vector.dev/docs/reference/cli/#vector
 [`vector generate` subcommand]: https://vector.dev/docs/reference/cli/#generate

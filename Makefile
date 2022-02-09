@@ -118,9 +118,9 @@ define ENVIRONMENT_EXEC
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
-			--mount type=bind,source=${CURRENT_DIR},target=/git/timberio/vector \
+			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
+			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			$(ENVIRONMENT_UPSTREAM)
 endef
@@ -483,12 +483,12 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
-check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
 	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
 
 ##@ Packaging
@@ -550,37 +550,37 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 
@@ -600,7 +600,7 @@ release-github: ## Release to Github
 	@scripts/release-github.sh
 
 .PHONY: release-homebrew
-release-homebrew: ## Release to timberio Homebrew tap
+release-homebrew: ## Release to vectordotdev Homebrew tap
 	@scripts/release-homebrew.sh
 
 .PHONY: release-prepare

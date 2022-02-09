@@ -50,12 +50,12 @@ you need to build containers or not, see a summary:
 ...
 Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
 Recording 'comparison' captures to /tmp/datadog_agent_remap_datadog_logs-captures.ZSRFXO
-~/projects/com/github/timberio/vector/soaks ~/projects/com/github/timberio/vector
+~/projects/com/github/vectordotdev/vector/soaks ~/projects/com/github/vectordotdev/vector
 ✋  Stopping node "minikube"  ...
 🛑  1 nodes stopped.
 🔥  Deleting "minikube" in kvm2 ...
 💀  Removed all traces of the "minikube" cluster.
-~/projects/com/github/timberio/vector
+~/projects/com/github/vectordotdev/vector
 Captures recorded to /tmp/datadog_agent_remap_datadog_logs-captures.ZSRFXO
 
 Here is a statistical summary of that file. Units are bytes.

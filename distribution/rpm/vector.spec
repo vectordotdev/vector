@@ -82,5 +82,5 @@ rm -rf %{buildroot}
 %license LICENSE
 
 %changelog
-* Fri Jun 21 2019 Vector Devs <vector@timber.io> - 0.3.0
+* Fri Jun 21 2019 Vector Devs <vector@datadoghq.com> - 0.3.0
 - Release v0.3.0

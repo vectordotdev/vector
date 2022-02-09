@@ -198,7 +198,7 @@ mod test {
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
-    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    // This is a regression test, see: https://github.com/vectordotdev/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
         let mut parser = JsonParser::from(JsonParserConfig {
