@@ -59,12 +59,12 @@ impl Function for ToTimestamp {
             },
             Example {
                 title: "integer",
-                source: "to_timestamp(5)",
+                source: "to_timestamp!(5)",
                 result: Ok("t'1970-01-01T00:00:05Z'"),
             },
             Example {
                 title: "float",
-                source: "to_timestamp(5.6)",
+                source: "to_timestamp!(5.6)",
                 result: Ok("t'1970-01-01T00:00:05.600Z'"),
             },
             Example {
