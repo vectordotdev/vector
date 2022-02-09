@@ -93,8 +93,8 @@ impl Expression for AssertFn {
         }
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.condition.type_def(state).fallible().boolean()
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::boolean().fallible()
     }
 }
 

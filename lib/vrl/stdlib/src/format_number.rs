@@ -78,7 +78,7 @@ impl Expression for FormatNumberFn {
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Integer | Kind::Float,
+                    expected: Kind::integer() | Kind::float(),
                 }
                 .into())
             }
@@ -154,7 +154,7 @@ impl Expression for FormatNumberFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -168,14 +168,14 @@ mod tests {
         number {
             args: func_args![value: 1234.567],
             want: Ok(value!("1234.567")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         precision {
             args: func_args![value: 1234.567,
                              scale: 2],
             want: Ok(value!("1234.56")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
 
@@ -184,7 +184,7 @@ mod tests {
                              scale: 2,
                              decimal_separator: ","],
             want: Ok(value!("1234,56")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         more_separators {
@@ -193,7 +193,7 @@ mod tests {
                              decimal_separator: ",",
                              grouping_separator: " "],
             want: Ok(value!("1 234,56")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         big_number {
@@ -202,34 +202,34 @@ mod tests {
                              decimal_separator: ",",
                              grouping_separator: "."],
             want: Ok(value!("11.222.333.444,567")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         integer {
             args: func_args![value: 100.0],
             want: Ok(value!("100")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         integer_decimals {
             args: func_args![value: 100.0,
                              scale: 2],
             want: Ok(value!("100.00")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         float_no_decimals {
             args: func_args![value: 123.45,
                              scale: 0],
             want: Ok(value!("123")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         integer_no_decimals {
             args: func_args![value: 12345,
                              scale: 2],
             want: Ok(value!("12345.00")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

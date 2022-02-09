@@ -9,6 +9,7 @@ use crate::{
         ast::{self, Ident},
         Node,
     },
+    value::kind::DefaultValue,
     vm::OpCode,
     Context, Expression, Span, State, TypeDef, Value,
 };
@@ -108,7 +109,7 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.infallible();
-                let default = type_def.kind().default_value();
+                let default_value = type_def.default_value();
                 let value = match &expr {
                     Expr::Literal(v) => Some(v.to_value()),
                     _ => None,
@@ -119,7 +120,7 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
-                let type_def = TypeDef::new().bytes().add_null().infallible();
+                let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(state, type_def, None);
 
@@ -127,7 +128,7 @@ impl Assignment {
                     ok,
                     err,
                     expr: Box::new(expr),
-                    default,
+                    default: default_value,
                 }
             }
         };
@@ -214,7 +215,7 @@ impl Target {
             Internal(ident, path) => {
                 let td = match path {
                     None => type_def,
-                    Some(path) => type_def.for_path(path.clone()),
+                    Some(path) => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match state.variable(ident) {
@@ -230,7 +231,7 @@ impl Target {
             External(path) => {
                 let td = match path {
                     None => type_def,
-                    Some(path) => type_def.for_path(path.clone()),
+                    Some(path) => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match state.target() {
