@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use chrono::{offset::TimeZone, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref REGEX_GLOG: Regex = Regex::new(
+static REGEX_GLOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                                     # Ignore whitespace and comments in the regex expression.
         ^\s*                                                        # Start with any number of whitespaces.
         (?P<level>\w)                                               # Match one word character (expecting `I`,`W`,`E` or `F`).
@@ -19,8 +19,8 @@ lazy_static! {
         (?P<message>.*?)                                            # Match any characters (non-greedily).
         \s*$                                                        # Match any number of whitespaces to be stripped from the end.
     "#)
-    .expect("failed compiling regex for glog");
-}
+                                                 .expect("failed compiling regex for glog")
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGlog;

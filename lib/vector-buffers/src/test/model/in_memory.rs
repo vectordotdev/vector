@@ -9,25 +9,23 @@ use crate::{
     WhenFull,
 };
 
-/// `InMemory` is the `Model` for in-memory v1 buffers, based on `futures`.
-pub(crate) struct InMemoryV1 {
+/// `InMemory` is the `Model` for in-memory v2 buffers, based on `tokio`.
+pub(crate) struct InMemory {
     inner: VecDeque<Message>,
     when_full: WhenFull,
-    num_senders: usize,
     capacity: usize,
 }
 
-impl InMemoryV1 {
-    pub(crate) fn new(variant: &Variant, num_senders: usize) -> Self {
+impl InMemory {
+    pub(crate) fn new(variant: &Variant) -> Self {
         match variant {
-            Variant::MemoryV1 {
+            Variant::Memory {
                 max_events,
                 when_full,
                 ..
-            } => InMemoryV1 {
+            } => InMemory {
                 inner: VecDeque::with_capacity(*max_events),
                 capacity: *max_events,
-                num_senders,
                 when_full: *when_full,
             },
             _ => unreachable!(),
@@ -35,11 +33,11 @@ impl InMemoryV1 {
     }
 }
 
-impl Model for InMemoryV1 {
+impl Model for InMemory {
     fn send(&mut self, item: Message) -> Progress {
         match self.when_full {
             WhenFull::DropNewest => {
-                if self.inner.len() >= (self.capacity + self.num_senders) {
+                if self.inner.len() >= self.capacity {
                     // DropNewest never blocks, instead it silently drops the
                     // item pushed in when the buffer is too full.
                 } else {
@@ -48,7 +46,7 @@ impl Model for InMemoryV1 {
                 Progress::Advanced
             }
             WhenFull::Block | WhenFull::Overflow => {
-                if self.inner.len() >= (self.capacity + self.num_senders) {
+                if self.inner.len() >= self.capacity {
                     Progress::Blocked(item)
                 } else {
                     self.inner.push_back(item);

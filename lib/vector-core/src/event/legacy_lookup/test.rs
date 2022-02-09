@@ -1,11 +1,12 @@
+use once_cell::sync::Lazy;
 use std::{fs, io::Read, path::Path};
 
 use super::*;
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
-lazy_static::lazy_static! {
-    static ref SUFFICIENTLY_DECOMPOSED: [Segment; 9] = [
+static SUFFICIENTLY_DECOMPOSED: Lazy<[Segment; 9]> = Lazy::new(|| {
+    [
         Segment::field(r#"regular"#.to_string()),
         Segment::field(r#""quoted""#.to_string()),
         Segment::field(r#""quoted but spaces""#.to_string()),
@@ -15,8 +16,8 @@ lazy_static::lazy_static! {
         Segment::field(r#"nested_lookup"#.to_string()),
         Segment::index(0),
         Segment::index(0),
-    ];
-}
+    ]
+});
 
 #[test]
 fn zero_len_not_allowed() {

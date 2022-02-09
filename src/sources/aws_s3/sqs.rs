@@ -3,7 +3,7 @@ use std::{cmp, future::ready, panic, sync::Arc};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
 use rusoto_sqs::{
@@ -32,10 +32,8 @@ use crate::{
     SourceSender,
 };
 
-lazy_static! {
-    static ref SUPPORTED_S3S_EVENT_VERSION: semver::VersionReq =
-        semver::VersionReq::parse("~2").unwrap();
-}
+static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
+    Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
 #[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
 #[derivative(Default)]
