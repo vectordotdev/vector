@@ -180,7 +180,11 @@ impl Expression for DelFn {
             match self.query.delete_type_def(state) {
                 Err(remove::Error::RootPath)
                 | Err(remove::Error::CoalescedPath)
-                | Err(remove::Error::NegativeIndexPath) => { /* TODO: handle removal errors */ }
+                | Err(remove::Error::NegativeIndexPath) => {
+                    // This function is (currently) infallible, so we ignore any errors here.
+                    //
+                    // see: https://github.com/vectordotdev/vector/issues/11264
+                }
                 Ok(_) => {}
             }
         }
