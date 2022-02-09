@@ -79,7 +79,7 @@ print("")
 print(results.to_markdown(index=False, tablefmt='github'))
 
 p_value_violation = results['p-value'] < args.p_value
-drift_filter = results['Δ mean %'] > args.mean_drift_percentage
+drift_filter = results['Δ mean %'] < -args.mean_drift_percentage
 declared_erratic = results.experiment.isin(known_erratic_soaks)
 
 changes = results[p_value_violation & drift_filter & ~declared_erratic]
