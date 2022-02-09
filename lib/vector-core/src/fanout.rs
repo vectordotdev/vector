@@ -74,11 +74,12 @@ impl Fanout {
                 sink.flush().await?;
             }
         } else {
-            let mut faulty_sinks = Vec::with_capacity(0);
+            let mut faulty_sinks = Vec::new();
 
             {
                 let mut jobs = FuturesUnordered::new();
-                let mut clone_army: Vec<Vec<Event>> = Vec::with_capacity(self.sinks.len());
+                let mut clone_army: Vec<Vec<Event>> =
+                    Vec::with_capacity(self.sinks.iter().filter(|x| x.1.is_some()).count());
                 for _ in 0..(self.sinks.len() - 1) {
                     clone_army.push(events.clone());
                 }
