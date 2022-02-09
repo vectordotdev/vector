@@ -152,12 +152,10 @@ impl Expression for ToTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let fallible = Kind::timestamp()
-            .or_integer()
-            .or_float()
-            .is_superset(self.value.type_def(state).kind());
-
-        TypeDef::timestamp().with_fallibility(!fallible)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::timestamp())
+            .with_kind(Kind::timestamp())
     }
 }
 
@@ -203,13 +201,13 @@ mod tests {
         integer {
              args: func_args![value: 1431648000],
              want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
-             tdef: TypeDef::timestamp(),
+             tdef: TypeDef::timestamp().fallible(),
         }
 
         float {
              args: func_args![value: 1431648000.5],
              want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
-             tdef: TypeDef::timestamp(),
+             tdef: TypeDef::timestamp().fallible(),
         }
     ];
 }
