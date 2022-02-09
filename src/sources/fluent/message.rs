@@ -149,13 +149,13 @@ impl From<FluentValue> for Value {
                 // `From<serde_json::Value> for Value` handles it
                 .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
             rmpv::Value::F32(f) => {
-                // serde_json converts NaN to Null, so we model that behavior here
+                // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f as f64)
                     .map(|f| Value::Float(f))
                     .unwrap_or(Value::Null)
             }
             rmpv::Value::F64(f) => {
-                // serde_json converts NaN to Null, so we model that behavior here
+                // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f)
                     .map(|f| Value::Float(f))
                     .unwrap_or(Value::Null)
@@ -260,15 +260,10 @@ mod test {
     quickcheck! {
       fn from_f32(input: f32) -> () {
           let val = Value::from(FluentValue(rmpv::Value::F32(input)));
-          match val {
-              Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
-                  } else {
-                      assert_relative_eq!(input as f64, f);
-                  }
-              }
-              _ => unreachable!(),
+          if input.is_nan() {
+              assert_eq!(val, Value::Null);
+          } else {
+              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
           }
         }
     }
@@ -276,15 +271,10 @@ mod test {
     quickcheck! {
       fn from_f64(input: f64) -> () {
           let val = Value::from(FluentValue(rmpv::Value::F64(input)));
-          match val {
-              Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
-                  } else {
-                      assert_relative_eq!(input, f);
-                  }
-              }
-              _ => unreachable!(),
+          if input.is_nan() {
+              assert_eq!(val, Value::Null);
+          } else {
+              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
           }
         }
     }

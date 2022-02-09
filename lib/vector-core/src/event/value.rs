@@ -320,6 +320,20 @@ impl From<NotNan<f64>> for Value {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        NotNan::new(f).unwrap().into()
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+impl From<f32> for Value {
+    fn from(f: f32) -> Self {
+        NotNan::new(f as f64).unwrap().into()
+    }
+}
+
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
@@ -486,6 +500,13 @@ impl Value {
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
         match &self {
             Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<NotNan<f64>> {
+        match self {
+            Value::Float(f) => Some(*f),
             _ => None,
         }
     }

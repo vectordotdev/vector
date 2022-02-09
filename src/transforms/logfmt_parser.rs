@@ -183,7 +183,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::from(42.3));
         assert_eq!(log["flag"], Value::Boolean(true));
         assert_eq!(log["code"], Value::Integer(1234));
         assert_eq!(log["rest"], Value::Bytes("word".into()));

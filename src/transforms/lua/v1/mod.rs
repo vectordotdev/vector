@@ -399,7 +399,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
     #[test]
