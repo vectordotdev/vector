@@ -25,6 +25,17 @@ pub struct TapPatterns {
     pub for_inputs: HashSet<String>,
 }
 
+impl TapPatterns {
+    /// Get all user-specified patterns
+    pub fn all_patterns(&self) -> HashSet<String> {
+        self.for_outputs
+            .iter()
+            .cloned()
+            .chain(self.for_inputs.iter().cloned())
+            .collect()
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
 

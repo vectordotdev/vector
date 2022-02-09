@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    iter::FromIterator,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -35,6 +34,34 @@ impl GlobMatcher<&str> for String {
         match glob::Pattern::new(self) {
             Ok(pattern) => pattern.matches(rhs),
             _ => false,
+        }
+    }
+}
+
+/// Distinguishing between pattern variants helps us preserve user-friendly tap
+/// notifications. Otherwise, after translating an input pattern into relevant
+/// output patterns, we'd be unable to send a [`TapPayload::Notification`] with
+/// the original user-specified input pattern.
+#[derive(Debug, Eq, PartialEq, Hash)]
+enum Pattern {
+    /// A pattern used to tap into outputs of components
+    OutputPattern(String),
+    /// A pattern used to tap into inputs of components.
+    ///
+    /// As a tap user, an input pattern is effectively a shortcut for specifying
+    /// one or more output patterns since a component's inputs are other
+    /// components' outputs. This variant captures the original user-supplied
+    /// pattern alongside the output patterns it's translated into.
+    InputPattern(String, Vec<String>),
+}
+
+impl GlobMatcher<&str> for Pattern {
+    fn matches_glob(&self, rhs: &str) -> bool {
+        match self {
+            Pattern::OutputPattern(pattern) => pattern.matches_glob(rhs),
+            Pattern::InputPattern(_, patterns) => {
+                patterns.iter().any(|pattern| pattern.matches_glob(rhs))
+            }
         }
     }
 }
@@ -157,13 +184,13 @@ fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> Shutdo
 }
 
 /// Sends a 'matched' tap payload.
-async fn send_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_matched(tx: TapSender, pattern: String) -> Result<(), SendError<TapPayload>> {
     debug!(message = "Sending matched notification.", pattern = ?pattern);
     tx.send(TapPayload::matched(pattern)).await
 }
 
 /// Sends a 'not matched' tap payload.
-async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_not_matched(tx: TapSender, pattern: String) -> Result<(), SendError<TapPayload>> {
     debug!(message = "Sending not matched notification.", pattern = ?pattern);
     tx.send(TapPayload::not_matched(pattern)).await
 }
@@ -171,7 +198,7 @@ async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
-    mut patterns: TapPatterns,
+    patterns: TapPatterns,
     tx: TapSender,
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
@@ -181,6 +208,13 @@ async fn tap_handler(
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
     let mut sinks: HashMap<OutputId, _> = HashMap::new();
+
+    // All patterns
+    let raw_patterns = patterns.all_patterns();
+
+    // The patterns that matched on the last iteration, to compare with the latest
+    // round of matches when sending notifications.
+    let mut last_matches = HashSet::new();
 
     loop {
         tokio::select! {
@@ -196,29 +230,21 @@ async fn tap_handler(
                     inputs,
                 } = watch_rx.borrow().clone();
 
+                let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(|pattern| Pattern::OutputPattern(pattern)).collect::<HashSet<_>>();
+
                 // Matching an input pattern is equivalent to matching the outputs of the component's inputs
-                for (key, related_inputs) in inputs.iter() {
-                    match patterns.for_inputs.iter().filter(|pattern| pattern.matches_glob(&key.to_string())).collect_vec() {
+                for pattern in patterns.for_inputs.iter() {
+                    match inputs.iter().filter(|(key, _)|
+                        pattern.matches_glob(&key.to_string())
+                    ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect_vec()).collect::<HashSet<_>>() {
                         found if !found.is_empty() => {
-                            debug!(message = "Component matched.", ?key, ?patterns.for_inputs);
-                            patterns.for_outputs.extend(related_inputs.into_iter().map(|id| id.to_string()));
+                            component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter().collect_vec()));
                         }
                         _ => {
-                            debug!(
-                                message="Component not matched.", ?key, ?patterns.for_inputs
-                            );
+                            debug!(message="Input pattern not expanded: no matching components.", ?pattern);
                         }
                     }
                 }
-
-                let component_id_patterns = patterns.for_outputs.clone();
-
-                // Get the patterns that matched on the last iteration, to compare with the latest
-                // round of matches when sending notifications.
-                let last_matches = component_id_patterns
-                    .iter()
-                    .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(&id.to_string())))
-                    .collect::<HashSet<_>>();
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
@@ -264,7 +290,12 @@ async fn tap_handler(
                                 }
                             }
 
-                            matched.extend(found);
+                            matched.extend(found.iter().map(|pattern| {
+                                match pattern {
+                                    Pattern::OutputPattern(p) => p.to_owned(),
+                                    Pattern::InputPattern(p, _) => p.to_owned(),
+                                }
+                            }));
                         }
                         _ => {
                             debug!(
@@ -288,13 +319,15 @@ async fn tap_handler(
 
                 // Matched notifications.
                 for pattern in matched.difference(&last_matches) {
-                    notifications.push(send_matched(tx.clone(), pattern).boxed());
+                    notifications.push(send_matched(tx.clone(), pattern.clone()).boxed());
                 }
 
                 // Not matched notifications.
-                for pattern in HashSet::from_iter(&component_id_patterns).difference(&matched) {
-                    notifications.push(send_not_matched(tx.clone(), pattern).boxed());
+                for pattern in raw_patterns.difference(&matched) {
+                    notifications.push(send_not_matched(tx.clone(), pattern.clone()).boxed());
                 }
+
+                last_matches = matched;
 
                 // Send all events. If any event returns an error, this means the client
                 // channel has gone away, so we can break the loop.
