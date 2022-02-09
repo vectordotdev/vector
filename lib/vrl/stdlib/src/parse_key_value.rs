@@ -733,7 +733,7 @@ mod test {
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
-        // From https://github.com/timberio/vector/issues/5347
+        // From https://github.com/vectordotdev/vector/issues/5347
         real_case {
             args: func_args! [
                 value: r#"SerialNum=100018002000001906146520 GenTime="2019-10-24 14:25:03" SrcIP=10.10.254.2 DstIP=10.10.254.7 Protocol=UDP SrcPort=137 DstPort=137 PolicyID=3 Action=PERMIT Content="Session Backout""#

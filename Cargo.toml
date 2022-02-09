@@ -1,7 +1,7 @@
 [package]
 name = "vector"
 version = "0.20.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 homepage = "https://vector.dev"
@@ -359,7 +359,7 @@ default = ["api", "api-client", "enrichment-tables", "rdkafka-plain", "sinks", "
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
-# TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
+# TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 default-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-api-client = ["api", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]

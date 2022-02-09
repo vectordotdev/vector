@@ -34,7 +34,7 @@ impl Deserializer for SyslogDeserializer {
             error
         })?;
         let line = line.trim();
-        let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
+        let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
         let mut event = Event::from(parsed.msg);
 
         insert_fields_from_syslog(&mut event, parsed);
