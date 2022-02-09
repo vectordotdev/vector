@@ -200,7 +200,7 @@ async fn multiple_inputs_backpressure() {
 }
 
 mod test_sink {
-    use crate::config::{DataType, SinkConfig, SinkContext};
+    use crate::config::{Input, SinkConfig, SinkContext};
     use crate::event::Event;
     use crate::sinks::util::StreamSink;
     use crate::sinks::{Healthcheck, VectorSink};
@@ -240,8 +240,8 @@ mod test_sink {
             Ok((VectorSink::from_event_streamsink(sink), healthcheck))
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::any()
         }
 
         fn sink_type(&self) -> &'static str {

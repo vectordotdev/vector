@@ -6,7 +6,8 @@ use toml::value::Value as TomlValue;
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::{
@@ -71,8 +72,8 @@ impl TransformConfig for AddFieldsConfig {
         Ok(Transform::function(AddFields::new(fields, self.overwrite)?))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {

@@ -32,7 +32,7 @@ use super::util::{
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     serde::to_string,
     sinks::{
@@ -692,8 +692,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Ok(sink_and_healthcheck)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -13,7 +13,7 @@ use serde_json::Value as JsonValue;
 
 use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -119,8 +119,8 @@ impl SinkConfig for AzureMonitorLogsConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

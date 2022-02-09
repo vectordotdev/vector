@@ -7,7 +7,7 @@ use snafu::ResultExt;
 
 use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
@@ -92,8 +92,8 @@ impl SinkConfig for ClickhouseConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -68,7 +68,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::AnyCondition,
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     transforms::Transform,
@@ -242,8 +242,8 @@ impl TransformConfig for PipelinesConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {
