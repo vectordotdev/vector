@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
@@ -208,17 +208,11 @@ impl HttpSink for LogdnaConfig {
 
         let query = query.finish();
 
-        let body = {
-            let mut buffer = BytesMut::new();
-            serde_json::to_writer(
-                (&mut buffer).writer(),
-                &json!({
-                    "lines": events,
-                }),
-            )
-            .unwrap();
-            buffer.freeze()
-        };
+        let body = crate::serde_json::to_bytes(&json!({
+            "lines": events,
+        }))
+        .unwrap()
+        .freeze();
 
         let uri = self.build_uri(&query);
 

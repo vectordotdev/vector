@@ -1,6 +1,6 @@
 use std::num::NonZeroU64;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -183,11 +183,7 @@ impl HttpSink for PubsubSink {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
-        let body = {
-            let mut buffer = BytesMut::new();
-            serde_json::to_writer((&mut buffer).writer(), &body).unwrap();
-            buffer.freeze()
-        };
+        let body = crate::serde_json::to_bytes(&body).unwrap().freeze();
 
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");

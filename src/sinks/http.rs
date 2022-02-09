@@ -180,30 +180,31 @@ impl HttpSink for HttpSinkConfig {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
-        let mut body = BytesMut::new();
-        match &self.encoding.codec() {
+        let body = match &self.encoding.codec() {
             Encoding::Text => {
                 if let Some(v) = event.get(crate::config::log_schema().message_key()) {
+                    let mut body = BytesMut::new();
                     body.put_slice(&v.to_string_lossy().into_bytes());
                     body.put_u8(b'\n');
+                    body
                 } else {
                     emit!(&HttpEventMissingMessage);
                     return None;
                 }
             }
-
             Encoding::Ndjson => {
-                serde_json::to_writer((&mut body).writer(), &event)
+                let mut body = crate::serde_json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 body.put_u8(b'\n');
+                body
             }
-
             Encoding::Json => {
-                serde_json::to_writer((&mut body).writer(), &event)
+                let mut body = crate::serde_json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 body.put_u8(b',');
+                body
             }
         };
 

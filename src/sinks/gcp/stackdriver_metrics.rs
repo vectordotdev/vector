@@ -1,6 +1,6 @@
 use std::num::NonZeroU64;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use http::{header::AUTHORIZATION, HeaderValue, Uri};
@@ -200,11 +200,7 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = {
-            let mut buffer = BytesMut::new();
-            serde_json::to_writer((&mut buffer).writer(), &series).unwrap();
-            buffer.freeze()
-        };
+        let body = crate::serde_json::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",

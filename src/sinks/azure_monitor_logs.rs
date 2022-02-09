@@ -1,4 +1,4 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{
     header,
@@ -227,11 +227,7 @@ impl AzureMonitorLogsSink {
     }
 
     fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
-        let body = {
-            let mut buffer = BytesMut::new();
-            serde_json::to_writer((&mut buffer).writer(), &events).unwrap();
-            buffer.freeze()
-        };
+        let body = crate::serde_json::to_bytes(&events).unwrap().freeze();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body)?;

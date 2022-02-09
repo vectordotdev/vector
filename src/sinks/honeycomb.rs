@@ -1,6 +1,6 @@
 use std::num::NonZeroU64;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
@@ -122,12 +122,7 @@ impl HttpSink for HoneycombConfig {
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
-
-        let body = {
-            let mut buffer = BytesMut::new();
-            serde_json::to_writer((&mut buffer).writer(), &events).unwrap();
-            buffer.freeze()
-        };
+        let body = crate::serde_json::to_bytes(&events).unwrap().freeze();
 
         request.body(body).map_err(Into::into)
     }
