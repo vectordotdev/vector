@@ -275,7 +275,7 @@ impl<T> SinkOuter<T> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::Memory { .. } => {}
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
                     resources.push(Resource::DiskBuffer(id.to_string()))
                 }

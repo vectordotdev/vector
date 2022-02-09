@@ -12,7 +12,7 @@ use crate::{
         TransformDescription,
     },
     event::Event,
-    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
+    internal_events::AwsCloudwatchLogsSubscriptionParserError,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -85,9 +85,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
             .map(|s| s.as_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
-                    .map_err(|error| {
-                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
-                    })
+                    .map_err(|error| emit!(&AwsCloudwatchLogsSubscriptionParserError { error }))
                     .ok()
             });
 

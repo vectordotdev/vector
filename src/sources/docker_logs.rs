@@ -12,7 +12,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use vector_core::ByteSizeOf;
@@ -43,11 +43,9 @@ const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly regconized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
-lazy_static! {
-    static ref STDERR: Bytes = "stderr".into();
-    static ref STDOUT: Bytes = "stdout".into();
-    static ref CONSOLE: Bytes = "console".into();
-}
+static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
+static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
+static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]

@@ -51,11 +51,12 @@ impl From<TapEncodingFormat>
 }
 
 impl output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns {
-    pub fn as_log(
+    pub fn as_string(
         &self,
-    ) -> Option<&output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatternsOnLog>{
+    ) -> Option<&str>{
         match self {
-            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev),
+            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev.string.as_ref()),
+            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => Some(ev.string.as_ref()),
             _ => None,
         }
     }

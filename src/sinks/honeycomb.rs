@@ -2,6 +2,7 @@ use std::num::NonZeroU64;
 
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -16,9 +17,7 @@ use crate::{
     },
 };
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HoneycombConfig {

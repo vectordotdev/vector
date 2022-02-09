@@ -3,6 +3,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
 };
 
+use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
@@ -350,15 +351,16 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
     }
 }
 
-fn trim_xml(xml: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE: Regex = RegexBuilder::new(r">\s+?<")
-            .multi_line(true)
-            .build()
-            .expect("trim regex failed");
-    }
+static XML_RE: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new(r">\s+?<")
+        .multi_line(true)
+        .build()
+        .expect("trim regex failed")
+});
 
-    RE.replace_all(xml, "><")
+#[inline]
+fn trim_xml(xml: &str) -> Cow<str> {
+    XML_RE.replace_all(xml, "><")
 }
 
 #[cfg(test)]

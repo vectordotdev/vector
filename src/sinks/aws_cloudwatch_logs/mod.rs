@@ -11,7 +11,7 @@ mod integration_tests;
 use snafu::Snafu;
 
 use self::config::CloudwatchLogsSinkConfig;
-use crate::{config::SinkDescription, internal_events::TemplateRenderingFailed};
+use crate::{config::SinkDescription, internal_events::TemplateRenderingError};
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
