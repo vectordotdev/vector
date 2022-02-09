@@ -555,7 +555,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(output.as_log()["number"], Value::from(3.14159));
         Ok(())
     }
 

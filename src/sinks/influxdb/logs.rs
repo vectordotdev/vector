@@ -248,7 +248,7 @@ impl InfluxDbLogsConfig {
 fn to_field(value: &Value) -> Field {
     match value {
         Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
+        Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
         _ => Field::String(value.to_string_lossy()),
     }

@@ -313,6 +313,7 @@ mod tests {
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -529,7 +530,7 @@ mod tests {
         .expect("Failed to parse log");
         assert_eq!(log["check"], Value::Boolean(false));
         assert_eq!(log["status"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(6789.01));
+        assert_eq!(log["time"], Value::Float(NotNan::new(6789.01).unwrap()));
     }
 
     #[tokio::test]
@@ -582,7 +583,7 @@ mod tests {
 
         assert_eq!(log.get("id1"), None);
         assert_eq!(log["id2"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["time"], Value::Float(NotNan::new(235.42).unwrap()));
         assert_eq!(log["check"], Value::Boolean(true));
         assert!(log.get("message").is_some());
     }

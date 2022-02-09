@@ -770,32 +770,36 @@ mod test {
         );
 
         assert_eq!(
-            merge(json!([4]).into(), json!([2]).into(), &MergeStrategy::Concat),
-            Ok(json!([4, 2]).into())
+            merge(
+                json!([4_i64]).into(),
+                json!([2_i64]).into(),
+                &MergeStrategy::Concat
+            ),
+            Ok(json!([4_i64, 2_i64]).into())
         );
         assert_eq!(
-            merge(json!([]).into(), 42.into(), &MergeStrategy::Concat),
-            Ok(json!([42]).into())
+            merge(json!([]).into(), 42_i64.into(), &MergeStrategy::Concat),
+            Ok(json!([42_i64]).into())
         );
 
         assert_eq!(
             merge(
-                json!([34]).into(),
-                json!([42, 43]).into(),
+                json!([34_i64]).into(),
+                json!([42_i64, 43_i64]).into(),
                 &MergeStrategy::ShortestArray
             ),
-            Ok(json!([34]).into())
+            Ok(json!([34_i64]).into())
         );
         assert_eq!(
             merge(
-                json!([34]).into(),
-                json!([42, 43]).into(),
+                json!([34_i64]).into(),
+                json!([42_i64, 43_i64]).into(),
                 &MergeStrategy::LongestArray
             ),
-            Ok(json!([42, 43]).into())
+            Ok(json!([42_i64, 43_i64]).into())
         );
 
-        let v = merge(34.into(), 43.into(), &MergeStrategy::FlatUnique).unwrap();
+        let v = merge(34_i64.into(), 43_i64.into(), &MergeStrategy::FlatUnique).unwrap();
         if let Value::Array(v) = v.clone() {
             let v: Vec<_> = v
                 .into_iter()
@@ -812,7 +816,7 @@ mod test {
         } else {
             panic!("Not array");
         }
-        let v = merge(v, 34.into(), &MergeStrategy::FlatUnique).unwrap();
+        let v = merge(v, 34_i32.into(), &MergeStrategy::FlatUnique).unwrap();
         if let Value::Array(v) = v {
             let v: Vec<_> = v
                 .into_iter()
