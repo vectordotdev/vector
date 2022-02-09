@@ -17,6 +17,7 @@ use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
@@ -416,7 +417,7 @@ impl Source {
 
             emit!(&KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size,
+                byte_size: event.size_of(),
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
 

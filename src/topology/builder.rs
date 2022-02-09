@@ -5,14 +5,14 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     time::{timeout, Duration},
 };
+use tracing_futures::Instrument;
 use vector_core::{
     buffers::{
         topology::{
@@ -42,9 +42,8 @@ use crate::{
     SourceSender,
 };
 
-lazy_static! {
-    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
-}
+static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
+    Lazy::new(enrichment::TableRegistry::default);
 
 pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
@@ -262,7 +261,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -289,7 +288,7 @@ pub async fn build_pieces(
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::Memory { .. } => "memory",
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
@@ -628,7 +627,7 @@ impl Runner {
                                 }
 
                                 outputs_buf
-                            });
+                            }.in_current_span());
                             in_flight.push(task);
                         }
                         None => {
@@ -658,7 +657,7 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (output, control) = Fanout::new();
+    let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
@@ -674,15 +673,15 @@ fn build_task_transform(
     let transform = t
         .transform(Box::pin(filtered))
         .flat_map(|events| futures::stream::iter(events.into_events()))
-        .map(Ok)
-        .forward(output.with(|event: Event| async {
+        .inspect(|event: &Event| {
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
                 output: None,
             });
-            Ok(event)
-        }))
+        })
+        .map(Ok)
+        .forward(fanout)
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");

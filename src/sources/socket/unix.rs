@@ -28,9 +28,9 @@ pub struct UnixConfig {
     pub max_length: Option<usize>,
     pub host_key: Option<String>,
     #[serde(default)]
-    pub framing: Option<Box<dyn FramingConfig>>,
+    pub framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 impl UnixConfig {

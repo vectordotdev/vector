@@ -1,7 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use indoc::indoc;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::{
@@ -16,16 +16,16 @@ use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
-lazy_static! {
-    static ref ERRORS: Vec<String> = [
+static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
+    [
         100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 203, 204, 205, 206, 207, 208, 209, 300,
         301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 400, 401, 402, 403,
-        601, 620, 630, 640, 650, 651, 652, 660, 701
+        601, 620, 630, 640, 650, 651, 652, 660, 701,
     ]
     .iter()
     .map(|i| i.to_string())
-    .collect();
-}
+    .collect()
+});
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";

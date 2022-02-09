@@ -26,9 +26,9 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -57,7 +57,7 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let svc = filters::firehose(

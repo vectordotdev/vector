@@ -47,6 +47,10 @@
 
       {{ block "main" . }}
       {{ end }}
+
+      {{/*  Include modal partial ONCE - Handles all instances of button-modal partial  */}}
+      {{/*  To add a modal, include another dict based on .Params.marketo_form  */}}
+      {{ partial "modal.html" (dict "form" (slice (dict "form_id" "12461" "form_title" "Sign up to receive emails on the latest Vector content and new releases" "form_thankyou" "Thank you for joining our Updates Newsletter"))) }}
     </div>
 
     {{/* For things pushed down with the footer (e.g. pagination) */}}
