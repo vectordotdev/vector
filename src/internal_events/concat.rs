@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -16,7 +17,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
             message = "Substring error.",
             error = "Unable to split string.",
             error_type = "parser_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             condition = self.condition,
             source = self.source,
             start = self.start,
@@ -31,7 +32,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
             "component_errors_total", 1,
             "error" => "Substring error.",
             "error_type" => "parser_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1);

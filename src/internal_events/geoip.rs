@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -12,7 +13,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
             message = "IP Address not parsed correctly.",
             error = "Invalid IP address",
             error_type = "parser_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             address = %self.address,
             internal_log_rate_secs = 30
         );
@@ -23,7 +24,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
             "component_errors_total", 1,
             "error" => "Invalid IP address",
             "error_type" => "parser_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!(

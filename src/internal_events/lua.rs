@@ -1,5 +1,4 @@
-// ## skip check-events ##
-
+use super::prelude::error_stage;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -25,7 +24,7 @@ impl InternalEvent for LuaScriptError {
             message = "Error in lua script; discarding event.",
             error = ?self.error,
             error_type = "script_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
     }
@@ -35,13 +34,13 @@ impl InternalEvent for LuaScriptError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "script_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "script_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1);
@@ -59,7 +58,7 @@ impl InternalEvent for LuaBuildError {
             message = "Error in lua script; discarding event.",
             error = ?self.error,
             error_type = "script_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
     }
@@ -69,13 +68,13 @@ impl InternalEvent for LuaBuildError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "script_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "script_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1);

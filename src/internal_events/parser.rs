@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -12,7 +13,7 @@ impl InternalEvent for ParserMatchError<'_> {
             message = "Pattern failed to match.",
             error = "Failed to match pattern",
             error_type = "condition_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
         );
@@ -23,7 +24,7 @@ impl InternalEvent for ParserMatchError<'_> {
             "component_errors_total", 1,
             "error" => "Failed to match pattern",
             "error_type" => "condition_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "failed_match");
@@ -42,7 +43,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             field = %self.field,
             error = "Field not found",
             error_type = "condition_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
         );
     }
@@ -52,7 +53,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             "component_errors_total", 1,
             "error" => "Field not found",
             "error_type" => "condition_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
         // deprecated
@@ -71,7 +72,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
             message = "Target field already exists.",
             error = "Target field already exists",
             error_type = "condition_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             target_field = %self.target_field,
             internal_log_rate_secs = 30
         )
@@ -82,7 +83,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
             "component_errors_total", 1,
             "error" => "Target field already exists",
             "error_type" => "condition_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "target_field" => self.target_field.to_string(),
         );
         // deprecated
@@ -103,7 +104,7 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             name = %self.name,
             error = ?self.error,
             error_type = "conversion_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
     }
@@ -113,7 +114,7 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "conversion_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "name" => self.name.to_string(),
         );
         // deprecated

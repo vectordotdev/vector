@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
@@ -13,7 +14,7 @@ impl<'a> InternalEvent for MetricToLogSerializeError {
             message = "Metric failed to serialize as JSON.",
             error = ?self.error,
             error_type = "serialize_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         )
     }
@@ -23,7 +24,7 @@ impl<'a> InternalEvent for MetricToLogSerializeError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "serialize_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "failed_serialize");

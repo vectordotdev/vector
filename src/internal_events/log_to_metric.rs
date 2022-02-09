@@ -1,5 +1,6 @@
 use std::num::ParseFloatError;
 
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -15,7 +16,7 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             message = "Field is null.",
             error = "Unable to convert null field",
             error_type = "condition_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             null_field = %self.field,
             internal_log_rate_secs = 30
         );
@@ -26,7 +27,7 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             "component_errors_total", 1,
             "error" => "Unable to convert null field",
             "error_type" => "condition_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "null_field" => self.field.to_string(),
         );
         // deprecated
@@ -49,7 +50,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             field = %self.field,
             error = %self.error,
             error_type = "parser_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
     }
@@ -59,7 +60,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "parser_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
         // deprecated
@@ -80,7 +81,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
             message = "Failed to parse template.",
             error = ?self.error,
             error_type = "template_failed",
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
     }
@@ -90,7 +91,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
             "component_errors_total", 1,
             "error" => self.error.to_string(),
             "error_type" => "template_failed",
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!(
