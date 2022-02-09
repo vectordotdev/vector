@@ -1,6 +1,8 @@
 use crate::{config::ComponentKey, event::Event};
 use futures::Sink;
 use futures_util::SinkExt;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::{
     fmt,
     pin::Pin,
@@ -172,13 +174,13 @@ impl Sink<Event> for Fanout {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), ()> {
-        let mut items = vec![item; self.sinks.len()];
+        let mut rng = thread_rng();
+        self.sinks.shuffle(&mut rng);
 
         let mut i = 1;
         while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink.as_mut() {
-                let item = items.pop().unwrap();
-                if sink.as_mut().start_send(item).is_err() {
+                if sink.as_mut().start_send(item.clone()).is_err() {
                     self.handle_sink_error(i)?;
                     continue;
                 }
@@ -188,7 +190,6 @@ impl Sink<Event> for Fanout {
 
         if let Some((_, sink)) = self.sinks.first_mut() {
             if let Some(sink) = sink.as_mut() {
-                let item = items.pop().unwrap();
                 if sink.as_mut().start_send(item).is_err() {
                     self.handle_sink_error(0)?;
                 }
