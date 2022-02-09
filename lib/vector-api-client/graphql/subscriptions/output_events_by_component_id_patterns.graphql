@@ -8,6 +8,11 @@ subscription OutputEventsByComponentIdPatternsSubscription(
             timestamp
             string(encoding: $encoding)
         }
+        ... on Metric {
+            componentId
+            timestamp
+            string(encoding: $encoding)
+        }
         ... on EventNotification {
             pattern
             notification
