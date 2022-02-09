@@ -1,4 +1,5 @@
 use bytes::BytesMut;
+use ordered_float::NotNan;
 
 use super::{query_value::QueryValue, Function};
 use crate::{
@@ -47,8 +48,14 @@ impl Arithmetic {
 #[allow(clippy::cast_precision_loss)]
 fn coerce_number_types(left: Value, right: Value) -> (Value, Value) {
     match (&left, &right) {
-        (Value::Float(lf), Value::Integer(ri)) => (Value::Float(*lf), Value::Float(*ri as f64)),
-        (Value::Integer(li), Value::Float(rf)) => (Value::Float(*li as f64), Value::Float(*rf)),
+        (Value::Float(lf), Value::Integer(ri)) => (
+            Value::Float(*lf),
+            Value::Float(NotNan::new(*ri as f64).unwrap()),
+        ),
+        (Value::Integer(li), Value::Float(rf)) => (
+            Value::Float(NotNan::new(*li as f64).unwrap()),
+            Value::Float(*rf),
+        ),
         _ => (left, right),
     }
 }
@@ -65,7 +72,9 @@ fn compare_number_types(
         (Value::Integer(li), Value::Integer(ri)) => {
             Ok(Value::Boolean(compare_fn(li as f64, ri as f64)))
         }
-        (Value::Float(lf), Value::Float(rf)) => Ok(Value::Boolean(compare_fn(lf, rf))),
+        (Value::Float(lf), Value::Float(rf)) => {
+            Ok(Value::Boolean(compare_fn(lf.into_inner(), rf.into_inner())))
+        }
         (l, r) => Err(format!(
             "unable to numerically compare field types {:?} and {:?}",
             l, r
@@ -139,7 +148,9 @@ impl Function for Arithmetic {
                         }
                     },
                     Value::Integer(il) => match right {
-                        Value::Integer(ir) => Value::Float(il as f64 / ir as f64),
+                        Value::Integer(ir) => Value::Float(
+                            NotNan::new(il as f64).unwrap() / NotNan::new(ir as f64).unwrap(),
+                        ),
                         vr => {
                             return Err(format!("unable to divide right-hand field type {:?}", vr))
                         }

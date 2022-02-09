@@ -1,4 +1,5 @@
 use mlua::prelude::*;
+use ordered_float::NotNan;
 
 use super::util::{table_is_timestamp, table_to_timestamp, timestamp_to_table};
 use crate::event::Value;
@@ -9,7 +10,7 @@ impl<'a> ToLua<'a> for Value {
         match self {
             Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
             Value::Integer(i) => Ok(LuaValue::Integer(i)),
-            Value::Float(f) => Ok(LuaValue::Number(f)),
+            Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
             Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
@@ -24,7 +25,14 @@ impl<'a> FromLua<'a> for Value {
         match value {
             LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
-            LuaValue::Number(f) => Ok(Value::Float(f)),
+            LuaValue::Number(f) => {
+                let f = NotNan::new(f).map_err(|_| mlua::Error::FromLuaConversionError {
+                    from: value.type_name(),
+                    to: "Value",
+                    message: Some("NaN not supported".to_string()),
+                })?;
+                Ok(Value::Float(f))
+            }
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
             LuaValue::Table(t) => {
                 if t.len()? > 0 {
