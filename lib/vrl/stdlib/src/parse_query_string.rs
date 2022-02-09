@@ -79,14 +79,12 @@ impl Expression for ParseQueryStringFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().object::<(), Kind>(type_def())
+        TypeDef::object(inner_kind())
     }
 }
 
-fn type_def() -> BTreeMap<(), Kind> {
-    map! {
-        (): Kind::Bytes | Kind::Array,
-    }
+fn inner_kind() -> Collection<Field> {
+    Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
 }
 
 #[cfg(test)]
@@ -104,7 +102,7 @@ mod tests {
                 xyz: "",
                 abc: "",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         multiple_values {
@@ -112,7 +110,7 @@ mod tests {
             want: Ok(value!({
                 foo: ["bar", "xyz"],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         ruby_on_rails_multiple_values {
@@ -120,7 +118,7 @@ mod tests {
             want: Ok(value!({
                 "foo[]": ["bar", "xyz"],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         empty_key {
@@ -128,7 +126,7 @@ mod tests {
             want: Ok(value!({
                 "": ["", ""],
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         single_key {
@@ -136,13 +134,13 @@ mod tests {
             want: Ok(value!({
                 foo: "",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         empty {
             args: func_args![value: value!("")],
             want: Ok(value!({})),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
 
         starts_with_question_mark {
@@ -150,7 +148,7 @@ mod tests {
             want: Ok(value!({
                 foo: "bar",
             })),
-            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()),
         }
     ];
 }

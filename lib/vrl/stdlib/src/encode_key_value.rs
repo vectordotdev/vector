@@ -145,9 +145,7 @@ impl Expression for EncodeKeyValueFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .bytes()
-            .with_fallibility(self.fields.is_some())
+        TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
 }
 
@@ -167,7 +165,7 @@ mod tests {
                 }
             ],
             want: Ok("lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         multiple_elements {
@@ -178,7 +176,7 @@ mod tests {
                 }
             ],
             want: Ok("log_id=12345 lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         string_with_spaces {
@@ -188,7 +186,7 @@ mod tests {
                     "msg" => "This is a log message"
                 }],
             want: Ok(r#"lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         flatten_boolean {
@@ -202,7 +200,7 @@ mod tests {
                 flatten_boolean: value!(true)
             ],
             want: Ok(r#"beta lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         dont_flatten_boolean {
@@ -216,7 +214,7 @@ mod tests {
                 flatten_boolean: value!(false)
             ],
             want: Ok(r#"beta=true lvl=info msg="This is a log message" prod=false"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         flatten_boolean_with_custom_delimiters {
@@ -231,7 +229,7 @@ mod tests {
                 flatten_boolean: value!(true)
             ],
             want: Ok(r#"tag_a:val_a,tag_b:val_b,tag_c"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
         string_with_characters_to_escape {
             args: func_args![value:
@@ -242,7 +240,7 @@ mod tests {
                     "space key" => "foo"
                 }],
             want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         nested_fields {
@@ -264,7 +262,7 @@ mod tests {
                     "event" => "log"
                 }],
                 want: Ok("agent.id=1234 agent.name=vector event=log log.file.path=encode_key_value.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"),
-                tdef: TypeDef::new().bytes().infallible(),
+                tdef: TypeDef::bytes().infallible(),
         }
 
         fields_ordering {
@@ -277,7 +275,7 @@ mod tests {
                 fields_ordering: value!(["lvl", "msg"])
             ],
             want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         nested_fields_ordering {
@@ -296,7 +294,7 @@ mod tests {
                 fields_ordering:  value!(["event", "log.file.path", "agent.name"])
             ],
             want: Ok("event=log log.file.path=encode_key_value.rs agent.name=vector"),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         fields_ordering_invalid_field_type {
@@ -310,10 +308,10 @@ mod tests {
             ],
             want: Err(format!(r"invalid field value type at index 1: {}",
                     value::Error::Expected {
-                        got: Kind::Integer,
-                        expected: Kind::Bytes
+                        got: Kind::integer(),
+                        expected: Kind::bytes()
                     })),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

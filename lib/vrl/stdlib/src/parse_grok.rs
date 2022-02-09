@@ -13,7 +13,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::InvalidGrokPattern(err) => write!(f, "{}", err),
+            Error::InvalidGrokPattern(err) => err.fmt(f),
         }
     }
 }
@@ -149,9 +149,7 @@ impl Expression for ParseGrokFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(map! {
-            (): Kind::all(),
-        })
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
@@ -168,27 +166,21 @@ mod test {
             args: func_args![ value: "foo",
                               pattern: "%{NOG}"],
             want: Err("The given pattern definition name \"NOG\" could not be found in the definition map"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error {
             args: func_args![ value: "an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
             want: Err("unable to parse input with grok pattern"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
             want: Err("unable to parse input with grok pattern"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         parsed {
@@ -199,9 +191,7 @@ mod test {
                 "level" => "info",
                 "message" => "Hello world",
             })),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         parsed2 {
@@ -211,9 +201,7 @@ mod test {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         remove_empty {
@@ -224,9 +212,7 @@ mod test {
             want: Ok(Value::from(
                 btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }

@@ -4,11 +4,13 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    value::Kind, Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
+    value::{Collection, Field, Index, Kind},
+    Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 
+pub use std::collections::BTreeMap;
 pub use std::fmt;
 
 pub use bytes::Bytes;
