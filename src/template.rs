@@ -5,7 +5,7 @@ use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
@@ -18,9 +18,7 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
-}
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 #[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {

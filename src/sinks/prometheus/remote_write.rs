@@ -14,7 +14,7 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{
@@ -117,7 +117,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingFailed {
+                                    emit!(&TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,

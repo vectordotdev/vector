@@ -1242,13 +1242,13 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
     let mut sum = 0.0;
     let mut count = 0;
     for sample in samples {
-        buckets
+        if let Some((i, _)) = buckets
             .iter()
             .enumerate()
-            .skip_while(|&(_, b)| *b < sample.value)
-            .for_each(|(i, _)| {
-                counts[i] += sample.rate;
-            });
+            .find(|&(_, b)| *b >= sample.value)
+        {
+            counts[i] += sample.rate;
+        }
 
         sum += sample.value * f64::from(sample.rate);
         count += sample.rate;
@@ -1649,14 +1649,31 @@ mod test {
         assert_eq!(counter_value.distribution_to_sketch(), None);
 
         let distrib_value = MetricValue::Distribution {
-            samples: samples!(1.0 => 1),
+            samples: samples!(1.0 => 10, 2.0 => 5, 5.0 => 2),
             statistic: StatisticKind::Summary,
         };
-        let converted = distrib_value.distribution_to_agg_histogram(&[1.0]);
-        assert!(matches!(
+        let converted = distrib_value.distribution_to_agg_histogram(&[1.0, 5.0, 10.0]);
+        assert_eq!(
             converted,
-            Some(MetricValue::AggregatedHistogram { .. })
-        ));
+            Some(MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 10,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 7,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 0,
+                    },
+                ],
+                sum: 30.0,
+                count: 17,
+            })
+        );
 
         let distrib_value = MetricValue::Distribution {
             samples: samples!(1.0 => 1),

@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+pub mod prelude;
+
 mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
@@ -70,6 +72,8 @@ mod grok_parser;
 mod heartbeat;
 mod http;
 pub mod http_client;
+#[cfg(feature = "sources-internal_logs")]
+mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 #[cfg(feature = "transforms-json_parser")]
@@ -222,6 +226,8 @@ pub(crate) use self::grok_parser::*;
     feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
+#[cfg(feature = "sources-internal_logs")]
+pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]

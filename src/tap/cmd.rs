@@ -65,10 +65,10 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
-                    for log_event in d.output_events_by_component_id_patterns.iter().filter_map(|ev| ev.as_log()) {
+                    for event_string in d.output_events_by_component_id_patterns.iter().filter_map(|ev| ev.as_string()) {
                         #[allow(clippy::print_stdout)]
                         {
-                            println!("{}", log_event.string);
+                            println!("{}", event_string);
                         }
                     }
                 }

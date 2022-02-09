@@ -10,7 +10,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{
-        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
+        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
     },
     serde::Fields,
     template::Template,
@@ -113,7 +113,7 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(error) => {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(&TemplateRenderingError {
                             error,
                             field: Some(&key),
                             drop_event: false

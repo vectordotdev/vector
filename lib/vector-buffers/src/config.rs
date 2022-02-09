@@ -9,7 +9,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
+    variant::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
     Acker, Bufferable, WhenFull,
 };
 
@@ -24,9 +24,7 @@ pub enum BufferBuildError {
 #[derive(Deserialize, Serialize)]
 enum BufferTypeKind {
     #[serde(rename = "memory")]
-    MemoryV1,
-    #[serde(rename = "memory_v2")]
-    MemoryV2,
+    Memory,
     #[serde(rename = "disk")]
     DiskV1,
     #[serde(rename = "disk_v2")]
@@ -77,29 +75,17 @@ impl BufferTypeVisitor {
                 }
             }
         }
-        let kind = kind.unwrap_or(BufferTypeKind::MemoryV1);
+        let kind = kind.unwrap_or(BufferTypeKind::Memory);
         let when_full = when_full.unwrap_or_default();
         match kind {
-            BufferTypeKind::MemoryV1 => {
+            BufferTypeKind::Memory => {
                 if max_size.is_some() {
                     return Err(de::Error::unknown_field(
                         "max_size",
                         &["type", "max_events", "when_full"],
                     ));
                 }
-                Ok(BufferType::MemoryV1 {
-                    max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
-                    when_full,
-                })
-            }
-            BufferTypeKind::MemoryV2 => {
-                if max_size.is_some() {
-                    return Err(de::Error::unknown_field(
-                        "max_size",
-                        &["type", "max_events", "when_full"],
-                    ));
-                }
-                Ok(BufferType::MemoryV2 {
+                Ok(BufferType::Memory {
                     max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
                     when_full,
                 })
@@ -220,17 +206,9 @@ pub const fn memory_buffer_default_max_events() -> usize {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BufferType {
-    /// A buffer stage backed by an in-memory channel provided by `futures`.
-    #[serde(rename = "memory")]
-    MemoryV1 {
-        #[serde(default = "memory_buffer_default_max_events")]
-        max_events: usize,
-        #[serde(default)]
-        when_full: WhenFull,
-    },
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
-    #[serde(rename = "memory_v2")]
-    MemoryV2 {
+    #[serde(rename = "memory")]
+    Memory {
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: usize,
         #[serde(default)]
@@ -269,17 +247,11 @@ impl BufferType {
         T: Bufferable + Clone,
     {
         match *self {
-            BufferType::MemoryV1 {
+            BufferType::Memory {
                 when_full,
                 max_events,
             } => {
-                builder.stage(MemoryV1Buffer::new(max_events), when_full);
-            }
-            BufferType::MemoryV2 {
-                when_full,
-                max_events,
-            } => {
-                builder.stage(MemoryV2Buffer::new(max_events), when_full);
+                builder.stage(MemoryBuffer::new(max_events), when_full);
             }
             BufferType::DiskV1 {
                 when_full,
@@ -323,7 +295,7 @@ pub struct BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         Self {
-            stages: vec![BufferType::MemoryV1 {
+            stages: vec![BufferType::Memory {
                 max_events: memory_buffer_default_max_events(),
                 when_full: WhenFull::default(),
             }],
@@ -428,7 +400,7 @@ max_events: 42
             r#"
           max_events: 100
           "#,
-            BufferType::MemoryV1 {
+            BufferType::Memory {
                 max_events: 100,
                 when_full: WhenFull::Block,
             },
@@ -444,11 +416,11 @@ max_events: 42
             when_full: drop_newest
           "#,
             &[
-                BufferType::MemoryV1 {
+                BufferType::Memory {
                     max_events: 42,
                     when_full: WhenFull::Block,
                 },
-                BufferType::MemoryV1 {
+                BufferType::Memory {
                     max_events: 100,
                     when_full: WhenFull::DropNewest,
                 },
@@ -458,49 +430,6 @@ max_events: 42
 
     #[test]
     fn ensure_field_defaults_for_all_types() {
-        check_single_stage(
-            r#"
-          type: memory
-          "#,
-            BufferType::MemoryV1 {
-                max_events: 500,
-                when_full: WhenFull::Block,
-            },
-        );
-
-        check_single_stage(
-            r#"
-          type: memory
-          max_events: 100
-          "#,
-            BufferType::MemoryV1 {
-                max_events: 100,
-                when_full: WhenFull::Block,
-            },
-        );
-
-        check_single_stage(
-            r#"
-          type: memory
-          when_full: drop_newest
-          "#,
-            BufferType::MemoryV1 {
-                max_events: 500,
-                when_full: WhenFull::DropNewest,
-            },
-        );
-
-        check_single_stage(
-            r#"
-          type: memory
-          when_full: overflow
-          "#,
-            BufferType::MemoryV1 {
-                max_events: 500,
-                when_full: WhenFull::Overflow,
-            },
-        );
-
         check_single_stage(
             r#"
           type: disk
@@ -514,9 +443,9 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           "#,
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: 500,
                 when_full: WhenFull::Block,
             },
@@ -524,10 +453,10 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           max_events: 100
           "#,
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: 100,
                 when_full: WhenFull::Block,
             },
@@ -535,10 +464,10 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           when_full: drop_newest
           "#,
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: 500,
                 when_full: WhenFull::DropNewest,
             },
@@ -546,10 +475,10 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: memory_v2
+          type: memory
           when_full: overflow
           "#,
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: 500,
                 when_full: WhenFull::Overflow,
             },
