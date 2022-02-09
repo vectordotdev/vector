@@ -16,6 +16,7 @@ use std::fmt;
 use std::result::Result as StdResult;
 use toml::value::Value as TomlValue;
 
+use crate::event::value_regex::ValueRegex;
 use crate::{
     event::{error::EventError, timestamp_to_string},
     ByteSizeOf, Result,
@@ -24,6 +25,10 @@ use crate::{
 #[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
+
+    /// When used in the context of Vector this is treated identically to Bytes. It has
+    /// additional meaning in the context of VRL
+    Regex(ValueRegex),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -474,6 +479,7 @@ impl Value {
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::ByRegextes(regex) => ,
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
@@ -557,6 +563,7 @@ impl Value {
     pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",
+            Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
@@ -609,6 +616,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_) => false,
@@ -876,6 +884,7 @@ impl Value {
             // if the type is one of the following, the field is modified to be a map.
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -962,6 +971,7 @@ impl Value {
             // This is just not allowed!
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -1148,6 +1158,7 @@ impl Value {
             // This is just not allowed!
             (Some(_s), Value::Boolean(_))
             | (Some(_s), Value::Bytes(_))
+            | (Some(_s), Value::Regex(_))
             | (Some(_s), Value::Timestamp(_))
             | (Some(_s), Value::Float(_))
             | (Some(_s), Value::Integer(_))
@@ -1197,6 +1208,7 @@ impl Value {
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
+            | (_, Value::Regex(_))
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
             | (_, Value::Integer(_))
@@ -1308,6 +1320,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
@@ -1414,6 +1427,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
