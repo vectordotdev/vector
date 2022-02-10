@@ -87,7 +87,7 @@ impl Vrl {
         // more performance (one less clone), and boot-time errors when a
         // program wants to mutate its events.
         //
-        // see: https://github.com/timberio/vector/issues/4744
+        // see: https://github.com/vectordotdev/vector/issues/4744
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -54,8 +54,8 @@ impl TransformConfig for SplitConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -146,6 +146,7 @@ mod tests {
         config::TransformConfig,
         event::{Event, LogEvent, Value},
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -251,7 +252,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::Float(NotNan::new(42.3).unwrap()));
         assert_eq!(log["flag"], Value::Boolean(true));
         assert_eq!(log["code"], Value::Integer(1234));
         assert_eq!(log["rest"], Value::Bytes("word".into()));

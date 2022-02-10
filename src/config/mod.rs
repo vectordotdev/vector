@@ -12,7 +12,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
 };
 
@@ -362,7 +362,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
         cx: SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
 
-    fn input_type(&self) -> DataType;
+    fn input(&self) -> Input;
 
     fn sink_type(&self) -> &'static str;
 

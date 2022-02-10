@@ -161,7 +161,7 @@ Output:
 {"message": "bar"}
 ```
 
-Support for iteration as part of [#6031](https://github.com/timberio/vector/issues/6031) will allow for users to do
+Support for iteration as part of [#6031](https://github.com/vectordotdev/vector/issues/6031) will allow for users to do
 things like map fields onto each element. An example might look something like:
 
 Input:
@@ -185,14 +185,14 @@ Output:
 {"host": "foobar", "message": "bar"}
 ```
 
-This is similar to the support that the current [`explode` transform PR](https://github.com/timberio/vector/pull/6545)
+This is similar to the support that the current [`explode` transform PR](https://github.com/vectordotdev/vector/pull/6545)
 has for merging in top-level fields when creating events from a subfield that has an array.
 
 ### emit_log function
 
 (previous proposal)
 
-This is roughly the same as https://github.com/timberio/vector/issues/6330#issuecomment-772562955 with some slight tweaks.
+This is roughly the same as https://github.com/vectordotdev/vector/issues/6330#issuecomment-772562955 with some slight tweaks.
 
 A new `emit_log` function will be added to the VRL stdlib
 
@@ -209,7 +209,7 @@ but can be set to `false` by users to suppress this behavior. Admittedly, I'm no
 config option, but I'm not seeing another great alternative.
 
 This will be able to be combined with the iteration mechanism that will be introduced
-[#6031](https://github.com/timberio/vector/issues/6031) to emit an unknown number of events. Naively this might look
+[#6031](https://github.com/vectordotdev/vector/issues/6031) to emit an unknown number of events. Naively this might look
 something like:
 
 ```text
@@ -242,7 +242,7 @@ option.
 
 ### Modifying remap to accept setting the root object to an array
 
-https://github.com/timberio/vector/issues/6988
+https://github.com/vectordotdev/vector/issues/6988
 
 This would modify remap to allow setting `.` to an array of objects to have each element emitted independently.
 
@@ -259,5 +259,5 @@ this in the future anyway.
 1. Modify `remap` to treat setting `.` to an array to indicate that multiple events should be emitted
 2. Implement `unnest` VRL function
 
-[1]: https://github.com/timberio/vector/issues/6330#issue-799809382
+[1]: https://github.com/vectordotdev/vector/issues/6330#issue-799809382
 [2]: https://discord.com/channels/742820443487993987/764187584452493323/808744293945704479

@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -108,8 +108,8 @@ impl SinkConfig for InfluxDbConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

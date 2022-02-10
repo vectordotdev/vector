@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{host_key, Encoding};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     sinks::{
         splunk_hec::{
             common::{
@@ -81,8 +81,8 @@ impl SinkConfig for HumioLogsConfig {
         self.build_hec_config().build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

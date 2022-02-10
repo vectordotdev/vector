@@ -14,7 +14,7 @@ use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
@@ -140,8 +140,8 @@ impl SinkConfig for StatsdSinkConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

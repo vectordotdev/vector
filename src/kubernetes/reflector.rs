@@ -97,7 +97,7 @@ where
                 Err(watcher::invocation::Error::Other { source }) => {
                     // Unrecoverable error
                     // TODO: retry these errors
-                    // https://github.com/timberio/vector/issues/7149
+                    // https://github.com/vectordotdev/vector/issues/7149
                     error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
                 }

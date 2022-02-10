@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, Value},
@@ -86,8 +86,8 @@ impl TransformConfig for DedupeConfig {
         Ok(Transform::event_task(Dedupe::new(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -141,6 +141,7 @@ const fn type_id_for_value(val: &Value) -> TypeId {
         Value::Map(_) => 5,
         Value::Array(_) => 6,
         Value::Null => 7,
+        Value::Regex(_) => 8,
     }
 }
 

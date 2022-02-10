@@ -7,7 +7,7 @@ use snafu::ResultExt;
 use vector_common::TimeZone;
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -51,8 +51,8 @@ impl TransformConfig for RegexParserConfig {
         RegexParser::build(self, context.globals.timezone)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -313,6 +313,7 @@ mod tests {
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -529,7 +530,7 @@ mod tests {
         .expect("Failed to parse log");
         assert_eq!(log["check"], Value::Boolean(false));
         assert_eq!(log["status"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(6789.01));
+        assert_eq!(log["time"], Value::Float(NotNan::new(6789.01).unwrap()));
     }
 
     #[tokio::test]
@@ -560,7 +561,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // https://github.com/timberio/vector/issues/3096
+    // https://github.com/vectordotdev/vector/issues/3096
     async fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
         let log = do_transform(
             "match1234 235.42 true",
@@ -582,7 +583,7 @@ mod tests {
 
         assert_eq!(log.get("id1"), None);
         assert_eq!(log["id2"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["time"], Value::Float(NotNan::new(235.42).unwrap()));
         assert_eq!(log["check"], Value::Boolean(true));
         assert!(log.get("message").is_some());
     }
