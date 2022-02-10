@@ -1,4 +1,5 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -96,7 +97,7 @@ impl Function for Remove {
                 title: "invalid segment type",
                 source: r#"remove!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "remove" at (0:65): path segment must be either string or integer, not boolean"#,
+                    r#"function call error for "remove" at (0:65): path segment must be either "string" or "integer", not "boolean""#,
                 ),
             },
         ]
@@ -141,7 +142,7 @@ impl Expression for RemoveFn {
                         Value::Integer(index) => SegmentBuf::Index(index as isize),
                         value => {
                             return Err(format!(
-                                r#"path segment must be either string or integer, not {}"#,
+                                r#"path segment must be either "string" or "integer", not {}"#,
                                 value.kind()
                             )
                             .into())
@@ -156,7 +157,7 @@ impl Expression for RemoveFn {
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::array(Collection::any()),
+                    expected: Kind::Array,
                 }
                 .into())
             }
@@ -171,19 +172,18 @@ impl Expression for RemoveFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let value_td = self.value.type_def(state);
+        let kind = self.value.type_def(state).kind();
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let td = TypeDef::new().fallible();
 
-        if value_td.is_array() {
-            td = td.add_array(Collection::any())
-        };
-
-        if value_td.is_object() {
-            td = td.add_object(Collection::any())
-        };
-
-        td
+        match kind {
+            Kind::Array => td.array::<Kind>(vec![]),
+            Kind::Object => td.object::<(), Kind>(btreemap! {}),
+            k if k.contains_array() && k.contains_object() => td
+                .array::<Kind>(vec![])
+                .add_object::<(), Kind>(btreemap! {}),
+            _ => unreachable!("compiler guaranteed"),
+        }
     }
 }
 
@@ -197,13 +197,13 @@ mod tests {
         array {
             args: func_args![value: value!([42]), path: value!([0])],
             want: Ok(value!([])),
-            tdef: TypeDef::array(Collection::any()).fallible(),
+            tdef: TypeDef::new().array::<Kind>(vec![]).fallible(),
         }
 
         object {
             args: func_args![value: value!({ "foo": 42 }), path: value!(["foo"])],
             want: Ok(value!({})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: TypeDef::new().object::<(), Kind>(btreemap!{}).fallible(),
         }
     ];
 }

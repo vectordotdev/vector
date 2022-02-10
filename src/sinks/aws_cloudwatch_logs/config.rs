@@ -7,7 +7,7 @@ use vector_core::config::log_schema;
 
 use crate::{
     aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
@@ -84,8 +84,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

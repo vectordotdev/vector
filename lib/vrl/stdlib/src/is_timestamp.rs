@@ -63,7 +63,7 @@ impl Expression for IsTimestampFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -81,13 +81,13 @@ mod tests {
                 .unwrap()
                 .with_timezone(&Utc))],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         integer {
             args: func_args![value: value!(1789)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }

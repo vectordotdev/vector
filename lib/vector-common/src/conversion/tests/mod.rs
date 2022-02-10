@@ -4,7 +4,7 @@ use ordered_float::NotNan;
 
 use crate::conversion::parse_bool;
 
-#[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
+#[cfg(unix)] // see https://github.com/vectordotdev/vector/issues/1201
 mod unix;
 
 #[derive(PartialEq, Debug, Clone)]

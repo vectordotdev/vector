@@ -4,14 +4,13 @@ use std::{
 };
 
 use diagnostic::{DiagnosticError, Label, Note};
-use value::kind::Collection;
 
 use crate::{
     expression::{
         container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
-    value::{kind, Kind},
+    value::Kind,
     vm::VmArgumentList,
     Context, ExpressionError, Span, Value,
 };
@@ -128,49 +127,8 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        let mut kind = Kind::empty();
-
-        let n = self.kind;
-
-        if (n & kind::BYTES) == kind::BYTES {
-            kind.add_bytes();
-        }
-
-        if (n & kind::INTEGER) == kind::INTEGER {
-            kind.add_integer();
-        }
-
-        if (n & kind::FLOAT) == kind::FLOAT {
-            kind.add_float();
-        }
-
-        if (n & kind::BOOLEAN) == kind::BOOLEAN {
-            kind.add_boolean();
-        }
-
-        if (n & kind::OBJECT) == kind::OBJECT {
-            kind.add_object(Collection::any());
-        }
-
-        if (n & kind::ARRAY) == kind::ARRAY {
-            kind.add_array(Collection::any());
-        }
-
-        if (n & kind::TIMESTAMP) == kind::TIMESTAMP {
-            kind.add_timestamp();
-        }
-
-        if (n & kind::REGEX) == kind::REGEX {
-            kind.add_regex();
-        }
-
-        if (n & kind::NULL) == kind::NULL {
-            kind.add_null();
-        }
-
-        kind
+        Kind::new(self.kind)
     }
 }
 
@@ -483,49 +441,5 @@ impl diagnostic::DiagnosticError for Error {
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parameter_kind() {
-        struct TestCase {
-            parameter_kind: u16,
-            kind: Kind,
-        }
-
-        for (
-            title,
-            TestCase {
-                parameter_kind,
-                kind,
-            },
-        ) in HashMap::from([
-            (
-                "bytes",
-                TestCase {
-                    parameter_kind: kind::BYTES,
-                    kind: Kind::bytes(),
-                },
-            ),
-            (
-                "integer",
-                TestCase {
-                    parameter_kind: kind::INTEGER,
-                    kind: Kind::integer(),
-                },
-            ),
-        ]) {
-            let parameter = Parameter {
-                keyword: "",
-                kind: parameter_kind,
-                required: false,
-            };
-
-            assert_eq!(parameter.kind(), kind, "{}", title);
-        }
     }
 }

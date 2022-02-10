@@ -84,7 +84,7 @@ impl Expression for DecodeBase64Fn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
-        TypeDef::bytes().fallible()
+        TypeDef::new().bytes().fallible()
     }
 }
 
@@ -98,31 +98,31 @@ mod test {
         with_defaults {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl")],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         with_standard_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!["standard"]],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         with_urlsafe_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!("url_safe")],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         empty_string_standard_charset {
             args: func_args![value: value!(""), charset: value!("standard")],
             want: Ok(value!("")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         empty_string_urlsafe_charset {
             args: func_args![value: value!(""), charset: value!("url_safe")],
             want: Ok(value!("")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
     ];
 }

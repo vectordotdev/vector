@@ -92,7 +92,7 @@ Otherwise, the stable release is your best bet.
 [download page]: https://vector.dev/download/
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
-[Github repository]: https://github.com/timberio/vector
+[Github repository]: https://github.com/vectordotdev/vector
 [Github subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
-[`master` branch]: https://github.com/timberio/vector/tree/master
-[versioning policy]: https://github.com/timberio/vector/blob/master/VERSIONING.md
+[`master` branch]: https://github.com/vectordotdev/vector/tree/master
+[versioning policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md

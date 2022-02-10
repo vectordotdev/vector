@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::EventArray,
     sinks::{
         elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
@@ -96,8 +96,8 @@ impl SinkConfig for SematextLogsConfig {
         Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -3,7 +3,8 @@ use serde_json::Value;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
@@ -35,8 +36,8 @@ impl TransformConfig for JsonParserConfig {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -198,7 +199,7 @@ mod test {
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
-    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    // This is a regression test, see: https://github.com/vectordotdev/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
         let mut parser = JsonParser::from(JsonParserConfig {

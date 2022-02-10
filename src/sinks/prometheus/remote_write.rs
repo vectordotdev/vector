@@ -11,7 +11,7 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, SinkConfig, SinkDescription},
+    config::{self, Input, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingError,
@@ -140,8 +140,8 @@ impl SinkConfig for RemoteWriteConfig {
         Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

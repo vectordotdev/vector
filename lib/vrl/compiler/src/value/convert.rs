@@ -3,7 +3,6 @@ use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterat
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use value::kind::Collection;
 
 use super::{Error, Kind, Regex, Value};
 use crate::{
@@ -71,7 +70,7 @@ impl Value {
             Value::Integer(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::integer(),
+                expected: Kind::Integer,
             }),
         }
     }
@@ -132,7 +131,7 @@ impl TryFrom<&Value> for i64 {
         match v {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(v.into_inner() as i64),
-            _ => Err(Error::Coerce(v.kind(), Kind::integer())),
+            _ => Err(Error::Coerce(v.kind(), Kind::Integer)),
         }
     }
 }
@@ -156,7 +155,7 @@ impl Value {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::float(),
+                expected: Kind::Float,
             }),
         }
     }
@@ -175,7 +174,7 @@ impl TryFrom<&Value> for f64 {
         match v {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Coerce(v.kind(), Kind::float())),
+            _ => Err(Error::Coerce(v.kind(), Kind::Float)),
         }
     }
 }
@@ -218,7 +217,7 @@ impl Value {
             Value::Bytes(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::bytes(),
+                expected: Kind::Bytes,
             }),
         }
     }
@@ -228,7 +227,7 @@ impl Value {
             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::bytes(),
+                expected: Kind::Bytes,
             }),
         }
     }
@@ -310,7 +309,7 @@ impl Value {
             Value::Boolean(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::boolean(),
+                expected: Kind::Boolean,
             }),
         }
     }
@@ -341,7 +340,7 @@ impl Value {
             Value::Regex(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::regex(),
+                expected: Kind::Regex,
             }),
         }
     }
@@ -378,7 +377,7 @@ impl Value {
             Value::Null => Ok(()),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::null(),
+                expected: Kind::Null,
             }),
         }
     }
@@ -425,7 +424,7 @@ impl Value {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::array(Collection::any()),
+                expected: Kind::Array,
             }),
         }
     }
@@ -469,7 +468,7 @@ impl Value {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::object(Collection::any()),
+                expected: Kind::Object,
             }),
         }
     }
@@ -506,7 +505,7 @@ impl Value {
             Value::Timestamp(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::timestamp(),
+                expected: Kind::Timestamp,
             }),
         }
     }

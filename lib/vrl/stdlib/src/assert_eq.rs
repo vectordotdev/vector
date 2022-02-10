@@ -108,7 +108,7 @@ impl Expression for AssertEqFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().fallible()
+        TypeDef::new().fallible().boolean()
     }
 }
 
@@ -122,19 +122,19 @@ mod tests {
         pass {
             args: func_args![left: "foo", right: "foo"],
             want: Ok(true),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
 
         fail {
             args: func_args![left: "foo", right: "bar"],
             want: Err(r#"assertion failed: "foo" == "bar""#),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
 
         message {
             args: func_args![left: "foo", right: "bar", message: "failure!"],
             want: Err("failure!"),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
     ];
 }

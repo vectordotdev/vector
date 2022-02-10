@@ -89,7 +89,7 @@ impl Expression for Sha2Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -108,7 +108,7 @@ mod tests {
         sha2 {
              args: func_args![value: "foo"],
              want: Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         sha2_224 {
@@ -116,7 +116,7 @@ mod tests {
                              variant: "SHA-224"
             ],
             want: Ok("0808f64e60d58979fcb676c96ec938270dea42445aeefcd3a4e6f8db"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         sha2_256 {
@@ -124,7 +124,7 @@ mod tests {
                               variant: "SHA-256"
              ],
              want: Ok("2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         sha2_385 {
@@ -132,7 +132,7 @@ mod tests {
                              variant: "SHA-384"
             ],
             want: Ok("98c11ffdfdd540676b1a137cb1a22b2a70350c9a44171d6b1180c6be5cbb2ee3f79d532c8a1dd9ef2e8e08e752a3babb"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         sha2_512 {
@@ -140,7 +140,7 @@ mod tests {
                               variant: "SHA-512"
              ],
              want: Ok("f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         sha2_512_224 {
@@ -148,7 +148,7 @@ mod tests {
                               variant: "SHA-512/224"
              ],
              want: Ok("d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
 
         sha2_512_256 {
@@ -156,7 +156,7 @@ mod tests {
                               variant: "SHA-512/256"
              ],
              want: Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
     ];
 }

@@ -102,41 +102,40 @@ impl Expression for ParseAwsVpcFlowLogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind()).fallible(/* log parsing error */)
+        TypeDef::new()
+            .fallible() // Log parsing error
+            .object::<&str, Kind>(inner_type_def())
     }
 }
 
-fn inner_kind() -> BTreeMap<Field, Kind> {
+fn inner_type_def() -> BTreeMap<&'static str, Kind> {
     map! {
-        "account_id": Kind::integer() | Kind::null(),
-        "action": Kind::bytes() | Kind::null(),
-        "az_id": Kind::bytes() | Kind::null(),
-        "bytes": Kind::integer() | Kind::null(),
-        "dstaddr": Kind::bytes() | Kind::null(),
-        "dstport": Kind::integer() | Kind::null(),
-        "end": Kind::integer() | Kind::null(),
-        "instance_id": Kind::bytes() | Kind::null(),
-        "interface_id": Kind::bytes() | Kind::null(),
-        "log_status": Kind::bytes() | Kind::null(),
-        "packets": Kind::integer() | Kind::null(),
-        "pkt_dstaddr": Kind::bytes() | Kind::null(),
-        "pkt_srcaddr": Kind::bytes() | Kind::null(),
-        "protocol": Kind::integer() | Kind::null(),
-        "region": Kind::bytes() | Kind::null(),
-        "srcaddr": Kind::bytes() | Kind::null(),
-        "srcport": Kind::integer() | Kind::null(),
-        "start": Kind::integer() | Kind::null(),
-        "sublocation_id": Kind::bytes() | Kind::null(),
-        "sublocation_type": Kind::bytes() | Kind::null(),
-        "subnet_id": Kind::bytes() | Kind::null(),
-        "tcp_flags": Kind::integer() | Kind::null(),
-        "type": Kind::bytes() | Kind::null(),
-        "version": Kind::integer() | Kind::null(),
-        "vpc_id": Kind::bytes() | Kind::null(),
+        "account_id": Kind::Integer | Kind::Null,
+        "action": Kind::Bytes | Kind::Null,
+        "az_id": Kind::Bytes | Kind::Null,
+        "bytes": Kind::Integer | Kind::Null,
+        "dstaddr": Kind::Bytes | Kind::Null,
+        "dstport": Kind::Integer | Kind::Null,
+        "end": Kind::Integer | Kind::Null,
+        "instance_id": Kind::Bytes | Kind::Null,
+        "interface_id": Kind::Bytes | Kind::Null,
+        "log_status": Kind::Bytes | Kind::Null,
+        "packets": Kind::Integer | Kind::Null,
+        "pkt_dstaddr": Kind::Bytes | Kind::Null,
+        "pkt_srcaddr": Kind::Bytes | Kind::Null,
+        "protocol": Kind::Integer | Kind::Null,
+        "region": Kind::Bytes | Kind::Null,
+        "srcaddr": Kind::Bytes | Kind::Null,
+        "srcport": Kind::Integer | Kind::Null,
+        "start": Kind::Integer | Kind::Null,
+        "sublocation_id": Kind::Bytes | Kind::Null,
+        "sublocation_type": Kind::Bytes | Kind::Null,
+        "subnet_id": Kind::Bytes | Kind::Null,
+        "tcp_flags": Kind::Integer | Kind::Null,
+        "type": Kind::Bytes | Kind::Null,
+        "version": Kind::Integer | Kind::Null,
+        "vpc_id": Kind::Bytes | Kind::Null,
     }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -296,7 +295,7 @@ mod tests {
                  "start": 1418530010,
                  "version": 2
              })),
-             tdef: TypeDef::object(inner_kind()).fallible(),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
          }
 
         fields {
@@ -325,7 +324,7 @@ mod tests {
                  "version": 3,
                  "vpc_id": "vpc-abcdefab012345678"
              })),
-             tdef: TypeDef::object(inner_kind()).fallible(),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
          }
     ];
 }

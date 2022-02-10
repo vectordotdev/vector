@@ -52,7 +52,7 @@ impl Expression for UniqueFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::array(Collection::any())
+        TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
     }
 }
 
@@ -68,7 +68,7 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!(["bar", "foo", "baz"])),
-            tdef: TypeDef::array(Collection::any()),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         mixed_values {
@@ -76,7 +76,7 @@ mod tests {
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
             want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
-            tdef: TypeDef::array(Collection::any()),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
     ];
 }

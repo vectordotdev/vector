@@ -611,7 +611,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
-        // https://github.com/timberio/vector/issues/5607
+        // https://github.com/vectordotdev/vector/issues/5607
         //#[cfg(feature = "only_fields")]
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]

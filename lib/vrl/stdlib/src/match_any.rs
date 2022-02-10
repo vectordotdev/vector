@@ -84,7 +84,7 @@ impl Expression for MatchAnyFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -106,7 +106,7 @@ mod tests {
                                  Value::Regex(Regex::new("baz").unwrap().into()),
                              ])],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         no {
@@ -116,7 +116,7 @@ mod tests {
                                  Value::Regex(Regex::new("foobar").unwrap().into()),
                              ])],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }

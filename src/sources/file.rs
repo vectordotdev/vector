@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    // https://github.com/timberio/vector/issues/8363
+    // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
         let n = 5;
@@ -1465,7 +1465,7 @@ mod tests {
         );
     }
 
-    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    // Ignoring on mac: https://github.com/vectordotdev/vector/issues/8373
     #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {

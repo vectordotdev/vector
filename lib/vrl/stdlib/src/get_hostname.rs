@@ -38,6 +38,6 @@ impl Expression for GetHostnameFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().fallible()
+        TypeDef::new().fallible().bytes()
     }
 }

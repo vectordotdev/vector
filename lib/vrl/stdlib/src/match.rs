@@ -68,7 +68,7 @@ impl Expression for MatchFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -86,14 +86,14 @@ mod tests {
             args: func_args![value: "foobar",
                              pattern: Value::Regex(Regex::new("\\s\\w+").unwrap().into())],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         no {
             args: func_args![value: "foo 2 bar",
                              pattern: Value::Regex(Regex::new("foo \\d bar").unwrap().into())],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }

@@ -929,7 +929,7 @@ mod test {
         );
     }
 
-    // https://github.com/timberio/vector/issues/3276
+    // https://github.com/vectordotdev/vector/issues/3276
     #[test]
     fn test_nginx() {
         let exp = r##"

@@ -52,7 +52,7 @@ impl Expression for GetEnvVarFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().fallible()
+        TypeDef::new().fallible().bytes()
     }
 }
 
@@ -70,31 +70,31 @@ mod tests {
         doesnt_exist {
             args: func_args![name: "VAR1"],
             want: Err("environment variable not found"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         exists {
             args: func_args![name: "VAR2"],
             want: Ok(value!("var")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid1 {
             args: func_args![name: "="],
             want: Err("environment variable not found"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid2 {
             args: func_args![name: ""],
             want: Err("environment variable not found"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid3 {
             args: func_args![name: "a=b"],
             want: Err("environment variable not found"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
 }

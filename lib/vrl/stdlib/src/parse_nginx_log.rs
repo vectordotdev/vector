@@ -130,46 +130,47 @@ impl Expression for ParseNginxLogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(match self.format.as_ref() {
-            b"combined" => kind_combined(),
-            b"error" => kind_error(),
-            _ => unreachable!(),
-        })
-        .fallible()
+        TypeDef::new()
+            .fallible()
+            .object(match self.format.as_ref() {
+                b"combined" => type_def_combined(),
+                b"error" => type_def_error(),
+                _ => unreachable!(),
+            })
     }
 }
 
-fn kind_combined() -> BTreeMap<Field, Kind> {
-    BTreeMap::from([
-        ("client".into(), Kind::bytes()),
-        ("user".into(), Kind::bytes().or_null()),
-        ("timestamp".into(), Kind::timestamp()),
-        ("request".into(), Kind::bytes()),
-        ("method".into(), Kind::bytes()),
-        ("path".into(), Kind::bytes()),
-        ("protocol".into(), Kind::bytes()),
-        ("status".into(), Kind::integer()),
-        ("size".into(), Kind::integer()),
-        ("referer".into(), Kind::bytes().or_null()),
-        ("agent".into(), Kind::bytes().or_null()),
-        ("compression".into(), Kind::bytes().or_null()),
-    ])
+fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
+    map! {
+        "client": Kind::Bytes,
+        "user": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp,
+        "request": Kind::Bytes,
+        "method": Kind::Bytes,
+        "path": Kind::Bytes,
+        "protocol": Kind::Bytes,
+        "status": Kind::Integer,
+        "size": Kind::Integer,
+        "referer": Kind::Bytes | Kind::Null,
+        "agent": Kind::Bytes | Kind::Null,
+        "compression": Kind::Bytes | Kind::Null,
+    }
 }
 
-fn kind_error() -> BTreeMap<Field, Kind> {
-    BTreeMap::from([
-        ("timestamp".into(), Kind::timestamp()),
-        ("severity".into(), Kind::bytes()),
-        ("pid".into(), Kind::integer()),
-        ("tid".into(), Kind::integer()),
-        ("cid".into(), Kind::integer()),
-        ("message".into(), Kind::bytes()),
-        ("client".into(), Kind::bytes().or_null()),
-        ("server".into(), Kind::bytes().or_null()),
-        ("request".into(), Kind::bytes().or_null()),
-        ("host".into(), Kind::bytes().or_null()),
-        ("port".into(), Kind::bytes().or_null()),
-    ])
+fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
+    map! {
+        "timestamp": Kind::Timestamp,
+        "severity": Kind::Bytes,
+        "pid": Kind::Integer,
+        "tid": Kind::Integer,
+        "cid": Kind::Integer,
+        "message": Kind::Bytes,
+        "client": Kind::Bytes | Kind::Null,
+        "server": Kind::Bytes | Kind::Null,
+        "request": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes | Kind::Null,
+        "port": Kind::Bytes | Kind::Null,
+    }
 }
 
 #[cfg(test)]
@@ -198,7 +199,7 @@ mod tests {
                 "size" => 612,
                 "agent" => "curl/7.75.0",
             }),
-            tdef: TypeDef::object(kind_combined()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_combined()),
         }
 
         combined_line_valid_no_compression {
@@ -218,7 +219,7 @@ mod tests {
                 "referer" => "https://my-url.com/my-path",
                 "agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36",
             }),
-            tdef: TypeDef::object(kind_combined()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_combined()),
         }
 
         combined_line_valid_all_fields {
@@ -240,7 +241,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36",
                 "compression" => "2.75",
             }),
-            tdef: TypeDef::object(kind_combined()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_combined()),
         }
 
         error_line_valid {
@@ -260,7 +261,7 @@ mod tests {
                 "request" => "POST /not-found HTTP/1.1",
                 "host" => "localhost:8081",
             }),
-            tdef: TypeDef::object(kind_error()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
         }
 
         error_line_with_referrer {
@@ -281,7 +282,7 @@ mod tests {
                 "host" => "65.21.190.83:31256",
                 "referer" => "http://65.21.190.83:31256/",
             }),
-            tdef: TypeDef::object(kind_error()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
         }
 
         error_line_starting {
@@ -296,7 +297,7 @@ mod tests {
                 "tid" => 133309,
                 "message" => "signal process started",
             }),
-            tdef: TypeDef::object(kind_error()).fallible(),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
         }
     ];
 }

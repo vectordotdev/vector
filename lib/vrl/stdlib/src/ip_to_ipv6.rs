@@ -59,7 +59,7 @@ impl Expression for IpToIpv6Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().fallible()
+        TypeDef::new().fallible().bytes()
     }
 }
 
@@ -74,19 +74,19 @@ mod tests {
             args: func_args![value: "i am not an ipaddress"],
             want: Err(
                     "unable to parse IP address: invalid IP address syntax"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         valid {
             args: func_args![value: "192.168.0.1"],
             want: Ok(value!("::ffff:192.168.0.1")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         ipv6_passthrough {
             args: func_args![value: "2404:6800:4003:c02::64"],
             want: Ok(value!("2404:6800:4003:c02::64")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
 }

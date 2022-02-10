@@ -9,7 +9,7 @@ use snafu::Snafu;
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -148,8 +148,8 @@ impl SinkConfig for StackdriverConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

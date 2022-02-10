@@ -21,7 +21,7 @@ use crate::{
         auth::AwsAuthentication,
         rusoto::{self, RegionOrEndpoint},
     },
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -87,8 +87,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

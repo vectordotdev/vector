@@ -42,7 +42,7 @@ impl Expression for Block {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the block.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
+        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
 
         type_def.with_fallibility(fallible)
     }

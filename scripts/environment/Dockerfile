@@ -11,19 +11,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p /git/timberio/vector/scripts/environment
-ADD scripts/environment/bootstrap-ubuntu-20.04.sh /git/timberio/vector/scripts/environment/
-RUN ./git/timberio/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
+RUN mkdir -p /git/vectordotdev/vector/scripts/environment
+ADD scripts/environment/bootstrap-ubuntu-20.04.sh /git/vectordotdev/vector/scripts/environment/
+RUN ./git/vectordotdev/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
 
 # Setup the toolchain
-WORKDIR /git/timberio/vector
-ADD scripts/environment/prepare.sh /git/timberio/vector/scripts/environment/
-ADD scripts/environment/setup-helm.sh /git/timberio/vector/scripts/environment/
-ADD scripts/environment/release-flags.sh /git/timberio/vector/scripts/environment/
+WORKDIR /git/vectordotdev/vector
+ADD scripts/environment/prepare.sh /git/vectordotdev/vector/scripts/environment/
+ADD scripts/environment/setup-helm.sh /git/vectordotdev/vector/scripts/environment/
+ADD scripts/environment/release-flags.sh /git/vectordotdev/vector/scripts/environment/
 ADD scripts/Gemfile scripts/Gemfile.lock \
-    /git/timberio/vector/scripts/
+    /git/vectordotdev/vector/scripts/
 ADD rust-toolchain.toml \
-    /git/timberio/vector/
+    /git/vectordotdev/vector/
 RUN ./scripts/environment/prepare.sh
 RUN ./scripts/environment/setup-helm.sh
 

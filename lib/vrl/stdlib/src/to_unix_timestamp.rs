@@ -176,7 +176,7 @@ impl Expression for ToUnixTimestampFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::integer().infallible()
+        TypeDef::new().infallible().integer()
     }
 }
 
@@ -194,7 +194,7 @@ mod test {
                              unit: "seconds"
             ],
             want: Ok(1609459200i64),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         milliseconds {
@@ -202,7 +202,7 @@ mod test {
                              unit: "milliseconds"
             ],
             want: Ok(1609459200000i64),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         nanoseconds {
@@ -210,7 +210,7 @@ mod test {
                               unit: "nanoseconds"
              ],
              want: Ok(1609459200000000000i64),
-             tdef: TypeDef::integer().infallible(),
+             tdef: TypeDef::new().infallible().integer(),
          }
     ];
 }

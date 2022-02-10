@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn float(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Float(_) => Ok(v),
-        v => Err(format!("expected float, got {}", v.kind()).into()),
+        v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for Float {
                 title: "invalid",
                 source: "float!(true)",
                 result: Err(
-                    r#"function call error for "float" at (0:12): expected float, got boolean"#,
+                    r#"function call error for "float" at (0:12): expected "float", got "boolean""#,
                 ),
             },
         ]
@@ -72,8 +72,9 @@ impl Expression for FloatFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let non_float = !self.value.type_def(state).is_float();
-
-        TypeDef::float().with_fallibility(non_float)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Float)
+            .float()
     }
 }

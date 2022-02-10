@@ -80,7 +80,7 @@ jobs:
             docker:
               - 'distribution/docker/**'
 
-  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu

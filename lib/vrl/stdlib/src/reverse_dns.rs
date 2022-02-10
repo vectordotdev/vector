@@ -59,8 +59,8 @@ impl Expression for ReverseDnsFn {
         Ok(host.into())
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().fallible()
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value.type_def(state).fallible().bytes()
     }
 }
 
@@ -74,25 +74,25 @@ mod tests {
         invalid_ip {
             args: func_args![value: value!("999.999.999.999")],
             want: Err("unable to parse IP address: invalid IP address syntax"),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         google_ipv4 {
             args: func_args![value: value!("8.8.8.8")],
             want: Ok(value!("dns.google")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         google_ipv6 {
             args: func_args![value: value!("2001:4860:4860::8844")],
             want: Ok(value!("dns.google")),
-            tdef: TypeDef::bytes().fallible(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid_type {
             args: func_args![value: value!(1)],
-            want: Err("expected string, got integer"),
-            tdef: TypeDef::bytes().fallible(),
+            want: Err("expected \"string\", got \"integer\""),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
 }

@@ -129,7 +129,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::array(Collection::any()),
+                    expected: Kind::Array,
                 }),
             })
             .transpose()?;
@@ -164,7 +164,9 @@ impl Expression for FindEnrichmentTableRecordsFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
+        TypeDef::new()
+            .fallible()
+            .array_mapped::<(), Kind>(map! { (): Kind::Object })
     }
 }
 

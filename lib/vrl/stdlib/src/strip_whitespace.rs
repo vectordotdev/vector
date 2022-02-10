@@ -67,7 +67,7 @@ impl Expression for StripWhitespaceFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -81,31 +81,31 @@ mod tests {
         empty {
             args: func_args![value: ""],
             want: Ok(""),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         just_spaces {
             args: func_args![value: "      "],
             want: Ok(""),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         no_spaces {
             args: func_args![value: "hi there"],
             want: Ok("hi there"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         spaces {
             args: func_args![value: "           hi there        "],
             want: Ok("hi there"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         unicode_whitespace {
             args: func_args![value: " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "],
             want: Ok("❤❤ hi there ❤❤"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }

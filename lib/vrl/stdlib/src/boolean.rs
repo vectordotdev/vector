@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn boolean(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Boolean(_) => Ok(v),
-        v => Err(format!("expected boolean, got {}", v.kind()).into()),
+        v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for Boolean {
                 title: "invalid",
                 source: "bool!(42)",
                 result: Err(
-                    r#"function call error for "bool" at (0:9): expected boolean, got integer"#,
+                    r#"function call error for "bool" at (0:9): expected "boolean", got "integer""#,
                 ),
             },
         ]
@@ -72,8 +72,9 @@ impl Expression for BooleanFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let non_boolean = !self.value.type_def(state).is_boolean();
-
-        TypeDef::boolean().with_fallibility(non_boolean)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Boolean)
+            .boolean()
     }
 }

@@ -89,7 +89,7 @@ impl FindFn {
             )),
             other => Err(value::Error::Expected {
                 got: other.kind(),
-                expected: Kind::bytes() | Kind::regex(),
+                expected: Kind::Bytes | Kind::Regex,
             }
             .into()),
         }
@@ -111,7 +111,7 @@ impl Expression for FindFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::integer().infallible()
+        TypeDef::new().infallible().integer()
     }
 }
 
@@ -127,43 +127,43 @@ mod tests {
         str_matching_end {
             args: func_args![value: "foobar", pattern: "bar"],
             want: Ok(value!(3)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         str_matching_beginning {
             args: func_args![value: "foobar", pattern: "foo"],
             want: Ok(value!(0)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         str_matching_middle {
             args: func_args![value: "foobar", pattern: "ob"],
             want: Ok(value!(2)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         str_too_long {
             args: func_args![value: "foo", pattern: "foobar"],
             want: Ok(value!(-1)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         regex_matching_end {
             args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("bar").unwrap().into())],
             want: Ok(value!(3)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         regex_matching_start {
             args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
             want: Ok(value!(0)),
-            tdef: TypeDef::integer().infallible(),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
         wrong_pattern {
             args: func_args![value: "foobar", pattern: Value::Integer(42)],
-            want: Err("expected regex or string, got integer"),
-            tdef: TypeDef::integer().infallible(),
+            want: Err("expected \"string\" or \"regex\", got \"integer\""),
+            tdef: TypeDef::new().infallible().integer(),
         }
     ];
 }

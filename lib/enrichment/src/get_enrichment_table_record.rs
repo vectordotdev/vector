@@ -125,7 +125,7 @@ impl Expression for GetEnrichmentTableRecordFn {
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::array(Collection::any()),
+                    expected: Kind::Array,
                 }),
             })
             .transpose()?;
@@ -156,7 +156,9 @@ impl Expression for GetEnrichmentTableRecordFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(Collection::any()).fallible()
+        TypeDef::new()
+            .fallible()
+            .add_object::<(), Kind>(map! { (): Kind::all() })
     }
 }
 

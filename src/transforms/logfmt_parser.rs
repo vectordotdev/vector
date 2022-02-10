@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -44,8 +44,8 @@ impl TransformConfig for LogfmtConfig {
         }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {

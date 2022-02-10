@@ -8,7 +8,7 @@ use serde_json::json;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -86,8 +86,8 @@ impl SinkConfig for HoneycombConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

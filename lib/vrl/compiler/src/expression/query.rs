@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, fmt};
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind};
 
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
@@ -51,24 +50,15 @@ impl Query {
         }
     }
 
-    pub fn delete_type_def(&self, state: &mut State) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = state.target().as_mut() {
-            let value = target.value.clone();
-            let mut type_def = target.type_def.clone();
+    pub fn delete_type_def(&self, state: &mut State) {
+        if self.is_external() {
+            if let Some(ref mut target) = state.target().as_mut() {
+                let value = target.value.clone();
+                let type_def = target.type_def.remove_path(&self.path);
 
-            let result = type_def.remove_at_path(
-                &self.path.to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
-
-            state.update_target(assignment::Details { type_def, value });
-
-            return result;
+                state.update_target(assignment::Details { type_def, value })
+            }
         }
-
-        Ok(None)
     }
 }
 
@@ -115,18 +105,20 @@ impl Expression for Query {
                 //
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
-                    return TypeDef::object(BTreeMap::default()).infallible();
+                    return TypeDef::new()
+                        .object::<String, TypeDef>(BTreeMap::default())
+                        .infallible();
                 }
 
                 match state.target() {
-                    None => TypeDef::any().infallible(),
-                    Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
+                    None => TypeDef::new().unknown().infallible(),
+                    Some(details) => details.clone().type_def.at_path(self.path.clone()),
                 }
             }
 
-            Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
-            Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
+            Internal(variable) => variable.type_def(state).at_path(self.path.clone()),
+            FunctionCall(call) => call.type_def(state).at_path(self.path.clone()),
+            Container(container) => container.type_def(state).at_path(self.path.clone()),
         }
     }
 
