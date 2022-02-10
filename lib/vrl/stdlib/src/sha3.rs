@@ -85,7 +85,7 @@ impl Expression for Sha3Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -104,13 +104,13 @@ mod tests {
         sha3 {
              args: func_args![value: "foo"],
              want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         sha3_224  {
             args: func_args![value: "foo"],
             want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         sha3_256 {
@@ -118,7 +118,7 @@ mod tests {
                               variant: "SHA3-256"
              ],
              want: Ok("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         sha3_384 {
@@ -126,7 +126,7 @@ mod tests {
                               variant: "SHA3-384"
              ],
              want: Ok("665551928d13b7d84ee02734502b018d896a0fb87eed5adb4c87ba91bbd6489410e11b0fbcc06ed7d0ebad559e5d3bb5"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         sha3_512 {
@@ -134,7 +134,7 @@ mod tests {
                               variant: "SHA3-512"
              ],
              want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
     ];
 }

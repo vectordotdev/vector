@@ -62,7 +62,7 @@ impl Expression for Ipv6ToIpV4Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -76,31 +76,31 @@ mod tests {
         error {
             args: func_args![value: "i am not an ipaddress"],
             want: Err(r#"unable to parse IP address: invalid IP address syntax"#.to_string()),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         incompatible {
             args: func_args![value: "2001:0db8:85a3::8a2e:0370:7334"],
             want: Err("IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4".to_string()),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_compatible {
             args: func_args![value: "::ffff:192.168.0.1"],
             want: Ok(Value::from("192.168.0.1")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6 {
             args: func_args![value: "0:0:0:0:0:ffff:c633:6410"],
             want: Ok(Value::from("198.51.100.16")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4 {
             args: func_args![value: "198.51.100.16"],
             want: Ok(Value::from("198.51.100.16")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

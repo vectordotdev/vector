@@ -10,7 +10,7 @@ fn to_string(value: Value) -> std::result::Result<Value, ExpressionError> {
         Boolean(v) => v.to_string().into(),
         Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Null => "".into(),
-        v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
+        v => return Err(format!("unable to coerce {} into string", v.kind()).into()),
     };
     Ok(value)
 }
@@ -72,21 +72,21 @@ impl Function for ToString {
                 title: "array",
                 source: "to_string!([])",
                 result: Err(
-                    r#"function call error for "to_string" at (0:14): unable to coerce "array" into "string""#,
+                    r#"function call error for "to_string" at (0:14): unable to coerce array into string"#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_string!({})",
                 result: Err(
-                    r#"function call error for "to_string" at (0:14): unable to coerce "object" into "string""#,
+                    r#"function call error for "to_string" at (0:14): unable to coerce object into string"#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_string!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_string" at (0:18): unable to coerce "regex" into "string""#,
+                    r#"function call error for "to_string" at (0:18): unable to coerce regex into string"#,
                 ),
             },
         ]
@@ -123,17 +123,10 @@ impl Expression for ToStringFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(
-                Kind::Bytes
-                    | Kind::Integer
-                    | Kind::Float
-                    | Kind::Boolean
-                    | Kind::Null
-                    | Kind::Timestamp,
-            )
-            .bytes()
+        let td = self.value.type_def(state);
+
+        TypeDef::bytes()
+            .with_fallibility(td.contains_array() || td.contains_object() || td.contains_regex())
     }
 }
 
@@ -147,13 +140,13 @@ mod tests {
         integer {
             args: func_args![value: 20],
             want: Ok("20"),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
 
         float {
             args: func_args![value: 20.5],
             want: Ok("20.5"),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
     ];
 }
