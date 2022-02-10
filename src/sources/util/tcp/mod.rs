@@ -262,10 +262,12 @@ async fn handle_stream<T>(
         }
     }
 
+    // TODO: leaking memory is probably bad
+    let leaked_peer_addr: &'static str = Box::leak(peer_addr.to_string().into_boxed_str());
     let socket = socket.after_read(move |byte_size| {
         emit!(&TcpBytesReceived {
             byte_size,
-            peer_addr
+            peer_addr: &leaked_peer_addr,
         });
     });
     let reader = FramedRead::new(socket, source.decoder());

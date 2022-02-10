@@ -1,7 +1,5 @@
 // ## skip check-events ##
 
-use std::net::IpAddr;
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -118,19 +116,19 @@ impl InternalEvent for TcpSendAckError {
 #[derive(Debug)]
 pub struct TcpBytesReceived {
     pub byte_size: usize,
-    pub peer_addr: IpAddr,
+    pub peer_addr: &'static str,
 }
 
 impl InternalEvent for TcpBytesReceived {
     fn emit_logs(&self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, peer_addr = %self.peer_addr);
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, peer_addr = self.peer_addr);
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => "tcp",
-            "peer_addr" => self.peer_addr.to_string()
+            "peer_addr" => self.peer_addr,
         );
     }
 }
