@@ -67,7 +67,7 @@ impl InternalEvent for TcpSocketConnectionError {
         match self.error {
             // Specific error that occurs when the other side is only
             // doing SYN/SYN-ACK connections for healthcheck.
-            // https://github.com/timberio/vector/issues/7318
+            // https://github.com/vectordotdev/vector/issues/7318
             TlsError::Handshake { ref source }
                 if source.code() == openssl::ssl::ErrorCode::SYSCALL
                     && source.io_error().is_none() =>

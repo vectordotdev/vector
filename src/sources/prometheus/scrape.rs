@@ -323,7 +323,7 @@ fn prometheus(
                                     }
                                     Err(error) => {
                                         if url.path() == "/" {
-                                            // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                             warn!(
                                                 message = PARSE_ERROR_NO_PATH,
                                                 endpoint = %url,
@@ -342,7 +342,7 @@ fn prometheus(
                                 if header.status == hyper::StatusCode::NOT_FOUND
                                     && url.path() == "/"
                                 {
-                                    // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                     warn!(
                                         message = NOT_FOUND_NO_PATH,
                                         endpoint = %url,

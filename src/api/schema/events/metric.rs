@@ -1,5 +1,9 @@
 use async_graphql::{Enum, Object};
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
+use serde_json::Value;
+use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
@@ -111,6 +115,17 @@ impl Metric {
                 .expect("JSON serialization of metric event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of metric event failed. Please report."),
+            EventEncodingType::Logfmt => {
+                let json = serde_json::to_value(&self.event)
+                    .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
+                match json {
+                    Value::Object(map) => encode_logfmt::to_string(
+                        &map.into_iter().collect::<BTreeMap<String, Value>>(),
+                    )
+                    .expect("logfmt serialization of metric event failed. Please report."),
+                    _ => panic!("logfmt serialization of metric event failed: metric converted to unexpected serde Value. Please report."),
+                }
+            }
         }
     }
 }

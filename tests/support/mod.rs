@@ -27,8 +27,8 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-        TransformContext,
+        DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+        TransformConfig, TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -298,8 +298,8 @@ impl TransformConfig for MockTransformConfig {
         }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -383,8 +383,8 @@ impl SinkConfig for MockSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {

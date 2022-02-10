@@ -1,11 +1,12 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{DataType, Output},
+    config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     transforms::{TaskTransform, Transform},
@@ -36,8 +37,8 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Log
+    pub fn input(&self) -> Input {
+        Input::log()
     }
 
     pub fn outputs(&self) -> Vec<Output> {
@@ -201,8 +202,10 @@ impl mlua::UserData for LuaEvent {
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
-                    Some(mlua::Value::Number(number)) => {
-                        this.inner.as_mut_log().insert(key, Value::Float(number));
+                    Some(mlua::Value::Number(number)) if !number.is_nan() => {
+                        this.inner
+                            .as_mut_log()
+                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
@@ -396,7 +399,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
     #[test]

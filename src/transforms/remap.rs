@@ -20,7 +20,7 @@ use vrl::Vm;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, VrlTarget},
@@ -59,8 +59,8 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {

@@ -58,7 +58,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     // Loop over the returned results, printing out log events.
     // NOTE: This will currently ignore notifications. A later `--verbose` option is planned
     // to include these.
-    // TODO: https://github.com/timberio/vector/issues/6870
+    // TODO: https://github.com/vectordotdev/vector/issues/6870
     loop {
         tokio::select! {
             biased;

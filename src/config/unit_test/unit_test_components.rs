@@ -8,7 +8,7 @@ use futures_util::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, Input, Output},
     event::Event,
     sink::{StreamSink, VectorSink},
 };
@@ -111,8 +111,8 @@ impl SinkConfig for UnitTestSinkConfig {
         "unit_test"
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 }
 
