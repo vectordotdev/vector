@@ -242,6 +242,32 @@ url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
 
+# Extra links under the "Going to Production" section in the docs
+[[languages.en.menus.gtp]]
+name = "Deployment Architecting"
+url = "https://www.notion.so/Deployment-Architecting-4d868670f19a415c829f088a92bd6579"
+weight = 1
+
+[[languages.en.menus.gtp]]
+name = "High Availability"
+url = "https://www.notion.so/High-Availability-b2a44d37e88a4bae83677139b3979872"
+weight = 2
+
+[[languages.en.menus.gtp]]
+name = "Hardening"
+url = "https://www.notion.so/Hardening-1fcce789ceaa4ea1ac9bc39112ee7224"
+weight = 3
+
+[[languages.en.menus.gtp]]
+name = "Sizing, Scaling, & Capacity Planning"
+url = "https://www.notion.so/Sizing-Scaling-Capacity-Planning-33d69dd0d87f42b89a0c1a9468cd73c5"
+weight = 4
+
+[[languages.en.menus.gtp]]
+name = "Rolling Out"
+url = "https://www.notion.so/Rolling-Out-afab50d7d1d4460d86a4ee6780647f95"
+weight = 5
+
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
 name = "Privacy"
