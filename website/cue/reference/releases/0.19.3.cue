@@ -22,7 +22,7 @@ releases: "0.19.3": {
 			description: """
 				`encoding.only_fields` YAML and JSON configuration now correctly deserializes again for sinks that used
 				fixed encodings (i.e. those that don't have `encoding.codec`). This was a regression in `v0.18.0`. It
-				was fixed in v0.19.2 but only for TOML configuration.
+				was fixed in `v0.19.2` but only for TOML configuration.
 				"""
 			pr_numbers: [11312]
 		},
