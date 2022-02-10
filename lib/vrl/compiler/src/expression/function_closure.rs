@@ -1,4 +1,5 @@
 use diagnostic::{DiagnosticError, Label};
+use std::collections::btree_map::BTreeMap;
 
 use crate::expression::Block;
 use crate::parser::{Ident, Node};
@@ -25,7 +26,7 @@ impl FunctionClosure {
         &self,
         ctx: &mut Context,
         value: Value,
-        mut func: impl FnMut(&Context, Output) -> Result<(), ExpressionError>,
+        mut func: impl FnMut(&Context, Output, &mut Value) -> Result<(), ExpressionError>,
     ) -> Result<Value, ExpressionError> {
         match value {
             Value::Object(object) => {
@@ -42,6 +43,7 @@ impl FunctionClosure {
                     .clone()
                     .into_inner();
 
+                let mut result = Value::Object(BTreeMap::default());
                 for (key, value) in object.into_iter() {
                     let state = ctx.state_mut();
                     state.insert_variable(key_ident.clone(), key.into());
@@ -67,14 +69,17 @@ impl FunctionClosure {
                         _ => Err(Error::ObjectArrayRequired.to_string()),
                     }?;
 
-                    func(ctx, output)?;
+                    func(ctx, output, &mut result)?;
 
                     let state = ctx.state_mut();
                     state.remove_variable(&key_ident);
                     state.remove_variable(&value_ident);
                 }
+                Ok(result)
             }
             Value::Array(array) => {
+                let mut result = Value::Array(Vec::default());
+
                 let index_ident = self
                     .variables
                     .get(0)
@@ -97,17 +102,16 @@ impl FunctionClosure {
                         element: self.block.resolve(ctx)?,
                     };
 
-                    func(ctx, output)?;
+                    func(ctx, output, &mut result)?;
 
                     let state = ctx.state_mut();
                     state.remove_variable(&index_ident);
                     state.remove_variable(&value_ident);
                 }
+                Ok(result)
             }
             _ => unimplemented!(),
-        };
-
-        Ok(value!(null))
+        }
     }
 }
 
