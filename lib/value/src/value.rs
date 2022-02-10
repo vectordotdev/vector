@@ -6,6 +6,8 @@ mod regex;
 
 #[cfg(feature = "api")]
 mod api;
+#[cfg(feature = "arbitrary")]
+mod arbitrary;
 #[cfg(feature = "lua")]
 mod lua;
 #[cfg(feature = "json")]
