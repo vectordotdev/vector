@@ -48,7 +48,7 @@ enum Pattern {
     OutputPattern(String),
     /// A pattern used to tap into inputs of components.
     ///
-    /// As a tap user, an input pattern is effectively a shortcut for specifying
+    /// For a tap user, an input pattern is effectively a shortcut for specifying
     /// one or more output patterns since a component's inputs are other
     /// components' outputs. This variant captures the original user-supplied
     /// pattern alongside the output patterns it's translated into.
@@ -209,8 +209,9 @@ async fn tap_handler(
     // a shutdown trigger for sending a remove control message when matching sinks change.
     let mut sinks: HashMap<OutputId, _> = HashMap::new();
 
-    // All patterns
-    let raw_patterns = patterns.all_patterns();
+    // Recording user-provided patterns for later use in sending notifications
+    // (determining patterns which did not match)
+    let user_provided_patterns = patterns.all_patterns();
 
     // The patterns that matched on the last iteration, to compare with the latest
     // round of matches when sending notifications.
@@ -323,7 +324,7 @@ async fn tap_handler(
                 }
 
                 // Not matched notifications.
-                for pattern in raw_patterns.difference(&matched) {
+                for pattern in user_provided_patterns.difference(&matched) {
                     notifications.push(send_not_matched(tx.clone(), pattern.clone()).boxed());
                 }
 
