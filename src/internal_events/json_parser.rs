@@ -14,10 +14,10 @@ pub struct JsonParserError<'a> {
 impl<'a> InternalEvent for JsonParserError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "Event failed to parse as JSON.",
+            message = %format!("Event failed to parse as JSON: {:?}", self.error),
             field = %self.field,
             value = %self.value,
-            error = ?self.error,
+            error = "invalid_json",
             error_type = "parser_failed",
             stage = error_stage::PROCESSING,
             drop_invalid = self.drop_invalid,
@@ -28,13 +28,22 @@ impl<'a> InternalEvent for JsonParserError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
+            "error" => "invalid_json",
             "error_type" => "parser_failed",
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
             "value" => self.value.to_string(),
-            "drop_invalid" => self.drop_invalid.to_string(),
         );
+        if self.drop_invalid {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error" => "invalid_json",
+                "error_type" => "parser_failed",
+                "stage" => error_stage::PROCESSING,
+                "field" => self.field.to_string(),
+                "value" => self.value.to_string(),
+            );
+        }
         // deprecated
         counter!(
             "processing_errors_total", 1,
