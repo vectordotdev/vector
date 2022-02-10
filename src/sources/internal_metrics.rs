@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;

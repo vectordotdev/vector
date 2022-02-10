@@ -179,7 +179,7 @@ impl SourceSender {
         name: &str,
         events: Vec<Event>,
     ) -> Result<(), ClosedError> {
-        self.named_inner
+        self.named_inners
             .get_mut(name)
             .expect("unknown output")
             .send_batch(events)
