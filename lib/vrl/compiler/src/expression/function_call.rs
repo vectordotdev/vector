@@ -7,7 +7,6 @@ use std::{fmt, sync::Arc};
 use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
-use crate::type_def::KindInfo;
 use crate::{
     expression,
     expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
@@ -227,8 +226,8 @@ impl FunctionCall {
                             // The type definition of the value does not match the expected closure
                             // type, continue to check if the closure eventually accepts this
                             // definition.
-                            if type_def.kind() != input.kind {
-                                found_type_def = Some(type_def.kind.clone());
+                            if !input.kind.is_superset(&type_def.kind()) {
+                                found_type_def = Some(type_def.kind().clone());
                                 input_expression = Some(expr);
                                 continue;
                             }
@@ -295,7 +294,7 @@ impl FunctionCall {
                 if !matched {
                     return Err(Error::EnumerationTypeMismatch {
                         call_span,
-                        found_kind: found_type_def.unwrap_or(KindInfo::Unknown),
+                        found_kind: found_type_def.unwrap_or(Kind::any()),
                         input_expression: input_expression
                             .unwrap_or(&expression::Expr::Noop(Noop {}))
                             .clone(),
@@ -719,7 +718,7 @@ pub enum Error {
     #[error("type mismatch in enumeration function call")]
     EnumerationTypeMismatch {
         call_span: Span,
-        found_kind: KindInfo,
+        found_kind: Kind,
         input_expression: expression::Expr,
     },
 }
@@ -739,7 +738,7 @@ impl DiagnosticError for Error {
             FallibleArgument { .. } => 630,
             UpdateState { .. } => 640,
             UnexpectedClosure { .. } => 109,
-            MissingClosure { .. } => 110,
+            MissingClosure { .. } => 111,
             ClosureArityMismatch { .. } => 120,
             EnumerationTypeMismatch { .. } => 121,
         }
@@ -909,7 +908,7 @@ impl DiagnosticError for Error {
                     "This input value does not have a known enumerable type."
                 ),
                 call_span,
-            ), Label::context(format!("The expression {input_expression} has an inferred type of {found_kind:#?} where an Array or Object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
+            ), Label::context(format!("The expression {input_expression} has an inferred type of {found_kind} where an array or object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
         }
     }
 

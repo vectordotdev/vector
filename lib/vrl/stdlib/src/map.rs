@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -47,24 +46,26 @@ impl Function for Map {
     fn closure(&self) -> Option<closure::Definition> {
         let object = closure::Input {
             parameter_keyword: "value",
-            kind: Kind::Object,
+            kind: Kind::object(Collection::any()),
             variables: vec![
-                closure::Variable { kind: Kind::Bytes },
-                closure::Variable { kind: Kind::all() },
+                closure::Variable {
+                    kind: Kind::bytes(),
+                },
+                closure::Variable { kind: Kind::any() },
             ],
             output: closure::Output::Array {
-                elements: vec![Kind::Bytes, Kind::all()],
+                elements: vec![Kind::bytes(), Kind::any()],
             },
         };
 
         let array = closure::Input {
             parameter_keyword: "value",
-            kind: Kind::Array,
+            kind: Kind::array(Collection::any()),
             variables: vec![
                 closure::Variable {
-                    kind: Kind::Integer,
+                    kind: Kind::integer(),
                 },
-                closure::Variable { kind: Kind::all() },
+                closure::Variable { kind: Kind::any() },
             ],
             output: closure::Output::Any,
         };
@@ -148,7 +149,7 @@ impl Expression for MapFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Object | Kind::Array)
+            .fallible_unless(Kind::object(Collection::any()) | Kind::array(Collection::any()))
             .restrict_array()
     }
 }
