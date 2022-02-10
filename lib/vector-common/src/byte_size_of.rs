@@ -81,6 +81,19 @@ where
     }
 }
 
+impl<T, const N: usize> ByteSizeOf for [T; N]
+where
+    T: ByteSizeOf,
+{
+    fn size_of(&self) -> usize {
+        self.allocated_bytes()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
 impl<T> ByteSizeOf for Option<T>
 where
     T: ByteSizeOf,
