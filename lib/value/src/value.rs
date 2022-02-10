@@ -29,7 +29,7 @@ use tracing::{instrument, trace, trace_span};
 
 use crate::value::regex::ValueRegex;
 
-/// A boxed std::error::Error
+/// A boxed `std::error::Error`
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// The main value type used in Vector events, and VRL
@@ -67,8 +67,8 @@ pub enum Value {
 
 impl Eq for Value {}
 
-impl PartialEq<Value> for Value {
-    fn eq(&self, other: &Value) -> bool {
+impl PartialEq<Self> for Value {
+    fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Array(a), Value::Array(b)) => a.eq(b),
             (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
@@ -163,7 +163,7 @@ impl Value {
     /// Merges `incoming` value into self.
     ///
     /// Will concatenate `Bytes` and overwrite the rest value kinds.
-    pub fn merge(&mut self, incoming: Value) {
+    pub fn merge(&mut self, incoming: Self) {
         match (self, incoming) {
             (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
                 let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
@@ -215,9 +215,9 @@ impl Value {
     fn insert_coalesce(
         sub_segments: Vec<FieldBuf>,
         working_lookup: &LookupBuf,
-        sub_value: &mut Value,
-        value: Value,
-    ) -> StdResult<Option<Value>, ValueError> {
+        sub_value: &mut Self,
+        value: Self,
+    ) -> StdResult<Option<Self>, ValueError> {
         // Creating a needle with a back out of the loop is very important.
         let mut needle = None;
         for sub_segment in sub_segments {
@@ -238,16 +238,16 @@ impl Value {
 
     /// Ensures the value is the correct type for the given segment.
     /// An Index needs the value to be an Array, the others need it to be a Map.
-    fn correct_type(value: &mut Value, segment: &SegmentBuf) {
+    fn correct_type(value: &mut Self, segment: &SegmentBuf) {
         match segment {
             SegmentBuf::Index(next_len) if !matches!(value, Value::Array(_)) => {
-                *value = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                *value = Self::Array(Vec::with_capacity(next_len.abs() as usize));
             }
             SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(Default::default());
+                *value = Self::Map(Default::default());
             }
             SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
-                *value = Value::Map(Default::default());
+                *value = Self::Map(Default::default());
             }
             _ => (),
         }
@@ -257,9 +257,9 @@ impl Value {
         name: &str,
         requires_quoting: bool,
         mut working_lookup: LookupBuf,
-        map: &mut BTreeMap<String, Value>,
-        value: Value,
-    ) -> StdResult<Option<Value>, ValueError> {
+        map: &mut BTreeMap<String, Self>,
+        value: Self,
+    ) -> StdResult<Option<Self>, ValueError> {
         let next_segment = match working_lookup.get(0) {
             Some(segment) => segment,
             None => {
@@ -268,16 +268,16 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|entry| Value::correct_type(entry, next_segment))
+            .and_modify(|entry| Self::correct_type(entry, next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
                 match next_segment {
                     SegmentBuf::Index(next_len) => {
-                        Value::Array(Vec::with_capacity(next_len.abs() as usize))
+                        Self::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Value::Map(Default::default())
+                        Self::Map(Default::default())
                     }
                 }
             })
@@ -304,9 +304,9 @@ impl Value {
     fn insert_array(
         i: isize,
         mut working_lookup: LookupBuf,
-        array: &mut Vec<Value>,
-        value: Value,
-    ) -> StdResult<Option<Value>, ValueError> {
+        array: &mut Vec<Self>,
+        value: Self,
+    ) -> StdResult<Option<Self>, ValueError> {
         let index = if i.is_negative() {
             array.len() as isize + i
         } else {
@@ -323,7 +323,7 @@ impl Value {
 
         if let Some(inner) = item {
             if let Some(next_segment) = working_lookup.get(0) {
-                Value::correct_type(inner, next_segment);
+                Self::correct_type(inner, next_segment);
             }
 
             inner.insert(working_lookup, value).map_err(|mut e| {
@@ -347,16 +347,16 @@ impl Value {
                 let abs = i.abs() as usize - 1;
                 let len = array.len();
 
-                array.resize(abs, Value::Null);
+                array.resize(abs, Self::Null);
                 array.rotate_right(abs - len);
             } else {
                 // Fill the vector to the index.
-                array.resize(i as usize, Value::Null);
+                array.resize(i as usize, Self::Null);
             }
             let mut retval = Ok(None);
             let next_val = match working_lookup.get(0) {
                 Some(SegmentBuf::Index(next_len)) => {
-                    let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                    let mut inner = Self::Array(Vec::with_capacity(next_len.abs() as usize));
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
                         if let ValueError::PrimitiveDescent {
                             original_target,
@@ -376,7 +376,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Value::Map(Default::default());
+                    let mut inner = Self::Map(Default::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -400,7 +400,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Value::Map(Default::default());
+                        let mut inner = Self::Map(Default::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {
@@ -449,8 +449,8 @@ impl Value {
     pub fn insert(
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
-        value: impl Into<Value> + Debug,
-    ) -> StdResult<Option<Value>, ValueError> {
+        value: impl Into<Self> + Debug,
+    ) -> StdResult<Option<Self>, ValueError> {
         let mut working_lookup: LookupBuf = lookup.into();
         let value = value.into();
         let span = trace_span!("insert", lookup = %working_lookup);
@@ -468,13 +468,9 @@ impl Value {
             // The top level insert will always be a map (or an array in tests).
             // Then for further descents into the lookup, in the `insert_map` function
             // if the type is one of the following, the field is modified to be a map.
-            (Some(segment), Value::Boolean(_))
-            | (Some(segment), Value::Bytes(_))
-            | (Some(segment), Value::Regex(_))
-            | (Some(segment), Value::Timestamp(_))
-            | (Some(segment), Value::Float(_))
-            | (Some(segment), Value::Integer(_))
-            | (Some(segment), Value::Null) => {
+            (Some(segment),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 trace!("Encountered descent into a primitive.");
                 Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
@@ -488,7 +484,7 @@ impl Value {
             }
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
-                Value::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
+                Self::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
             }
             // Descend into a map
             (
@@ -497,14 +493,14 @@ impl Value {
                     ref requires_quoting,
                 })),
                 Value::Map(ref mut map),
-            ) => Value::insert_map(name, *requires_quoting, working_lookup, map, value),
+            ) => Self::insert_map(name, *requires_quoting, working_lookup, map, value),
             (Some(SegmentBuf::Index(_)), Value::Map(_)) => {
                 trace!("Mismatched index trying to access map.");
                 Ok(None)
             }
             // Descend into an array
             (Some(SegmentBuf::Index(i)), Value::Array(ref mut array)) => {
-                Value::insert_array(i, working_lookup, array, value)
+                Self::insert_array(i, working_lookup, array, value)
             }
             (Some(SegmentBuf::Field(FieldBuf { .. })), Value::Array(_)) => {
                 trace!("Mismatched field trying to access array.");
@@ -541,7 +537,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> StdResult<Option<Value>, ValueError> {
+    ) -> StdResult<Option<Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("remove", lookup = %working_lookup, %prune);
         let _guard = span.enter();
@@ -555,13 +551,9 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(segment), Value::Boolean(_))
-            | (Some(segment), Value::Bytes(_))
-            | (Some(segment), Value::Regex(_))
-            | (Some(segment), Value::Timestamp(_))
-            | (Some(segment), Value::Float(_))
-            | (Some(segment), Value::Integer(_))
-            | (Some(segment), Value::Null) => {
+            (Some(segment),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 if working_lookup.is_empty() {
                     trace!("Cannot remove self. Caller must remove.");
                     Err(ValueError::RemovingSelf)
@@ -686,7 +678,7 @@ impl Value {
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&Value>, ValueError> {
+    ) -> StdResult<Option<&Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -742,13 +734,9 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(_s), Value::Boolean(_))
-            | (Some(_s), Value::Bytes(_))
-            | (Some(_s), Value::Regex(_))
-            | (Some(_s), Value::Timestamp(_))
-            | (Some(_s), Value::Float(_))
-            | (Some(_s), Value::Integer(_))
-            | (Some(_s), Value::Null) => {
+            (Some(_s),
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => {
                 trace!("Mismatched primitive field while trying to use segment.");
                 Ok(None)
             }
@@ -782,7 +770,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&mut Value>, ValueError> {
+    ) -> StdResult<Option<&mut Self>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
@@ -792,13 +780,9 @@ impl Value {
             // We've met an end and found our value.
             (None, item) => Ok(Some(item)),
             // This is just not allowed!
-            (_, Value::Boolean(_))
-            | (_, Value::Bytes(_))
-            | (_, Value::Regex(_))
-            | (_, Value::Timestamp(_))
-            | (_, Value::Float(_))
-            | (_, Value::Integer(_))
-            | (_, Value::Null) => unimplemented!(),
+            (_,
+ Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
+ Value::Float(_) | Value::Integer(_) | Value::Null) => unimplemented!(),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -1009,7 +993,7 @@ impl Value {
         &'a self,
         prefix: Option<Lookup<'a>>,
         only_leaves: bool,
-    ) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Value)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Self)> + 'a> {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
@@ -1069,7 +1053,7 @@ impl Value {
 }
 
 /// Converts a timestamp to a String
-pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
+#[must_use] pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 

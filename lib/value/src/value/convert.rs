@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 impl Value {
     /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Map`
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Self>> {
         match &self {
             Value::Map(map) => Some(map),
             _ => None,
@@ -22,7 +22,7 @@ impl Value {
     }
 
     /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`
-    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
+    pub fn into_map(self) -> Option<BTreeMap<String, Self>> {
         match self {
             Value::Map(map) => Some(map),
             _ => None,
@@ -42,7 +42,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Map`.
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Self> {
         match self {
             Value::Map(ref mut m) => m,
             _ => panic!("Tried to call `Value::as_map` on a non-map value."),
@@ -54,7 +54,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array(&self) -> &Vec<Value> {
+    pub fn as_array(&self) -> &Vec<Self> {
         match self {
             Value::Array(ref a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
@@ -66,7 +66,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
+    pub fn as_array_mut(&mut self) -> &mut Vec<Self> {
         match self {
             Value::Array(ref mut a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
@@ -76,11 +76,11 @@ impl Value {
 
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
+        Self::Bytes(bytes)
     }
 }
 
-impl<T: Into<Value>> From<Vec<T>> for Value {
+impl<T: Into<Self>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
         set.into_iter()
             .map(::std::convert::Into::into)
@@ -90,26 +90,26 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl From<String> for Value {
     fn from(string: String) -> Self {
-        Value::Bytes(string.into())
+        Self::Bytes(string.into())
     }
 }
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::Bytes(Vec::from(s.as_bytes()).into())
+        Self::Bytes(Vec::from(s.as_bytes()).into())
     }
 }
 
 impl From<DateTime<Utc>> for Value {
     fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
+        Self::Timestamp(timestamp)
     }
 }
 
-impl<T: Into<Value>> From<Option<T>> for Value {
+impl<T: Into<Self>> From<Option<T>> for Value {
     fn from(value: Option<T>) -> Self {
         match value {
-            None => Value::Null,
+            None => Self::Null,
             Some(v) => v.into(),
         }
     }
@@ -117,13 +117,13 @@ impl<T: Into<Value>> From<Option<T>> for Value {
 
 impl From<NotNan<f32>> for Value {
     fn from(value: NotNan<f32>) -> Self {
-        Value::Float(value.into())
+        Self::Float(value.into())
     }
 }
 
 impl From<NotNan<f64>> for Value {
     fn from(value: NotNan<f64>) -> Self {
-        Value::Float(value)
+        Self::Float(value)
     }
 }
 
@@ -134,21 +134,21 @@ impl From<f64> for Value {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Map(value)
+impl From<BTreeMap<String, Self>> for Value {
+    fn from(value: BTreeMap<String, Self>) -> Self {
+        Self::Map(value)
     }
 }
 
-impl FromIterator<Value> for Value {
-    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        Value::Array(iter.into_iter().collect::<Vec<Value>>())
+impl FromIterator<Self> for Value {
+    fn from_iter<I: IntoIterator<Item = Self>>(iter: I) -> Self {
+        Self::Array(iter.into_iter().collect::<Vec<Self>>())
     }
 }
 
-impl FromIterator<(String, Value)> for Value {
-    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+impl FromIterator<(String, Self)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, Self)>>(iter: I) -> Self {
+        Self::Map(iter.into_iter().collect::<BTreeMap<String, Self>>())
     }
 }
 
@@ -173,6 +173,6 @@ impl_valuekind_from_integer!(isize);
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        Value::Boolean(value)
+        Self::Boolean(value)
     }
 }
