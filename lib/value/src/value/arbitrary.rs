@@ -27,27 +27,27 @@ impl Arbitrary for Value {
         match u8::arbitrary(g) % 8 {
             0 => {
                 let bytes: Vec<u8> = Vec::arbitrary(g);
-                Value::Bytes(Bytes::from(bytes))
+                Self::Bytes(Bytes::from(bytes))
             }
-            1 => Value::Integer(i64::arbitrary(g)),
+            1 => Self::Integer(i64::arbitrary(g)),
             2 => {
                 let mut f = f64::arbitrary(g) % MAX_F64_SIZE;
                 if f.is_nan() {
                     f = 0.0;
                 }
-                Value::from(f)
+                Self::from(f)
             }
-            3 => Value::Boolean(bool::arbitrary(g)),
-            4 => Value::Timestamp(datetime(g)),
+            3 => Self::Boolean(bool::arbitrary(g)),
+            4 => Self::Timestamp(datetime(g)),
             5 => {
                 let mut gen = Gen::new(MAX_MAP_SIZE);
-                Value::Map(BTreeMap::arbitrary(&mut gen))
+                Self::Map(BTreeMap::arbitrary(&mut gen))
             }
             6 => {
                 let mut gen = Gen::new(MAX_ARRAY_SIZE);
-                Value::Array(Vec::arbitrary(&mut gen))
+                Self::Array(Vec::arbitrary(&mut gen))
             }
-            7 => Value::Null,
+            7 => Self::Null,
             _ => unreachable!(),
         }
     }
