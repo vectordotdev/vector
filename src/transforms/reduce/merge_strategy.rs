@@ -523,6 +523,7 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
             Value::Null => Box::new(DiscardMerger::new(v)),
             Value::Boolean(_) => Box::new(DiscardMerger::new(v)),
             Value::Bytes(_) => Box::new(DiscardMerger::new(v)),
+            Value::Regex(_) => Box::new(DiscardMerger::new(v)),
             Value::Array(_) => Box::new(DiscardMerger::new(v)),
         }
     }

@@ -16,6 +16,7 @@ use std::fmt;
 use std::result::Result as StdResult;
 use toml::value::Value as TomlValue;
 
+use crate::event::value_regex::ValueRegex;
 use crate::{
     event::{error::EventError, timestamp_to_string},
     ByteSizeOf, Result,
@@ -24,6 +25,10 @@ use crate::{
 #[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
+
+    /// When used in the context of Vector this is treated identically to Bytes. It has
+    /// additional meaning in the context of VRL
+    Regex(ValueRegex),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -41,6 +46,7 @@ impl PartialEq<Value> for Value {
             (Value::Array(a), Value::Array(b)) => a.eq(b),
             (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
             (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
+            (Value::Regex(a), Value::Regex(b)) => a.eq(b),
             (Value::Float(a), Value::Float(b)) => {
                 // This compares floats with the following rules:
                 // * NaNs compare as equal
@@ -78,6 +84,9 @@ impl Hash for Value {
             }
             Value::Bytes(v) => {
                 v.hash(state);
+            }
+            Value::Regex(regex) => {
+                regex.as_bytes_slice().hash(state);
             }
             Value::Float(v) => {
                 // This hashes floats with the following rules:
@@ -132,6 +141,7 @@ impl Serialize for Value {
             Value::Bytes(_) | Value::Timestamp(_) => {
                 serializer.serialize_str(&self.to_string_lossy())
             }
+            Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
@@ -409,6 +419,7 @@ impl TryInto<serde_json::Value> for Value {
             Value::Integer(v) => Ok(serde_json::Value::from(v)),
             Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
             Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
+            Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
             Value::Map(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
             Value::Null => Ok(serde_json::Value::Null),
@@ -445,6 +456,7 @@ impl From<Value> for vrl_core::Value {
 
         match v {
             Value::Bytes(v) => v.into(),
+            Value::Regex(regex) => regex.into_inner().into(),
             Value::Integer(v) => v.into(),
             Value::Float(v) => v.into(),
             Value::Boolean(v) => v.into(),
@@ -457,10 +469,11 @@ impl From<Value> for vrl_core::Value {
 }
 
 impl Value {
-    // TODO: return Cow
+    // TODO: return Cow 🐄
     pub fn to_string_lossy(&self) -> String {
         match self {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
+            Value::Regex(regex) => regex.as_str().to_string(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
@@ -474,6 +487,7 @@ impl Value {
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Regex(regex) => regex.as_bytes(),
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
@@ -556,7 +570,7 @@ impl Value {
 
     pub fn kind(&self) -> &str {
         match self {
-            Value::Bytes(_) => "string",
+            Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
@@ -609,6 +623,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_) => false,
@@ -876,6 +891,7 @@ impl Value {
             // if the type is one of the following, the field is modified to be a map.
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -962,6 +978,7 @@ impl Value {
             // This is just not allowed!
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Regex(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
@@ -1148,6 +1165,7 @@ impl Value {
             // This is just not allowed!
             (Some(_s), Value::Boolean(_))
             | (Some(_s), Value::Bytes(_))
+            | (Some(_s), Value::Regex(_))
             | (Some(_s), Value::Timestamp(_))
             | (Some(_s), Value::Float(_))
             | (Some(_s), Value::Integer(_))
@@ -1197,6 +1215,7 @@ impl Value {
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
+            | (_, Value::Regex(_))
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
             | (_, Value::Integer(_))
@@ -1308,6 +1327,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
@@ -1414,6 +1434,7 @@ impl Value {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
+            | Value::Regex(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)

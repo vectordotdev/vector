@@ -9,6 +9,9 @@ impl<'a> ToLua<'a> for Value {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         match self {
             Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
+            Value::Regex(regex) => lua
+                .create_string(regex.as_bytes_slice())
+                .map(LuaValue::String),
             Value::Integer(i) => Ok(LuaValue::Integer(i)),
             Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
