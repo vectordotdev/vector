@@ -341,7 +341,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    container: timberio/ci_image
+    container: timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
     needs: changes
     steps:
       - uses: actions/checkout@v2.4.0
