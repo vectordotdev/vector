@@ -1,5 +1,6 @@
 extern crate pest;
 
+use ordered_float::NotNan;
 use std::{convert::TryFrom, str::FromStr};
 
 use pest::{
@@ -413,7 +414,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::float => Box::new(Literal::from(Value::from(
-            pair.as_str().parse::<f64>().unwrap(),
+            NotNan::new(pair.as_str().parse::<f64>().unwrap()).unwrap(),
         ))),
         Rule::integer => Box::new(Literal::from(Value::from(
             pair.as_str().parse::<i64>().unwrap(),

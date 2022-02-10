@@ -9,7 +9,11 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
+use ordered_float::NotNan;
+use serde::de::{Error as SerdeError, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
+use std::fmt;
+use std::result::Result as StdResult;
 use toml::value::Value as TomlValue;
 
 use crate::{
@@ -17,11 +21,11 @@ use crate::{
     ByteSizeOf, Result,
 };
 
-#[derive(PartialOrd, Debug, Clone, Deserialize)]
+#[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
-    Float(f64),
+    Float(NotNan<f64>),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
     Map(BTreeMap<String, Value>),
@@ -117,13 +121,13 @@ impl ByteSizeOf for Value {
 }
 
 impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match &self {
             Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(*f),
+            Value::Float(f) => serializer.serialize_f64(f.into_inner()),
             Value::Boolean(b) => serializer.serialize_bool(*b),
             Value::Bytes(_) | Value::Timestamp(_) => {
                 serializer.serialize_str(&self.to_string_lossy())
@@ -132,6 +136,108 @@ impl Serialize for Value {
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> StdResult<Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> Visitor<'de> for ValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("any valid JSON value")
+            }
+
+            #[inline]
+            fn visit_bool<E>(self, value: bool) -> StdResult<Value, E> {
+                Ok(value.into())
+            }
+
+            #[inline]
+            fn visit_i64<E>(self, value: i64) -> StdResult<Value, E> {
+                Ok(value.into())
+            }
+
+            #[inline]
+            fn visit_u64<E>(self, value: u64) -> StdResult<Value, E> {
+                Ok((value as i64).into())
+            }
+
+            #[inline]
+            fn visit_f64<E>(self, value: f64) -> StdResult<Value, E>
+            where
+                E: serde::de::Error,
+            {
+                let f = NotNan::new(value).map_err(|_| {
+                    SerdeError::invalid_value(serde::de::Unexpected::Float(value), &self)
+                })?;
+                Ok(Value::Float(f))
+            }
+
+            #[inline]
+            fn visit_str<E>(self, value: &str) -> StdResult<Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Value::Bytes(Bytes::copy_from_slice(value.as_bytes())))
+            }
+
+            #[inline]
+            fn visit_string<E>(self, value: String) -> StdResult<Value, E> {
+                Ok(Value::Bytes(value.into()))
+            }
+
+            #[inline]
+            fn visit_none<E>(self) -> StdResult<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_some<D>(self, deserializer: D) -> StdResult<Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                Deserialize::deserialize(deserializer)
+            }
+
+            #[inline]
+            fn visit_unit<E>(self) -> StdResult<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_seq<V>(self, mut visitor: V) -> StdResult<Value, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(value) = visitor.next_element()? {
+                    vec.push(value);
+                }
+
+                Ok(Value::Array(vec))
+            }
+
+            fn visit_map<V>(self, mut visitor: V) -> StdResult<Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut map = BTreeMap::new();
+                while let Some((key, value)) = visitor.next_entry()? {
+                    map.insert(key, value);
+                }
+
+                Ok(Value::Map(map))
+            }
+        }
+
+        deserializer.deserialize_any(ValueVisitor)
     }
 }
 
@@ -174,7 +280,9 @@ impl TryFrom<TomlValue> for Value {
             ),
             TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
             TomlValue::Boolean(b) => Self::from(b),
-            TomlValue::Float(f) => Self::from(f),
+            TomlValue::Float(f) => {
+                Value::Float(NotNan::new(f).map_err(|_| "NaN value not supported")?)
+            }
         })
     }
 }
@@ -200,15 +308,22 @@ impl<T: Into<Value>> From<Option<T>> for Value {
     }
 }
 
-impl From<f32> for Value {
-    fn from(value: f32) -> Self {
-        Value::Float(f64::from(value))
+impl From<NotNan<f32>> for Value {
+    fn from(value: NotNan<f32>) -> Self {
+        Value::Float(value.into())
     }
 }
 
-impl From<f64> for Value {
-    fn from(value: f64) -> Self {
+impl From<NotNan<f64>> for Value {
+    fn from(value: NotNan<f64>) -> Self {
         Value::Float(value)
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        NotNan::new(f).unwrap().into()
     }
 }
 
@@ -261,8 +376,13 @@ impl From<serde_json::Value> for Value {
             serde_json::Value::Bool(b) => Value::Boolean(b),
             serde_json::Value::Number(n) => {
                 let float_or_byte = || {
-                    n.as_f64()
-                        .map_or_else(|| Value::Bytes(n.to_string().into()), Value::Float)
+                    n.as_f64().map_or_else(
+                        || Value::Bytes(n.to_string().into()),
+                        |f| {
+                            // JSON does not support NaN values
+                            Value::Float(NotNan::new(f).unwrap())
+                        },
+                    )
                 };
                 n.as_i64().map_or_else(float_or_byte, Value::Integer)
             }
@@ -283,11 +403,11 @@ impl From<serde_json::Value> for Value {
 impl TryInto<serde_json::Value> for Value {
     type Error = crate::Error;
 
-    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
+    fn try_into(self) -> StdResult<serde_json::Value, Self::Error> {
         match self {
             Value::Boolean(v) => Ok(serde_json::Value::from(v)),
             Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v)),
+            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
             Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
             Value::Map(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
@@ -307,7 +427,7 @@ impl From<vrl_core::Value> for Value {
         match v {
             Bytes(v) => Value::Bytes(v),
             Integer(v) => Value::Integer(v),
-            Float(v) => Value::Float(*v),
+            Float(v) => Value::Float(v),
             Boolean(v) => Value::Boolean(v),
             Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
@@ -373,6 +493,13 @@ impl Value {
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
         match &self {
             Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<NotNan<f64>> {
+        match self {
+            Value::Float(f) => Some(*f),
             _ => None,
         }
     }
@@ -496,7 +623,7 @@ impl Value {
         working_lookup: &LookupBuf,
         sub_value: &mut Value,
         value: Value,
-    ) -> std::result::Result<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, EventError> {
         // Creating a needle with a back out of the loop is very important.
         let mut needle = None;
         for sub_segment in sub_segments {
@@ -538,7 +665,7 @@ impl Value {
         mut working_lookup: LookupBuf,
         map: &mut BTreeMap<String, Value>,
         value: Value,
-    ) -> std::result::Result<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, EventError> {
         let next_segment = match working_lookup.get(0) {
             Some(segment) => segment,
             None => {
@@ -585,7 +712,7 @@ impl Value {
         mut working_lookup: LookupBuf,
         array: &mut Vec<Value>,
         value: Value,
-    ) -> std::result::Result<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, EventError> {
         let index = if i.is_negative() {
             array.len() as isize + i
         } else {
@@ -729,7 +856,7 @@ impl Value {
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
         value: impl Into<Value> + Debug,
-    ) -> std::result::Result<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, EventError> {
         let mut working_lookup: LookupBuf = lookup.into();
         let value = value.into();
         let span = trace_span!("insert", lookup = %working_lookup);
@@ -819,7 +946,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> std::result::Result<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("remove", lookup = %working_lookup, %prune);
         let _guard = span.enter();
@@ -963,7 +1090,7 @@ impl Value {
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> std::result::Result<Option<&Value>, EventError> {
+    ) -> StdResult<Option<&Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1058,7 +1185,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> std::result::Result<Option<&mut Value>, EventError> {
+    ) -> StdResult<Option<&mut Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1369,10 +1496,10 @@ mod test {
             assert!(Value::Integer(0).eq(&Value::Integer(0)));
             assert!(!Value::Integer(0).eq(&Value::Integer(1)));
             assert!(!Value::Boolean(true).eq(&Value::Integer(2)));
-            assert!(Value::Float(1.2).eq(&Value::Float(1.4)));
-            assert!(!Value::Float(1.2).eq(&Value::Float(-1.2)));
-            assert!(!Value::Float(-0.0).eq(&Value::Float(0.0)));
-            assert!(!Value::Float(f64::NEG_INFINITY).eq(&Value::Float(f64::INFINITY)));
+            assert!(Value::from(1.2).eq(&Value::from(1.4)));
+            assert!(!Value::from(1.2).eq(&Value::from(-1.2)));
+            assert!(!Value::from(-0.0).eq(&Value::from(0.0)));
+            assert!(!Value::from(f64::NEG_INFINITY).eq(&Value::from(f64::INFINITY)));
             assert!(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
                 .eq(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
             assert!(!Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
@@ -1395,12 +1522,12 @@ mod test {
             assert_eq!(hash(&Value::Integer(0)), hash(&Value::Integer(0)));
             assert_ne!(hash(&Value::Integer(0)), hash(&Value::Integer(1)));
             assert_ne!(hash(&Value::Boolean(true)), hash(&Value::Integer(2)));
-            assert_eq!(hash(&Value::Float(1.2)), hash(&Value::Float(1.4)));
-            assert_ne!(hash(&Value::Float(1.2)), hash(&Value::Float(-1.2)));
-            assert_ne!(hash(&Value::Float(-0.0)), hash(&Value::Float(0.0)));
+            assert_eq!(hash(&Value::from(1.2)), hash(&Value::from(1.4)));
+            assert_ne!(hash(&Value::from(1.2)), hash(&Value::from(-1.2)));
+            assert_ne!(hash(&Value::from(-0.0)), hash(&Value::from(0.0)));
             assert_ne!(
-                hash(&Value::Float(f64::NEG_INFINITY)),
-                hash(&Value::Float(f64::INFINITY))
+                hash(&Value::from(f64::NEG_INFINITY)),
+                hash(&Value::from(f64::INFINITY))
             );
             assert_eq!(
                 hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),

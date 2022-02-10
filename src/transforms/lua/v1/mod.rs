@@ -1,6 +1,7 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
@@ -201,8 +202,10 @@ impl mlua::UserData for LuaEvent {
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
-                    Some(mlua::Value::Number(number)) => {
-                        this.inner.as_mut_log().insert(key, Value::Float(number));
+                    Some(mlua::Value::Number(number)) if !number.is_nan() => {
+                        this.inner
+                            .as_mut_log()
+                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
@@ -396,7 +399,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
     #[test]

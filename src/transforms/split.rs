@@ -146,6 +146,7 @@ mod tests {
         config::TransformConfig,
         event::{Event, LogEvent, Value},
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -251,7 +252,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::Float(NotNan::new(42.3).unwrap()));
         assert_eq!(log["flag"], Value::Boolean(true));
         assert_eq!(log["code"], Value::Integer(1234));
         assert_eq!(log["rest"], Value::Bytes("word".into()));

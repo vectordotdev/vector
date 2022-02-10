@@ -1,4 +1,5 @@
 use mlua::prelude::*;
+use ordered_float::NotNan;
 
 use super::util::{table_is_timestamp, table_to_timestamp, timestamp_to_table};
 use crate::event::Value;
@@ -9,7 +10,7 @@ impl<'a> ToLua<'a> for Value {
         match self {
             Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
             Value::Integer(i) => Ok(LuaValue::Integer(i)),
-            Value::Float(f) => Ok(LuaValue::Number(f)),
+            Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
             Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
@@ -24,7 +25,14 @@ impl<'a> FromLua<'a> for Value {
         match value {
             LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
-            LuaValue::Number(f) => Ok(Value::Float(f)),
+            LuaValue::Number(f) => {
+                let f = NotNan::new(f).map_err(|_| mlua::Error::FromLuaConversionError {
+                    from: value.type_name(),
+                    to: "Value",
+                    message: Some("NaN not supported".to_string()),
+                })?;
+                Ok(Value::Float(f))
+            }
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
             LuaValue::Table(t) => {
                 if t.len()? > 0 {
@@ -58,13 +66,13 @@ mod test {
                 Value::Bytes("\u{237a}\u{3b2}\u{3b3}".into()),
             ),
             ("123", Value::Integer(123)),
-            ("4.333", Value::Float(4.333)),
+            ("4.333", Value::from(4.333)),
             ("true", Value::Boolean(true)),
             (
                 "{ x = 1, y = '2', nested = { other = 5.678 } }",
                 Value::Map(
                     vec![
-                        ("x".into(), 1.into()),
+                        ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
@@ -77,7 +85,7 @@ mod test {
             ),
             (
                 "{1, '2', 0.57721566}",
-                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
+                Value::Array(vec![1_i64.into(), "2".into(), 0.577_215_66.into()]),
             ),
             (
                 "os.date('!*t', 1584297428)",
@@ -122,7 +130,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Float(4.333),
+                Value::from(4.333),
                 r#"
                 function (value)
                     return value == 4.333
@@ -140,7 +148,7 @@ mod test {
             (
                 Value::Map(
                     vec![
-                        ("x".into(), 1.into()),
+                        ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
@@ -159,7 +167,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
+                Value::Array(vec![1_i64.into(), "2".into(), 0.577_215_66.into()]),
                 r#"
                 function (value)
                     return value[1] == 1 and
