@@ -52,6 +52,7 @@ tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.3.8", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
+value = {path = "../value", features = ["lua", "toml", "json", "api"]}
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
@@ -75,7 +76,7 @@ tracing-subscriber = { version = "0.3.8", default-features = false, features = [
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
-api = ["async-graphql"]
+api = ["async-graphql", "value/api"]
 default = []
 lua = ["mlua", "tokio-stream"]
 vrl = ["vrl-core", "enrichment"]

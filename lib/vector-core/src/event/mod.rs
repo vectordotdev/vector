@@ -6,7 +6,6 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes};
-use chrono::{DateTime, SecondsFormat, Utc};
 use enumflags2::{bitflags, BitFlags, FromBitsError};
 use prost::Message;
 use snafu::Snafu;
@@ -14,6 +13,7 @@ use vector_buffers::{encoding::AsMetadata, encoding::Encodable, EventCount};
 use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
+pub use ::value::Value;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
@@ -24,7 +24,6 @@ pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use util::log::{PathComponent, PathIter};
-pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
@@ -43,8 +42,6 @@ pub mod proto;
 #[cfg(test)]
 mod test;
 pub mod util;
-mod value;
-mod value_regex;
 #[cfg(feature = "vrl")]
 mod vrl_target;
 
@@ -231,10 +228,6 @@ impl EventDataEq for Event {
             _ => false,
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 impl From<BTreeMap<String, Value>> for Event {

@@ -1,40 +1,67 @@
+//! Contains the main "Value" type for Vector and VRL, as well as helper methods
+
+mod convert;
+mod error;
+mod regex;
+
+#[cfg(feature = "api")]
+mod api;
+#[cfg(feature = "lua")]
+mod lua;
+#[cfg(feature = "json")]
+mod serde;
+#[cfg(feature = "toml")]
+mod toml;
+
 use std::{
     collections::BTreeMap,
-    convert::{TryFrom, TryInto},
     fmt::Debug,
     hash::{Hash, Hasher},
-    iter::FromIterator,
 };
 
 use bytes::{Bytes, BytesMut};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
+use error::ValueError;
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
-use serde::de::{Error as SerdeError, MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Serialize, Serializer};
-use std::fmt;
 use std::result::Result as StdResult;
-use toml::value::Value as TomlValue;
+use tracing::{instrument, trace, trace_span};
 
-use crate::event::value_regex::ValueRegex;
-use crate::{
-    event::{error::EventError, timestamp_to_string},
-    ByteSizeOf, Result,
-};
+use crate::value::regex::ValueRegex;
 
+/// A boxed std::error::Error
+pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+/// The main value type used in Vector events, and VRL
 #[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
+    /// Bytes - usually representing a UTF8 String
     Bytes(Bytes),
 
+    /// Regex
     /// When used in the context of Vector this is treated identically to Bytes. It has
     /// additional meaning in the context of VRL
     Regex(ValueRegex),
+
+    /// Integer
     Integer(i64),
+
+    /// Float - not NaN
     Float(NotNan<f64>),
+
+    /// Boolean
     Boolean(bool),
+
+    /// Timetamp (UTC)
     Timestamp(DateTime<Utc>),
+
+    /// Map
     Map(BTreeMap<String, Value>),
+
+    /// Array
     Array(Vec<Value>),
+
+    /// Null
     Null,
 }
 
@@ -118,456 +145,8 @@ impl Hash for Value {
     }
 }
 
-impl ByteSizeOf for Value {
-    fn allocated_bytes(&self) -> usize {
-        match self {
-            Value::Bytes(bytes) => bytes.len(),
-            Value::Map(map) => map.size_of(),
-            Value::Array(arr) => arr.size_of(),
-            _ => 0,
-        }
-    }
-}
-
-impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self {
-            Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(f.into_inner()),
-            Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
-            Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
-            Value::Map(m) => serializer.collect_map(m),
-            Value::Array(a) => serializer.collect_seq(a),
-            Value::Null => serializer.serialize_none(),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Value {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> StdResult<Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct ValueVisitor;
-
-        impl<'de> Visitor<'de> for ValueVisitor {
-            type Value = Value;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("any valid JSON value")
-            }
-
-            #[inline]
-            fn visit_bool<E>(self, value: bool) -> StdResult<Value, E> {
-                Ok(value.into())
-            }
-
-            #[inline]
-            fn visit_i64<E>(self, value: i64) -> StdResult<Value, E> {
-                Ok(value.into())
-            }
-
-            #[inline]
-            fn visit_u64<E>(self, value: u64) -> StdResult<Value, E> {
-                Ok((value as i64).into())
-            }
-
-            #[inline]
-            fn visit_f64<E>(self, value: f64) -> StdResult<Value, E>
-            where
-                E: serde::de::Error,
-            {
-                let f = NotNan::new(value).map_err(|_| {
-                    SerdeError::invalid_value(serde::de::Unexpected::Float(value), &self)
-                })?;
-                Ok(Value::Float(f))
-            }
-
-            #[inline]
-            fn visit_str<E>(self, value: &str) -> StdResult<Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(Value::Bytes(Bytes::copy_from_slice(value.as_bytes())))
-            }
-
-            #[inline]
-            fn visit_string<E>(self, value: String) -> StdResult<Value, E> {
-                Ok(Value::Bytes(value.into()))
-            }
-
-            #[inline]
-            fn visit_none<E>(self) -> StdResult<Value, E> {
-                Ok(Value::Null)
-            }
-
-            #[inline]
-            fn visit_some<D>(self, deserializer: D) -> StdResult<Value, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                Deserialize::deserialize(deserializer)
-            }
-
-            #[inline]
-            fn visit_unit<E>(self) -> StdResult<Value, E> {
-                Ok(Value::Null)
-            }
-
-            #[inline]
-            fn visit_seq<V>(self, mut visitor: V) -> StdResult<Value, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                let mut vec = Vec::new();
-                while let Some(value) = visitor.next_element()? {
-                    vec.push(value);
-                }
-
-                Ok(Value::Array(vec))
-            }
-
-            fn visit_map<V>(self, mut visitor: V) -> StdResult<Value, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                let mut map = BTreeMap::new();
-                while let Some((key, value)) = visitor.next_entry()? {
-                    map.insert(key, value);
-                }
-
-                Ok(Value::Map(map))
-            }
-        }
-
-        deserializer.deserialize_any(ValueVisitor)
-    }
-}
-
-impl From<Bytes> for Value {
-    fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
-    }
-}
-
-impl<T: Into<Value>> From<Vec<T>> for Value {
-    fn from(set: Vec<T>) -> Self {
-        set.into_iter()
-            .map(::std::convert::Into::into)
-            .collect::<Self>()
-    }
-}
-
-impl From<String> for Value {
-    fn from(string: String) -> Self {
-        Value::Bytes(string.into())
-    }
-}
-
-impl TryFrom<TomlValue> for Value {
-    type Error = crate::Error;
-
-    fn try_from(toml: TomlValue) -> crate::Result<Self> {
-        Ok(match toml {
-            TomlValue::String(s) => Self::from(s),
-            TomlValue::Integer(i) => Self::from(i),
-            TomlValue::Array(a) => Self::from(
-                a.into_iter()
-                    .map(Value::try_from)
-                    .collect::<Result<Vec<_>>>()?,
-            ),
-            TomlValue::Table(t) => Self::from(
-                t.into_iter()
-                    .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
-                    .collect::<Result<BTreeMap<_, _>>>()?,
-            ),
-            TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
-            TomlValue::Boolean(b) => Self::from(b),
-            TomlValue::Float(f) => {
-                Value::Float(NotNan::new(f).map_err(|_| "NaN value not supported")?)
-            }
-        })
-    }
-}
-
-impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Value::Bytes(Vec::from(s.as_bytes()).into())
-    }
-}
-
-impl From<DateTime<Utc>> for Value {
-    fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
-    }
-}
-
-impl<T: Into<Value>> From<Option<T>> for Value {
-    fn from(value: Option<T>) -> Self {
-        match value {
-            None => Value::Null,
-            Some(v) => v.into(),
-        }
-    }
-}
-
-impl From<NotNan<f32>> for Value {
-    fn from(value: NotNan<f32>) -> Self {
-        Value::Float(value.into())
-    }
-}
-
-impl From<NotNan<f64>> for Value {
-    fn from(value: NotNan<f64>) -> Self {
-        Value::Float(value)
-    }
-}
-
-#[cfg(any(test, feature = "test"))]
-impl From<f64> for Value {
-    fn from(f: f64) -> Self {
-        NotNan::new(f).unwrap().into()
-    }
-}
-
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Map(value)
-    }
-}
-
-impl FromIterator<Value> for Value {
-    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        Value::Array(iter.into_iter().collect::<Vec<Value>>())
-    }
-}
-
-impl FromIterator<(String, Value)> for Value {
-    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
-    }
-}
-
-macro_rules! impl_valuekind_from_integer {
-    ($t:ty) => {
-        impl From<$t> for Value {
-            fn from(value: $t) -> Self {
-                Value::Integer(value as i64)
-            }
-        }
-    };
-}
-
-impl_valuekind_from_integer!(i64);
-impl_valuekind_from_integer!(i32);
-impl_valuekind_from_integer!(i16);
-impl_valuekind_from_integer!(i8);
-impl_valuekind_from_integer!(u32);
-impl_valuekind_from_integer!(u16);
-impl_valuekind_from_integer!(u8);
-impl_valuekind_from_integer!(isize);
-
-impl From<bool> for Value {
-    fn from(value: bool) -> Self {
-        Value::Boolean(value)
-    }
-}
-
-impl From<serde_json::Value> for Value {
-    fn from(json_value: serde_json::Value) -> Self {
-        match json_value {
-            serde_json::Value::Bool(b) => Value::Boolean(b),
-            serde_json::Value::Number(n) => {
-                let float_or_byte = || {
-                    n.as_f64().map_or_else(
-                        || Value::Bytes(n.to_string().into()),
-                        |f| {
-                            // JSON does not support NaN values
-                            Value::Float(NotNan::new(f).unwrap())
-                        },
-                    )
-                };
-                n.as_i64().map_or_else(float_or_byte, Value::Integer)
-            }
-            serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
-            serde_json::Value::Object(obj) => Value::Map(
-                obj.into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect(),
-            ),
-            serde_json::Value::Array(arr) => {
-                Value::Array(arr.into_iter().map(Value::from).collect())
-            }
-            serde_json::Value::Null => Value::Null,
-        }
-    }
-}
-
-impl TryInto<serde_json::Value> for Value {
-    type Error = crate::Error;
-
-    fn try_into(self) -> StdResult<serde_json::Value, Self::Error> {
-        match self {
-            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
-            Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
-            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
-            Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
-            Value::Map(v) => Ok(serde_json::to_value(v)?),
-            Value::Array(v) => Ok(serde_json::to_value(v)?),
-            Value::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
-        }
-    }
-}
-
-#[cfg(feature = "vrl")]
-impl From<vrl_core::Value> for Value {
-    fn from(v: vrl_core::Value) -> Self {
-        use vrl_core::Value::{
-            Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
-        };
-
-        match v {
-            Bytes(v) => Value::Bytes(v),
-            Integer(v) => Value::Integer(v),
-            Float(v) => Value::Float(v),
-            Boolean(v) => Value::Boolean(v),
-            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
-            Timestamp(v) => Value::Timestamp(v),
-            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
-            Null => Value::Null,
-        }
-    }
-}
-
-#[cfg(feature = "vrl")]
-impl From<Value> for vrl_core::Value {
-    fn from(v: Value) -> Self {
-        use vrl_core::Value::{Array, Object};
-
-        match v {
-            Value::Bytes(v) => v.into(),
-            Value::Regex(regex) => regex.into_inner().into(),
-            Value::Integer(v) => v.into(),
-            Value::Float(v) => v.into(),
-            Value::Boolean(v) => v.into(),
-            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
-            Value::Timestamp(v) => v.into(),
-            Value::Null => ().into(),
-        }
-    }
-}
-
 impl Value {
-    // TODO: return Cow 🐄
-    pub fn to_string_lossy(&self) -> String {
-        match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            Value::Regex(regex) => regex.as_str().to_string(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => format!("{}", num),
-            Value::Float(num) => format!("{}", num),
-            Value::Boolean(b) => format!("{}", b),
-            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Value::Null => "<null>".to_string(),
-        }
-    }
-
-    pub fn as_bytes(&self) -> Bytes {
-        match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            Value::Regex(regex) => regex.as_bytes(),
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(format!("{}", num)),
-            Value::Float(num) => Bytes::from(format!("{}", num)),
-            Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
-            Value::Array(arr) => {
-                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
-            }
-            Value::Null => Bytes::from("<null>"),
-        }
-    }
-
-    pub fn into_bytes(self) -> Bytes {
-        self.as_bytes()
-    }
-
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
-        match &self {
-            Value::Map(map) => Some(map),
-            _ => None,
-        }
-    }
-
-    pub fn as_float(&self) -> Option<NotNan<f64>> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
-    }
-
-    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
-        match self {
-            Value::Map(map) => Some(map),
-            _ => None,
-        }
-    }
-
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
-            _ => None,
-        }
-    }
-
-    /// Returns self as a mutable `BTreeMap<String, Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Map`.
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self {
-            Value::Map(ref mut m) => m,
-            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
-        }
-    }
-
-    /// Returns self as a `Vec<Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array(&self) -> &Vec<Value> {
-        match self {
-            Value::Array(ref a) => a,
-            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
-        }
-    }
-
-    /// Returns self as a mutable `Vec<Value>`
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
-        match self {
-            Value::Array(ref mut a) => a,
-            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
-        }
-    }
-
+    /// Returns a string description of the value type
     pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) | Value::Regex(_) => "string",
@@ -599,7 +178,7 @@ impl Value {
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -638,7 +217,7 @@ impl Value {
         working_lookup: &LookupBuf,
         sub_value: &mut Value,
         value: Value,
-    ) -> StdResult<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, ValueError> {
         // Creating a needle with a back out of the loop is very important.
         let mut needle = None;
         for sub_segment in sub_segments {
@@ -680,7 +259,7 @@ impl Value {
         mut working_lookup: LookupBuf,
         map: &mut BTreeMap<String, Value>,
         value: Value,
-    ) -> StdResult<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, ValueError> {
         let next_segment = match working_lookup.get(0) {
             Some(segment) => segment,
             None => {
@@ -704,7 +283,7 @@ impl Value {
             })
             .insert(working_lookup, value)
             .map_err(|mut e| {
-                if let EventError::PrimitiveDescent {
+                if let ValueError::PrimitiveDescent {
                     original_target,
                     primitive_at,
                     original_value: _,
@@ -727,7 +306,7 @@ impl Value {
         mut working_lookup: LookupBuf,
         array: &mut Vec<Value>,
         value: Value,
-    ) -> StdResult<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, ValueError> {
         let index = if i.is_negative() {
             array.len() as isize + i
         } else {
@@ -748,7 +327,7 @@ impl Value {
             }
 
             inner.insert(working_lookup, value).map_err(|mut e| {
-                if let EventError::PrimitiveDescent {
+                if let ValueError::PrimitiveDescent {
                     original_target,
                     primitive_at,
                     original_value: _,
@@ -779,7 +358,7 @@ impl Value {
                 Some(SegmentBuf::Index(next_len)) => {
                     let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                        if let EventError::PrimitiveDescent {
+                        if let ValueError::PrimitiveDescent {
                             original_target,
                             primitive_at,
                             original_value: _,
@@ -801,7 +380,7 @@ impl Value {
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                        if let EventError::PrimitiveDescent {
+                        if let ValueError::PrimitiveDescent {
                             original_target,
                             primitive_at,
                             original_value: _,
@@ -819,12 +398,12 @@ impl Value {
                     inner
                 }
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
-                    None => return Err(EventError::EmptyCoalesceSubSegment),
+                    None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
                         let mut inner = Value::Map(Default::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            if let EventError::PrimitiveDescent {
+                            if let ValueError::PrimitiveDescent {
                                 original_target,
                                 primitive_at,
                                 original_value: _,
@@ -852,7 +431,7 @@ impl Value {
     /// Insert a value at a given lookup.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -871,7 +450,7 @@ impl Value {
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
         value: impl Into<Value> + Debug,
-    ) -> StdResult<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, ValueError> {
         let mut working_lookup: LookupBuf = lookup.into();
         let value = value.into();
         let span = trace_span!("insert", lookup = %working_lookup);
@@ -897,7 +476,7 @@ impl Value {
             | (Some(segment), Value::Integer(_))
             | (Some(segment), Value::Null) => {
                 trace!("Encountered descent into a primitive.");
-                Err(EventError::PrimitiveDescent {
+                Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
                     original_target: {
                         let mut l = LookupBuf::from(segment);
@@ -939,7 +518,7 @@ impl Value {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -962,7 +541,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> StdResult<Option<Value>, EventError> {
+    ) -> StdResult<Option<Value>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("remove", lookup = %working_lookup, %prune);
         let _guard = span.enter();
@@ -985,10 +564,10 @@ impl Value {
             | (Some(segment), Value::Null) => {
                 if working_lookup.is_empty() {
                     trace!("Cannot remove self. Caller must remove.");
-                    Err(EventError::RemovingSelf)
+                    Err(ValueError::RemovingSelf)
                 } else {
                     trace!("Encountered descent into a primitive.");
-                    Err(EventError::PrimitiveDescent {
+                    Err(ValueError::PrimitiveDescent {
                         primitive_at: LookupBuf::default(),
                         original_target: {
                             let mut l = LookupBuf::from(segment.clone().into_buf());
@@ -1088,7 +667,7 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -1107,7 +686,7 @@ impl Value {
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&Value>, EventError> {
+    ) -> StdResult<Option<&Value>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1179,7 +758,7 @@ impl Value {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -1203,7 +782,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&mut Value>, EventError> {
+    ) -> StdResult<Option<&mut Value>, ValueError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1271,7 +850,7 @@ impl Value {
     /// Determine if the lookup is contained within the value.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -1299,7 +878,7 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
@@ -1387,7 +966,7 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use vector_core::event::Value;
+    /// use value::Value;
     /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
@@ -1489,25 +1068,16 @@ impl Value {
     }
 }
 
+/// Converts a timestamp to a String
+pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+}
+
 #[cfg(test)]
 mod test {
-    use std::{fs, io::Read, path::Path};
-
     use quickcheck::{QuickCheck, TestResult};
 
     use super::*;
-
-    fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
-        let mut test_file = match fs::File::open(path) {
-            Ok(file) => file,
-            Err(e) => return Err(e),
-        };
-
-        let mut buf = Vec::new();
-        test_file.read_to_end(&mut buf)?;
-
-        Ok(buf)
-    }
 
     mod value_compare {
         use super::*;
@@ -1883,60 +1453,5 @@ mod test {
             .tests(100)
             .max_tests(200)
             .quickcheck(inner as fn(LookupBuf) -> TestResult);
-    }
-
-    // This test iterates over the `tests/data/fixtures/value` folder and:
-    //   * Ensures the parsed folder name matches the parsed type of the `Value`.
-    //   * Ensures the `serde_json::Value` to `vector::Value` conversions are harmless. (Think UTF-8 errors)
-    //
-    // Basically: This test makes sure we aren't mutilating any content users might be sending.
-    #[test]
-    fn json_value_to_vector_value_to_json_value() {
-        const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
-
-        std::fs::read_dir(FIXTURE_ROOT)
-            .unwrap()
-            .for_each(|type_dir| match type_dir {
-                Ok(type_name) => {
-                    let path = type_name.path();
-                    std::fs::read_dir(path)
-                        .unwrap()
-                        .for_each(|fixture_file| match fixture_file {
-                            Ok(fixture_file) => {
-                                let path = fixture_file.path();
-                                let buf = parse_artifact(&path).unwrap();
-
-                                let serde_value: serde_json::Value =
-                                    serde_json::from_slice(&*buf).unwrap();
-                                let vector_value = Value::from(serde_value);
-
-                                // Validate type
-                                let expected_type = type_name
-                                    .path()
-                                    .file_name()
-                                    .unwrap()
-                                    .to_string_lossy()
-                                    .to_string();
-                                let is_match = match vector_value {
-                                    Value::Boolean(_) => expected_type.eq("boolean"),
-                                    Value::Integer(_) => expected_type.eq("integer"),
-                                    Value::Bytes(_) => expected_type.eq("bytes"),
-                                    Value::Array { .. } => expected_type.eq("array"),
-                                    Value::Map(_) => expected_type.eq("map"),
-                                    Value::Null => expected_type.eq("null"),
-                                    _ => unreachable!("You need to add a new type handler here."),
-                                };
-                                assert!(
-                                    is_match,
-                                    "Typecheck failure. Wanted {}, got {:?}.",
-                                    expected_type, vector_value
-                                );
-                                let _value: serde_json::Value = vector_value.try_into().unwrap();
-                            }
-                            _ => panic!("This test should never read Err'ing test fixtures."),
-                        });
-                }
-                _ => panic!("This test should never read Err'ing type folders."),
-            });
     }
 }

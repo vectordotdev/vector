@@ -8120,7 +8120,19 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 name = "value"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
+ "bytes 1.1.0",
+ "chrono",
  "lookup",
+ "mlua",
+ "ordered-float",
+ "quickcheck",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "toml",
+ "tracing 0.1.30",
 ]
 
 [[package]]
@@ -8312,6 +8324,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
+ "value",
  "vector-api-client",
  "vector-datadog-filter",
  "vector-vrl-functions",
@@ -8429,6 +8442,7 @@ dependencies = [
  "smallvec",
  "snafu",
  "tracing 0.1.30",
+ "value",
 ]
 
 [[package]]
@@ -8493,6 +8507,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "value",
  "vector_buffers",
  "vector_common",
  "vrl",
