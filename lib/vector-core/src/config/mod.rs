@@ -62,6 +62,12 @@ impl Input {
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
+
+    /// NOTE: schema definitions are currently ignored for non-log events. In the future, we can
+    /// change `DataType` to keep track of schema data internally (e.g. keep one for the `Log` or
+    /// `Metric` variants, and two for the `Any` variant, one for log events and one for metrics).
+    /// Alternatively, we could update this field to `log_schema_definition` and add a new
+    /// `metric_schema_definition` as well.
     pub schema_definition: schema::Definition,
 }
 
@@ -76,6 +82,12 @@ impl Output {
             ty,
             schema_definition: schema::Definition::empty(),
         }
+    }
+
+    /// Set the schema definition for this output.
+    pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
+        self.schema_definition = schema_definition;
+        self
     }
 }
 

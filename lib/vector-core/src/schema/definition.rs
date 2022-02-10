@@ -119,6 +119,66 @@ impl Definition {
         self.collection.set_unknown(unknown);
         self
     }
+
+    /// Merge `other` definition into `self`.
+    ///
+    /// The merge strategy for optional fields is as follows:
+    ///
+    /// If the field is marked as optional in both definitions, _or_ if it's optional in one,
+    /// and unspecified in the other, then the field remains optional.
+    ///
+    /// If it's marked as "required" in either of the two definitions, then it becomes
+    /// a required field in the merged definition.
+    ///
+    /// Note that it is allowed to have required field nested under optional fields. For
+    /// example, `.foo` might be set as optional, but `.foo.bar` as required. In this case, it
+    /// means that the object at `.foo` is allowed to be missing, but if it's present, then it's
+    /// required to have a `bar` field.
+    pub fn merge(mut self, other: Self) -> Self {
+        let mut optional = HashSet::default();
+
+        for path in &self.optional {
+            if other.is_optional_field(path)
+                || other
+                    .collection
+                    .find_known_at_path(&mut path.to_lookup())
+                    .ok()
+                    .flatten()
+                    .is_none()
+            {
+                optional.insert(path.clone());
+            }
+        }
+        for path in other.optional {
+            if self.is_optional_field(&path)
+                || self
+                    .collection
+                    .find_known_at_path(&mut path.to_lookup())
+                    .ok()
+                    .flatten()
+                    .is_none()
+            {
+                optional.insert(path);
+            }
+        }
+
+        self.optional = optional;
+        self.meaning.extend(other.meaning);
+        self.collection.merge(
+            other.collection,
+            merge::Strategy {
+                depth: merge::Depth::Deep,
+                indices: merge::Indices::Keep,
+            },
+        );
+
+        self
+    }
+
+    /// Returns `true` if the provided field is marked as optional.
+    fn is_optional_field(&self, path: &LookupBuf) -> bool {
+        self.optional.contains(path)
+    }
 }
 
 #[cfg(test)]
@@ -322,5 +382,138 @@ mod tests {
         got = got.unknown_fields(Kind::bytes().or_integer());
 
         assert_eq!(got, want);
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_merge() {
+        struct TestCase {
+            this: Definition,
+            other: Definition,
+            want: Definition,
+        }
+
+        for (title, TestCase { this, other, want }) in HashMap::from([
+            (
+                "equal definitions",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::from(["foo".into()]),
+                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::from(["foo".into()]),
+                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::from(["foo".into()]),
+                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                    },
+                },
+            ),
+            (
+                "this optional, other required",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::from(["foo".into()]),
+                        meaning: HashMap::default(),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                },
+            ),
+            (
+                "this required, other optional",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::from(["foo".into()]),
+                        meaning: HashMap::default(),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                },
+            ),
+            (
+                "this required, other required",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: HashSet::default(),
+                        meaning: HashMap::default(),
+                    },
+                },
+            ),
+        ]) {
+            let got = this.merge(other);
+
+            assert_eq!(got, want, "{}", title);
+        }
     }
 }
