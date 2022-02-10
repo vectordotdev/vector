@@ -797,7 +797,7 @@ impl RowReader {
         Ok(value)
     }
 
-    pub fn into_inner(self) -> usize {
+    pub const fn into_inner(self) -> usize {
         self.0
     }
 }
