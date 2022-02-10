@@ -25,22 +25,29 @@ pub enum OutputEventsPayload {
 }
 
 /// Convert an `api::TapPayload` to the equivalent GraphQL type.
-impl From<TapPayload> for OutputEventsPayload {
+impl From<TapPayload> for Vec<OutputEventsPayload> {
     fn from(t: TapPayload) -> Self {
         match t {
-            TapPayload::Log(output, ev) => Self::Log(Log::new(output, ev)),
-            TapPayload::Metric(output, ev) => Self::Metric(Metric::new(output, ev)),
+            TapPayload::Log(output, log_array) => log_array
+                .into_iter()
+                .map(|log| OutputEventsPayload::Log(Log::new(output.clone(), log)))
+                .collect(),
+            TapPayload::Metric(output, metric_array) => metric_array
+                .into_iter()
+                .map(|metric| OutputEventsPayload::Metric(Metric::new(output.clone(), metric)))
+                .collect(),
             TapPayload::Notification(component_key, n) => match n {
-                TapNotification::Matched => Self::Notification(EventNotification::new(
-                    component_key,
-                    EventNotificationType::Matched,
-                )),
-                TapNotification::NotMatched => Self::Notification(EventNotification::new(
-                    component_key,
-                    EventNotificationType::NotMatched,
-                )),
+                TapNotification::Matched => vec![OutputEventsPayload::Notification(
+                    EventNotification::new(component_key, EventNotificationType::Matched),
+                )],
+                TapNotification::NotMatched => vec![OutputEventsPayload::Notification(
+                    EventNotification::new(component_key, EventNotificationType::NotMatched),
+                )],
             },
-            TapPayload::Trace(output, ev) => Self::Trace(Trace::new(output, ev)),
+            TapPayload::Trace(output, trace_array) => trace_array
+                .into_iter()
+                .map(|trace| OutputEventsPayload::Trace(Trace::new(output.clone(), trace)))
+                .collect(),
         }
     }
 }

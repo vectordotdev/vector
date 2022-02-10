@@ -288,6 +288,13 @@ mod test_source {
                 for i in 0.. {
                     let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::AcqRel);
+                    // Place ourselves at the back of tokio's task queue, giving downstream
+                    // components a chance to process the event we just sent before sending more.
+                    // This helps the backpressure tests behave more deterministically when we use
+                    // opportunistic batching at the topology level. Yielding here makes it very
+                    // unlikely that a `ready_chunks` or similar will have a chance to see more
+                    // than one event available at a time.
+                    tokio::task::yield_now().await;
                 }
                 Ok(())
             }

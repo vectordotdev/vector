@@ -11,7 +11,7 @@ use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
 pub use ::value::Value;
-pub use array::{EventArray, EventContainer, LogArray, MetricArray};
+pub use array::{EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
