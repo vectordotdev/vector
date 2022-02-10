@@ -231,7 +231,7 @@ async fn tap_handler(
                     inputs,
                 } = watch_rx.borrow().clone();
 
-                let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(|pattern| Pattern::OutputPattern(pattern)).collect::<HashSet<_>>();
+                let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(Pattern::OutputPattern).collect::<HashSet<_>>();
 
                 // Matching an input pattern is equivalent to matching the outputs of the component's inputs
                 for pattern in patterns.for_inputs.iter() {
