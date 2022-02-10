@@ -52,7 +52,8 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
         .credentials_provider(
             AwsAuthentication::test_auth()
                 .credentials_provider()
-                .await?,
+                .await
+                .unwrap(),
         )
         .endpoint_resolver(Endpoint::immutable(
             Uri::from_str(sqs_address().as_str()).unwrap(),
