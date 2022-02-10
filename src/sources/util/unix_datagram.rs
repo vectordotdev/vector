@@ -27,7 +27,7 @@ pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     max_length: usize,
     decoder: codecs::Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Source {
@@ -54,7 +54,7 @@ async fn listen(
     max_length: usize,
     decoder: codecs::Decoder,
     mut shutdown: ShutdownSignal,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let mut buf = BytesMut::with_capacity(max_length);
@@ -90,14 +90,14 @@ async fn listen(
 
                 loop {
                     match stream.next().await {
-                        Some(Ok((mut events, byte_size))) => {
+                        Some(Ok((mut events, _byte_size))) => {
                             emit!(&SocketEventsReceived {
                                 mode: SocketMode::Unix,
                                 byte_size: events.size_of(),
                                 count: events.len()
                             });
 
-                            handle_events(&mut events, received_from.clone(), byte_size);
+                            handle_events(&mut events, received_from.clone());
 
                             let count = events.len();
                             if let Err(error) = out.send_all(stream::iter(events)).await {

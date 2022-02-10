@@ -34,7 +34,7 @@ use crate::{
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
     decoder: codecs::Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Source {
@@ -91,14 +91,14 @@ pub fn build_unix_stream_source(
 
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok((mut events, byte_size)) => {
+                            Ok((mut events, _byte_size)) => {
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.size_of(),
                                     count: events.len(),
                                 });
 
-                                handle_events(&mut events, received_from.clone(), byte_size);
+                                handle_events(&mut events, received_from.clone());
 
                                 let count = events.len();
                                 if let Err(error) = out.send_all(stream::iter(events)).await {

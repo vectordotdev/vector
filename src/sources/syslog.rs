@@ -151,7 +151,7 @@ impl SourceConfig for SyslogConfig {
                 Ok(build_unix_stream_source(
                     path,
                     decoder,
-                    move |events, host, _| handle_events(events, &host_key, host),
+                    move |events, host| handle_events(events, &host_key, host),
                     cx.shutdown,
                     cx.out,
                 ))
