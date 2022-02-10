@@ -160,7 +160,15 @@ async fn run(
     let listener = tls_settings.bind(&address).await?;
     let stream = listener.accept_stream().map(|result| {
         result.map(|socket| {
-            let peer_addr = socket.connect_info().remote_addr.ip();
+            // TODO: leaks bad
+            let peer_addr: &'static str = Box::leak(
+                socket
+                    .connect_info()
+                    .remote_addr
+                    .ip()
+                    .to_string()
+                    .into_boxed_str(),
+            );
             socket.after_read(move |byte_size| {
                 emit!(&TcpBytesReceived {
                     byte_size,

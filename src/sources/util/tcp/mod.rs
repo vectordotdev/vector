@@ -267,7 +267,7 @@ async fn handle_stream<T>(
     let socket = socket.after_read(move |byte_size| {
         emit!(&TcpBytesReceived {
             byte_size,
-            peer_addr: &leaked_peer_addr,
+            peer_addr: leaked_peer_addr,
         });
     });
     let reader = FramedRead::new(socket, source.decoder());
