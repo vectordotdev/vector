@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, ops::Deref};
+use std::{fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
@@ -53,13 +53,7 @@ impl Expression for Array {
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
-        let collection = type_defs
-            .into_iter()
-            .enumerate()
-            .map(|(index, type_def)| (index.into(), type_def.into()))
-            .collect::<BTreeMap<_, _>>();
-
-        TypeDef::array(collection).with_fallibility(fallible)
+        TypeDef::new().array(type_defs).with_fallibility(fallible)
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
@@ -100,37 +94,35 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{expr, test_type_def, value::Kind, TypeDef};
-    use value::kind::Collection;
+    use crate::{expr, map, test_type_def, value::Kind, TypeDef};
 
     test_type_def![
         empty_array {
             expr: |_| expr!([]),
-            want: TypeDef::array(Collection::empty()),
+            want: TypeDef::new().array::<TypeDef>(vec![]),
         }
 
         scalar_array {
             expr: |_| expr!([1, "foo", true]),
-            want: TypeDef::array(BTreeMap::from([
-                (0.into(), Kind::integer()),
-                (1.into(), Kind::bytes()),
-                (2.into(), Kind::boolean()),
-            ])),
+            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: Kind::Bytes,
+                2: Kind::Boolean,
+            }),
         }
 
         mixed_array {
             expr: |_| expr!([1, [true, "foo"], { "bar": null }]),
-            want: TypeDef::array(BTreeMap::from([
-                (0.into(), Kind::integer()),
-                (1.into(), Kind::array(BTreeMap::from([
-                    (0.into(), Kind::boolean()),
-                    (1.into(), Kind::bytes()),
-                ]))),
-                (2.into(), Kind::object(BTreeMap::from([
-                    ("bar".into(), Kind::null())
-                ]))),
-            ])),
+            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                    0: Kind::Boolean,
+                    1: Kind::Bytes,
+                }),
+                2: TypeDef::new().object::<&str, TypeDef>(map! {
+                    "bar": Kind::Null,
+                }),
+            }),
         }
     ];
 }

@@ -279,61 +279,46 @@ impl Mode {
 
     fn type_def(self) -> TypeDef {
         match self {
-            Mode::Fast | Mode::Reliable => TypeDef::object(BTreeMap::from([
-                (
-                    "browser".into(),
-                    Kind::object(BTreeMap::from([
-                        ("family".into(), Kind::bytes().or_null()),
-                        ("version".into(), Kind::bytes().or_null()),
-                    ])),
-                ),
-                (
-                    "os".into(),
-                    Kind::object(BTreeMap::from([
-                        ("family".into(), Kind::bytes().or_null()),
-                        ("version".into(), Kind::bytes().or_null()),
-                    ])),
-                ),
-                (
-                    "device".into(),
-                    Kind::object(BTreeMap::from([(
-                        "category".into(),
-                        Kind::bytes().or_null(),
-                    )])),
-                ),
-            ])),
-            Mode::Enriched => TypeDef::object(BTreeMap::from([
-                (
-                    "browser".into(),
-                    Kind::object(BTreeMap::from([
-                        ("family".into(), Kind::bytes().or_null()),
-                        ("version".into(), Kind::bytes().or_null()),
-                        ("major".into(), Kind::bytes().or_null()),
-                        ("minor".into(), Kind::bytes().or_null()),
-                        ("patch".into(), Kind::bytes().or_null()),
-                    ])),
-                ),
-                (
-                    "os".into(),
-                    Kind::object(BTreeMap::from([
-                        ("family".into(), Kind::bytes().or_null()),
-                        ("version".into(), Kind::bytes().or_null()),
-                        ("major".into(), Kind::bytes().or_null()),
-                        ("minor".into(), Kind::bytes().or_null()),
-                        ("patch".into(), Kind::bytes().or_null()),
-                        ("patch_minor".into(), Kind::bytes().or_null()),
-                    ])),
-                ),
-                (
-                    "device".into(),
-                    Kind::object(BTreeMap::from([
-                        ("family".into(), Kind::bytes().or_null()),
-                        ("category".into(), Kind::bytes().or_null()),
-                        ("brand".into(), Kind::bytes().or_null()),
-                        ("model".into(), Kind::bytes().or_null()),
-                    ])),
-                ),
-            ])),
+            Mode::Fast | Mode::Reliable => TypeDef::new()
+                .infallible()
+                .object::<&'static str, TypeDef>(map! {
+                    "browser": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "family": Kind::Bytes | Kind::Null,
+                        "version": Kind::Bytes | Kind::Null,
+                    }),
+                    "os": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "family": Kind::Bytes | Kind::Null,
+                        "version": Kind::Bytes | Kind::Null,
+                    }),
+                    "device": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "category": Kind::Bytes | Kind::Null,
+                    }),
+                }),
+            Mode::Enriched => TypeDef::new()
+                .infallible()
+                .object::<&'static str, TypeDef>(map! {
+                    "browser": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "family": Kind::Bytes | Kind::Null,
+                        "version": Kind::Bytes | Kind::Null,
+                        "major": Kind::Bytes | Kind::Null,
+                        "minor": Kind::Bytes | Kind::Null,
+                        "patch": Kind::Bytes | Kind::Null,
+                    }),
+                    "os": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "family": Kind::Bytes | Kind::Null,
+                        "version": Kind::Bytes | Kind::Null,
+                        "major": Kind::Bytes | Kind::Null,
+                        "minor": Kind::Bytes | Kind::Null,
+                        "patch": Kind::Bytes | Kind::Null,
+                        "patch_minor":  Kind::Bytes | Kind::Null,
+                    }),
+                    "device": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
+                        "family": Kind::Bytes | Kind::Null,
+                        "category": Kind::Bytes | Kind::Null,
+                        "brand": Kind::Bytes | Kind::Null,
+                        "model": Kind::Bytes | Kind::Null,
+                    }),
+                }),
         }
     }
 }

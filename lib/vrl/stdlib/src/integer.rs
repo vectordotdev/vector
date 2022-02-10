@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn int(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Integer(_) => Ok(v),
-        v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
+        v => Err(format!(r#"expected "integer", got {}"#, v.kind()).into()),
     }
 }
 
@@ -34,7 +34,7 @@ impl Function for Integer {
                 title: "invalid",
                 source: "int!(true)",
                 result: Err(
-                    r#"function call error for "int" at (0:10): expected integer, got boolean"#,
+                    r#"function call error for "int" at (0:10): expected "integer", got "boolean""#,
                 ),
             },
         ]
@@ -72,8 +72,9 @@ impl Expression for IntegerFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let non_integer = !self.value.type_def(state).is_integer();
-
-        TypeDef::integer().with_fallibility(non_integer)
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Integer)
+            .integer()
     }
 }

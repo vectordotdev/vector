@@ -92,7 +92,7 @@ impl Expression for FormatIntFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::integer().fallible()
+        TypeDef::new().fallible().integer()
     }
 }
 
@@ -135,19 +135,19 @@ mod tests {
         decimal {
             args: func_args![value: 42],
             want: Ok(value!("42")),
-            tdef: TypeDef::integer().fallible(),
+            tdef: TypeDef::new().fallible().integer(),
         }
 
         hexidecimal {
             args: func_args![value: 42, base: 16],
             want: Ok(value!("2a")),
-            tdef: TypeDef::integer().fallible(),
+            tdef: TypeDef::new().fallible().integer(),
         }
 
         negative_hexidecimal {
             args: func_args![value: -42, base: 16],
             want: Ok(value!("-2a")),
-            tdef: TypeDef::integer().fallible(),
+            tdef: TypeDef::new().fallible().integer(),
         }
     ];
 }

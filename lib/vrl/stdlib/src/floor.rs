@@ -64,17 +64,17 @@ impl Expression for FloorFn {
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::float() | Kind::integer(),
+                expected: Kind::Float | Kind::Integer,
             }
             .into()),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        match Kind::from(self.value.type_def(state)) {
-            v if v.is_float() || v.is_integer() => v.into(),
-            _ => Kind::integer().or_float().into(),
-        }
+        TypeDef::new().scalar(match self.value.type_def(state).kind() {
+            v if v.is_float() || v.is_integer() => v,
+            _ => Kind::Integer | Kind::Float,
+        })
     }
 }
 
@@ -88,40 +88,40 @@ mod tests {
         lower {
             args: func_args![value: 1234.2],
             want: Ok(value!(1234.0)),
-            tdef: TypeDef::float(),
+            tdef: TypeDef::new().float(),
         }
 
         higher {
             args: func_args![value: 1234.8],
             want: Ok(value!(1234.0)),
-            tdef: TypeDef::float(),
+            tdef: TypeDef::new().float(),
         }
 
         exact {
             args: func_args![value: 1234],
             want: Ok(value!(1234)),
-            tdef: TypeDef::integer(),
+            tdef: TypeDef::new().integer(),
         }
 
         precision {
             args: func_args![value: 1234.39429,
                              precision: 1],
             want: Ok(value!(1234.3)),
-            tdef: TypeDef::float(),
+            tdef: TypeDef::new().float(),
         }
 
         bigger_precision {
             args: func_args![value: 1234.56789,
                              precision: 4],
             want: Ok(value!(1234.5678)),
-            tdef: TypeDef::float(),
+            tdef: TypeDef::new().float(),
         }
 
         huge_number {
             args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
                              precision: 5],
             want: Ok(value!(9876543210123456789098765432101234567890987654321.98765)),
-            tdef: TypeDef::float(),
+            tdef: TypeDef::new().float(),
         }
     ];
 }

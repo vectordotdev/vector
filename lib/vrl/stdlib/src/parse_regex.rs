@@ -151,7 +151,9 @@ impl Expression for ParseRegexFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(util::regex_kind(&self.pattern)).fallible()
+        TypeDef::new()
+            .fallible()
+            .object(util::regex_type_def(&self.pattern))
     }
 }
 
@@ -159,7 +161,6 @@ impl Expression for ParseRegexFn {
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-    use vector_common::btreemap;
 
     test_function![
         find => ParseRegex;
@@ -189,25 +190,27 @@ mod tests {
                              "7": "201",
                              "8": "20574",
             })),
-            tdef: TypeDef::object(btreemap! {
-                    Field::from("bytes_in") => Kind::bytes(),
-                    Field::from("host") => Kind::bytes(),
-                    Field::from("user") => Kind::bytes(),
-                    Field::from("timestamp") => Kind::bytes(),
-                    Field::from("method") => Kind::bytes(),
-                    Field::from("path") => Kind::bytes(),
-                    Field::from("status") => Kind::bytes(),
-                    Field::from("bytes_out") => Kind::bytes(),
-                    Field::from("0") => Kind::bytes() | Kind::null(),
-                    Field::from("1") => Kind::bytes() | Kind::null(),
-                    Field::from("2") => Kind::bytes() | Kind::null(),
-                    Field::from("3") => Kind::bytes() | Kind::null(),
-                    Field::from("4") => Kind::bytes() | Kind::null(),
-                    Field::from("5") => Kind::bytes() | Kind::null(),
-                    Field::from("6") => Kind::bytes() | Kind::null(),
-                    Field::from("7") => Kind::bytes() | Kind::null(),
-                    Field::from("8") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                    "bytes_in": Kind::Bytes,
+                    "host": Kind::Bytes,
+                    "user": Kind::Bytes,
+                    "timestamp": Kind::Bytes,
+                    "method": Kind::Bytes,
+                    "path": Kind::Bytes,
+                    "status": Kind::Bytes,
+                    "bytes_out": Kind::Bytes,
+                    "0": Kind::Bytes | Kind::Null,
+                    "1": Kind::Bytes | Kind::Null,
+                    "2": Kind::Bytes | Kind::Null,
+                    "3": Kind::Bytes | Kind::Null,
+                    "4": Kind::Bytes | Kind::Null,
+                    "5": Kind::Bytes | Kind::Null,
+                    "6": Kind::Bytes | Kind::Null,
+                    "7": Kind::Bytes | Kind::Null,
+                    "8": Kind::Bytes | Kind::Null,
+                }),
         }
 
         single_match {
@@ -216,11 +219,13 @@ mod tests {
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
             want: Ok(value!({"number": "first"})),
-            tdef: TypeDef::object(btreemap! {
-                        Field::from("number") => Kind::bytes(),
-                        Field::from("0") => Kind::bytes() | Kind::null(),
-                        Field::from("1") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                        "number": Kind::Bytes,
+                        "0": Kind::Bytes | Kind::Null,
+                        "1": Kind::Bytes | Kind::Null,
+                }),
         }
 
         no_match {
@@ -230,25 +235,27 @@ mod tests {
                             .unwrap()
             ],
             want: Err("could not find any pattern matches"),
-            tdef: TypeDef::object(btreemap! {
-                    Field::from("host") => Kind::bytes(),
-                    Field::from("user") => Kind::bytes(),
-                    Field::from("bytes_in") => Kind::bytes(),
-                    Field::from("timestamp") => Kind::bytes(),
-                    Field::from("method") => Kind::bytes(),
-                    Field::from("path") => Kind::bytes(),
-                    Field::from("status") => Kind::bytes(),
-                    Field::from("bytes_out") => Kind::bytes(),
-                    Field::from("0") => Kind::bytes() | Kind::null(),
-                    Field::from("1") => Kind::bytes() | Kind::null(),
-                    Field::from("2") => Kind::bytes() | Kind::null(),
-                    Field::from("3") => Kind::bytes() | Kind::null(),
-                    Field::from("4") => Kind::bytes() | Kind::null(),
-                    Field::from("5") => Kind::bytes() | Kind::null(),
-                    Field::from("6") => Kind::bytes() | Kind::null(),
-                    Field::from("7") => Kind::bytes() | Kind::null(),
-                    Field::from("8") => Kind::bytes() | Kind::null(),
-                }).fallible(),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                    "host": Kind::Bytes,
+                    "user": Kind::Bytes,
+                    "bytes_in": Kind::Bytes,
+                    "timestamp": Kind::Bytes,
+                    "method": Kind::Bytes,
+                    "path": Kind::Bytes,
+                    "status": Kind::Bytes,
+                    "bytes_out": Kind::Bytes,
+                    "0": Kind::Bytes | Kind::Null,
+                    "1": Kind::Bytes | Kind::Null,
+                    "2": Kind::Bytes | Kind::Null,
+                    "3": Kind::Bytes | Kind::Null,
+                    "4": Kind::Bytes | Kind::Null,
+                    "5": Kind::Bytes | Kind::Null,
+                    "6": Kind::Bytes | Kind::Null,
+                    "7": Kind::Bytes | Kind::Null,
+                    "8": Kind::Bytes | Kind::Null,
+                }),
         }
     ];
 }

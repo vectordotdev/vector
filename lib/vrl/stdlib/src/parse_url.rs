@@ -113,7 +113,7 @@ impl Expression for ParseUrlFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind()).fallible()
+        TypeDef::new().fallible().object(type_def())
     }
 }
 
@@ -153,20 +153,19 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
         .collect::<Value>()
 }
 
-fn inner_kind() -> BTreeMap<Field, Kind> {
-    BTreeMap::from([
-        ("scheme".into(), Kind::bytes()),
-        ("username".into(), Kind::bytes()),
-        ("password".into(), Kind::bytes()),
-        ("path".into(), Kind::bytes().or_null()),
-        ("host".into(), Kind::bytes()),
-        ("port".into(), Kind::integer().or_null()),
-        ("fragment".into(), Kind::bytes().or_null()),
-        (
-            "query".into(),
-            Kind::object(Collection::from_unknown(Kind::bytes())),
-        ),
-    ])
+fn type_def() -> BTreeMap<&'static str, TypeDef> {
+    map! {
+        "scheme": Kind::Bytes,
+        "username": Kind::Bytes,
+        "password": Kind::Bytes,
+        "path": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes,
+        "port": Kind::Integer | Kind::Null,
+        "fragment": Kind::Bytes | Kind::Null,
+        "query": TypeDef::new().object::<(), Kind>(map! {
+            (): Kind::Bytes,
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -188,7 +187,7 @@ mod tests {
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
         }
 
         default_port_specified {
@@ -203,7 +202,7 @@ mod tests {
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
         }
 
         default_port {
@@ -218,7 +217,7 @@ mod tests {
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
         }
     ];
 }

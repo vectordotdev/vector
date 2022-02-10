@@ -67,47 +67,46 @@ impl Expression for ParseAwsAlbLogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind()).fallible(/* log parsing error */)
+        TypeDef::new()
+            .fallible() // Log parsing error
+            .object::<&str, Kind>(inner_type_def())
     }
 }
 
-fn inner_kind() -> BTreeMap<Field, Kind> {
+fn inner_type_def() -> BTreeMap<&'static str, Kind> {
     map! {
-        "actions_executed": Kind::bytes() | Kind::null(),
-        "chosen_cert_arn": Kind::bytes() | Kind::null(),
-        "classification_reason": Kind::bytes() | Kind::null(),
-        "classification": Kind::bytes() | Kind::null(),
-        "client_host": Kind::bytes(),
-        "domain_name": Kind::bytes() | Kind::null(),
-        "elb_status_code": Kind::bytes(),
-        "elb": Kind::bytes(),
-        "error_reason": Kind::bytes() | Kind::null(),
-        "matched_rule_priority": Kind::bytes() | Kind::null(),
-        "received_bytes": Kind::integer(),
-        "redirect_url": Kind::bytes() | Kind::null(),
-        "request_creation_time": Kind::bytes(),
-        "request_method": Kind::bytes(),
-        "request_processing_time": Kind::float(),
-        "request_protocol": Kind::bytes(),
-        "request_url": Kind::bytes(),
-        "response_processing_time": Kind::float(),
-        "sent_bytes": Kind::integer(),
-        "ssl_cipher": Kind::bytes() | Kind::null(),
-        "ssl_protocol": Kind::bytes() | Kind::null(),
-        "target_group_arn": Kind::bytes(),
-        "target_host": Kind::bytes() | Kind::null(),
-        "target_port_list": Kind::bytes() | Kind::null(),
-        "target_processing_time": Kind::float(),
-        "target_status_code_list": Kind::bytes() | Kind::null(),
-        "target_status_code": Kind::bytes() | Kind::null(),
-        "timestamp": Kind::bytes(),
-        "trace_id": Kind::bytes(),
-        "type": Kind::bytes(),
-        "user_agent": Kind::bytes(),
+        "actions_executed": Kind::Bytes | Kind::Null,
+        "chosen_cert_arn": Kind::Bytes | Kind::Null,
+        "classification_reason": Kind::Bytes | Kind::Null,
+        "classification": Kind::Bytes | Kind::Null,
+        "client_host": Kind::Bytes,
+        "domain_name": Kind::Bytes | Kind::Null,
+        "elb_status_code": Kind::Bytes,
+        "elb": Kind::Bytes,
+        "error_reason": Kind::Bytes | Kind::Null,
+        "matched_rule_priority": Kind::Bytes | Kind::Null,
+        "received_bytes": Kind::Integer,
+        "redirect_url": Kind::Bytes | Kind::Null,
+        "request_creation_time": Kind::Bytes,
+        "request_method": Kind::Bytes,
+        "request_processing_time": Kind::Float,
+        "request_protocol": Kind::Bytes,
+        "request_url": Kind::Bytes,
+        "response_processing_time": Kind::Float,
+        "sent_bytes": Kind::Integer,
+        "ssl_cipher": Kind::Bytes | Kind::Null,
+        "ssl_protocol": Kind::Bytes | Kind::Null,
+        "target_group_arn": Kind::Bytes,
+        "target_host": Kind::Bytes | Kind::Null,
+        "target_port_list": Kind::Bytes | Kind::Null,
+        "target_processing_time": Kind::Float,
+        "target_status_code_list": Kind::Bytes | Kind::Null,
+        "target_status_code": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Bytes,
+        "trace_id": Kind::Bytes,
+        "type": Kind::Bytes,
+        "user_agent": Kind::Bytes,
     }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {
@@ -304,7 +303,7 @@ mod tests {
                              user_agent: "curl/7.46.0"
 
             })),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         two {
@@ -340,7 +339,7 @@ mod tests {
                               trace_id: "Root=1-58337281-1d84f3d73c47ec4e58577259",
                               type: "https",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         three {
@@ -376,7 +375,7 @@ mod tests {
                               trace_id: "Root=1-58337327-72bd00b0343d75b906739c42",
                               type: "h2",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         four {
@@ -412,7 +411,7 @@ mod tests {
                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                              type: "ws",
                              user_agent: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         five {
@@ -448,7 +447,7 @@ mod tests {
                               trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                               type: "wss",
                               user_agent: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         six {
@@ -484,7 +483,7 @@ mod tests {
                               trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                               type: "http",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         seven {
@@ -520,7 +519,7 @@ mod tests {
                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                              type: "http",
                              user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         eight {
@@ -556,7 +555,7 @@ mod tests {
                              target_status_code_list: ["200"],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         nine {
@@ -592,7 +591,7 @@ mod tests {
                              target_status_code_list: [],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         ten {
@@ -628,7 +627,7 @@ mod tests {
                              target_status_code_list: [],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
 
         eleven {
@@ -664,7 +663,7 @@ mod tests {
                              target_status_code_list: ["200"],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
     ];
 }

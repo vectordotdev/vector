@@ -211,14 +211,15 @@ impl Expression for ParseXmlFn {
     }
 }
 
-fn type_def() -> TypeDef {
-    TypeDef::bytes()
-        .fallible()
-        .add_object(Collection::from_unknown(inner_kind()))
+fn inner_kind() -> Kind {
+    Kind::Object
 }
 
-fn inner_kind() -> Kind {
-    Kind::object(BTreeMap::default())
+fn type_def() -> TypeDef {
+    TypeDef::new()
+        .fallible()
+        .bytes()
+        .add_object::<(), Kind>(map! { (): inner_kind() })
 }
 
 /// Process an XML node, and return a VRL `Value`.

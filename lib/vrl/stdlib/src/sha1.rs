@@ -50,7 +50,7 @@ impl Expression for Sha1Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -64,7 +64,7 @@ mod tests {
         sha {
              args: func_args![value: "foo"],
              want: Ok("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
          }
     ];
 }

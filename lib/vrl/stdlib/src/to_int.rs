@@ -13,7 +13,7 @@ fn to_int(value: Value) -> std::result::Result<Value, ExpressionError> {
             .convert(v)
             .map_err(|e| e.to_string().into()),
         Timestamp(v) => Ok(v.timestamp().into()),
-        v => Err(format!("unable to coerce {} into integer", v.kind()).into()),
+        v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
     }
 }
 
@@ -81,21 +81,21 @@ impl Function for ToInt {
                 title: "array",
                 source: "to_int!([])",
                 result: Err(
-                    r#"function call error for "to_int" at (0:11): unable to coerce array into integer"#,
+                    r#"function call error for "to_int" at (0:11): unable to coerce "array" into "integer""#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_int!({})",
                 result: Err(
-                    r#"function call error for "to_int" at (0:11): unable to coerce object into integer"#,
+                    r#"function call error for "to_int" at (0:11): unable to coerce "object" into "integer""#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_int!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_int" at (0:15): unable to coerce regex into integer"#,
+                    r#"function call error for "to_int" at (0:15): unable to coerce "regex" into "integer""#,
                 ),
             },
         ]
@@ -132,14 +132,13 @@ impl Expression for ToIntFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let td = self.value.type_def(state);
-
-        TypeDef::integer().with_fallibility(
-            td.contains_bytes()
-                || td.contains_array()
-                || td.contains_object()
-                || td.contains_regex(),
-        )
+        TypeDef::new()
+            .with_fallibility(
+                self.value
+                    .type_def(state)
+                    .has_kind(Kind::Bytes | Kind::Array | Kind::Object | Kind::Regex),
+            )
+            .integer()
     }
 }
 
@@ -155,13 +154,13 @@ mod tests {
         string {
              args: func_args![value: "20"],
              want: Ok(20),
-             tdef: TypeDef::integer().fallible(),
+             tdef: TypeDef::new().fallible().integer(),
         }
 
         float {
              args: func_args![value: 20.5],
              want: Ok(20),
-             tdef: TypeDef::integer().infallible(),
+             tdef: TypeDef::new().infallible().integer(),
         }
 
         timezone {
@@ -169,7 +168,7 @@ mod tests {
                             .unwrap()
                             .with_timezone(&Utc)],
              want: Ok(1571227200),
-             tdef: TypeDef::integer().infallible(),
+             tdef: TypeDef::new().infallible().integer(),
          }
     ];
 }

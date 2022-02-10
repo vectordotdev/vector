@@ -97,30 +97,27 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind()).fallible(/* message parsing error */)
+        TypeDef::new()
+            .fallible() // Message parsing error
+            .object::<&str, TypeDef>(inner_type_def())
     }
 }
 
-fn inner_kind() -> BTreeMap<Field, Kind> {
+fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
     map! {
-        "owner": Kind::bytes(),
-        "message_type": Kind::bytes(),
-        "log_group": Kind::bytes(),
-        "log_stream": Kind::bytes(),
-        "subscription_filters": Kind::array({
-            let mut v = Collection::any();
-            v.set_unknown(Kind::bytes());
-            v
+        "owner": Kind::Bytes,
+        "message_type": Kind::Bytes,
+        "log_group": Kind::Bytes,
+        "log_stream": Kind::Bytes,
+        "subscription_filters": TypeDef::new().array_mapped::<(), Kind>(map! {
+            (): Kind::Bytes
         }),
-        "log_events": Kind::object(BTreeMap::from([
-            ("id".into(), Kind::bytes()),
-            ("timestamp".into(), Kind::timestamp()),
-            ("message".into(), Kind::bytes()),
-        ])),
+        "log_events": TypeDef::new().object::<&str, Kind>(map! {
+            "id": Kind::Bytes,
+            "timestamp": Kind::Timestamp,
+            "message": Kind::Bytes,
+        }),
     }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
 }
 
 #[cfg(test)]
@@ -135,7 +132,7 @@ mod tests {
         invalid_type {
             args: func_args![value: "42"],
             want: Err("unable to parse: invalid type: integer `42`, expected struct AwsCloudWatchLogsSubscriptionMessage at line 1 column 2"),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
         }
 
         string {
@@ -178,13 +175,13 @@ mod tests {
                     "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
                 ]],
             ]),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
         }
 
         invalid_value {
             args: func_args![value: r#"{ INVALID }"#],
             want: Err("unable to parse: key must be a string at line 1 column 3"),
-            tdef: TypeDef::object(inner_kind()).fallible(),
+            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
         }
     ];
 }

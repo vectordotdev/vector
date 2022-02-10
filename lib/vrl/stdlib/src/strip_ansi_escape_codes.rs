@@ -53,7 +53,7 @@ impl Expression for StripAnsiEscapeCodesFn {
         // We're marking this as infallible, because `strip_ansi_escapes` only
         // fails if it can't write to the buffer, which is highly unlikely to
         // occur.
-        TypeDef::bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -67,25 +67,25 @@ mod tests {
         no_codes {
             args: func_args![value: "foo bar"],
             want: Ok("foo bar"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         strip_1 {
             args: func_args![value: "\x1b[3;4Hfoo bar"],
             want: Ok("foo bar"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         strip_2 {
             args: func_args![value: "\x1b[46mfoo\x1b[0m bar"],
             want: Ok("foo bar"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         strip_3 {
             args: func_args![value: "\x1b[=3lfoo bar"],
             want: Ok("foo bar"),
-            tdef: TypeDef::bytes().infallible(),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }

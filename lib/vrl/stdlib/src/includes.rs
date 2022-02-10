@@ -68,7 +68,7 @@ impl Expression for IncludesFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().infallible()
+        TypeDef::new().infallible().boolean()
     }
 }
 
@@ -82,91 +82,91 @@ mod tests {
         empty_not_included {
             args: func_args![value: value!([]), item: value!("foo")],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         string_included {
             args: func_args![value: value!(["foo", "bar"]), item: value!("foo")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         string_not_included {
             args: func_args![value: value!(["foo", "bar"]), item: value!("baz")],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         bool_included {
             args: func_args![value: value!([true, false]), item: value!(true)],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         bool_not_included {
             args: func_args![value: value!([true, true]), item: value!(false)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         integer_included {
             args: func_args![value: value!([1, 2, 3, 4, 5]), item: value!(5)],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         integer_not_included {
             args: func_args![value: value!([1, 2, 3, 4, 6]), item: value!(5)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         float_included {
             args: func_args![value: value!([0.5, 12.1, 13.075]), item: value!(13.075)],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         float_not_included {
             args: func_args![value: value!([0.5, 12.1, 13.075]), item: value!(471.0)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         array_included {
             args: func_args![value: value!([[1,2,3], [4,5,6]]), item: value!([1,2,3])],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         array_not_included {
             args: func_args![value: value!([[1,2,3], [4,5,6]]), item: value!([1,2,4])],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         mixed_included_string {
             args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         mixed_not_included_string {
             args: func_args![value: value!(["bar", 1, true, [1,2,3]]), item: value!("foo")],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         mixed_included_bool {
             args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!(true)],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
         mixed_not_included_bool {
             args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!(false)],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().infallible(),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
 }

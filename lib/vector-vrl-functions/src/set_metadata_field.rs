@@ -63,6 +63,6 @@ impl Expression for SetMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::null().infallible()
+        TypeDef::new().infallible().null()
     }
 }

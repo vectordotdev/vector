@@ -283,7 +283,7 @@ mod test {
                  filters: vec![Regex::new(r"\d+").unwrap()],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
         patterns {
@@ -297,7 +297,7 @@ mod test {
                  ],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
         us_social_security_number{
@@ -306,7 +306,7 @@ mod test {
                  filters: vec!["us_social_security_number"],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
         invalid_filter {
@@ -315,7 +315,7 @@ mod test {
                  filters: vec!["not a filter"],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
         missing_patterns {
@@ -328,7 +328,7 @@ mod test {
                  ],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::bytes().infallible(),
+             tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }

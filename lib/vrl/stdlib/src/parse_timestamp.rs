@@ -70,7 +70,9 @@ impl Expression for ParseTimestampFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
+        TypeDef::new()
+            .fallible() // Always fallible because the format needs to be parsed at runtime
+            .timestamp()
     }
 }
 
@@ -95,7 +97,7 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::timestamp().fallible(),
+            tdef: TypeDef::new().fallible().timestamp(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -109,7 +111,7 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::timestamp().fallible(),
+            tdef: TypeDef::new().fallible().timestamp(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -123,7 +125,7 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::timestamp().fallible(),
+            tdef: TypeDef::new().fallible().timestamp(),
             tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];

@@ -94,7 +94,7 @@ impl Expression for IpCidrContainsFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::boolean().fallible()
+        TypeDef::new().fallible().boolean()
     }
 }
 
@@ -110,7 +110,7 @@ mod tests {
                              cidr: "192.168.0.0/16",
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
 
         ipv4_no {
@@ -118,7 +118,7 @@ mod tests {
                              cidr: "192.168.0.0/24",
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
 
         ipv6_yes {
@@ -126,7 +126,7 @@ mod tests {
                              cidr: "2001:4f8:3:ba::/64",
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
 
         ipv6_no {
@@ -134,7 +134,7 @@ mod tests {
                              cidr: "2001:4f8:4:ba::/64",
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::boolean().fallible(),
+            tdef: TypeDef::new().fallible().boolean(),
         }
     ];
 }

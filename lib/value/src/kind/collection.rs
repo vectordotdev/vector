@@ -50,15 +50,6 @@ impl<T: Ord> Collection<T> {
         }
     }
 
-    /// Create a collection kind of which there are no known and no unknown kinds.
-    #[must_use]
-    pub fn empty() -> Self {
-        Self {
-            known: BTreeMap::default(),
-            unknown: None,
-        }
-    }
-
     /// Create a collection kind of which the encapsulated values can be any kind.
     #[must_use]
     pub fn any() -> Self {
