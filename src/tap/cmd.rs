@@ -80,10 +80,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         let stream = res.stream();
     };
 
-    // Loop over the returned results, printing out log events.
-    // NOTE: This will currently ignore notifications. A later `--verbose` option is planned
-    // to include these.
-    // TODO: https://github.com/vectordotdev/vector/issues/6870
+    // Loop over the returned results, printing out tap events.
     loop {
         tokio::select! {
             biased;
