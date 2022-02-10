@@ -164,6 +164,11 @@ pub struct SourceOuter {
     pub proxy: ProxyConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: bool,
 }
 
 impl SourceOuter {
@@ -171,6 +176,7 @@ impl SourceOuter {
         Self {
             inner: Box::new(source),
             proxy: Default::default(),
+            acknowledgements: false,
         }
     }
 }
@@ -257,6 +263,12 @@ pub struct SinkOuter<T> {
 
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
+
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: bool,
 }
 
 impl<T> SinkOuter<T> {
@@ -268,6 +280,7 @@ impl<T> SinkOuter<T> {
             healthcheck_uri: None,
             inner,
             proxy: Default::default(),
+            acknowledgements: false,
         }
     }
 
@@ -319,6 +332,7 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            acknowledgements: false,
         }
     }
 }
