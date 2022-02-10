@@ -35,4 +35,8 @@ pub struct Opts {
     /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
     #[structopt(use_delimiter(true), long)]
     inputs_of: Vec<String>,
+
+    /// Verbose output includes event notifications (pattern matched/not matched)
+    #[structopt(short, long)]
+    verbose: bool,
 }
