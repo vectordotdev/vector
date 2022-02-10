@@ -99,6 +99,7 @@ mod nats;
 mod nginx_metrics;
 mod open;
 #[cfg(any(
+    feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",
     feature = "transforms-json_parser",
@@ -251,6 +252,7 @@ pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
+    feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",
     feature = "transforms-json_parser",
