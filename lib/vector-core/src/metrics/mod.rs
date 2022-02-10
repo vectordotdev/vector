@@ -46,11 +46,11 @@ pub struct Controller {
 }
 
 fn metrics_enabled() -> bool {
-    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
+    false
 }
 
 fn tracing_context_layer_enabled() -> bool {
-    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
+    false
 }
 
 fn init(recorder: VectorRecorder) -> Result<()> {
