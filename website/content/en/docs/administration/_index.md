@@ -1,7 +1,7 @@
 ---
 title: Administering Vector
 short: Administration
-weight: 4
+weight: 5
 tags: ["admin"]
 ---
 

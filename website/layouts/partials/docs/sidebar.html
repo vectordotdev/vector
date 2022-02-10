@@ -1,7 +1,6 @@
 {{ $sections := where site.Sections "Section" "docs" }}
 {{ $here := .RelPermalink }}
 {{ $section := .CurrentSection }}
-{{ $gtpLinks := site.Menus.gtp }}
 {{ $metaLinks := site.Menus.meta }}
 
 {{/* Iterate through all docs sections, including the root */}}
@@ -16,21 +15,12 @@
   {{ end }}
   {{ end }}
 
-
-  {{/* Extra "Going to Production" links specified in config.toml (external links outside our doc tree) */}}
-  <div>
-    {{ template "heading" (dict "title" "Going to Production" "url" "https://www.notion.so/Going-to-Production-540e098d99bf4292b0961a499cb3407e" "external" true) }}
-  
-    <div class="flex flex-col space-y-0.5 mt-1.5">
-      {{ template "external-link-menu" $gtpLinks }}
-    </div>
-  </div>
   {{/* Extra "meta" links specified in config.toml (external links outside our doc tree) */}}
   <div>
     {{ template "heading" (dict "title" "Meta" "hover" false) }}
 
     <div class="flex flex-col space-y-0.5 mt-1.5">
-      {{ template "external-link-menu" $metaLinks }}
+      {{ template "meta-menu" $metaLinks }}
     </div>
   </div>
 </div>
@@ -83,15 +73,8 @@
 {{ define "heading" }}
 {{ $isActive := eq .here .url }}
 {{ if .url }}
-<a class="flex uppercase font-semibold text-gray-500 dark:text-gray-200 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
-  <span class="inline pr-0.5">
-      {{ .title }}
-  </span>
-  {{ if .external }}
-    <svg xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-    </svg>
-  {{ end }}
+<a class="uppercase font-semibold text-gray-500 dark:text-gray-200 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
+  {{ .title }}
 </a>
 {{ else }}
 <p class="uppercase font-semibold tracking-tight text-gray-500 dark:text-gray-200">
@@ -116,18 +99,20 @@
 </a>
 {{ end }}
 
-{{ define "external-link-menu" }}
+{{ define "meta-menu" }}
 {{ range .  }}
 <p class="flex items-start">
   <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" rel="noopener" target="_blank">
-      <span class="pr-0.5 inline">
+    <span class="flex justify-between items-start">
+      <span class="pr-0.5">
         {{ .Name }}
       </span>
 
       {{/* Heroicon: outline/external-link */}}
-      <svg xmlns="http://www.w3.org/2000/svg" class="inline dark:text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
       </svg>
+    </span>
   </a>
 </p>
 {{ end }}
