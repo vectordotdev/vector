@@ -90,7 +90,7 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
         let request_body = OutputEventsByComponentIdPatternsSubscription::build_query(
             output_events_by_component_id_patterns_subscription::Variables {
                 outputs_patterns,
-                inputs_patterns,
+                inputs_patterns: Some(inputs_patterns),
                 limit,
                 interval,
                 encoding: encoding.into(),

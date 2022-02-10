@@ -53,7 +53,7 @@ impl EventsSubscription {
         &'a self,
         ctx: &'a Context<'a>,
         outputs_patterns: Vec<String>,
-        inputs_patterns: Vec<String>,
+        inputs_patterns: Option<Vec<String>>,
         #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(minimum = 1, maximum = 10_000))] limit: u32,
     ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
@@ -61,7 +61,7 @@ impl EventsSubscription {
 
         let patterns = TapPatterns {
             for_outputs: outputs_patterns.into_iter().collect(),
-            for_inputs: inputs_patterns.into_iter().collect(),
+            for_inputs: inputs_patterns.unwrap_or_default().into_iter().collect(),
         };
         // Client input is confined to `u32` to provide sensible bounds.
         create_events_stream(watch_rx, patterns, interval as u64, limit as usize)
