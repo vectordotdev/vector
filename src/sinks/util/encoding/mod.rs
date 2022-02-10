@@ -278,7 +278,7 @@ fn deserialize_path_components<'de, D>(
 where
     D: serde::de::Deserializer<'de>,
 {
-    let fields: Option<Vec<&str>> = serde::de::Deserialize::deserialize(deserializer)?;
+    let fields: Option<Vec<String>> = serde::de::Deserialize::deserialize(deserializer)?;
     Ok(fields.map(|fields| {
         fields
             .iter()
