@@ -738,7 +738,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "message": "function call error for \"string\" at (160:175): expected string, got integer",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",

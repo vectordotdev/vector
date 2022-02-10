@@ -94,16 +94,14 @@ impl Expression for SplitFn {
             }
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::Regex | Kind::Bytes,
+                expected: Kind::regex() | Kind::bytes(),
             }
             .into()),
         })
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .infallible()
-            .array_mapped::<(), Kind>(map! {(): Kind::Bytes})
+        TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
     }
 }
 
@@ -120,9 +118,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!([""])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         single {
@@ -130,9 +126,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         long {
@@ -140,9 +134,7 @@ mod test {
                              pattern: " "
             ],
             want: Ok(value!(["This", "is", "a", "long", "string."])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         regex {
@@ -151,9 +143,7 @@ mod test {
                              limit: 2
             ],
             want: Ok(value!(["This", "is a long string"])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         non_space {
@@ -161,9 +151,7 @@ mod test {
                              pattern: Value::Regex(regex::Regex::new("(?i)a").unwrap().into())
             ],
             want: Ok(value!(["This", "is", "long", "string."])),
-            tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         unicode {
@@ -171,9 +159,7 @@ mod test {
                               pattern: " "
              ],
              want: Ok(value!(["˙ƃuᴉɹʇs", "ƃuol", "ɐ", "sᴉ", "sᴉɥ┴"])),
-             tdef: TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
          }
 
     ];

@@ -56,7 +56,7 @@ impl Expression for IpNtoaFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -70,13 +70,13 @@ mod tests {
         invalid {
             args: func_args![value: u32::MAX as i64 + 1],
             want: Err("cannot convert to bytes: integer does not fit in u32"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
             args: func_args![value: 16909060],
             want: Ok(value!("1.2.3.4")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

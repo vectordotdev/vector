@@ -116,25 +116,24 @@ impl Expression for ParseJsonFn {
 }
 
 fn inner_kind() -> Kind {
-    Kind::Null
-        | Kind::Bytes
-        | Kind::Integer
-        | Kind::Float
-        | Kind::Boolean
-        | Kind::Array
-        | Kind::Object
+    Kind::null()
+        | Kind::bytes()
+        | Kind::integer()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 fn type_def() -> TypeDef {
-    TypeDef::new()
+    TypeDef::bytes()
         .fallible()
-        .bytes()
         .add_boolean()
         .add_integer()
         .add_float()
         .add_null()
-        .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
-        .add_object::<(), Kind>(map! { (): inner_kind() })
+        .add_array(Collection::from_unknown(inner_kind()))
+        .add_object(Collection::from_unknown(inner_kind()))
 }
 
 #[cfg(test)]
@@ -159,15 +158,13 @@ mod tests {
         invalid_json_errors {
             args: func_args![ value: r#"{"field": "value"# ],
             want: Err("unable to parse json: EOF while parsing a string at line 1 column 16"),
-            tdef: TypeDef::new()
-                .fallible()
-                .bytes()
+            tdef: TypeDef::bytes().fallible()
                 .add_boolean()
                 .add_integer()
                 .add_float()
                 .add_null()
-                .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
-                .add_object::<(), Kind>(map! { (): inner_kind() }),
+                .add_array(Collection::from_unknown(inner_kind()))
+                .add_object(Collection::from_unknown(inner_kind())),
         }
     ];
 }

@@ -96,23 +96,26 @@ impl Expression for ParseCommonLogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object(type_def())
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
+fn inner_kind() -> BTreeMap<Field, Kind> {
     map! {
-        "host": Kind::Bytes | Kind::Null,
-        "identity": Kind::Bytes | Kind::Null,
-        "user": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp | Kind::Null,
-        "message": Kind::Bytes | Kind::Null,
-        "method": Kind::Bytes | Kind::Null,
-        "path": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Bytes | Kind::Null,
-        "status": Kind::Integer | Kind::Null,
-        "size": Kind::Integer | Kind::Null,
+        "host": Kind::bytes() | Kind::null(),
+        "identity": Kind::bytes() | Kind::null(),
+        "user": Kind::bytes() | Kind::null(),
+        "timestamp": Kind::timestamp() | Kind::null(),
+        "message": Kind::bytes() | Kind::null(),
+        "method": Kind::bytes() | Kind::null(),
+        "path": Kind::bytes() | Kind::null(),
+        "protocol": Kind::bytes() | Kind::null(),
+        "status": Kind::integer() | Kind::null(),
+        "size": Kind::integer() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
 #[cfg(test)]
@@ -139,19 +142,19 @@ mod tests {
                 "status" => 200,
                 "size" => 2326,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_with_timestamp_format {
@@ -161,19 +164,19 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid {
             args: func_args![value: r#"not a common log line"#],
             want: Err("failed parsing common log line"),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: r#"- - - [1234] - - -"#],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

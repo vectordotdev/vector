@@ -129,6 +129,7 @@ where
 #[cfg(test)]
 mod tests {
     use value::Kind;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -141,9 +142,9 @@ mod tests {
                 from: value!({ key2: "val2" })
             ],
             want: Ok(value!({ key1: "val1", key2: "val2" })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
             }),
         }
 
@@ -163,11 +164,11 @@ mod tests {
                 key2: "val2",
                 child: { grandchild2: true },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
         }
@@ -192,11 +193,11 @@ mod tests {
                     grandchild2: true,
                 },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
 
