@@ -125,6 +125,38 @@ impl Config {
             .cloned()
             .unwrap_or_else(|| vec![identifier.clone()])
     }
+
+    pub fn propagate_acknowledgements(&mut self) {
+        for sink in self.sinks.values_mut() {
+            sink.acknowledgements.merge(&self.global.acknowledgements);
+        }
+
+        let inputs: Vec<_> = self
+            .sinks
+            .values()
+            .filter(|sink| sink.acknowledgements.enabled())
+            .flat_map(|sink| sink.inputs.clone())
+            .collect();
+        self.propagate_acks_rec(inputs);
+    }
+
+    fn propagate_acks_rec(&mut self, inputs: Vec<OutputId>) {
+        for input in inputs {
+            if input.port.is_some() {
+                let component = &input.component;
+                if let Some(source) = self.sources.get_mut(component) {
+                    if !source.inner.can_acknowledge() {
+                        warn!("FIXME");
+                    } else {
+                        source.acknowledgements.enable();
+                    }
+                } else if let Some(transform) = self.transforms.get(component) {
+                    let inputs = transform.inputs.clone();
+                    self.propagate_acks_rec(inputs);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -182,9 +214,10 @@ pub struct SourceOuter {
     pub(super) inner: Box<dyn SourceConfig>,
     #[serde(
         default,
+        skip_deserializing,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: bool,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl SourceOuter {
@@ -192,7 +225,7 @@ impl SourceOuter {
         Self {
             inner: Box::new(source),
             proxy: Default::default(),
-            acknowledgements: false,
+            acknowledgements: false.into(),
         }
     }
 }
@@ -209,6 +242,10 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     /// Resources that the source is using.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -284,7 +321,7 @@ pub struct SinkOuter<T> {
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: bool,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl<T> SinkOuter<T> {
@@ -296,7 +333,7 @@ impl<T> SinkOuter<T> {
             healthcheck_uri: None,
             inner,
             proxy: Default::default(),
-            acknowledgements: false,
+            acknowledgements: false.into(),
         }
     }
 
@@ -348,7 +385,7 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
-            acknowledgements: false,
+            acknowledgements: false.into(),
         }
     }
 }

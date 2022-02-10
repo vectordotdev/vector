@@ -95,7 +95,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
-        let config = Config {
+        let mut config = Config {
             global,
             #[cfg(feature = "api")]
             api,
@@ -110,6 +110,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             expansions,
         };
+
+        config.propagate_acknowledgements();
 
         let warnings = validation::warnings(&config);
 

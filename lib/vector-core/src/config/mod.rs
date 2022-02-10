@@ -104,6 +104,10 @@ impl AcknowledgementsConfig {
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
     }
+
+    pub fn enable(&mut self) {
+        self.enabled = Some(true);
+    }
 }
 
 impl From<Option<bool>> for AcknowledgementsConfig {
