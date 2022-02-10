@@ -399,7 +399,7 @@ mod tests {
             watch_rx,
             sink_tx,
             TapPatterns::new(
-                HashSet::from_iter([pattern_matched.to_string(), pattern_not_matched.to_string()]),
+                HashSet::from([pattern_matched.to_string(), pattern_not_matched.to_string()]),
                 HashSet::new(),
             ),
         );
@@ -615,6 +615,127 @@ mod tests {
             EventNotification::new("transform".to_string(), EventNotificationType::Matched)
         );
         let _log = assert_log(transform_tap_events[1][0].clone());
+    }
+
+    #[tokio::test]
+    async fn integration_test_transform_input() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some(".message = \"new message\"".to_string()),
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["in"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let tap_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(
+                HashSet::new(),
+                HashSet::from(["transform".to_string(), "in".to_string()]),
+            ),
+            500,
+            100,
+        );
+
+        let tap_events: Vec<_> = tap_stream.take(3).collect().await;
+
+        let notifications = [
+            assert_notification(tap_events[0][0].clone()),
+            assert_notification(tap_events[1][0].clone()),
+        ];
+        assert!(notifications.iter().any(|n| *n
+            == EventNotification::new("transform".to_string(), EventNotificationType::Matched)));
+        // "in" is not matched since it corresponds to a source
+        assert!(notifications
+            .iter()
+            .any(|n| *n
+                == EventNotification::new("in".to_string(), EventNotificationType::NotMatched)));
+
+        assert_eq!(
+            assert_log(tap_events[2][0].clone())
+                .get_message()
+                .unwrap_or_default(),
+            "test"
+        );
+    }
+
+    #[tokio::test]
+    async fn integration_test_sink() {
+        let mut config = Config::builder();
+        config.add_source(
+            "in",
+            DemoLogsConfig {
+                interval: 0.01,
+                count: 200,
+                format: OutputFormat::Shuffle {
+                    sequence: false,
+                    lines: vec!["test".to_string()],
+                },
+                ..Default::default()
+            },
+        );
+        config.add_transform(
+            "transform",
+            &["in"],
+            RemapConfig {
+                source: Some(".message = \"new message\"".to_string()),
+                ..Default::default()
+            },
+        );
+        config.add_sink(
+            "out",
+            &["transform"],
+            BlackholeConfig {
+                print_interval_secs: 1,
+                rate: None,
+            },
+        );
+
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+        let tap_stream = create_events_stream(
+            topology.watch(),
+            TapPatterns::new(HashSet::new(), HashSet::from(["out".to_string()])),
+            500,
+            100,
+        );
+
+        let tap_events: Vec<_> = tap_stream.take(2).collect().await;
+
+        assert_eq!(
+            assert_notification(tap_events[0][0].clone()),
+            EventNotification::new("out".to_string(), EventNotificationType::Matched)
+        );
+        assert_eq!(
+            assert_log(tap_events[1][0].clone())
+                .get_message()
+                .unwrap_or_default(),
+            "new message"
+        );
     }
 
     #[tokio::test]
