@@ -518,6 +518,7 @@ fn build_sync_transform(
 
 struct Runner {
     transform: Box<dyn SyncTransform>,
+    pool: Vec<Box<dyn SyncTransform>>,
     input_rx: Option<BufferReceiver<Event>>,
     input_type: DataType,
     outputs: TransformOutputs,
@@ -534,6 +535,7 @@ impl Runner {
     ) -> Self {
         Self {
             transform,
+            pool: vec![],
             input_rx: Some(input_rx),
             input_type,
             outputs,
@@ -588,6 +590,18 @@ impl Runner {
         Ok(TaskOutput::Transform)
     }
 
+    fn duplicate_transform(&mut self, capacity: usize) -> Box<dyn SyncTransform> {
+        match self.pool.pop() {
+            None => {
+                for _ in 0..(capacity - 1) {
+                    self.pool.push(self.transform.clone());
+                }
+                self.transform.clone()
+            }
+            Some(t) => t,
+        }
+    }
+
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
         // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
         // try to balance out the increased overhead of spawning tasks
@@ -623,7 +637,7 @@ impl Runner {
                         Some(events) => {
                             self.on_events_received(&events);
 
-                            let mut t = self.transform.clone();
+                            let mut t = self.duplicate_transform(CONCURRENT_BATCH_SIZE);
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
                             let task = tokio::spawn(async move {
                                 for event in events {
