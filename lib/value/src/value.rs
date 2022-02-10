@@ -123,7 +123,7 @@ impl Hash for Value {
                 // * otherwise transmute to u64 and hash
                 if v.is_finite() {
                     v.is_sign_negative().hash(state);
-                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc().to_bits()) };
+                    let trunc: u64 = v.trunc().to_bits();
                     trunc.hash(state);
                 } else if !v.is_nan() {
                     v.is_sign_negative().hash(state);
@@ -147,7 +147,7 @@ impl Hash for Value {
 
 impl Value {
     /// Returns a string description of the value type
-    pub fn kind(&self) -> &str {
+    pub const fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
@@ -244,10 +244,10 @@ impl Value {
                 *value = Self::Array(Vec::with_capacity(next_len.abs() as usize));
             }
             SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
-                *value = Self::Map(Default::default());
+                *value = Self::Map(BTreeMap::default());
             }
             SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
-                *value = Self::Map(Default::default());
+                *value = Self::Map(BTreeMap::default());
             }
             _ => (),
         }
@@ -277,7 +277,7 @@ impl Value {
                         Self::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Self::Map(Default::default())
+                        Self::Map(BTreeMap::default())
                     }
                 }
             })
@@ -376,7 +376,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Self::Map(Default::default());
+                    let mut inner = Self::Map(BTreeMap::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -400,7 +400,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Self::Map(Default::default());
+                        let mut inner = Self::Map(BTreeMap::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {
@@ -468,9 +468,16 @@ impl Value {
             // The top level insert will always be a map (or an array in tests).
             // Then for further descents into the lookup, in the `insert_map` function
             // if the type is one of the following, the field is modified to be a map.
-            (Some(segment),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(segment),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 trace!("Encountered descent into a primitive.");
                 Err(ValueError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
@@ -551,9 +558,16 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(segment),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(segment),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 if working_lookup.is_empty() {
                     trace!("Cannot remove self. Caller must remove.");
                     Err(ValueError::RemovingSelf)
@@ -734,9 +748,16 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (Some(_s),
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => {
+            (
+                Some(_s),
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => {
                 trace!("Mismatched primitive field while trying to use segment.");
                 Ok(None)
             }
@@ -780,9 +801,16 @@ impl Value {
             // We've met an end and found our value.
             (None, item) => Ok(Some(item)),
             // This is just not allowed!
-            (_,
- Value::Boolean(_) | Value::Bytes(_) | Value::Regex(_) | Value::Timestamp(_) |
- Value::Float(_) | Value::Integer(_) | Value::Null) => unimplemented!(),
+            (
+                _,
+                Value::Boolean(_)
+                | Value::Bytes(_)
+                | Value::Regex(_)
+                | Value::Timestamp(_)
+                | Value::Float(_)
+                | Value::Integer(_)
+                | Value::Null,
+            ) => unimplemented!(),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -1053,7 +1081,8 @@ impl Value {
 }
 
 /// Converts a timestamp to a String
-#[must_use] pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
+#[must_use]
+pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 

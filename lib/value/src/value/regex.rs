@@ -12,7 +12,7 @@ use std::{
 pub struct ValueRegex(regex::Regex);
 
 impl ValueRegex {
-    pub fn new(regex: regex::Regex) -> Self {
+    pub const fn new(regex: regex::Regex) -> Self {
         Self(regex)
     }
 
@@ -24,6 +24,7 @@ impl ValueRegex {
         self.as_str().as_bytes()
     }
 
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_inner(self) -> regex::Regex {
         self.0
     }

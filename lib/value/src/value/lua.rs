@@ -25,24 +25,24 @@ impl<'a> ToLua<'a> for Value {
 impl<'a> FromLua<'a> for Value {
     fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
-            LuaValue::Integer(i) => Ok(Value::Integer(i)),
+            LuaValue::String(s) => Ok(Self::Bytes(Vec::from(s.as_bytes()).into())),
+            LuaValue::Integer(i) => Ok(Self::Integer(i)),
             LuaValue::Number(f) => {
                 let f = NotNan::new(f).map_err(|_| mlua::Error::FromLuaConversionError {
                     from: value.type_name(),
                     to: "Value",
                     message: Some("NaN not supported".to_string()),
                 })?;
-                Ok(Value::Float(f))
+                Ok(Self::Float(f))
             }
-            LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
+            LuaValue::Boolean(b) => Ok(Self::Boolean(b)),
             LuaValue::Table(t) => {
                 if t.len()? > 0 {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Value::Array)
+                    <_>::from_lua(LuaValue::Table(t), lua).map(Self::Array)
                 } else if table_is_timestamp(&t)? {
-                    table_to_timestamp(t).map(Value::Timestamp)
+                    table_to_timestamp(t).map(Self::Timestamp)
                 } else {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Value::Map)
+                    <_>::from_lua(LuaValue::Table(t), lua).map(Self::Map)
                 }
             }
             other => Err(mlua::Error::FromLuaConversionError {

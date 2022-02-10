@@ -13,18 +13,18 @@ impl TryFrom<TomlValue> for Value {
             TomlValue::Integer(i) => Self::from(i),
             TomlValue::Array(a) => Self::from(
                 a.into_iter()
-                    .map(Value::try_from)
+                    .map(Self::try_from)
                     .collect::<Result<Vec<_>, StdError>>()?,
             ),
             TomlValue::Table(t) => Self::from(
                 t.into_iter()
-                    .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
+                    .map(|(k, v)| Self::try_from(v).map(|v| (k, v)))
                     .collect::<Result<BTreeMap<_, _>, StdError>>()?,
             ),
             TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
             TomlValue::Boolean(b) => Self::from(b),
             TomlValue::Float(f) => {
-                Value::Float(NotNan::new(f).map_err(|_| "NaN value not supported")?)
+                Self::Float(NotNan::new(f).map_err(|_| "NaN value not supported")?)
             }
         })
     }

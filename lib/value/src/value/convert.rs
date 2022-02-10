@@ -128,6 +128,7 @@ impl From<NotNan<f64>> for Value {
 }
 
 #[cfg(any(test, feature = "test"))]
+#[allow(clippy::fallible_impl_from)] // fallibility is intentional here, it's only for tests
 impl From<f64> for Value {
     fn from(f: f64) -> Self {
         NotNan::new(f).unwrap().into()
