@@ -143,14 +143,12 @@ impl Config {
 
     fn propagate_acks_rec(&mut self, inputs: Vec<OutputId>) {
         for input in inputs {
-            if input.port.is_some() {
-                let component = &input.component;
-                if let Some(source) = self.sources.get_mut(component) {
-                    source.enable_acknowledgements();
-                } else if let Some(transform) = self.transforms.get(component) {
-                    let inputs = transform.inputs.clone();
-                    self.propagate_acks_rec(inputs);
-                }
+            let component = &input.component;
+            if let Some(source) = self.sources.get_mut(component) {
+                source.enable_acknowledgements();
+            } else if let Some(transform) = self.transforms.get(component) {
+                let inputs = transform.inputs.clone();
+                self.propagate_acks_rec(inputs);
             }
         }
     }
@@ -401,7 +399,7 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
-            acknowledgements: Default::default(),
+            acknowledgements: self.acknowledgements,
         }
     }
 }
@@ -1168,6 +1166,58 @@ mod test {
         .unwrap();
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
+
+    #[test]
+    fn propagates_acknowledgement_settings() {
+        // The topology:
+        // in1 => out1
+        // in2 => out2 (acks enabled)
+        // in3 => parse3 => out3 (acks enabled)
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+                [sources.in1]
+                    type = "file"
+                [sources.in2]
+                    type = "file"
+                [sources.in3]
+                    type = "file"
+                [transforms.parse3]
+                    type = "json_parser"
+                    inputs = ["in3"]
+                [sinks.out1]
+                    type = "console"
+                    inputs = ["in1"]
+                    encoding = "json"
+                [sinks.out2]
+                    type = "console"
+                    inputs = ["in2"]
+                    encoding = "json"
+                    acknowledgements = true
+                [sinks.out3]
+                    type = "console"
+                    inputs = ["parse3"]
+                    encoding = "json"
+                    acknowledgements.enabled = true
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        for source in config.sources.values() {
+            assert_eq!(
+                source.sink_acknowledgements, false,
+                "Source `sink_acknowledgements` should be `false` before propagation"
+            );
+        }
+
+        let config = config.build().unwrap();
+
+        let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
+        assert_eq!(get("in1").sink_acknowledgements, false);
+        assert_eq!(get("in2").sink_acknowledgements, true);
+        assert_eq!(get("in3").sink_acknowledgements, true);
     }
 }
 
