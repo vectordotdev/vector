@@ -594,12 +594,12 @@ async fn health_503_during_shutdown() {
             [api]
               enabled = true
               address = "127.0.0.1:8686"
-                    
+
             [sources.source]
               type = "demo_logs"
               format = "json"
               interval = 0
-            
+
             [sinks.sink]
               type = "blackhole"
               inputs = ["source"]
