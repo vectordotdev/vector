@@ -239,7 +239,6 @@ cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
-		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
