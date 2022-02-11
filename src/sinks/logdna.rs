@@ -208,7 +208,7 @@ impl HttpSink for LogdnaConfig {
 
         let query = query.finish();
 
-        let body = crate::serde::to_bytes(&json!({
+        let body = crate::serde::json::to_bytes(&json!({
             "lines": events,
         }))
         .unwrap()

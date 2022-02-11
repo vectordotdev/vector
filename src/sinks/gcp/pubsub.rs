@@ -183,7 +183,7 @@ impl HttpSink for PubsubSink {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
-        let body = crate::serde::to_bytes(&body).unwrap().freeze();
+        let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");

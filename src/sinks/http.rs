@@ -193,14 +193,14 @@ impl HttpSink for HttpSinkConfig {
                 }
             }
             Encoding::Ndjson => {
-                let mut body = crate::serde::to_bytes(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 body.put_u8(b'\n');
                 body
             }
             Encoding::Json => {
-                let mut body = crate::serde::to_bytes(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 body.put_u8(b',');
