@@ -21,9 +21,16 @@ impl Predicate {
         let (span, block) = node.take();
         let type_def = block.type_def(state);
 
+        if type_def.is_fallible() {
+            return Err(Error {
+                variant: ErrorVariant::Fallible,
+                span,
+            });
+        }
+
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind()),
+                variant: ErrorVariant::NonBoolean(type_def.into()),
                 span,
             });
         }
@@ -59,7 +66,7 @@ impl Expression for Predicate {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
 
         type_def.with_fallibility(fallible)
     }
@@ -125,6 +132,8 @@ pub struct Error {
 pub enum ErrorVariant {
     #[error("non-boolean predicate")]
     NonBoolean(Kind),
+    #[error("fallible predicate")]
+    Fallible,
 }
 
 impl fmt::Display for Error {
@@ -145,6 +154,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             NonBoolean(..) => 102,
+            Fallible => 111,
         }
     }
 
@@ -155,6 +165,10 @@ impl DiagnosticError for Error {
             NonBoolean(kind) => vec![
                 Label::primary("this predicate must resolve to a boolean", self.span),
                 Label::context(format!("instead it resolves to {}", kind), self.span),
+            ],
+            Fallible => vec![
+                Label::primary("this predicate can result in runtime error", self.span),
+                Label::context("handle the error case to ensure runtime success", self.span),
             ],
         }
     }
@@ -170,6 +184,7 @@ impl DiagnosticError for Error {
                     Urls::expression_docs_url("#if"),
                 ),
             ],
+            Fallible => vec![Note::SeeErrorDocs],
         }
     }
 }

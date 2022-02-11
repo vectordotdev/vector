@@ -10,10 +10,10 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::rusoto::RegionOrEndpoint,
-    config::{log_schema, DataType, SinkConfig, SinkContext},
+    config::{log_schema, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
             encoder::ElasticSearchEncoder,
@@ -196,7 +196,7 @@ impl DataStreamConfig {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -209,7 +209,7 @@ impl DataStreamConfig {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -222,7 +222,7 @@ impl DataStreamConfig {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -341,8 +341,8 @@ impl SinkConfig for ElasticSearchConfig {
         Ok((stream, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {

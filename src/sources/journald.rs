@@ -12,11 +12,11 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use futures::{future, stream, stream::BoxStream, StreamExt};
-use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
@@ -54,9 +54,7 @@ const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
-lazy_static! {
-    static ref JOURNALCTL: PathBuf = "journalctl".into();
-}
+static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
 
 #[derive(Debug, Snafu)]
 enum BuildError {

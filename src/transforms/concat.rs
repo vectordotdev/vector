@@ -1,11 +1,12 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::BuildError;
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
@@ -55,8 +56,8 @@ impl TransformConfig for ConcatConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -75,13 +76,12 @@ pub struct Substring {
     end: Option<i32>,
 }
 
+static SUBSTR_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$").unwrap()
+});
+
 impl Substring {
     fn new(input: String) -> Result<Substring, BuildError> {
-        lazy_static! {
-            static ref SUBSTR_REGEX: Regex =
-                Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$")
-                    .unwrap();
-        }
         let cap = match SUBSTR_REGEX.captures(input.as_bytes()) {
             None => {
                 return Err(BuildError::InvalidSubstring {

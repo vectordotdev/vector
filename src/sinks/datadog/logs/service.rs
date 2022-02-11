@@ -3,6 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
@@ -46,7 +47,7 @@ pub struct LogApiRequest {
     pub batch_size: usize,
     pub api_key: Arc<str>,
     pub compression: Compression,
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
 }

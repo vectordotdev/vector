@@ -67,9 +67,9 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
     #[serde(default = "crate::serde::default_false")]
@@ -105,7 +105,7 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
@@ -236,11 +236,10 @@ impl DatadogAgentSource {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
                 let count = events.len();
 
-                let mut events = futures::stream::iter(events);
                 if let Some(name) = output {
-                    out.send_all_named(name, &mut events).await
+                    out.send_batch_named(name, events).await
                 } else {
-                    out.send_all(&mut events).await
+                    out.send_batch(events).await
                 }
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     emit!(&StreamClosedError { error, count });

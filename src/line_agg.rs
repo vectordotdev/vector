@@ -562,7 +562,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    /// https://github.com/timberio/vector/issues/3237
+    /// https://github.com/vectordotdev/vector/issues/3237
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![

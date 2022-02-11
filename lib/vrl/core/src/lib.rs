@@ -4,8 +4,7 @@ mod runtime;
 use std::any::Any;
 
 pub use compiler::{
-    function, state, type_def::Index, value, vm::Vm, Context, Expression, Function, Program,
-    Target, Value,
+    function, state, value, vm::Vm, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

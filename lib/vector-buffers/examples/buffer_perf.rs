@@ -22,7 +22,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, BufferType, Bufferable, WhenFull,
+    Acker, BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 
@@ -45,6 +45,12 @@ impl VariableMessage {
 impl ByteSizeOf for VariableMessage {
     fn allocated_bytes(&self) -> usize {
         self.payload.len()
+    }
+}
+
+impl EventCount for VariableMessage {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
@@ -123,7 +129,7 @@ impl Configuration {
                     .help("Sets the buffer type to use")
                     .short('t')
                     .long("buffer-type")
-                    .possible_values(&["disk-v1", "disk-v2", "in-memory-v1", "in-memory-v2"])
+                    .possible_values(&["disk-v1", "disk-v2", "in-memory"])
                     .default_value("disk-v2"),
             )
             .arg(
@@ -230,22 +236,12 @@ where
     let mut builder = TopologyBuilder::default();
 
     let variant = match buffer_type {
-        "in-memory-v1" => {
-            info!(
-                "[buffer-perf] creating in-memory v1 buffer with max_events={}, in blocking mode",
-                max_size_events
-            );
-            BufferType::MemoryV1 {
-                max_events: max_size_events,
-                when_full,
-            }
-        }
-        "in-memory-v2" => {
+        "in-memory" => {
             info!(
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: max_size_events,
                 when_full,
             }

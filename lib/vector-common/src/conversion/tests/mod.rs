@@ -1,9 +1,10 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use ordered_float::NotNan;
 
 use crate::conversion::parse_bool;
 
-#[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
+#[cfg(unix)] // see https://github.com/vectordotdev/vector/issues/1201
 mod unix;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -30,6 +31,12 @@ impl From<DateTime<Utc>> for StubValue {
 impl From<f64> for StubValue {
     fn from(v: f64) -> Self {
         StubValue::Float(v)
+    }
+}
+
+impl From<NotNan<f64>> for StubValue {
+    fn from(v: NotNan<f64>) -> Self {
+        StubValue::Float(v.into_inner())
     }
 }
 

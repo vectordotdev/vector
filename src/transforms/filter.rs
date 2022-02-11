@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::FilterEventDiscarded,
@@ -45,8 +46,8 @@ impl TransformConfig for FilterConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {

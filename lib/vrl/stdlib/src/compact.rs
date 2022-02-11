@@ -183,19 +183,17 @@ impl Expression for CompactFn {
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::Array | Kind::Object,
+                expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
             }
             .into()),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let td = self.value.type_def(state);
-
-        if td.is_array() {
-            TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+        if self.value.type_def(state).is_array() {
+            TypeDef::array(Collection::any())
         } else {
-            TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+            TypeDef::object(Collection::any())
         }
     }
 }
@@ -396,13 +394,13 @@ mod test {
                                          "key3": "",
             ]],
             want: Ok(Value::Object(map!["key2": 1])),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         with_array {
             args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
             want: Ok(Value::Array(vec![Value::from(1)])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         nullish {
@@ -415,7 +413,7 @@ mod test {
                 nullish: true
             ],
             want: Ok(Value::Object(map!["key2": 1])),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
     ];
 }

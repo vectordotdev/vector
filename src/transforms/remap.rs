@@ -20,7 +20,7 @@ use vrl::Vm;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, VrlTarget},
@@ -59,8 +59,8 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -738,7 +738,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "message": "function call error for \"string\" at (160:175): expected string, got integer",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",

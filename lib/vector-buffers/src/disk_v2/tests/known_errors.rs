@@ -23,6 +23,7 @@ use crate::{
         ReaderError,
     },
     encoding::{AsMetadata, Encodable},
+    EventCount,
 };
 
 #[tokio::test]
@@ -722,6 +723,12 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
     impl ByteSizeOf for ControllableRecord {
         fn allocated_bytes(&self) -> usize {
             0
+        }
+    }
+
+    impl EventCount for ControllableRecord {
+        fn event_count(&self) -> usize {
+            1
         }
     }
 

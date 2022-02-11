@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use super::StatsdDeserializer;
 use crate::{
-    codecs::{Decoder, NewlineDelimitedDecoder},
+    codecs::{
+        decoding::{Deserializer, Framer},
+        Decoder, NewlineDelimitedDecoder,
+    },
     shutdown::ShutdownSignal,
     sources::{util::build_unix_stream_source, Source},
     SourceSender,
@@ -17,8 +20,8 @@ pub struct UnixConfig {
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: SourceSender) -> Source {
     let decoder = Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
 
     build_unix_stream_source(

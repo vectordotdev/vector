@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     event::PathComponent,
     serde::skip_serializing_if_default,
-    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
+    sinks::util::encoding::{deserialize_path_components, EncodingConfiguration, TimestampFormat},
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.
@@ -21,8 +21,12 @@ pub struct EncodingConfigFixed<E: Default + PartialEq> {
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    #[serde(
+        default,
+        skip_serializing_if = "skip_serializing_if_default",
+        deserialize_with = "deserialize_path_components"
+    )]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
