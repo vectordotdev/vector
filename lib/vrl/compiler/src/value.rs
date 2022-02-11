@@ -13,7 +13,7 @@ use std::{collections::BTreeMap, fmt};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use error::Error;
-pub use kind::Kind;
+pub use kind::{Collection, Field, Index, Kind};
 use ordered_float::NotNan;
 
 pub use self::regex::Regex;
@@ -100,7 +100,7 @@ mod test {
     use indoc::indoc;
     use ordered_float::NotNan;
     use regex::Regex;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::Value;
 

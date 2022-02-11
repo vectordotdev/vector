@@ -6,6 +6,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
 use tower::Service;
@@ -165,7 +166,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<DatadogLogsJsonEncoding>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -201,7 +202,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
 
-        Ok(compressor.into_inner())
+        Ok(compressor.into_inner().freeze())
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {

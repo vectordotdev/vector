@@ -11,10 +11,10 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, SinkConfig, SinkDescription},
+    config::{self, Input, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{
@@ -117,7 +117,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingFailed {
+                                    emit!(&TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,
@@ -140,8 +140,8 @@ impl SinkConfig for RemoteWriteConfig {
         Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -397,7 +397,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         drop(trigger);
 
@@ -453,7 +453,6 @@ mod tests {
 mod integration_tests {
     use std::{collections::HashMap, ops::Range};
 
-    use futures::stream;
     use serde_json::Value;
 
     use super::{tests::*, *};
@@ -495,7 +494,7 @@ mod integration_tests {
         let events = create_events(0..5, |n| n * 11.0);
 
         let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let result = query(url, &format!("show series on {}", database)).await;
 

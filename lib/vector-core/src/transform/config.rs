@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::config::{ComponentKey, DataType, GlobalOptions, Output};
+use crate::config::{ComponentKey, GlobalOptions, Input, Output};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
@@ -48,7 +48,7 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     async fn build(&self, globals: &TransformContext)
         -> crate::Result<crate::transform::Transform>;
 
-    fn input_type(&self) -> DataType;
+    fn input(&self) -> Input;
 
     fn outputs(&self) -> Vec<Output>;
 

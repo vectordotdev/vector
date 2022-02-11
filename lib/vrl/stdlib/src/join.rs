@@ -79,7 +79,7 @@ impl Expression for JoinFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -92,25 +92,25 @@ mod test {
         with_comma_separator {
             args: func_args![value: value!(["one", "two", "three"]), separator: ", "],
             want: Ok(value!("one, two, three")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         with_space_separator {
             args: func_args![value: value!(["one", "two", "three"]), separator: " "],
             want: Ok(value!("one two three")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         without_separator {
             args: func_args![value: value!(["one", "two", "three"])],
             want: Ok(value!("onetwothree")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         non_string_array_item_throws_error {
             args: func_args![value: value!(["one", "two", 3])],
             want: Err("all array items must be strings"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

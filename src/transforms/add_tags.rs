@@ -5,11 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -50,8 +51,8 @@ impl TransformConfig for AddTagsConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -70,7 +71,7 @@ impl AddTags {
 }
 
 impl FunctionTransform for AddTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         if !self.tags.is_empty() {
             let metric = event.as_mut_metric();
 
@@ -97,7 +98,7 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::{

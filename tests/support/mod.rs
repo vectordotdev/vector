@@ -27,8 +27,8 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-        TransformContext,
+        DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+        TransformConfig, TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -38,9 +38,9 @@ use vector::{
     source_sender::{ReceiverStream, SourceSender},
     sources::Source,
     test_util::{temp_dir, temp_file},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -227,7 +227,7 @@ pub struct MockTransform {
 }
 
 impl FunctionTransform for MockTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
@@ -298,8 +298,8 @@ impl TransformConfig for MockTransformConfig {
         }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -383,8 +383,8 @@ impl SinkConfig for MockSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {

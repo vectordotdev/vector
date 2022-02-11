@@ -454,7 +454,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		processed_events_total: {
 			description:       """
@@ -516,7 +516,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_received_bytes_total: {
-			description:       "The number of raw bytes accepted by this component from source origins."
+			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
@@ -592,13 +592,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		datadog_logs_received_in_total: {
 			description:       "Number of Datadog logs received."
@@ -1166,12 +1166,15 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
+				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
+				"stream_closed":               "The downstream was closed, forwarding the event(s) failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
@@ -1199,6 +1202,10 @@ components: sources: internal_metrics: {
 				unix: "Unix domain socket"
 			}
 		}
+		_output: {
+			description: "The specific output of the component."
+			required:    false
+		}
 		_stage: {
 			description: "The stage within the component at which the error occurred."
 			required:    true
@@ -1224,5 +1231,12 @@ components: sources: internal_metrics: {
 				"oversized":    "The event was too large."
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

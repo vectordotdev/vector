@@ -1,4 +1,4 @@
-use shared::conversion::Conversion;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -70,9 +70,7 @@ impl Expression for ParseTimestampFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Always fallible because the format needs to be parsed at runtime
-            .timestamp()
+        TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }
 }
 
@@ -97,8 +95,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text {
@@ -111,8 +109,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text_with_tz {
@@ -125,8 +123,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];
 }

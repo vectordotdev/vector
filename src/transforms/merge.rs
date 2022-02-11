@@ -8,7 +8,7 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
     transforms::{TaskTransform, Transform},
 };
@@ -56,11 +56,11 @@ impl Default for MergeConfig {
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(Merge::from(self.clone())))
+        Ok(Transform::event_task(Merge::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -145,7 +145,7 @@ impl From<MergeConfig> for Merge {
     }
 }
 
-impl TaskTransform for Merge {
+impl TaskTransform<Event> for Merge {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,

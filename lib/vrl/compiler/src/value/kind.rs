@@ -1,6 +1,4 @@
-#![allow(non_upper_case_globals)]
-
-use std::{fmt, ops::Deref};
+use std::collections::BTreeMap;
 
 use chrono::{TimeZone, Utc};
 use regex::Regex;
@@ -22,19 +20,10 @@ pub const ANY: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | OBJECT | ARRAY | TIMEST
 pub const SCALAR: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | TIMESTAMP | REGEX | NULL;
 pub const CONTAINER: u16 = OBJECT | ARRAY;
 
-bitflags::bitflags! {
-    pub struct Kind: u16 {
-        const Bytes = BYTES;
-        const Integer = INTEGER;
-        const Float = FLOAT;
-        const Boolean = BOOLEAN;
-        const Object = OBJECT;
-        const Array = ARRAY;
-        const Timestamp = TIMESTAMP;
-        const Regex = REGEX;
-        const Null = NULL;
-    }
-}
+pub use ::value::{
+    kind::{find, insert, merge, nest, remove, Collection, Field, Index},
+    Kind,
+};
 
 impl Value {
     pub fn kind(&self) -> Kind {
@@ -42,90 +31,7 @@ impl Value {
     }
 }
 
-impl Kind {
-    pub const fn new(kind: u16) -> Self {
-        Kind::from_bits_truncate(kind)
-    }
-
-    /// Returns `true` if self is more than one, but not all
-    /// [`value::Kind`]s.
-    pub fn is_many(self) -> bool {
-        !self.is_exact() && !self.is_all() && !self.is_empty()
-    }
-
-    /// Returns `true` if self is any valid [`value::Kind`].
-    pub fn is_any(self) -> bool {
-        self.is_all()
-    }
-
-    /// Return the existing kinds, without non-scalar kinds (objects and arrays).
-    pub fn scalar(self) -> Self {
-        self & !(Kind::Array | Kind::Object)
-    }
-
-    /// Returns `true` if the [`value::Kind`] is a scalar and `false` if it's
-    /// map or array.
-    pub fn is_scalar(self) -> bool {
-        self == self.scalar()
-    }
-
-    /// Returns a quoted variant of `as_str`
-    ///
-    /// This function is a close duplicate of `as_str`, returning the same
-    /// underlying str but with quotes. We avoid the obvious `format!("{}",
-    /// self.as_str())` here as that incurs an allocation cost and the `Display`
-    /// of `Kind` is sometimes in the hot path.
-    ///
-    /// See https://github.com/timberio/vector/pull/6878 for details.
-    pub(crate) fn quoted(self) -> &'static str {
-        match self {
-            Kind::Bytes => "\"string\"",
-            Kind::Integer => "\"integer\"",
-            Kind::Float => "\"float\"",
-            Kind::Boolean => "\"boolean\"",
-            Kind::Object => "\"object\"",
-            Kind::Array => "\"array\"",
-            Kind::Timestamp => "\"timestamp\"",
-            Kind::Regex => "\"regex\"",
-            Kind::Null => "\"null\"",
-            _ if self.is_all() => "\"unknown type\"",
-            _ if self.is_empty() => "\"none\"",
-            _ => "\"multiple\"",
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Kind::Bytes => "string",
-            Kind::Integer => "integer",
-            Kind::Float => "float",
-            Kind::Boolean => "boolean",
-            Kind::Object => "object",
-            Kind::Array => "array",
-            Kind::Timestamp => "timestamp",
-            Kind::Regex => "regex",
-            Kind::Null => "null",
-            _ if self.is_all() => "unknown type",
-            _ if self.is_empty() => "none",
-            _ => "multiple",
-        }
-    }
-
-    pub fn is_exact(self) -> bool {
-        matches!(
-            self,
-            Kind::Bytes
-                | Kind::Integer
-                | Kind::Float
-                | Kind::Boolean
-                | Kind::Object
-                | Kind::Array
-                | Kind::Timestamp
-                | Kind::Regex
-                | Kind::Null
-        )
-    }
-
+pub trait DefaultValue {
     /// Returns the default [`Value`] for a given [`Kind`].
     ///
     /// If the kind is unknown (or inexact), `null` is returned as the default
@@ -135,154 +41,176 @@ impl Kind {
     /// are particularly useful for the "infallible assignment" expression,
     /// where the `ok` value is set to the default value kind if the expression
     /// results in an error.
-    pub fn default_value(self) -> Value {
-        match self {
-            Kind::Bytes => value!(""),
-            Kind::Integer => value!(0),
-            Kind::Float => value!(0.0),
-            Kind::Boolean => value!(false),
-            Kind::Object => value!({}),
-            Kind::Array => value!([]),
-            Kind::Timestamp => Utc.timestamp(0, 0).into(),
+    fn default_value(&self) -> Value;
+}
+
+impl DefaultValue for Kind {
+    fn default_value(&self) -> Value {
+        if self.is_bytes() {
+            return value!("");
+        }
+
+        if self.is_integer() {
+            return value!(0);
+        }
+
+        if self.is_float() {
+            return value!(0.0);
+        }
+
+        if self.is_boolean() {
+            return value!(false);
+        }
+
+        if self.is_timestamp() {
+            return Utc.timestamp(0, 0).into();
+        }
+
+        if self.is_regex() {
             #[allow(clippy::trivial_regex)]
-            Kind::Regex => Regex::new("").unwrap().into(),
-            _ => Value::Null,
-        }
-    }
-}
-
-macro_rules! impl_kind {
-    ($(($kind:tt, $name:tt)),+ $(,)*) => {
-        impl fmt::Display for Kind {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                if !self.is_many() {
-                    return write!(f, "{}", self.quoted())
-                }
-
-                let mut kinds = Vec::with_capacity(16);
-                $(paste::paste! {
-                if self.[<contains_ $name>]() {
-                    kinds.push(Kind::$kind.quoted())
-                }
-                })+
-
-                let last = kinds.pop();
-                let mut string = kinds.join(", ");
-
-                if let Some(last) = last {
-                    if !string.is_empty() {
-                        string.push_str(" or ")
-                    }
-
-                    string.push_str(&last);
-                }
-
-                f.write_str(&string)
-            }
+            return Regex::new("").unwrap().into();
         }
 
-        impl Kind {
-            $(paste::paste! {
-            pub fn [<is_ $name>](self) -> bool {
-                matches!(self, Kind::$kind)
-            }
-
-            pub fn [<contains_ $name>](self) -> bool {
-                self.contains(Kind::$kind)
-            }
-            })+
+        if self.is_array() {
+            return value!([]);
         }
 
-        impl IntoIterator for Kind {
-            type Item = Self;
-            type IntoIter = std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                let mut kinds = vec![];
-                $(paste::paste! {
-                if self.[<contains_ $name>]() {
-                    kinds.push(Kind::$kind)
-                }
-                })+
-
-                kinds.into_iter()
-            }
+        if self.is_object() {
+            return value!({});
         }
-    };
-}
 
-impl_kind![
-    (Bytes, bytes),
-    (Integer, integer),
-    (Float, float),
-    (Boolean, boolean),
-    (Object, object),
-    (Array, array),
-    (Timestamp, timestamp),
-    (Regex, regex),
-    (Null, null),
-];
-
-impl Deref for Kind {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
+        Value::Null
     }
 }
 
 impl From<&Value> for Kind {
     fn from(value: &Value) -> Self {
         match value {
-            Value::Bytes(_) => Kind::Bytes,
-            Value::Integer(_) => Kind::Integer,
-            Value::Float(_) => Kind::Float,
-            Value::Boolean(_) => Kind::Boolean,
-            Value::Object(_) => Kind::Object,
-            Value::Array(_) => Kind::Array,
-            Value::Timestamp(_) => Kind::Timestamp,
-            Value::Regex(_) => Kind::Regex,
-            Value::Null => Kind::Null,
+            Value::Bytes(_) => Kind::bytes(),
+            Value::Integer(_) => Kind::integer(),
+            Value::Float(_) => Kind::float(),
+            Value::Boolean(_) => Kind::boolean(),
+            Value::Timestamp(_) => Kind::timestamp(),
+            Value::Regex(_) => Kind::regex(),
+            Value::Null => Kind::null(),
+
+            Value::Object(object) => Kind::object(
+                object
+                    .iter()
+                    .map(|(k, v)| (k.clone().into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+
+            Value::Array(array) => Kind::array(
+                array
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
         }
+    }
+}
+
+impl From<Value> for Kind {
+    fn from(value: Value) -> Self {
+        (&value).into()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
-    fn quoted() {
-        for i in 0..u16::MAX {
-            let kind = Kind::new(i);
-            assert_eq!(kind.quoted(), format!(r#""{}""#, kind.as_str()));
-        }
-    }
-
-    #[test]
-    fn kind_is_scalar() {
-        let scalars = vec![
-            Kind::Integer,
-            Kind::Bytes,
-            Kind::Null | Kind::Regex,
-            Kind::Timestamp | Kind::Float | Kind::Null,
-        ];
-
-        let non_scalars = vec![
-            Kind::Array,
-            Kind::Object,
-            Kind::Array | Kind::Integer,
-            Kind::Object | Kind::Array,
-            Kind::Object | Kind::Bytes,
-            Kind::Boolean | Kind::Null | Kind::Array,
-        ];
-
-        for kind in scalars {
-            assert!(kind.is_scalar());
+    fn test_from_value() {
+        struct TestCase {
+            value: Value,
+            want: Kind,
         }
 
-        for kind in non_scalars {
-            assert!(!kind.is_scalar());
+        for (title, TestCase { value, want }) in HashMap::from([
+            (
+                "bytes",
+                TestCase {
+                    value: value!("foo"),
+                    want: Kind::bytes(),
+                },
+            ),
+            (
+                "integer",
+                TestCase {
+                    value: value!(3),
+                    want: Kind::integer(),
+                },
+            ),
+            (
+                "float",
+                TestCase {
+                    value: value!(3.3),
+                    want: Kind::float(),
+                },
+            ),
+            (
+                "boolean",
+                TestCase {
+                    value: value!(true),
+                    want: Kind::boolean(),
+                },
+            ),
+            (
+                "timestamp",
+                TestCase {
+                    value: Utc::now().into(),
+                    want: Kind::timestamp(),
+                },
+            ),
+            (
+                "regex",
+                TestCase {
+                    value: Regex::new("").unwrap().into(),
+                    want: Kind::regex(),
+                },
+            ),
+            (
+                "null",
+                TestCase {
+                    value: value!(null),
+                    want: Kind::null(),
+                },
+            ),
+            (
+                "object",
+                TestCase {
+                    value: value!({ "foo": { "bar": 12 }, "baz": true }),
+                    want: Kind::object(BTreeMap::from([
+                        (
+                            "foo".into(),
+                            Kind::object(BTreeMap::from([("bar".into(), Kind::integer())])),
+                        ),
+                        ("baz".into(), Kind::boolean()),
+                    ])),
+                },
+            ),
+            (
+                "array",
+                TestCase {
+                    value: value!([12, true, "foo", { "bar": null }]),
+                    want: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::boolean()),
+                        (2.into(), Kind::bytes()),
+                        (
+                            3.into(),
+                            Kind::object(BTreeMap::from([("bar".into(), Kind::null())])),
+                        ),
+                    ])),
+                },
+            ),
+        ]) {
+            assert_eq!(Kind::from(value), want, "{}", title);
         }
     }
 }

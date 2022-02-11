@@ -3,11 +3,11 @@ use std::{
     mem,
 };
 
-use core_common::byte_size_of::ByteSizeOf;
 use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 

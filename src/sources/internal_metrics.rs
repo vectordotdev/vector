@@ -1,10 +1,12 @@
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -120,35 +122,41 @@ async fn run(
         let pid = std::process::id().to_string();
 
         let metrics = controller.capture_metrics();
+        let count = metrics.len();
+        let byte_size = metrics.size_of();
+        emit!(&EventsReceived { count, byte_size });
 
-        let mut stream = stream::iter(metrics).map(|mut metric| {
-            // A metric starts out with a default "vector" namespace, but will be overridden
-            // if an explicit namespace is provided to this source.
-            if namespace.is_some() {
-                metric = metric.with_namespace(namespace.as_ref());
-            }
-
-            // Version and configuration key are reported in enterprise.
-            if let Some(version) = &version {
-                metric.insert_tag("version".to_owned(), version.clone());
-            }
-            if let Some(configuration_key) = &configuration_key {
-                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-            }
-
-            if let Some(host_key) = host_key {
-                if let Ok(hostname) = &hostname {
-                    metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+        let batch = metrics
+            .into_iter()
+            .map(|mut metric| {
+                // A metric starts out with a default "vector" namespace, but will be overridden
+                // if an explicit namespace is provided to this source.
+                if namespace.is_some() {
+                    metric = metric.with_namespace(namespace.as_ref());
                 }
-            }
-            if let Some(pid_key) = pid_key {
-                metric.insert_tag(pid_key.to_owned(), pid.clone());
-            }
-            metric.into()
-        });
 
-        if let Err(error) = out.send_all(&mut stream).await {
-            error!(message = "Error sending internal metrics.", %error);
+                // Version and configuration key are reported in enterprise.
+                if let Some(version) = &version {
+                    metric.insert_tag("version".to_owned(), version.clone());
+                }
+                if let Some(configuration_key) = &configuration_key {
+                    metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
+                }
+
+                if let Some(host_key) = host_key {
+                    if let Ok(hostname) = &hostname {
+                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                    }
+                }
+                if let Some(pid_key) = pid_key {
+                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                }
+                metric.into()
+            })
+            .collect();
+
+        if let Err(error) = out.send_batch(batch).await {
+            emit!(&StreamClosedError { error, count });
             return Err(());
         }
     }
@@ -200,6 +208,7 @@ mod tests {
 
         let output = controller
             .capture_metrics()
+            .into_iter()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 

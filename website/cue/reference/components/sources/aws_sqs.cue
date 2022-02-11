@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_sqs: components._aws & {
+components: sources: aws_sqs: components._aws_new_sdk & {
 	title: "AWS SQS"
 
 	features: {

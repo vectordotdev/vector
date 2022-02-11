@@ -16,6 +16,7 @@ use snafu::Snafu;
 use tokio_util::codec::Decoder;
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
+    internal_event::EventsReceived,
     ByteSizeOf,
 };
 use warp::{
@@ -37,7 +38,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{EventsReceived, HttpBytesReceived, HttpDecompressError},
+    internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
@@ -66,9 +67,9 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
     #[serde(default = "crate::serde::default_false")]
@@ -104,7 +105,7 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
@@ -233,18 +234,15 @@ impl DatadogAgentSource {
         match events {
             Ok(mut events) => {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+                let count = events.len();
 
-                let mut events = futures::stream::iter(events);
                 if let Some(name) = output {
-                    out.send_all_named(name, &mut events).await
+                    out.send_batch_named(name, events).await
                 } else {
-                    out.send_all(&mut events).await
+                    out.send_batch(events).await
                 }
                 .map_err(move |error: crate::source_sender::ClosedError| {
-                    // can only fail if receiving end disconnected, so we are shutting down,
-                    // probably not gracefully.
-                    error!(message = "Failed to forward events, downstream is closed.");
-                    error!(message = "Tried to send the following event.", %error);
+                    emit!(&StreamClosedError { error, count });
                     warp::reject::custom(ApiError::ServerShutdown)
                 })?;
                 match receiver {

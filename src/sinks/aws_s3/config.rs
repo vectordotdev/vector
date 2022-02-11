@@ -8,7 +8,7 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::{
     aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -86,8 +86,8 @@ impl SinkConfig for S3SinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

@@ -21,7 +21,7 @@ use crate::{
         auth::AwsAuthentication,
         rusoto::{self, RegionOrEndpoint},
     },
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -87,8 +87,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -444,6 +444,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::offset::TimeZone;
+    use futures::StreamExt;
     use rand::seq::SliceRandom;
 
     use super::*;
@@ -528,7 +529,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 
@@ -557,7 +558,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 }

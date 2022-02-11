@@ -3,13 +3,14 @@ use std::{
     num::NonZeroU64,
 };
 
+use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -150,8 +151,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -161,8 +162,8 @@ impl SinkConfig for InfluxDbLogsConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
@@ -186,7 +187,7 @@ impl HttpSink for InfluxDbLogsSink {
             }
         });
 
-        let mut output = String::new();
+        let mut output = BytesMut::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
@@ -199,14 +200,14 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes())
+        Some(output)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
-            .body(events)
+            .body(events.freeze())
             .map_err(Into::into)
     }
 }
@@ -248,7 +249,7 @@ impl InfluxDbLogsConfig {
 fn to_field(value: &Value) -> Field {
     match value {
         Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
+        Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
         _ => Field::String(value.to_string_lossy()),
     }
@@ -257,7 +258,7 @@ fn to_field(value: &Value) -> Field {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{channel::mpsc, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -639,7 +640,7 @@ mod tests {
         drop(batch);
 
         components::init_test();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }
@@ -763,7 +764,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        components::run_sink_events(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

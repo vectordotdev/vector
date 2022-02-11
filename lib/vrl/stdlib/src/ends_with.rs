@@ -101,7 +101,7 @@ impl Expression for EndsWithFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -116,35 +116,35 @@ mod tests {
             args: func_args![value: "bar",
                              substring: "foo"],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         opposite {
             args: func_args![value: "bar",
                              substring: "foobar"],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         subset {
             args: func_args![value: "foobar",
                              substring: "oba"],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         yes {
             args: func_args![value: "foobar",
                              substring: "bar"],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         starts_with {
             args: func_args![value: "foobar",
                              substring: "foo"],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         uppercase {
@@ -152,7 +152,7 @@ mod tests {
                              substring: "BAR"
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         case_sensitive {
@@ -160,7 +160,7 @@ mod tests {
                              substring: "BAR"
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         case_insensitive {
@@ -168,7 +168,7 @@ mod tests {
                              substring: "BAR",
                              case_sensitive: false],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

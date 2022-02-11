@@ -12,12 +12,12 @@ inventory::submit! {
 #[cfg(test)]
 mod tests {
 
-    use vector_core::buffers::Acker;
+    use vector_buffers::Acker;
 
     use crate::{
         sinks::{
             blackhole::{config::BlackholeConfig, sink::BlackholeSink},
-            util::StreamSink,
+            VectorSink,
         },
         test_util::random_events_with_stream,
     };
@@ -28,9 +28,10 @@ mod tests {
             print_interval_secs: 10,
             rate: None,
         };
-        let sink = Box::new(BlackholeSink::new(config, Acker::passthrough()));
+        let sink = BlackholeSink::new(config, Acker::passthrough());
+        let sink = VectorSink::from_event_streamsink(sink);
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
-        let _ = sink.run(Box::pin(events)).await.unwrap();
+        let _ = sink.run(events).await.unwrap();
     }
 }

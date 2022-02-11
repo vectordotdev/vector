@@ -10,7 +10,8 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vec_stream::VecStreamExt;
 
-use crate::{event::Event, transform::TaskTransform};
+use super::{OutputBuffer, TaskTransform};
+use crate::event::Event;
 
 /// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
@@ -52,7 +53,7 @@ pub trait RuntimeTransform {
         Vec::new()
     }
 
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut maybe = None;
         self.hook_process(event, |event| maybe = Some(event));
         output.extend(maybe.into_iter());
@@ -68,9 +69,9 @@ enum Message {
     Timer(Timer),
 }
 
-impl<T> TaskTransform for T
+impl<T> TaskTransform<Event> for T
 where
-    T: RuntimeTransform + Send,
+    T: RuntimeTransform + Send + 'static,
 {
     fn transform(
         mut self: Box<Self>,

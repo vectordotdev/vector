@@ -130,13 +130,31 @@ impl Filter<LogEvent> for EventFilter {
                                 Comparison::Gte => lhs >= rhs,
                             }
                         }
+                        // Integer value - Float boundary
+                        (Some(Value::Integer(lhs)), ComparisonValue::Float(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => (*lhs as f64) < *rhs,
+                                Comparison::Lte => *lhs as f64 <= *rhs,
+                                Comparison::Gt => *lhs as f64 > *rhs,
+                                Comparison::Gte => *lhs as f64 >= *rhs,
+                            }
+                        }
                         // Floats.
                         (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => {
                             match comparator {
-                                Comparison::Lt => lhs < rhs,
-                                Comparison::Lte => lhs <= rhs,
-                                Comparison::Gt => lhs > rhs,
-                                Comparison::Gte => lhs >= rhs,
+                                Comparison::Lt => lhs.into_inner() < *rhs,
+                                Comparison::Lte => lhs.into_inner() <= *rhs,
+                                Comparison::Gt => lhs.into_inner() > *rhs,
+                                Comparison::Gte => lhs.into_inner() >= *rhs,
+                            }
+                        }
+                        // Float value - Integer boundary
+                        (Some(Value::Float(lhs)), ComparisonValue::Integer(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => lhs.into_inner() < *rhs as f64,
+                                Comparison::Lte => lhs.into_inner() <= *rhs as f64,
+                                Comparison::Gt => lhs.into_inner() > *rhs as f64,
+                                Comparison::Gte => lhs.into_inner() >= *rhs as f64,
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.

@@ -10,9 +10,9 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use vector_core::buffers::{Acker, BufferConfig, BufferType};
+use vector_buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
 };
 
@@ -52,7 +52,7 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use unit_test::{build_unit_tests_main as build_unit_tests, UnitTestResult};
+pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
@@ -275,7 +275,7 @@ impl<T> SinkOuter<T> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::Memory { .. } => {}
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
                     resources.push(Resource::DiskBuffer(id.to_string()))
                 }
@@ -362,7 +362,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
         cx: SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
 
-    fn input_type(&self) -> DataType;
+    fn input(&self) -> Input;
 
     fn sink_type(&self) -> &'static str;
 
@@ -631,7 +631,10 @@ pub struct TestDefinition<T = OutputId> {
 }
 
 impl TestDefinition<String> {
-    fn resolve_outputs(self, graph: &graph::Graph) -> TestDefinition<OutputId> {
+    fn resolve_outputs(
+        self,
+        graph: &graph::Graph,
+    ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
             input,
@@ -639,28 +642,53 @@ impl TestDefinition<String> {
             outputs,
             no_outputs_from,
         } = self;
+        let mut errors = Vec::new();
 
         let output_map = graph.input_map().expect("ambiguous outputs");
 
         let outputs = outputs
             .into_iter()
-            .map(|old| TestOutput {
-                extract_from: output_map.get(&old.extract_from).unwrap().clone(),
-                conditions: old.conditions,
+            .filter_map(|old| {
+                if let Some(output_id) = output_map.get(&old.extract_from) {
+                    Some(TestOutput {
+                        extract_from: output_id.clone(),
+                        conditions: old.conditions,
+                    })
+                } else {
+                    errors.push(format!(
+                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                        name, old.extract_from
+                    ));
+                    None
+                }
             })
             .collect();
 
         let no_outputs_from = no_outputs_from
             .into_iter()
-            .map(|o| output_map.get(&o).unwrap().clone())
+            .filter_map(|o| {
+                if let Some(output_id) = output_map.get(&o) {
+                    Some(output_id.clone())
+                } else {
+                    errors.push(format!(
+                        r#"Invalid no_outputs_from target in test '{}': '{}' does not exist"#,
+                        name, o
+                    ));
+                    None
+                }
+            })
             .collect();
 
-        TestDefinition {
-            name,
-            input,
-            inputs,
-            outputs,
-            no_outputs_from,
+        if errors.is_empty() {
+            Ok(TestDefinition {
+                name,
+                input,
+                inputs,
+                outputs,
+                no_outputs_from,
+            })
+        } else {
+            Err(errors)
         }
     }
 }

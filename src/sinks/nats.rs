@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -84,8 +84,8 @@ impl SinkConfig for NatsSinkConfig {
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -140,7 +140,7 @@ impl StreamSink<Event> for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("subject"),
                         drop_event: true,
@@ -223,6 +223,7 @@ mod integration_tests {
     use std::{thread, time::Duration};
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use crate::tls::TlsOptions;
 
@@ -234,7 +235,8 @@ mod integration_tests {
 
         // Create Sink
         let (acker, ack_counter) = Acker::basic();
-        let sink = Box::new(NatsSink::new(conf.clone(), acker).await?);
+        let sink = NatsSink::new(conf.clone(), acker).await?;
+        let sink = VectorSink::from_event_streamsink(sink);
 
         // Establish the consumer subscription.
         let subject = conf.subject.clone();
@@ -251,7 +253,8 @@ mod integration_tests {
         // Publish events.
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
-        let _ = sink.run(Box::pin(events)).await.unwrap();
+
+        let _ = sink.run(events).await.unwrap();
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));

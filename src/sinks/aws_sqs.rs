@@ -20,10 +20,10 @@ use super::util::SinkBatchSettings;
 use crate::{
     aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
+    internal_events::{AwsSqsEventSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -123,8 +123,8 @@ impl SinkConfig for SqsSinkConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -292,7 +292,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("message_group_id"),
                     drop_event: true
@@ -306,7 +306,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("message_deduplication_id"),
                     drop_event: true
@@ -397,6 +397,7 @@ mod integration_tests {
     use tokio::time::{sleep, Duration};
 
     use super::*;
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string};
 
     fn sqs_address() -> String {
@@ -431,10 +432,11 @@ mod integration_tests {
 
         config.clone().healthcheck(client.clone()).await.unwrap();
 
-        let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let sink = VectorSink::from_event_sink(sink);
 
         let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-        sink.send_all(&mut events.map(Ok)).await.unwrap();
+        sink.run(events).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;
 

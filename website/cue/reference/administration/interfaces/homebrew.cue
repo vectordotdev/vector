@@ -19,7 +19,7 @@ administration: interfaces: homebrew: {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			install:   "brew tap timberio/brew && brew install vector"
+			install:   "brew tap vectordotdev/brew && brew install vector"
 			logs:      "tail -f /usr/local/var/log/vector.log"
 			reload:    "killall -s SIGHUP vector"
 			restart:   "brew services restart vector"

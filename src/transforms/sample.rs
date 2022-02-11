@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::SampleEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -51,8 +52,8 @@ impl TransformConfig for SampleConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -75,8 +76,8 @@ impl TransformConfig for SampleCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -108,7 +109,7 @@ impl Sample {
 }
 
 impl FunctionTransform for Sample {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         if let Some(condition) = self.exclude.as_ref() {
             if condition.check(&event) {
                 output.push(event);
@@ -180,7 +181,7 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
                 buf.pop()
             })
@@ -198,7 +199,7 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
                 buf.pop()
             })
@@ -221,7 +222,7 @@ mod tests {
             .clone()
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
                 buf.pop()
             })
@@ -229,7 +230,7 @@ mod tests {
         let second_run = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
                 buf.pop()
             })

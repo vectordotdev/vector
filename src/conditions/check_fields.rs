@@ -62,11 +62,11 @@ impl CheckFieldsPredicate for EqualsPredicate {
                 }
                 CheckFieldsPredicateArg::Integer(i) => match v {
                     Value::Integer(vi) => *i == *vi,
-                    Value::Float(vf) => *i == *vf as i64,
+                    Value::Float(vf) => *i == vf.into_inner() as i64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Float(f) => match v {
-                    Value::Float(vf) => *f == *vf,
+                    Value::Float(vf) => *f == vf.into_inner(),
                     Value::Integer(vi) => *f == *vi as f64,
                     _ => false,
                 },

@@ -7,7 +7,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use prost::Message;
 use snafu::Snafu;
 use trust_dns_proto::{
@@ -17,7 +17,7 @@ use trust_dns_proto::{
 
 use crate::{
     event::{LogEvent, PathComponent, Value},
-    internal_events::DnstapParseDataError,
+    internal_events::DnstapParseError,
     Error, Result,
 };
 mod dnstap_proto {
@@ -46,8 +46,8 @@ enum DnstapParserError {
     UnsupportedDnstapMessageTypeError { dnstap_message_type_id: i32 },
 }
 
-lazy_static! {
-    static ref DNSTAP_MESSAGE_REQUEST_TYPE_IDS: HashSet<i32> = vec![
+static DNSTAP_MESSAGE_REQUEST_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
+    vec![
         DnstapMessageType::AuthQuery as i32,
         DnstapMessageType::ResolverQuery as i32,
         DnstapMessageType::ClientQuery as i32,
@@ -57,8 +57,10 @@ lazy_static! {
         DnstapMessageType::UpdateQuery as i32,
     ]
     .into_iter()
-    .collect();
-    static ref DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: HashSet<i32> = vec![
+    .collect()
+});
+static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
+    vec![
         DnstapMessageType::AuthResponse as i32,
         DnstapMessageType::ResolverResponse as i32,
         DnstapMessageType::ClientResponse as i32,
@@ -68,8 +70,8 @@ lazy_static! {
         DnstapMessageType::UpdateResponse as i32,
     ]
     .into_iter()
-    .collect();
-}
+    .collect()
+});
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
@@ -146,7 +148,7 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        emit!(&DnstapParseDataError {
+                        emit!(&DnstapParseError {
                             error: err.to_string().as_str()
                         });
                         need_raw_data = true;
@@ -158,7 +160,7 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            emit!(&DnstapParseDataError {
+            emit!(&DnstapParseError {
                 error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
             });
             need_raw_data = true;

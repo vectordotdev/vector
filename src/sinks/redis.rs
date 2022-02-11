@@ -13,9 +13,9 @@ use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
+    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -136,8 +136,8 @@ impl SinkConfig for RedisSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -226,7 +226,7 @@ fn encode_event(
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(&TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,
@@ -469,8 +469,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -527,8 +526,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 

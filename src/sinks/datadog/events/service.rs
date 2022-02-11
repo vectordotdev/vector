@@ -1,5 +1,6 @@
 use std::task::{Context, Poll};
 
+use bytes::Bytes;
 use futures::{
     future,
     future::{BoxFuture, Ready},
@@ -33,6 +34,7 @@ impl DriverResponse for DatadogEventsResponse {
         EventsSent {
             count: 1,
             byte_size: self.event_byte_size,
+            output: None,
         }
     }
 }
@@ -40,7 +42,7 @@ impl DriverResponse for DatadogEventsResponse {
 #[derive(Clone)]
 pub struct DatadogEventsService {
     batch_http_service:
-        HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
+        HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {

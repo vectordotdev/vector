@@ -5,14 +5,14 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     time::{timeout, Duration},
 };
+use tracing_futures::Instrument;
 use vector_core::{
     buffers::{
         topology::{
@@ -32,19 +32,18 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
-    event::Event,
+    event::{Event, EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     SourceSender,
 };
 
-lazy_static! {
-    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
-}
+static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
+    Lazy::new(enrichment::TableRegistry::default);
 
 pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
@@ -154,14 +153,11 @@ pub async fn build_pieces(
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         for output in source_outputs {
-            let mut rx = builder.add_output(output.clone());
+            let rx = builder.add_output(output.clone());
 
-            let (mut fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new();
             let pump = async move {
-                while let Some(event) = rx.next().await {
-                    fanout.feed(event).await?;
-                }
-                fanout.flush().await?;
+                rx.map(Ok).forward(fanout).await?;
                 Ok(TaskOutput::Source)
             };
 
@@ -252,7 +248,7 @@ pub async fn build_pieces(
             key: key.clone(),
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
-            input_type: transform.inner.input_type(),
+            input_details: transform.inner.input(),
             outputs: transform.inner.outputs(),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
@@ -265,7 +261,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -286,13 +282,13 @@ pub async fn build_pieces(
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
-        let input_type = sink.inner.input_type();
+        let input_type = sink.inner.input().data_type();
 
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::Memory { .. } => "memory",
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
@@ -350,11 +346,12 @@ pub async fn build_pieces(
 
             sink.run(
                 rx.by_ref()
-                    .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
+                    .map(EventArray::from) // Convert the `Event` into an `EventArray`
+                    .filter(|events| ready(filter_events_type(events, input_type)))
+                    .inspect(|events| {
                         emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
+                            count: events.len(),
+                            byte_size: events.size_of(),
                         })
                     })
                     .take_until_if(tripwire),
@@ -455,12 +452,20 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     }
 }
 
+const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
+    match data_type {
+        DataType::Any => true,
+        DataType::Log => matches!(events, EventArray::Logs(_)),
+        DataType::Metric => matches!(events, EventArray::Metrics(_)),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
     inputs: Vec<OutputId>,
-    input_type: DataType,
+    input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
 }
@@ -474,9 +479,13 @@ fn build_transform(
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
         Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
-        Transform::Task(t) => {
-            build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
+        Transform::Task(t) => build_task_transform(
+            t,
+            input_rx,
+            node.input_details.data_type(),
+            node.typetag,
+            &node.key,
+        ),
     }
 }
 
@@ -487,7 +496,7 @@ fn build_sync_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs);
 
-    let runner = Runner::new(t, input_rx, node.input_type, outputs);
+    let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
     } else {
@@ -547,15 +556,8 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
-        // TODO: account for named outputs separately?
-        let count = outputs_buf.len();
-        // TODO: do we only want allocated_bytes for events themselves?
-        let byte_size = outputs_buf.size_of();
-
         self.timer.start_wait();
         self.outputs.send(outputs_buf).await;
-
-        emit!(&EventsSent { count, byte_size });
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
@@ -629,7 +631,7 @@ impl Runner {
                                 }
 
                                 outputs_buf
-                            });
+                            }.in_current_span());
                             in_flight.push(task);
                         }
                         None => {
@@ -653,34 +655,37 @@ impl Runner {
 }
 
 fn build_task_transform(
-    t: Box<dyn TaskTransform>,
+    t: Box<dyn TaskTransform<EventArray>>,
     input_rx: BufferReceiver<Event>,
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (output, control) = Fanout::new();
+    let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .inspect(|event| {
+        .map(EventArray::from)
+        .filter(move |events| ready(filter_events_type(events, input_type)))
+        .inspect(|events| {
             emit!(&EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
+                count: events.len(),
+                byte_size: events.size_of(),
             })
         });
     let transform = t
         .transform(Box::pin(filtered))
-        .map(Ok)
-        .forward(output.with(|event: Event| async {
+        .flat_map(|events| futures::stream::iter(events.into_events()))
+        .inspect(|event: &Event| {
             emit!(&EventsSent {
                 count: 1,
                 byte_size: event.size_of(),
+                output: None,
             });
-            Ok(event)
-        }))
+        })
+        .map(Ok)
+        .forward(fanout)
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");

@@ -28,7 +28,7 @@ use tower::Service;
 
 use super::controller::ControllerStatistics;
 use crate::{
-    config::{self, DataType, SinkConfig, SinkContext},
+    config::{self, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self},
     sinks::{
@@ -187,8 +187,8 @@ impl SinkConfig for TestConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -442,6 +442,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = controller
         .capture_metrics()
+        .into_iter()
         .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them

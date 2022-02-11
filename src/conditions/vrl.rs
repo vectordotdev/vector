@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, Program, Runtime, Value};
 
 use crate::{
@@ -87,7 +87,7 @@ impl Vrl {
         // more performance (one less clone), and boot-time errors when a
         // program wants to mutate its events.
         //
-        // see: https://github.com/timberio/vector/issues/4744
+        // see: https://github.com/vectordotdev/vector/issues/4744
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
@@ -102,8 +102,10 @@ impl Condition for Vrl {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
             })
-            .unwrap_or_else(|_| {
-                emit!(&VrlConditionExecutionError);
+            .unwrap_or_else(|err| {
+                emit!(&VrlConditionExecutionError {
+                    error: err.to_string().as_ref()
+                });
                 false
             })
     }

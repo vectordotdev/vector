@@ -23,6 +23,8 @@ class Semantic::Version
   #
   def after_conventional_commit(commit_message)
     case commit_message
+    when /website/
+      self
     when /!:/
       self.increment!(self.major > 0 ? :major : :minor)
     when /^feat/

@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::RemoveFieldsFieldMissing,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,8 +45,8 @@ impl TransformConfig for RemoveFieldsConfig {
             .map(Transform::function)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -64,7 +65,7 @@ impl RemoveFields {
 }
 
 impl FunctionTransform for RemoveFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         for field in &self.fields {
             let field_string = field.to_string();

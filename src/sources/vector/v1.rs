@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
 use crate::{
-    codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        LengthDelimitedDecoder,
+    },
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -86,7 +90,7 @@ impl VectorConfig {
 #[derive(Debug, Clone)]
 struct VectorDeserializer;
 
-impl Deserializer for VectorDeserializer {
+impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
@@ -113,8 +117,8 @@ impl TcpSource for VectorSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(LengthDelimitedDecoder::new()),
-            Box::new(VectorDeserializer),
+            Framer::LengthDelimited(LengthDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(VectorDeserializer)),
         )
     }
 
@@ -128,13 +132,12 @@ impl TcpSource for VectorSource {
 mod test {
     use std::net::SocketAddr;
 
-    use futures::stream;
-    use shared::assert_event_data_eq;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
+    use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -189,7 +192,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 

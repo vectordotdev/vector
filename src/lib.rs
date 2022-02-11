@@ -69,7 +69,7 @@ pub mod sink;
 pub mod sinks;
 pub mod source_sender;
 pub mod sources;
-pub(crate) mod stats;
+pub mod stats;
 pub mod stream;
 #[cfg(feature = "api-client")]
 mod tap;
@@ -92,7 +92,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{event, mapping, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

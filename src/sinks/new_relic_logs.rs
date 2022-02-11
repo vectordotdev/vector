@@ -7,7 +7,7 @@ use snafu::Snafu;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -104,8 +104,8 @@ impl SinkConfig for NewRelicLogsConfig {
         http_conf.build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -334,7 +334,7 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
 
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

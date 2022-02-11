@@ -6,7 +6,10 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
 
-use crate::{expression::Resolved, value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use crate::{
+    expression::Resolved, value::Regex, vm::OpCode, Context, Expression, Span, State, TypeDef,
+    Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -73,16 +76,24 @@ impl Expression for Literal {
         use Literal::*;
 
         let type_def = match self {
-            String(_) => TypeDef::new().bytes(),
-            Integer(_) => TypeDef::new().integer(),
-            Float(_) => TypeDef::new().float(),
-            Boolean(_) => TypeDef::new().boolean(),
-            Regex(_) => TypeDef::new().regex(),
-            Timestamp(_) => TypeDef::new().timestamp(),
-            Null => TypeDef::new().null(),
+            String(_) => TypeDef::bytes(),
+            Integer(_) => TypeDef::integer(),
+            Float(_) => TypeDef::float(),
+            Boolean(_) => TypeDef::boolean(),
+            Regex(_) => TypeDef::regex(),
+            Timestamp(_) => TypeDef::timestamp(),
+            Null => TypeDef::null(),
         };
 
         type_def.infallible()
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // Add the literal as a constant.
+        let constant = vm.add_constant(self.to_value());
+        vm.write_opcode(OpCode::Constant);
+        vm.write_primitive(constant);
+        Ok(())
     }
 }
 
@@ -377,12 +388,12 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| expr!("foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         integer {
             expr: |_| expr!(12),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
     ];
 }

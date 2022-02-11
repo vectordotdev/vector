@@ -3,11 +3,12 @@ use serde_json::Value;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
-    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
-    transforms::{FunctionTransform, Transform},
+    internal_events::{JsonParserError, ParserTargetExistsError},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -35,8 +36,8 @@ impl TransformConfig for JsonParserConfig {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -78,7 +79,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl FunctionTransform for JsonParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 
@@ -87,7 +88,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(&JsonParserFailedParse {
+                        emit!(&JsonParserError {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -110,7 +111,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&JsonParserTargetExists { target_field })
+                        emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);
@@ -198,7 +199,7 @@ mod test {
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
-    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    // This is a regression test, see: https://github.com/vectordotdev/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
         let mut parser = JsonParser::from(JsonParserConfig {

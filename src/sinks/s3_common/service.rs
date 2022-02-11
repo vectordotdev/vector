@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::{internal_events::AwsBytesSent, serde::to_string};
+use crate::{internal_events::AwsBytesSent, serde::json::to_string};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -61,6 +61,7 @@ impl DriverResponse for S3Response {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

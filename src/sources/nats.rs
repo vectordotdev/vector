@@ -4,6 +4,7 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -15,7 +16,7 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::NatsEventsReceived,
+    internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -47,10 +48,10 @@ pub struct NatsSourceConfig {
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 inventory::submit! {
@@ -74,7 +75,7 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -128,29 +129,33 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
+        emit!(&BytesReceived {
+            byte_size: msg.data.len(),
+            protocol: "tcp",
+        });
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
                     emit!(&NatsEventsReceived {
-                        byte_size,
-                        count: events.len()
+                        byte_size: events.size_of(),
+                        count
                     });
 
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let events = stream::iter(events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
+                        event
+                    }));
 
-                        out.send(event).await.map_err(
-                            |error: crate::source_sender::ClosedError| {
-                                error!(message = "Error sending to sink.", %error);
-                            },
-                        )?;
-                    }
+                    out.send_all(events).await.map_err(|error| {
+                        emit!(&StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further
@@ -207,9 +212,7 @@ mod integration_tests {
         let nc_pub = nc.clone();
 
         let (tx, rx) = SourceSender::new_test();
-        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
-            .build()
-            .unwrap();
+        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
         tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
         let msg = "my message";
         nc_pub.publish(&subject, msg).await.unwrap();

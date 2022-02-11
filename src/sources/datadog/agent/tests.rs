@@ -1,6 +1,10 @@
 use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg};
 use crate::{
-    codecs::{self, BytesDecoder, BytesDeserializer},
+    codecs::{
+        self,
+        decoding::{Deserializer, Framer},
+        BytesDecoder, BytesDeserializer,
+    },
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
@@ -8,7 +12,10 @@ use crate::{
         Event, EventStatus,
     },
     serde::{default_decoding, default_framing_message_based},
-    test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+    test_util::{
+        components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+    },
     SourceSender,
 };
 use bytes::Bytes;
@@ -50,8 +57,8 @@ fn test_decode_log_body() {
         let api_key = None;
 
         let decoder = codecs::Decoder::new(
-            Box::new(BytesDecoder::new()),
-            Box::new(BytesDeserializer::new()),
+            Framer::Bytes(BytesDecoder::new()),
+            Deserializer::Bytes(BytesDeserializer::new()),
         );
         let source = DatadogAgentSource::new(true, decoder, "http");
         let events = source.decode_log_body(body, api_key).unwrap();
@@ -783,7 +790,7 @@ async fn decode_sketches() {
 
 #[tokio::test]
 async fn split_outputs() {
-    trace_init();
+    init_test();
     let (_, rx_logs, rx_metrics, addr) = source(EventStatus::Delivered, true, true, true).await;
 
     let mut headers_for_log = HeaderMap::new();
@@ -892,4 +899,6 @@ async fn split_outputs() {
             "12345678abcdefgh12345678abcdefgh"
         );
     }
+
+    COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
 }
