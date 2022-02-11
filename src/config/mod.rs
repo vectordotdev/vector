@@ -12,7 +12,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::{AcknowledgementsConfig, DataType, GlobalOptions, Output},
+    config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
 };
 
@@ -275,7 +275,7 @@ impl<T> SinkOuter<T> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
+                BufferType::Memory { .. } => {}
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
                     resources.push(Resource::DiskBuffer(id.to_string()))
                 }
@@ -362,7 +362,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
         cx: SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
 
-    fn input_type(&self) -> DataType;
+    fn input(&self) -> Input;
 
     fn sink_type(&self) -> &'static str;
 

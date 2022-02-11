@@ -66,9 +66,7 @@ impl Expression for TallyFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .object::<(), Kind>(map! { (): Kind::Integer })
-            .fallible()
+        TypeDef::object(Collection::from_unknown(Kind::integer())).fallible()
     }
 }
 
@@ -84,7 +82,7 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
+            tdef: TypeDef::object(Collection::from_unknown(Kind::integer())).fallible(),
         }
 
         non_string_values {
@@ -92,7 +90,7 @@ mod tests {
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
             want: Err("all values must be strings, found: Array([Integer(1), Integer(2), Integer(3)])"),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
+            tdef: TypeDef::object(Collection::from_unknown(Kind::integer())).fallible(),
         }
     ];
 }

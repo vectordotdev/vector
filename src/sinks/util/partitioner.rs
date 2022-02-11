@@ -1,6 +1,6 @@
 use vector_core::{event::Event, partition::Partitioner};
 
-use crate::{internal_events::TemplateRenderingFailed, template::Template};
+use crate::{internal_events::TemplateRenderingError, template::Template};
 
 /// Partitions items based on the generated key for the given event.
 pub struct KeyPartitioner(Template);
@@ -19,7 +19,7 @@ impl Partitioner for KeyPartitioner {
         self.0
             .render_string(item)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("key_prefix"),
                     drop_event: true,

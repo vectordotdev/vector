@@ -101,7 +101,7 @@ impl Expression for ParseIntFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+        TypeDef::integer().fallible()
     }
 }
 
@@ -115,31 +115,31 @@ mod tests {
         decimal {
              args: func_args![value: "-42"],
              want: Ok(-42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         binary {
              args: func_args![value: "0b1001"],
              want: Ok(9),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         octal {
              args: func_args![value: "042"],
              want: Ok(34),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         hexadecimal {
              args: func_args![value: "0x2a"],
              want: Ok(42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         explicit_hexadecimal {
              args: func_args![value: "2a", base: 16],
              want: Ok(42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
     ];
 }

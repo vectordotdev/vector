@@ -66,8 +66,8 @@ If you're contributing a new source, sink, or transform to Vector, thank you tha
 To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
-- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
+- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
+- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
 
 ## Workflow
 
@@ -88,7 +88,7 @@ complex changes.
 ### Github Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull \
-request](https://github.com/timberio/vector/pulls).
+request](https://github.com/vectordotdev/vector/pulls).
 
 #### Title
 
@@ -102,7 +102,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/timberio/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/tree/master/.github).
 
 The following are all good examples of pull request titles:
 
@@ -162,7 +162,7 @@ ci-condition: skip
 Some long running tests are only run daily, rather than on every pull request.
 If needed, an administrator can kick off these tests manually via the button on
 the [nightly build action
-page](https://github.com/timberio/vector/actions?query=workflow%3Anightly)
+page](https://github.com/vectordotdev/vector/actions?query=workflow%3Anightly)
 
 #### Flakey tests
 
@@ -174,7 +174,7 @@ not have passing tests:
   - Does it fail if you rerun CI?
   - Can you reproduce locally?
 - Find or open an issue for the test failure
-  ([example](https://github.com/timberio/vector/issues/3781))
+  ([example](https://github.com/vectordotdev/vector/issues/3781))
 - Link the PR in the issue for the failing test so that there are more examples
 
 ##### Test harness
@@ -217,8 +217,8 @@ The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev
 This is covered by the CLA.
 
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.existing_issues]: https://github.com/timberio/vector/issues
+[urls.existing_issues]: https://github.com/vectordotdev/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
-[urls.new_issue]: https://github.com/timberio/vector/issues/new
+[urls.new_issue]: https://github.com/vectordotdev/vector/issues/new
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
-[urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/

@@ -89,7 +89,7 @@ pub fn spawn_thread<'a>(
     _config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
     _delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
-    Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
+    Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/vectordotdev/vector/issues/938 .".into())
 }
 
 #[cfg(unix)]
@@ -119,7 +119,7 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
     Ok(())
 }
 
-#[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/timberio/vector/issues/5000
+#[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
 mod tests {
     use std::{fs::File, io::Write, time::Duration};
 

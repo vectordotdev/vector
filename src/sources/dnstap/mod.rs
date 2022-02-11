@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
@@ -180,8 +181,6 @@ impl FrameHandler for DnstapFrameHandler {
 
         let log_event = event.as_mut_log();
 
-        let frame_size = frame.len();
-
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
         }
@@ -192,7 +191,7 @@ impl FrameHandler for DnstapFrameHandler {
                 base64::encode(&frame),
             );
             emit!(&DnstapEventsReceived {
-                byte_size: frame_size
+                byte_size: event.size_of(),
             });
             Some(event)
         } else {
@@ -205,7 +204,7 @@ impl FrameHandler for DnstapFrameHandler {
                 }
                 Ok(_) => {
                     emit!(&DnstapEventsReceived {
-                        byte_size: frame_size
+                        byte_size: event.size_of(),
                     });
                     Some(event)
                 }

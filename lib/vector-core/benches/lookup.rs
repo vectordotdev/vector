@@ -110,7 +110,7 @@ fn lookup_to_string(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = lookup_to_string
 );

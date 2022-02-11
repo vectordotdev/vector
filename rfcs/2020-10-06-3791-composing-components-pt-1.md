@@ -83,7 +83,7 @@ architectural changes.
 ## Plan of Attack
 
 - [ ] Implement `TransformFn` from the [Architecture
-    RFC](https://github.com/timberio/vector/blob/master/rfcs/2020-06-18-2625-architecture-revisit.md),
+    RFC](https://github.com/vectordotdev/vector/blob/master/rfcs/2020-06-18-2625-architecture-revisit.md),
     switch non-task transforms to it
 - [ ] Add `Vec<dyn TransformFn>` field to `Pipeline`
 - [ ] Implement composed sources as facades that prepend the relevant `TransformFn`

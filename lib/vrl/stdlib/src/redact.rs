@@ -4,20 +4,20 @@ use std::{
     str::FromStr,
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use vrl::prelude::*;
 
-lazy_static! {
-    // https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
-    // (converted to non-lookaround version given `regex` does not support lookarounds)
-    // See also: https://www.ssa.gov/history/ssn/geocard.html
-    static ref US_SOCIAL_SECURITY_NUMBER : regex::Regex = regex::Regex::new(
+// https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
+// (converted to non-lookaround version given `regex` does not support lookarounds)
+// See also: https://www.ssa.gov/history/ssn/geocard.html
+static US_SOCIAL_SECURITY_NUMBER: Lazy<regex::Regex> = Lazy::new(|| {
+    regex::Regex::new(
     r#"(?x)                                                               # Ignore whitespace and comments in the regex expression.
     (?:00[1-9]|0[1-9][0-9]|[1-578][0-9]{2}|6[0-57-9][0-9]|66[0-57-9])-    # Area number: 001-899 except 666
     (?:0[1-9]|[1-9]0|[1-9][1-9])-                                         # Group number: 01-99
     (?:000[1-9]|00[1-9]0|0[1-9]00|[1-9]000|[1-9]{4})                      # Serial number: 0001-9999
-    "#).unwrap();
-}
+    "#).unwrap()
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
@@ -283,7 +283,7 @@ mod test {
                  filters: vec![Regex::new(r"\d+").unwrap()],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         patterns {
@@ -297,7 +297,7 @@ mod test {
                  ],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         us_social_security_number{
@@ -306,7 +306,7 @@ mod test {
                  filters: vec!["us_social_security_number"],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         invalid_filter {
@@ -315,7 +315,7 @@ mod test {
                  filters: vec!["not a filter"],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         missing_patterns {
@@ -328,7 +328,7 @@ mod test {
                  ],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

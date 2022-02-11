@@ -59,7 +59,7 @@ impl Expression for TallyValueFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().integer()
+        TypeDef::integer().infallible()
     }
 }
 
@@ -76,7 +76,7 @@ mod tests {
                 value: value!("foo"),
             ],
             want: Ok(value!(2)),
-            tdef: TypeDef::new().infallible().integer(),
+            tdef: TypeDef::integer().infallible(),
         }
     ];
 }

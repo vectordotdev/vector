@@ -1,16 +1,17 @@
 use std::collections::BTreeMap;
 
 use chrono::prelude::{DateTime, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use vector_common::TimeZone;
 use vrl::prelude::*;
 
-lazy_static! {
-    // Information about the common log format taken from the
-    // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
-    // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#common
-    pub static ref REGEX_APACHE_COMMON_LOG: Regex = Regex::new(
+// Information about the common log format taken from the
+// - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
+// - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#common
+#[cfg(any(feature = "parse_apache_log", feature = "parse_common_log"))]
+pub static REGEX_APACHE_COMMON_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
         (-|(?P<host>.*?))\s+                    # Match `-` or any character (non-greedily) and at least one whitespace.
@@ -28,10 +29,13 @@ lazy_static! {
         (-|(?P<size>\d+))                       # Match `-` or at least one digit.
         \s*$                                    # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log");
+                                                                     .expect("failed compiling regex for common log")
+});
 
-    // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#combined
-    pub static ref REGEX_APACHE_COMBINED_LOG: Regex = Regex::new(
+// - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#combined
+#[cfg(feature = "parse_apache_log")]
+pub static REGEX_APACHE_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
         (-|(?P<host>.*?))\s+                    # Match `-` or any character (non-greedily) and at least one whitespace.
@@ -56,11 +60,14 @@ lazy_static! {
         ")))                                    # Match the closing quote
         #\s*$                                   # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for combined log");
+    .expect("failed compiling regex for combined log")
+});
 
-    // It is possible to customise the format output by apache. This function just handles the default defined here.
-    // https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
-    pub static ref REGEX_APACHE_ERROR_LOG: Regex = Regex::new(
+// It is possible to customise the format output by apache. This function just handles the default defined here.
+// https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
+#[cfg(feature = "parse_apache_log")]
+pub static REGEX_APACHE_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                     # Ignore whitespace and comments in the regex expression.
         ^\s*                                        # Start with any number of whitespaces.
         (-|\[(-|(?P<timestamp>[^\[]*))\])\s+        # Match `-` or `[` followed by `-` or any character except `]`, `]` and at least one whitespace.
@@ -73,10 +80,13 @@ lazy_static! {
         (-|(?P<message>.*))                         # Match `-` or any character.
         \s*$                                        # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for error log");
+    .expect("failed compiling regex for error log")
+});
 
-    // - Nginx HTTP Server docs: http://nginx.org/en/docs/http/ngx_http_log_module.html
-    pub static ref REGEX_NGINX_COMBINED_LOG: Regex = Regex::new(
+// - Nginx HTTP Server docs: http://nginx.org/en/docs/http/ngx_http_log_module.html
+#[cfg(feature = "parse_nginx_log")]
+pub static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
         (-|(?P<client>\S+))\s+                  # Match `-` or any non space character
@@ -95,9 +105,12 @@ lazy_static! {
         (\s+"(-|(?P<compression>[^"]+))")?      # Match `-` or any non double-quote character
         \s*$                                    # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for Nginx combined log");
+    .expect("failed compiling regex for Nginx combined log")
+});
 
-    pub static ref REGEX_NGINX_ERROR_LOG: Regex = Regex::new(
+#[cfg(feature = "parse_nginx_log")]
+pub static REGEX_NGINX_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                         # Ignore whitespace and comments in the regex expression.
         ^\s*                                            # Start with any number of whitespaces.
         (?P<timestamp>.+)\s+                            # Match any character until [
@@ -113,8 +126,8 @@ lazy_static! {
         (,\s+refer?rer:\s+"(?P<referer>[^"]+)")?        # Match any character after ', referrer: '
         \s*$                                            # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for Nginx error log");
-}
+    .expect("failed compiling regex for Nginx error log")
+});
 
 // Parse the time as Utc from the given timezone
 fn parse_time(

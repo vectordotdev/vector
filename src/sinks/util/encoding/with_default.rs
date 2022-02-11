@@ -9,9 +9,9 @@ use serde::{
 };
 
 use crate::{
-    event::{PathComponent, PathIter},
+    event::PathComponent,
     serde::skip_serializing_if_default,
-    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
+    sinks::util::encoding::{deserialize_path_components, EncodingConfiguration, TimestampFormat},
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.
@@ -27,7 +27,6 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
@@ -137,17 +136,7 @@ where
         let concrete = Self {
             codec: inner.codec,
             schema: inner.schema,
-            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-            only_fields: inner.only_fields.map(|fields| {
-                fields
-                    .iter()
-                    .map(|only| {
-                        PathIter::new(only)
-                            .map(|component| component.into_static())
-                            .collect()
-                    })
-                    .collect()
-            }),
+            only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -163,8 +152,8 @@ pub struct InnerWithDefault<E: Default> {
     codec: E,
     #[serde(default)]
     schema: Option<String>,
-    #[serde(default)]
-    only_fields: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "deserialize_path_components")]
+    only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     #[serde(default)]
     except_fields: Option<Vec<String>>,
     #[serde(default)]

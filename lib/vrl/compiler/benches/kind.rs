@@ -1,17 +1,17 @@
 use std::fmt;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use vrl_compiler::value::Kind;
+use vrl_compiler::value::kind;
 
 struct Parameters {
-    basis: Kind,
+    basis: u16,
 }
 
 static PARAMETERS: [Parameters; 4] = [
-    Parameters { basis: Kind::Bytes },
-    Parameters { basis: Kind::Array },
-    Parameters { basis: Kind::Regex },
-    Parameters { basis: Kind::Null },
+    Parameters { basis: kind::BYTES },
+    Parameters { basis: kind::ARRAY },
+    Parameters { basis: kind::REGEX },
+    Parameters { basis: kind::NULL },
 ];
 
 impl fmt::Display for Parameters {
@@ -23,8 +23,16 @@ impl fmt::Display for Parameters {
 fn benchmark_kind_display(c: &mut Criterion) {
     let mut group = c.benchmark_group("vrl_compiler/value::kind::display");
     for param in &PARAMETERS {
-        group.bench_with_input(BenchmarkId::from_parameter(param), &param, |b, &param| {
-            b.iter(|| format!("{}", param.basis))
+        let parameter = vrl_compiler::Parameter {
+            keyword: "",
+            kind: param.basis,
+            required: false,
+        };
+
+        let kind = parameter.kind();
+
+        group.bench_with_input(BenchmarkId::from_parameter(param), &kind, |b, kind| {
+            b.iter(|| format!("{}", kind))
         });
     }
 }

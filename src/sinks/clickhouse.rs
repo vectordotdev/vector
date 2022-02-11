@@ -7,7 +7,7 @@ use snafu::ResultExt;
 
 use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
@@ -92,8 +92,8 @@ impl SinkConfig for ClickhouseConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -214,7 +214,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
                 // retry those errors.
                 //
-                // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
+                // Reference: https://github.com/vectordotdev/vector/pull/693#issuecomment-517332654
                 // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
                 //
                 // Fix already merged: https://github.com/ClickHouse/ClickHouse/pull/6271

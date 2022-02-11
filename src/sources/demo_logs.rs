@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -35,9 +36,9 @@ pub struct DemoLogsConfig {
     #[serde(flatten)]
     pub format: OutputFormat,
     #[derivative(Default(value = "default_framing_message_based()"))]
-    pub framing: Box<dyn FramingConfig>,
+    pub framing: FramingConfig,
     #[derivative(Default(value = "default_decoding()"))]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 const fn default_interval() -> f64 {
@@ -166,9 +167,12 @@ async fn demo_logs_source(
         let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived { count, byte_size });
+                    emit!(&EventsReceived {
+                        count,
+                        byte_size: events.size_of()
+                    });
                     let now = Utc::now();
 
                     let mut events = stream::iter(events).map(|mut event| {
@@ -212,7 +216,7 @@ impl_generate_config_from_default!(DemoLogsConfig);
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -272,9 +276,8 @@ mod tests {
     async fn runit(config: &str) -> ReceiverStream<Event> {
         let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())
-            .build()
-            .unwrap();
+        let decoder =
+            DecodingConfig::new(default_framing_message_based(), default_decoding()).build();
         demo_logs_source(
             config.interval,
             config.count,

@@ -24,7 +24,7 @@ impl Not {
 
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind()),
+                variant: ErrorVariant::NonBoolean(type_def.into()),
                 not_span,
                 expr_span,
             });
@@ -48,7 +48,9 @@ impl Expression for Not {
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
-        self.inner.type_def(state).boolean()
+        let fallible = self.inner.type_def(state).is_fallible();
+
+        TypeDef::boolean().with_fallibility(fallible)
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {

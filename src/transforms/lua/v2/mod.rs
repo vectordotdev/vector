@@ -6,7 +6,7 @@ pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::{
-    config::{self, DataType, Output, CONFIG_PATHS},
+    config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::Transform,
@@ -93,8 +93,8 @@ impl LuaConfig {
         Lua::new(self).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Any
+    pub fn input(&self) -> Input {
+        Input::any()
     }
 
     pub fn outputs(&self) -> Vec<Output> {
@@ -555,7 +555,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(output.as_log()["number"], Value::from(3.14159));
         Ok(())
     }
 

@@ -6,7 +6,7 @@ use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
     http::HttpClient,
     sinks::{
@@ -102,8 +102,8 @@ impl SinkConfig for StackdriverConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

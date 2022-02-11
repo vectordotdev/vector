@@ -27,10 +27,24 @@ jobs:
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        with:
+          images: timberio/ci_image
+          flavor: |
+            latest=true
+          tags: type=sha, format=long
+          labels: |
+            org.opencontainers.image.description=Image for Vector's CI workflows and Docker development environment
+            org.opencontainers.image.source=https://github.com/vectordotdev/vector/tree/master/scripts/environment/Dockerfile
+            org.opencontainers.image.title=Vector CI image
+            org.opencontainers.image.url=https://github.com/vectordotdev/vector
       - name: Build and push
         uses: docker/build-push-action@v2.9.0
         with:
           context: .
           file: ./scripts/environment/Dockerfile
           push: ${{ github.ref == 'refs/heads/master' }}
-          tags: timberio/ci_image:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

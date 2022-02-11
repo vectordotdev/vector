@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
@@ -57,8 +57,8 @@ impl TransformConfig for ReduceConfig {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {

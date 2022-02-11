@@ -5,11 +5,11 @@ use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
-    internal_events::MetricToLogFailedSerialize,
+    internal_events::MetricToLogSerializeError,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -45,8 +45,8 @@ impl TransformConfig for MetricToLogConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -83,7 +83,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(&MetricToLogFailedSerialize { error }))
+            .map_err(|error| emit!(&MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {

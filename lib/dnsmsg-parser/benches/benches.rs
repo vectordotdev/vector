@@ -88,7 +88,7 @@ fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/pull/6408
+    // https://github.com/vectordotdev/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_parse_as_query_message,
               benchmark_parse_as_update_message,

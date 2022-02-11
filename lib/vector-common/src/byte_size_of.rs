@@ -3,7 +3,9 @@ use std::{
     mem,
 };
 
+use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value};
+use smallvec::SmallVec;
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
@@ -30,6 +32,12 @@ pub trait ByteSizeOf {
 impl ByteSizeOf for String {
     fn allocated_bytes(&self) -> usize {
         self.len()
+    }
+}
+
+impl<'a> ByteSizeOf for &'a str {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -62,10 +70,32 @@ where
     }
 }
 
+impl<A: smallvec::Array> ByteSizeOf for SmallVec<A>
+where
+    A::Item: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
 impl<T> ByteSizeOf for &[T]
 where
     T: ByteSizeOf,
 {
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl<T, const N: usize> ByteSizeOf for [T; N]
+where
+    T: ByteSizeOf,
+{
+    fn size_of(&self) -> usize {
+        self.allocated_bytes()
+    }
+
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
@@ -117,5 +147,11 @@ impl ByteSizeOf for Value {
             Value::Array(a) => a.size_of(),
             Value::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
         }
+    }
+}
+
+impl ByteSizeOf for DateTime<Utc> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }

@@ -196,3 +196,64 @@ components: _aws: {
 		}
 	}
 }
+
+components: _aws_new_sdk: {
+	configuration: {
+		auth: {
+			common:      false
+			description: "Options for the authentication strategy."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					access_key_id: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["AKIAIOSFODNN7EXAMPLE"]
+						}
+					}
+					secret_access_key: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+						}
+					}
+					assume_role: {
+						category:    "Auth"
+						common:      false
+						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["arn:aws:iam::123456789098:role/my_role"]
+						}
+					}
+					profile: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
+						required:    false
+						type: string: {
+							default: "default"
+							examples: ["develop"]
+						}
+					}
+				}
+			}
+		}
+
+		endpoint: components._aws.configuration.endpoint
+		region:   components._aws.configuration.region
+	}
+
+	env_vars:     components._aws.env_vars
+	how_it_works: components._aws.how_it_works
+}

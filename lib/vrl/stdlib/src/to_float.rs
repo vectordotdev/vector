@@ -12,7 +12,7 @@ fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {
         Bytes(v) => Conversion::Float
             .convert(v)
             .map_err(|e| e.to_string().into()),
-        v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),
+        v => Err(format!("unable to coerce {} into float", v.kind()).into()),
     }
 }
 
@@ -80,21 +80,21 @@ impl Function for ToFloat {
                 title: "array",
                 source: "to_float!([])",
                 result: Err(
-                    r#"function call error for "to_float" at (0:13): unable to coerce "array" into "float""#,
+                    r#"function call error for "to_float" at (0:13): unable to coerce array into float"#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_float!({})",
                 result: Err(
-                    r#"function call error for "to_float" at (0:13): unable to coerce "object" into "float""#,
+                    r#"function call error for "to_float" at (0:13): unable to coerce object into float"#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_float!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_float" at (0:17): unable to coerce "regex" into "float""#,
+                    r#"function call error for "to_float" at (0:17): unable to coerce regex into float"#,
                 ),
             },
         ]
@@ -131,13 +131,14 @@ impl Expression for ToFloatFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .with_fallibility(
-                self.value
-                    .type_def(state)
-                    .has_kind(Kind::Bytes | Kind::Array | Kind::Object | Kind::Regex),
-            )
-            .float()
+        let td = self.value.type_def(state);
+
+        TypeDef::float().with_fallibility(
+            td.contains_bytes()
+                || td.contains_array()
+                || td.contains_object()
+                || td.contains_regex(),
+        )
     }
 }
 
@@ -153,19 +154,19 @@ mod tests {
         float {
             args: func_args![value: 20.5],
             want: Ok(20.5),
-            tdef: TypeDef::new().infallible().float(),
+            tdef: TypeDef::float().infallible(),
         }
 
         integer {
             args: func_args![value: 20],
             want: Ok(20.0),
-            tdef: TypeDef::new().infallible().float(),
+            tdef: TypeDef::float().infallible(),
         }
 
         timestamp {
              args: func_args![value: Utc.ymd(2014, 7, 8).and_hms_milli(9, 10, 11, 12)],
              want: Ok(1404810611.012),
-             tdef: TypeDef::new().infallible().float(),
+             tdef: TypeDef::float().infallible(),
         }
     ];
 }

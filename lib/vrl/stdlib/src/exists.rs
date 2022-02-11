@@ -112,6 +112,6 @@ impl Expression for ExistsFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }

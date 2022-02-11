@@ -9,6 +9,8 @@ pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 
+use crate::schema;
+
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
     vector_buffers::config::memory_buffer_default_max_events();
 
@@ -20,9 +22,47 @@ pub enum DataType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Input {
+    ty: DataType,
+    schema_requirement: schema::Requirement,
+}
+
+impl Input {
+    pub fn data_type(&self) -> DataType {
+        self.ty
+    }
+
+    pub fn schema_requirement(&self) -> &schema::Requirement {
+        &self.schema_requirement
+    }
+
+    pub fn log() -> Self {
+        Self {
+            ty: DataType::Log,
+            schema_requirement: schema::Requirement,
+        }
+    }
+
+    pub fn metric() -> Self {
+        Self {
+            ty: DataType::Metric,
+            schema_requirement: schema::Requirement,
+        }
+    }
+
+    pub fn any() -> Self {
+        Self {
+            ty: DataType::Any,
+            schema_requirement: schema::Requirement,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
+    pub schema_definition: schema::Definition,
 }
 
 impl Output {
@@ -31,12 +71,11 @@ impl Output {
     /// A default output is one without a port identifier (i.e. not a named output) and the default
     /// output consumers will receive if they declare the component itself as an input.
     pub fn default(ty: DataType) -> Self {
-        Self { port: None, ty }
-    }
-
-    /// Check if the `Output` is a default output
-    pub fn is_default(&self) -> bool {
-        self.port.is_none()
+        Self {
+            port: None,
+            ty,
+            schema_definition: schema::Definition,
+        }
     }
 }
 
@@ -45,6 +84,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
+            schema_definition: schema::Definition,
         }
     }
 }
