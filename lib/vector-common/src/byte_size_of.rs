@@ -3,6 +3,7 @@ use std::{
     mem,
 };
 
+use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value as JsonValue};
 use smallvec::SmallVec;
 use value::Value;
@@ -32,6 +33,12 @@ pub trait ByteSizeOf {
 impl ByteSizeOf for String {
     fn allocated_bytes(&self) -> usize {
         self.len()
+    }
+}
+
+impl<'a> ByteSizeOf for &'a str {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -77,6 +84,19 @@ impl<T> ByteSizeOf for &[T]
 where
     T: ByteSizeOf,
 {
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl<T, const N: usize> ByteSizeOf for [T; N]
+where
+    T: ByteSizeOf,
+{
+    fn size_of(&self) -> usize {
+        self.allocated_bytes()
+    }
+
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
@@ -139,5 +159,11 @@ impl ByteSizeOf for Value {
             Value::Array(arr) => arr.size_of(),
             _ => 0,
         }
+    }
+}
+
+impl ByteSizeOf for DateTime<Utc> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }

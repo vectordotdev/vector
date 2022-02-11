@@ -24,6 +24,7 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
@@ -31,7 +32,10 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
+    internal_events::{
+        BytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
+        PostgresqlMetricsCollectError, StreamClosedError,
+    },
 };
 
 macro_rules! tags {
@@ -156,6 +160,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
+                let count = metrics.len();
                 emit!(&PostgresqlMetricsCollectCompleted {
                     start,
                     end: Instant::now()
@@ -163,7 +168,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
                 let mut stream = stream::iter(metrics).flatten().map(Event::Metric);
                 if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending postgresql metrics.", %error);
+                    emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -464,7 +469,7 @@ impl PostgresqlMetrics {
         let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                emit!(&PostgresqlMetricsCollectFailed {
+                emit!(&PostgresqlMetricsCollectError {
                     error,
                     endpoint: self.tags.get("endpoint"),
                 });
@@ -491,9 +496,18 @@ impl PostgresqlMetrics {
         ])
         .await
         {
-            Ok(metrics) => {
+            Ok(result) => {
+                let (count, byte_size, received_byte_size) =
+                    result.iter().fold((0, 0, 0), |res, (set, size)| {
+                        (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
+                    });
+                emit!(&BytesReceived {
+                    byte_size: received_byte_size,
+                    protocol: "tcp"
+                });
+                emit!(&EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
-                Ok(metrics.into_iter().flatten())
+                Ok(result.into_iter().map(|(metrics, _)| metrics).flatten())
             }
             Err(error) => Err(error.to_string()),
         }
@@ -503,7 +517,7 @@ impl PostgresqlMetrics {
         &self,
         client: &Client,
         client_version: usize,
-    ) -> Result<Vec<Metric>, CollectError> {
+    ) -> Result<(Vec<Metric>, usize), CollectError> {
         let rows = self
             .datname_filter
             .pg_stat_database(client)
@@ -511,83 +525,84 @@ impl PostgresqlMetrics {
             .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(20 * rows.len());
+        let mut reader = RowReader::default();
         for row in rows.iter() {
-            let db = row_get_value::<Option<&str>>(row, "datname")?.unwrap_or("");
+            let db = reader.read::<Option<&str>>(row, "datname")?.unwrap_or("");
 
             metrics.extend_from_slice(&[
                 self.create_metric(
                     "pg_stat_database_datid",
-                    gauge!(row_get_value::<u32>(row, "datid")?),
+                    gauge!(reader.read::<u32>(row, "datid")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_numbackends",
-                    gauge!(row_get_value::<i32>(row, "numbackends")?),
+                    gauge!(reader.read::<i32>(row, "numbackends")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_xact_commit_total",
-                    counter!(row_get_value::<i64>(row, "xact_commit")?),
+                    counter!(reader.read::<i64>(row, "xact_commit")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_xact_rollback_total",
-                    counter!(row_get_value::<i64>(row, "xact_rollback")?),
+                    counter!(reader.read::<i64>(row, "xact_rollback")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_blks_read_total",
-                    counter!(row_get_value::<i64>(row, "blks_read")?),
+                    counter!(reader.read::<i64>(row, "blks_read")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_blks_hit_total",
-                    counter!(row_get_value::<i64>(row, "blks_hit")?),
+                    counter!(reader.read::<i64>(row, "blks_hit")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_tup_returned_total",
-                    counter!(row_get_value::<i64>(row, "tup_returned")?),
+                    counter!(reader.read::<i64>(row, "tup_returned")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_tup_fetched_total",
-                    counter!(row_get_value::<i64>(row, "tup_fetched")?),
+                    counter!(reader.read::<i64>(row, "tup_fetched")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_tup_inserted_total",
-                    counter!(row_get_value::<i64>(row, "tup_inserted")?),
+                    counter!(reader.read::<i64>(row, "tup_inserted")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_tup_updated_total",
-                    counter!(row_get_value::<i64>(row, "tup_updated")?),
+                    counter!(reader.read::<i64>(row, "tup_updated")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_tup_deleted_total",
-                    counter!(row_get_value::<i64>(row, "tup_deleted")?),
+                    counter!(reader.read::<i64>(row, "tup_deleted")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_conflicts_total",
-                    counter!(row_get_value::<i64>(row, "conflicts")?),
+                    counter!(reader.read::<i64>(row, "conflicts")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_temp_files_total",
-                    counter!(row_get_value::<i64>(row, "temp_files")?),
+                    counter!(reader.read::<i64>(row, "temp_files")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_temp_bytes_total",
-                    counter!(row_get_value::<i64>(row, "temp_bytes")?),
+                    counter!(reader.read::<i64>(row, "temp_bytes")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_deadlocks_total",
-                    counter!(row_get_value::<i64>(row, "deadlocks")?),
+                    counter!(reader.read::<i64>(row, "deadlocks")?),
                     tags!(self.tags, "db" => db),
                 ),
             ]);
@@ -595,19 +610,17 @@ impl PostgresqlMetrics {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
-                        counter!(
-                            row_get_value::<Option<i64>>(row, "checksum_failures")?.unwrap_or(0)
-                        ),
+                        counter!(reader
+                            .read::<Option<i64>>(row, "checksum_failures")?
+                            .unwrap_or(0)),
                         tags!(self.tags, "db" => db),
                     ),
                     self.create_metric(
                         "pg_stat_database_checksum_last_failure",
-                        gauge!(row_get_value::<Option<DateTime<Utc>>>(
-                            row,
-                            "checksum_last_failure"
-                        )?
-                        .map(|t| t.timestamp())
-                        .unwrap_or(0)),
+                        gauge!(reader
+                            .read::<Option<DateTime<Utc>>>(row, "checksum_last_failure")?
+                            .map(|t| t.timestamp())
+                            .unwrap_or(0)),
                         tags!(self.tags, "db" => db),
                     ),
                 ]);
@@ -615,30 +628,31 @@ impl PostgresqlMetrics {
             metrics.extend_from_slice(&[
                 self.create_metric(
                     "pg_stat_database_blk_read_time_seconds_total",
-                    counter!(row_get_value::<f64>(row, "blk_read_time")? / 1000f64),
+                    counter!(reader.read::<f64>(row, "blk_read_time")? / 1000f64),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_blk_write_time_seconds_total",
-                    counter!(row_get_value::<f64>(row, "blk_write_time")? / 1000f64),
+                    counter!(reader.read::<f64>(row, "blk_write_time")? / 1000f64),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_stats_reset",
-                    gauge!(row_get_value::<Option<DateTime<Utc>>>(row, "stats_reset")?
+                    gauge!(reader
+                        .read::<Option<DateTime<Utc>>>(row, "stats_reset")?
                         .map(|t| t.timestamp())
                         .unwrap_or(0)),
                     tags!(self.tags, "db" => db),
                 ),
             ]);
         }
-        Ok(metrics)
+        Ok((metrics, reader.into_inner()))
     }
 
     async fn collect_pg_stat_database_conflicts(
         &self,
         client: &Client,
-    ) -> Result<Vec<Metric>, CollectError> {
+    ) -> Result<(Vec<Metric>, usize), CollectError> {
         let rows = self
             .datname_filter
             .pg_stat_database_conflicts(client)
@@ -646,104 +660,114 @@ impl PostgresqlMetrics {
             .context(QuerySnafu)?;
 
         let mut metrics = Vec::with_capacity(5 * rows.len());
+        let mut reader = RowReader::default();
         for row in rows.iter() {
-            let db = row_get_value::<&str>(row, "datname")?;
+            let db = reader.read::<&str>(row, "datname")?;
 
             metrics.extend_from_slice(&[
                 self.create_metric(
                     "pg_stat_database_conflicts_confl_tablespace_total",
-                    counter!(row_get_value::<i64>(row, "confl_tablespace")?),
+                    counter!(reader.read::<i64>(row, "confl_tablespace")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_conflicts_confl_lock_total",
-                    counter!(row_get_value::<i64>(row, "confl_lock")?),
+                    counter!(reader.read::<i64>(row, "confl_lock")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_conflicts_confl_snapshot_total",
-                    counter!(row_get_value::<i64>(row, "confl_snapshot")?),
+                    counter!(reader.read::<i64>(row, "confl_snapshot")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_conflicts_confl_bufferpin_total",
-                    counter!(row_get_value::<i64>(row, "confl_bufferpin")?),
+                    counter!(reader.read::<i64>(row, "confl_bufferpin")?),
                     tags!(self.tags, "db" => db),
                 ),
                 self.create_metric(
                     "pg_stat_database_conflicts_confl_deadlock_total",
-                    counter!(row_get_value::<i64>(row, "confl_deadlock")?),
+                    counter!(reader.read::<i64>(row, "confl_deadlock")?),
                     tags!(self.tags, "db" => db),
                 ),
             ]);
         }
-        Ok(metrics)
+        Ok((metrics, reader.into_inner()))
     }
 
-    async fn collect_pg_stat_bgwriter(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_pg_stat_bgwriter(
+        &self,
+        client: &Client,
+    ) -> Result<(Vec<Metric>, usize), CollectError> {
         let row = self
             .datname_filter
             .pg_stat_bgwriter(client)
             .await
             .context(QuerySnafu)?;
+        let mut reader = RowReader::default();
 
-        Ok(vec![
-            self.create_metric(
-                "pg_stat_bgwriter_checkpoints_timed_total",
-                counter!(row_get_value::<i64>(&row, "checkpoints_timed")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_checkpoints_req_total",
-                counter!(row_get_value::<i64>(&row, "checkpoints_req")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_checkpoint_write_time_seconds_total",
-                counter!(row_get_value::<f64>(&row, "checkpoint_write_time")? / 1000f64),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_checkpoint_sync_time_seconds_total",
-                counter!(row_get_value::<f64>(&row, "checkpoint_sync_time")? / 1000f64),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_buffers_checkpoint_total",
-                counter!(row_get_value::<i64>(&row, "buffers_checkpoint")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_buffers_clean_total",
-                counter!(row_get_value::<i64>(&row, "buffers_clean")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_maxwritten_clean_total",
-                counter!(row_get_value::<i64>(&row, "maxwritten_clean")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_buffers_backend_total",
-                counter!(row_get_value::<i64>(&row, "buffers_backend")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_buffers_backend_fsync_total",
-                counter!(row_get_value::<i64>(&row, "buffers_backend_fsync")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_buffers_alloc_total",
-                counter!(row_get_value::<i64>(&row, "buffers_alloc")?),
-                tags!(self.tags),
-            ),
-            self.create_metric(
-                "pg_stat_bgwriter_stats_reset",
-                gauge!(row_get_value::<DateTime<Utc>>(&row, "stats_reset")?.timestamp()),
-                tags!(self.tags),
-            ),
-        ])
+        Ok((
+            vec![
+                self.create_metric(
+                    "pg_stat_bgwriter_checkpoints_timed_total",
+                    counter!(reader.read::<i64>(&row, "checkpoints_timed")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_checkpoints_req_total",
+                    counter!(reader.read::<i64>(&row, "checkpoints_req")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_checkpoint_write_time_seconds_total",
+                    counter!(reader.read::<f64>(&row, "checkpoint_write_time")? / 1000f64),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_checkpoint_sync_time_seconds_total",
+                    counter!(reader.read::<f64>(&row, "checkpoint_sync_time")? / 1000f64),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_buffers_checkpoint_total",
+                    counter!(reader.read::<i64>(&row, "buffers_checkpoint")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_buffers_clean_total",
+                    counter!(reader.read::<i64>(&row, "buffers_clean")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_maxwritten_clean_total",
+                    counter!(reader.read::<i64>(&row, "maxwritten_clean")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_buffers_backend_total",
+                    counter!(reader.read::<i64>(&row, "buffers_backend")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_buffers_backend_fsync_total",
+                    counter!(reader.read::<i64>(&row, "buffers_backend_fsync")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_buffers_alloc_total",
+                    counter!(reader.read::<i64>(&row, "buffers_alloc")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_bgwriter_stats_reset",
+                    gauge!(reader
+                        .read::<DateTime<Utc>>(&row, "stats_reset")?
+                        .timestamp()),
+                    tags!(self.tags),
+                ),
+            ],
+            reader.into_inner(),
+        ))
     }
 
     fn create_metric(
@@ -759,7 +783,29 @@ impl PostgresqlMetrics {
     }
 }
 
-fn row_get_value<'a, T: FromSql<'a>>(row: &'a Row, key: &'static str) -> Result<T, CollectError> {
+#[derive(Default)]
+struct RowReader(usize);
+
+impl RowReader {
+    pub fn read<'a, T: FromSql<'a> + ByteSizeOf>(
+        &mut self,
+        row: &'a Row,
+        key: &'static str,
+    ) -> Result<T, CollectError> {
+        let value = row_get_value::<T>(row, key)?;
+        self.0 += value.size_of();
+        Ok(value)
+    }
+
+    pub const fn into_inner(self) -> usize {
+        self.0
+    }
+}
+
+fn row_get_value<'a, T: FromSql<'a> + ByteSizeOf>(
+    row: &'a Row,
+    key: &'static str,
+) -> Result<T, CollectError> {
     row.try_get::<&str, T>(key)
         .map_err(|source| CollectError::PostgresGetValue { source, key })
 }

@@ -16,7 +16,7 @@ dyn-clone = { version = "1.0.4", default-features = false }
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.21", default-features = false, features = ["std"] }
 leveldb = { version = "0.8.6", default-features = false  }
-memmap2 = { version = "0.5.2", default-features = false }
+memmap2 = { version = "0.5.3", default-features = false }
 metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 parking_lot = { version = "0.12.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
