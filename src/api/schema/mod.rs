@@ -8,7 +8,6 @@ mod relay;
 pub mod sort;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
-pub use vector_core::api::schema::scalar;
 
 #[derive(MergedObject, Default)]
 pub struct Query(
