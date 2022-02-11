@@ -269,7 +269,7 @@ cli: {
 			flags: _default_flags & {
 				"quiet": {
 					_short:      "q"
-					description: "Quiet output includes only events. By default, diagnostic messages may appear."
+					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
 				}
 			}
 
