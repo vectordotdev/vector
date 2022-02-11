@@ -9,7 +9,7 @@ const MAX_MAP_SIZE: usize = 4;
 const MAX_F64_SIZE: f64 = 1_000_000.0;
 
 fn datetime(g: &mut Gen) -> DateTime<Utc> {
-    // chrono documents that there is an out-of-range for both second and
+    // `chrono` documents that there is an out-of-range for both second and
     // nanosecond values but doesn't actually document what the valid ranges
     // are. We just sort of arbitrarily restrict things.
     let secs = i64::arbitrary(g) % 32_000;
