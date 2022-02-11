@@ -343,7 +343,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
     );
-    let test = test.resolve_outputs(&transform_only_graph);
+    let test = test.resolve_outputs(&transform_only_graph)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
