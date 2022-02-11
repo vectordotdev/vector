@@ -26,7 +26,7 @@ impl Value {
     }
 
     // TODO: return Cow 🐄
-    /// Converts self into a String representation, using JSON for Map/Array
+    /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
     pub fn to_string_lossy(&self) -> String {
         match self {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
