@@ -171,60 +171,6 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-trait BytesMutExt {
-    fn pop(&mut self) -> Option<u8>;
-
-    fn insert_u8(&mut self, index: usize, element: u8);
-}
-
-impl BytesMutExt for BytesMut {
-    fn pop(&mut self) -> Option<u8> {
-        if self.is_empty() {
-            None
-        } else {
-            Some(self.split_off(self.len() - 1)[0])
-        }
-    }
-
-    // TODO: DON'T MERGE, JUST TESTING PERFORMANCE HERE.
-    // Copied from https://github.com/rust-lang/rust/blob/1.58.1/library/alloc/src/vec/mod.rs#L1354-L1367.
-    fn insert_u8(&mut self, index: usize, element: u8) {
-        #[cold]
-        #[inline(never)]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!(
-                "insertion index (is {}) should be <= len (is {})",
-                index, len
-            );
-        }
-
-        let len = self.len();
-        if index > len {
-            assert_failed(index, len);
-        }
-
-        // space for the new element
-        if len == self.capacity() {
-            self.reserve(1);
-        }
-
-        unsafe {
-            // infallible
-            // The spot to put the new value
-            {
-                let p = self.as_mut_ptr().add(index);
-                // Shift everything over to make space. (Duplicating the
-                // `index`th element into two consecutive places.)
-                std::ptr::copy(p, p.offset(1), len - index);
-                // Write it in, overwriting the first copy of the `index`th
-                // element.
-                std::ptr::write(p, element);
-            }
-            self.set_len(len + 1);
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
     type Input = BytesMut;
@@ -289,8 +235,13 @@ impl HttpSink for HttpSinkConfig {
                 // TODO(https://github.com/vectordotdev/vector/issues/11253):
                 // Prepend before building a request body to eliminate the
                 // additional copy here.
-                body.insert_u8(0, b'[');
-                body.pop(); // remove trailing comma from last record
+                let message = body.split();
+                body.put_u8(b'[');
+                if !message.is_empty() {
+                    body.unsplit(message);
+                    // remove trailing comma from last record
+                    body.truncate(body.len() - 1);
+                }
                 body.put_u8(b']');
                 "application/json"
             }
