@@ -76,13 +76,13 @@ impl Expression for Literal {
         use Literal::*;
 
         let type_def = match self {
-            String(_) => TypeDef::new().bytes(),
-            Integer(_) => TypeDef::new().integer(),
-            Float(_) => TypeDef::new().float(),
-            Boolean(_) => TypeDef::new().boolean(),
-            Regex(_) => TypeDef::new().regex(),
-            Timestamp(_) => TypeDef::new().timestamp(),
-            Null => TypeDef::new().null(),
+            String(_) => TypeDef::bytes(),
+            Integer(_) => TypeDef::integer(),
+            Float(_) => TypeDef::float(),
+            Boolean(_) => TypeDef::boolean(),
+            Regex(_) => TypeDef::regex(),
+            Timestamp(_) => TypeDef::timestamp(),
+            Null => TypeDef::null(),
         };
 
         type_def.infallible()
@@ -388,12 +388,12 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| expr!("foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         integer {
             expr: |_| expr!(12),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
     ];
 }

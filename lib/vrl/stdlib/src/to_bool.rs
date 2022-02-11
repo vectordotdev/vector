@@ -12,7 +12,7 @@ fn to_bool(value: Value) -> std::result::Result<Value, ExpressionError> {
         Bytes(v) => Conversion::Boolean
             .convert(v)
             .map_err(|e| e.to_string().into()),
-        v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),
+        v => Err(format!("unable to coerce {} into boolean", v.kind()).into()),
     }
 }
 
@@ -120,28 +120,28 @@ impl Function for ToBool {
                 title: "timestamp",
                 source: "to_bool!(t'2020-01-01T00:00:00Z')",
                 result: Err(
-                    r#"function call error for "to_bool" at (0:33): unable to coerce "timestamp" into "boolean""#,
+                    r#"function call error for "to_bool" at (0:33): unable to coerce timestamp into boolean"#,
                 ),
             },
             Example {
                 title: "array",
                 source: "to_bool!([])",
                 result: Err(
-                    r#"function call error for "to_bool" at (0:12): unable to coerce "array" into "boolean""#,
+                    r#"function call error for "to_bool" at (0:12): unable to coerce array into boolean"#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_bool!({})",
                 result: Err(
-                    r#"function call error for "to_bool" at (0:12): unable to coerce "object" into "boolean""#,
+                    r#"function call error for "to_bool" at (0:12): unable to coerce object into boolean"#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_bool!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_bool" at (0:16): unable to coerce "regex" into "boolean""#,
+                    r#"function call error for "to_bool" at (0:16): unable to coerce regex into boolean"#,
                 ),
             },
         ]
@@ -178,13 +178,15 @@ impl Expression for ToBoolFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .with_fallibility(
-                self.value.type_def(state).has_kind(
-                    Kind::Bytes | Kind::Timestamp | Kind::Array | Kind::Object | Kind::Regex,
-                ),
-            )
-            .boolean()
+        let td = self.value.type_def(state);
+
+        TypeDef::boolean().with_fallibility(
+            td.contains_bytes()
+                || td.contains_timestamp()
+                || td.contains_array()
+                || td.contains_object()
+                || td.contains_regex(),
+        )
     }
 }
 
@@ -198,31 +200,31 @@ mod tests {
         string_true {
             args: func_args![value: "true"],
             want: Ok(true),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
 
         string_false {
             args: func_args![value: "no"],
             want: Ok(false),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
 
         string_error {
             args: func_args![value: "cabbage"],
             want: Err(r#"Invalid boolean value "cabbage""#),
-            tdef: TypeDef::new().fallible().boolean(),
+            tdef: TypeDef::boolean().fallible(),
         }
 
         number_true {
             args: func_args![value: 20],
             want: Ok(true),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         number_false {
             args: func_args![value: 0],
             want: Ok(false),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

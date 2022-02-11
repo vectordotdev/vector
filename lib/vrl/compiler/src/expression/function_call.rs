@@ -118,7 +118,8 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
-            let expr_kind = argument.type_def(state).kind();
+            let argument_type_def = argument.type_def(state);
+            let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
             if !param_kind.intersects(expr_kind) {
@@ -130,16 +131,16 @@ impl FunctionCall {
                         .map(|arg| arg.inner().to_string())
                         .collect::<Vec<_>>(),
                     parameter: *parameter,
-                    got: expr_kind,
+                    got: expr_kind.clone(),
                     argument,
                     argument_span,
                 });
-            } else if !param_kind.contains(expr_kind) {
+            } else if !param_kind.is_superset(expr_kind) {
                 maybe_fallible_arguments = true;
             }
 
             // Check if the argument is infallible.
-            if argument.type_def(state).is_fallible() {
+            if argument_type_def.is_fallible() {
                 return Err(Error::FallibleArgument {
                     expr_span: argument.span(),
                 });
@@ -364,11 +365,11 @@ impl Expression for FunctionCall {
         // For the third event, both functions fail.
         //
         if self.maybe_fallible_arguments {
-            type_def.fallible = true;
+            type_def = type_def.with_fallibility(true);
         }
 
         if self.abort_on_error {
-            type_def.fallible = false;
+            type_def = type_def.with_fallibility(false);
         }
 
         type_def
@@ -661,7 +662,7 @@ impl DiagnosticError for Error {
                 let kind_str = |kind: &Kind| {
                     if kind.is_any() {
                         kind.to_string()
-                    } else if !kind.is_many() {
+                    } else if kind.is_exact() {
                         format!(r#"the exact type {}"#, kind)
                     } else {
                         format!("one of {}", kind)
@@ -717,24 +718,37 @@ impl DiagnosticError for Error {
                 ..
             } => {
                 // TODO: move this into a generic helper function
-                let guard = match parameter.kind() {
-                    Kind::Bytes => format!("string!({})", argument),
-                    Kind::Integer => format!("int!({})", argument),
-                    Kind::Float => format!("float!({})", argument),
-                    Kind::Boolean => format!("bool!({})", argument),
-                    Kind::Object => format!("object!({})", argument),
-                    Kind::Array => format!("array!({})", argument),
-                    Kind::Timestamp => format!("timestamp!({})", argument),
-                    _ => return vec![],
+                let kind = parameter.kind();
+                let guard = if kind.is_bytes() {
+                    format!("string!({})", argument)
+                } else if kind.is_integer() {
+                    format!("int!({})", argument)
+                } else if kind.is_float() {
+                    format!("float!({})", argument)
+                } else if kind.is_boolean() {
+                    format!("bool!({})", argument)
+                } else if kind.is_object() {
+                    format!("object!({})", argument)
+                } else if kind.is_array() {
+                    format!("array!({})", argument)
+                } else if kind.is_timestamp() {
+                    format!("timestamp!({})", argument)
+                } else {
+                    return vec![];
                 };
 
-                let coerce = match parameter.kind() {
-                    Kind::Bytes => Some(format!(r#"to_string({}) ?? "default""#, argument)),
-                    Kind::Integer => Some(format!("to_int({}) ?? 0", argument)),
-                    Kind::Float => Some(format!("to_float({}) ?? 0", argument)),
-                    Kind::Boolean => Some(format!("to_bool({}) ?? false", argument)),
-                    Kind::Timestamp => Some(format!("to_timestamp({}) ?? now()", argument)),
-                    _ => None,
+                let coerce = if kind.is_bytes() {
+                    Some(format!(r#"to_string({}) ?? "default""#, argument))
+                } else if kind.is_integer() {
+                    Some(format!("to_int({}) ?? 0", argument))
+                } else if kind.is_float() {
+                    Some(format!("to_float({}) ?? 0", argument))
+                } else if kind.is_boolean() {
+                    Some(format!("to_bool({}) ?? false", argument))
+                } else if kind.is_timestamp() {
+                    Some(format!("to_timestamp({}) ?? now()", argument))
+                } else {
+                    None
                 };
 
                 let args = {
@@ -798,7 +812,7 @@ mod tests {
         }
 
         fn type_def(&self, _state: &crate::State) -> TypeDef {
-            TypeDef::new().infallible()
+            TypeDef::null().infallible()
         }
     }
 

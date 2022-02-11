@@ -9,22 +9,19 @@ use std::{
     sync::Mutex,
 };
 
-use glob::glob;
-use indexmap::IndexMap;
-use lazy_static::lazy_static;
-
 use super::{
     builder::ConfigBuilder, format, loading::ConfigBuilderLoader, validation, vars, ComponentKey,
     Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
+use glob::glob;
+use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 
 pub use config_builder::*;
 pub use loader::*;
 
-lazy_static! {
-    pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
-}
+pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
 
 pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
     path.read_dir()

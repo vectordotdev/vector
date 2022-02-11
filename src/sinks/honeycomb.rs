@@ -2,12 +2,13 @@ use std::num::NonZeroU64;
 
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -16,9 +17,7 @@ use crate::{
     },
 };
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HoneycombConfig {
@@ -87,8 +86,8 @@ impl SinkConfig for HoneycombConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

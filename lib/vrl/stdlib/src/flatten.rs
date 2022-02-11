@@ -14,7 +14,7 @@ fn flatten(value: Value) -> Resolved {
         )),
         value => Err(value::Error::Expected {
             got: value.kind(),
-            expected: Kind::Array | Kind::Object,
+            expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
         }
         .into()),
     }
@@ -81,9 +81,9 @@ impl Expression for FlattenFn {
         let td = self.value.type_def(state);
 
         if td.is_array() {
-            TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+            TypeDef::array(Collection::any())
         } else {
-            TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+            TypeDef::object(Collection::any())
         }
     }
 }
@@ -203,43 +203,43 @@ mod test {
         array {
             args: func_args![value: value!([42])],
             want: Ok(value!([42])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         nested_array {
             args: func_args![value: value!([42, [43, 44]])],
             want: Ok(value!([42, 43, 44])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         nested_empty_array {
             args: func_args![value: value!([42, [], 43])],
             want: Ok(value!([42, 43])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         double_nested_array {
             args: func_args![value: value!([42, [43, 44, [45, 46]]])],
             want: Ok(value!([42, 43, 44, 45, 46])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         two_arrays {
             args: func_args![value: value!([[42, 43], [44, 45]])],
             want: Ok(value!([42, 43, 44, 45])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         map {
             args: func_args![value: value!({parent: "child"})],
             want: Ok(value!({parent: "child"})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         nested_map {
             args: func_args![value: value!({parent: {child1: 1, child2: 2}, key: "val"})],
             want: Ok(value!({"parent.child1": 1, "parent.child2": 2, key: "val"})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         double_nested_map {
@@ -256,7 +256,7 @@ mod test {
                 "parent.child2.grandchild2": 2,
                 key: "val",
             })),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         map_and_array {
@@ -273,7 +273,7 @@ mod test {
                 "parent.child2.grandchild2": [1, [2, 3], 4],
                 key: "val",
             })),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         // If the root object is an array, child maps are not flattened.
@@ -290,7 +290,7 @@ mod test {
                 { parent2: { child3: 3, child4: 4 } },
                 { parent3: { child5: 5 } },
             ])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         triple_nested_map {
@@ -307,7 +307,7 @@ mod test {
                 "parent1.child2.grandchild3": 3,
                 parent2: 4,
             })),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
     ];
 }

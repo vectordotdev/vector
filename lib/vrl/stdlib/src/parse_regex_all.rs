@@ -156,13 +156,10 @@ impl Expression for ParseRegexAllFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        let inner_type_def = TypeDef::new()
-            .object(util::regex_type_def(&self.pattern))
-            .add_null();
-
-        TypeDef::new()
-            .fallible()
-            .array_mapped::<(), TypeDef>(map![(): inner_type_def])
+        TypeDef::array(Collection::from_unknown(
+            Kind::object(util::regex_kind(&self.pattern)).or_null(),
+        ))
+        .fallible()
     }
 }
 
@@ -170,6 +167,7 @@ impl Expression for ParseRegexAllFn {
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
+    use vector_common::btreemap;
 
     test_function![
         parse_regex_all => ParseRegexAll;
@@ -183,18 +181,13 @@ mod tests {
                               "veg": "carrots"},
                              {"fruit": "peaches",
                               "veg": "peas"}])),
-            tdef: TypeDef::new()
-                .fallible()
-                .array_mapped::<(), TypeDef>(map![(): TypeDef::new()
-                                                  .object::<&str, Kind>(map! {
-                                                      "fruit": Kind::Bytes,
-                                                      "veg": Kind::Bytes,
-                                                      "0": Kind::Bytes | Kind::Null,
-                                                      "1": Kind::Bytes | Kind::Null,
-                                                      "2": Kind::Bytes | Kind::Null,
-                                                  })
-                                                  .add_null()
-            ]),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::null().or_object(btreemap! {
+                    Field::from("fruit") => Kind::bytes(),
+                    Field::from("veg") => Kind::bytes(),
+                    Field::from("0") => Kind::bytes() | Kind::null(),
+                    Field::from("1") => Kind::bytes() | Kind::null(),
+                    Field::from("2") => Kind::bytes() | Kind::null(),
+                }))).fallible(),
         }
 
         numeric_groups {
@@ -213,18 +206,13 @@ mod tests {
                               "0": "peaches and peas",
                               "1": "peaches",
                               "2": "peas"}])),
-            tdef: TypeDef::new()
-                .fallible()
-                .array_mapped::<(), TypeDef>(map![(): TypeDef::new()
-                                                  .object::<&str, Kind>(map! {
-                                                      "fruit": Kind::Bytes,
-                                                      "veg": Kind::Bytes,
-                                                      "0": Kind::Bytes | Kind::Null,
-                                                      "1": Kind::Bytes | Kind::Null,
-                                                      "2": Kind::Bytes | Kind::Null,
-                                                  })
-                                                  .add_null()
-            ]),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::null().or_object(btreemap! {
+                    Field::from("fruit") => Kind::bytes(),
+                    Field::from("veg") => Kind::bytes(),
+                    Field::from("0") => Kind::bytes() | Kind::null(),
+                    Field::from("1") => Kind::bytes() | Kind::null(),
+                    Field::from("2") => Kind::bytes() | Kind::null(),
+                }))).fallible(),
         }
 
         no_matches {
@@ -233,18 +221,13 @@ mod tests {
                 pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
             ],
             want: Ok(value!([])),
-            tdef: TypeDef::new()
-                .fallible()
-                .array_mapped::<(), TypeDef>(map![(): TypeDef::new()
-                                                  .object::<&str, Kind>(map! {
-                                                      "fruit": Kind::Bytes,
-                                                      "veg": Kind::Bytes,
-                                                      "0": Kind::Bytes | Kind::Null,
-                                                      "1": Kind::Bytes | Kind::Null,
-                                                      "2": Kind::Bytes | Kind::Null,
-                                                  })
-                                                  .add_null()
-                ]),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::null().or_object(btreemap! {
+                    Field::from("fruit") => Kind::bytes(),
+                    Field::from("veg") => Kind::bytes(),
+                    Field::from("0") => Kind::bytes() | Kind::null(),
+                    Field::from("1") => Kind::bytes() | Kind::null(),
+                    Field::from("2") => Kind::bytes() | Kind::null(),
+                }))).fallible(),
         }
     ];
 }

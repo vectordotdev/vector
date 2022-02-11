@@ -93,7 +93,7 @@ impl Expression for MatchArrayFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -113,7 +113,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("foo").unwrap().into())
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         all {
@@ -123,7 +123,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         not_all {
@@ -133,7 +133,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values {
@@ -142,7 +142,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("abc").unwrap().into())
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values_no_match {
@@ -151,7 +151,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("xyz").unwrap().into()),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values_no_match_all {
@@ -161,7 +161,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

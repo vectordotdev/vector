@@ -8,11 +8,11 @@ use vector_common::aws_cloudwatch_logs_subscription::{
 use super::Transform;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
-    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
+    internal_events::AwsCloudwatchLogsSubscriptionParserError,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -36,8 +36,8 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -85,9 +85,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
             .map(|s| s.as_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
-                    .map_err(|error| {
-                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
-                    })
+                    .map_err(|error| emit!(&AwsCloudwatchLogsSubscriptionParserError { error }))
                     .ok()
             });
 

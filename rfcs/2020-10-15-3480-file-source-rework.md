@@ -17,85 +17,85 @@ to a better structure, not rewriting from scratch.
 There are three pages of issues tagged `source: file` in the Vector repo. Below
 I've tried to collect some of the more notable ones and categorize them:
 
-* File source retains files on disk ([#763](https://github.com/timberio/vector/issues/763))
+* File source retains files on disk ([#763](https://github.com/vectordotdev/vector/issues/763))
 
   * Slowness due to many files
   * Need sequential instead of fair reads
   * Unclear why files handles were open
   * Unclear that files were not done being processed
 
-* Checksums are confusing ([#828](https://github.com/timberio/vector/issues/828))
+* Checksums are confusing ([#828](https://github.com/vectordotdev/vector/issues/828))
 
   * Checksums don't work with small files
 
-* `start_at_beginning` is confusing ([#1020](https://github.com/timberio/vector/issues/1020))
+* `start_at_beginning` is confusing ([#1020](https://github.com/vectordotdev/vector/issues/1020))
 
   * Config behavior does not match user expectations
 
-* Only warn about small files not empties ([#1065](https://github.com/timberio/vector/issues/1065))
+* Only warn about small files not empties ([#1065](https://github.com/vectordotdev/vector/issues/1065))
 
   * Checksums don't work with small files
   * Poor observability
 
-* Split reads ([#1125](https://github.com/timberio/vector/issues/1125) and [#2992](https://github.com/timberio/vector/issues/2992))
+* Split reads ([#1125](https://github.com/vectordotdev/vector/issues/1125) and [#2992](https://github.com/vectordotdev/vector/issues/2992))
 
   * Correctness
 
-* Periodically read a non-file file ([#1198](https://github.com/timberio/vector/issues/1198))
+* Periodically read a non-file file ([#1198](https://github.com/vectordotdev/vector/issues/1198))
 
   * New mode
 
-* Clean up file checkpoint files ([#1427](https://github.com/timberio/vector/issues/1427))
+* Clean up file checkpoint files ([#1427](https://github.com/vectordotdev/vector/issues/1427))
 
   * Checkpointing
 
-* File source slows down with many completed files ([#1466](https://github.com/timberio/vector/issues/1466))
+* File source slows down with many completed files ([#1466](https://github.com/vectordotdev/vector/issues/1466))
 
   * Slowness due to many files
   * Read scheduling
 
-* Add path-based fingerprinting ([#1948](https://github.com/timberio/vector/issues/1948))
+* Add path-based fingerprinting ([#1948](https://github.com/vectordotdev/vector/issues/1948))
 
   * Checksums don't work with small files
   * inode fingerprinting is fraught
 
-* Log permissions issues ([#2420](https://github.com/timberio/vector/issues/2420))
+* Log permissions issues ([#2420](https://github.com/vectordotdev/vector/issues/2420))
 
   * Poor observability
 
-* Stop after reading files (backfill mode) ([#3216](https://github.com/timberio/vector/issues/3216))
+* Stop after reading files (backfill mode) ([#3216](https://github.com/vectordotdev/vector/issues/3216))
 
   * New mode
 
-* Tailing limited to single core ([#3379](https://github.com/timberio/vector/issues/3379))
+* Tailing limited to single core ([#3379](https://github.com/vectordotdev/vector/issues/3379))
 
   * Performance
 
-* Not releasing descriptors due to falling behind ([#3440](https://github.com/timberio/vector/issues/3440))
+* Not releasing descriptors due to falling behind ([#3440](https://github.com/vectordotdev/vector/issues/3440))
 
   * Need fair reads instead of sequential reads
   * Unclear why files handles were open
   * Unclear that files were not done being processed
 
-* `ignore_older` is confusing ([#3567](https://github.com/timberio/vector/issues/3567))
+* `ignore_older` is confusing ([#3567](https://github.com/vectordotdev/vector/issues/3567))
 
   * Config behavior does not match user expectations
 
-* Ignore dangling symlinks (optionally?) ([#3662](https://github.com/timberio/vector/issues/3662))
+* Ignore dangling symlinks (optionally?) ([#3662](https://github.com/vectordotdev/vector/issues/3662))
 
   * Tweak for specific use case
 
-* Make it easier to reuse internally ([#4048](https://github.com/timberio/vector/issues/4048))
+* Make it easier to reuse internally ([#4048](https://github.com/vectordotdev/vector/issues/4048))
 
-* Batch mode ([#4271](https://github.com/timberio/vector/issues/4271))
+* Batch mode ([#4271](https://github.com/vectordotdev/vector/issues/4271))
 
   * New mode
 
-* Tail only new data ([#4382](https://github.com/timberio/vector/issues/4382))
+* Tail only new data ([#4382](https://github.com/vectordotdev/vector/issues/4382))
 
   * Config behavior does not match user expectations
 
-* Slow with millions of files on EBS ([#4434](https://github.com/timberio/vector/issues/4434))
+* Slow with millions of files on EBS ([#4434](https://github.com/vectordotdev/vector/issues/4434))
 
   * Slowness due to many files
   * Need sequential instead of fair reads
@@ -381,7 +381,7 @@ address all of the relevant issues. Some examples:
 For the last item, it would be particularly helpful to evolve how we store
 checkpoints. Instead of the strange filename-based system we have now, we should
 migrate towards a JSON file-based approach as laid out in
-[#1779](https://github.com/timberio/vector/issues/1779).
+[#1779](https://github.com/vectordotdev/vector/issues/1779).
 
 ## Doc-level Proposal
 

@@ -5,10 +5,11 @@ use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
-    internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
+    internal_events::{KeyValueParserError, ParserMissingFieldError, ParserTargetExistsError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -80,8 +81,8 @@ impl TransformConfig for KeyValueConfig {
         }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -151,7 +152,7 @@ impl FunctionTransform for KeyValue {
                     if self.overwrite_target {
                         log.remove(target_field);
                     } else {
-                        emit!(&KeyValueTargetExists { target_field });
+                        emit!(&ParserTargetExistsError { target_field });
                         return output.push(event);
                     }
                 }
@@ -168,7 +169,7 @@ impl FunctionTransform for KeyValue {
                             log.insert(key, value);
                         }
                         Err(error) => {
-                            emit!(&KeyValueParseFailed { key, error });
+                            emit!(&KeyValueParserError { key, error });
                         }
                     }
                 } else {
@@ -180,8 +181,8 @@ impl FunctionTransform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            emit!(&KeyValueFieldDoesNotExist {
-                field: self.field.to_string()
+            emit!(&ParserMissingFieldError {
+                field: self.field.as_str()
             });
         };
 

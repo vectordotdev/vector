@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::SampleEventDiscarded,
@@ -51,8 +52,8 @@ impl TransformConfig for SampleConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -75,8 +76,8 @@ impl TransformConfig for SampleCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
     fn outputs(&self) -> Vec<Output> {

@@ -16,6 +16,7 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+use ordered_float::NotNan;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -503,7 +504,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
                         TestInputValue::Boolean(b) => Value::from(*b),
                         TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(*f),
+                        TestInputValue::Float(f) => Value::from(
+                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
+                        ),
                     };
                     event.as_mut_log().insert(path.to_owned(), value);
                 }

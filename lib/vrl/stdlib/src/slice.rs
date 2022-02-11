@@ -37,7 +37,7 @@ fn slice(
             .map(Value::from),
         value => Err(value::Error::Expected {
             got: value.kind(),
-            expected: Kind::Bytes | Kind::Array,
+            expected: Kind::bytes() | Kind::array(Collection::any()),
         }
         .into()),
     }
@@ -136,14 +136,12 @@ impl Expression for SliceFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let td = TypeDef::new().fallible();
+        let td = TypeDef::from(Kind::empty()).fallible();
 
         match self.value.type_def(state) {
-            v if v.is_bytes() => td.merge(v),
-            v if v.is_array() => td.merge(v).collect_subtypes(),
-            _ => td.bytes().add_array_mapped::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            v if v.is_bytes() => td.merge_deep(v),
+            v if v.is_array() => td.merge_deep(v).collect_subtypes(),
+            _ => td.add_bytes().add_array(Collection::any()),
         }
     }
 }
@@ -160,7 +158,7 @@ mod tests {
                              start: 0
             ],
             want: Ok("foo"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_1 {
@@ -168,7 +166,7 @@ mod tests {
                              start: 1
             ],
             want: Ok("oo"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_2 {
@@ -176,7 +174,7 @@ mod tests {
                              start: 2
             ],
             want: Ok("o"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_minus_2 {
@@ -184,7 +182,7 @@ mod tests {
                              start: -2
             ],
             want: Ok("oo"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_empty {
@@ -192,7 +190,7 @@ mod tests {
                              start: 3
             ],
             want: Ok(""),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_empty_start_end {
@@ -201,7 +199,7 @@ mod tests {
                              end: 2
             ],
             want: Ok(""),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_overrun {
@@ -210,7 +208,7 @@ mod tests {
                              end: 4
             ],
             want: Ok("foo"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_start_overrun {
@@ -219,7 +217,7 @@ mod tests {
                              end: 5
             ],
             want: Ok("oo"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_negative  {
@@ -227,7 +225,7 @@ mod tests {
                              start: -7
             ],
             want: Ok("docious"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         bytes_middle {
@@ -236,7 +234,7 @@ mod tests {
                              end: 9
             ],
             want: Ok("cali"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         array_0 {
@@ -244,7 +242,7 @@ mod tests {
                              start: 0
             ],
             want: Ok(vec![0, 1, 2]),
-            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::integer())).fallible(),
         }
 
         array_1 {
@@ -252,7 +250,7 @@ mod tests {
                              start: 1
             ],
             want: Ok(vec![1, 2]),
-            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::integer())).fallible(),
         }
 
         array_minus_2 {
@@ -260,7 +258,7 @@ mod tests {
                              start: -2
             ],
             want: Ok(vec![1, 2]),
-            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::integer())).fallible(),
         }
 
         array_mixed_types {
@@ -268,9 +266,7 @@ mod tests {
                              start: 1
             ],
             want: Ok(value!(["ook", true])),
-            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(
-                map! { (): Kind::Integer | Kind::Bytes | Kind::Boolean }
-            ),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::integer().or_bytes().or_boolean())).fallible(),
         }
 
         error_after_end {
@@ -278,7 +274,7 @@ mod tests {
                              start: 4
             ],
             want: Err(r#""start" must be between "-3" and "3""#),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         error_minus_before_start {
@@ -286,7 +282,7 @@ mod tests {
                              start: -4
             ],
             want: Err(r#""start" must be between "-3" and "3""#),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         error_start_end {
@@ -295,7 +291,7 @@ mod tests {
                              end: 1
             ],
             want: Err(r#""end" must be greater or equal to "start""#),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

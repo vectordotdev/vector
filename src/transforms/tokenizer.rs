@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -51,8 +51,8 @@ impl TransformConfig for TokenizerConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -114,7 +114,7 @@ impl FunctionTransform for Tokenizer {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        emit!(&TokenizerConvertFailed { field: name, error });
+                        emit!(&ParserConversionError { name, error });
                     }
                 }
             }
@@ -122,7 +122,7 @@ impl FunctionTransform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&TokenizerFieldMissing { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event)
@@ -137,6 +137,7 @@ mod tests {
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -210,9 +211,9 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::Float(NotNan::new(42.3).unwrap()));
         assert_eq!(log["flag"], Value::Boolean(true));
-        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["code"], Value::Integer(1234_i64));
         assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
@@ -226,7 +227,7 @@ mod tests {
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         )
         .await;
-        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["code"], Value::Integer(1234_i64));
         assert_eq!(log["who"], Value::Bytes("-".into()));
         assert_eq!(log["why"], Value::Bytes("foo".into()));
     }

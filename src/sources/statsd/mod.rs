@@ -10,7 +10,11 @@ use tokio_util::udp::UdpFramed;
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        NewlineDelimitedDecoder,
+    },
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
@@ -145,7 +149,7 @@ impl SourceConfig for StatsdConfig {
 #[derive(Debug, Clone)]
 pub struct StatsdDeserializer;
 
-impl Deserializer for StatsdDeserializer {
+impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
@@ -190,8 +194,8 @@ async fn statsd_udp(
     );
 
     let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -224,8 +228,8 @@ impl TcpSource for StatsdTcpSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(NewlineDelimitedDecoder::new()),
-            Box::new(StatsdDeserializer),
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )
     }
 

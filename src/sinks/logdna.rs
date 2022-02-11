@@ -2,14 +2,14 @@ use std::time::SystemTime;
 
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
@@ -19,9 +19,7 @@ use crate::{
     template::{Template, TemplateRenderingError},
 };
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://logs.logdna.com");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"));
 
 const PATH: &str = "/logs/ingest";
 
@@ -101,8 +99,8 @@ impl SinkConfig for LogdnaConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -125,7 +123,7 @@ impl HttpSink for LogdnaConfig {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,

@@ -247,7 +247,7 @@ impl<T> Reader<T> {
 
             // Basic requirement to avoid leaving ldb files behind.
             // See:
-            // Vector  https://github.com/timberio/vector/issues/7425#issuecomment-849522738
+            // Vector  https://github.com/vectordotdev/vector/issues/7425#issuecomment-849522738
             // leveldb https://github.com/google/leveldb/issues/783
             //         https://github.com/syndtr/goleveldb/issues/166
             let min_size = self.uncompacted_size >= MIN_UNCOMPACTED_SIZE;

@@ -231,8 +231,14 @@ implement since errors are specific to the component.
 * Metrics
   * MUST increment the `component_errors_total` counter by 1 with the defined properties
     as metric tags.
-  * MUST increment the `component_discarded_events_total` counter by the number of Vector
-    events discarded if the error resulted in discarding (dropping) events.
+  * MUST increment the `component_discarded_events_total` counter by the number
+    of Vector events discarded if the error resulted in discarding (dropping)
+    acknowledged events. For sources, only increment this metric if incoming
+    events were consumed (and acknowledged if applicable) and discarded. The
+    metric MUST not include events that will be re-ingested. For sinks, this
+    means only incrementing this metric if the error resulted in the sink
+    dropping the events, and thus acknowledging them. Retried events MUST not be
+    included in the metric.
 * Logs
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
@@ -252,10 +258,10 @@ AWS's status.
 See the [development documentation][health checks] for more context guidance.
 
 [Configuration Specification]: configuration.md
-[high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[Pull request #8383]: https://github.com/timberio/vector/pull/8383/
-[RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
+[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
