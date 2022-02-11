@@ -426,6 +426,8 @@ async fn build_unit_test(
 /// To avoid warning logs that occur when building such topologies, we construct
 /// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
+    let mut config = config.clone();
+    let _ = expand_macros(&mut config);
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
