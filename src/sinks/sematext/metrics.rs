@@ -1,5 +1,6 @@
 use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
 
+use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
@@ -32,7 +33,7 @@ use crate::{
 #[derive(Clone)]
 struct SematextMetricsService {
     config: SematextMetricsConfig,
-    inner: HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>>>>,
+    inner: HttpBatchService<BoxFuture<'static, Result<Request<Bytes>>>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -191,7 +192,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(&self.config.token, &self.config.default_namespace, items);
-        let body: Vec<u8> = input.item.into_bytes();
+        let body = input.item;
 
         self.inner.call(body)
     }
@@ -215,7 +216,7 @@ impl MetricNormalize for SematextMetricNormalize {
 
 fn create_build_request(
     uri: http::Uri,
-) -> impl Fn(Vec<u8>) -> BoxFuture<'static, Result<Request<Vec<u8>>>> + Sync + Send + 'static {
+) -> impl Fn(Bytes) -> BoxFuture<'static, Result<Request<Bytes>>> + Sync + Send + 'static {
     move |body| {
         Box::pin(ready(
             Request::post(uri.clone())
@@ -230,8 +231,8 @@ fn encode_events(
     token: &str,
     default_namespace: &str,
     metrics: Vec<Metric>,
-) -> EncodedEvent<String> {
-    let mut output = String::new();
+) -> EncodedEvent<Bytes> {
+    let mut output = BytesMut::new();
     let byte_size = metrics.size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
@@ -265,8 +266,10 @@ fn encode_events(
         };
     }
 
-    output.pop();
-    EncodedEvent::new(output, byte_size)
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
+    EncodedEvent::new(output.freeze(), byte_size)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {

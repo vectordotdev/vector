@@ -1,4 +1,4 @@
-//! Contains the main "Value" type for Vector and VRL, as well as helper methods
+//! Contains the main "Value" type for Vector and VRL, as well as helper methods.
 
 mod convert;
 mod error;
@@ -31,39 +31,39 @@ use tracing::{instrument, trace, trace_span};
 
 use crate::value::regex::ValueRegex;
 
-/// A boxed `std::error::Error`
+/// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-/// The main value type used in Vector events, and VRL
+/// The main value type used in Vector events, and VRL.
 #[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
-    /// Bytes - usually representing a UTF8 String
+    /// Bytes - usually representing a UTF8 String.
     Bytes(Bytes),
 
-    /// Regex
+    /// Regex.
     /// When used in the context of Vector this is treated identically to Bytes. It has
-    /// additional meaning in the context of VRL
+    /// additional meaning in the context of VRL.
     Regex(ValueRegex),
 
-    /// Integer
+    /// Integer.
     Integer(i64),
 
-    /// Float - not NaN
+    /// Float - not NaN.
     Float(NotNan<f64>),
 
-    /// Boolean
+    /// Boolean.
     Boolean(bool),
 
-    /// Timetamp (UTC)
+    /// Timetamp (UTC).
     Timestamp(DateTime<Utc>),
 
-    /// Object
+    /// Object.
     Object(BTreeMap<String, Value>),
 
-    /// Array
+    /// Array.
     Array(Vec<Value>),
 
-    /// Null
+    /// Null.
     Null,
 }
 
@@ -1082,7 +1082,7 @@ impl Value {
     }
 }
 
-/// Converts a timestamp to a String
+/// Converts a timestamp to a `String`.
 #[must_use]
 pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)

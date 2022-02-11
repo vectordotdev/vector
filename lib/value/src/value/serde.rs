@@ -8,10 +8,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 impl Value {
-    /// Converts self into a Bytesy, using JSON for Map/Array
+    /// Converts self into a `Bytes`, using JSON for Map/Array.
     pub fn coerce_to_bytes(&self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
             Value::Regex(regex) => regex.as_bytes(),
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             Value::Integer(num) => Bytes::from(format!("{}", num)),
@@ -28,7 +28,7 @@ impl Value {
     }
 
     // TODO: return Cow 🐄
-    /// Converts self into a String representation, using JSON for Map/Array
+    /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
     pub fn to_string_lossy(&self) -> String {
         match self {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),

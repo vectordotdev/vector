@@ -57,7 +57,7 @@ impl<'a> FromLua<'a> for Value {
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use mlua::prelude::*;
 
-/// Convert a `DateTime<Utc>` to a `LuaTable`
+/// Convert a `DateTime<Utc>` to a `LuaTable`.
 ///
 /// # Errors
 ///
@@ -92,7 +92,7 @@ pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
     Ok(true)
 }
 
-/// Convert a `LuaTable` to a `DateTime<Utc>`
+/// Convert a `LuaTable` to a `DateTime<Utc>`.
 ///
 /// # Errors
 ///

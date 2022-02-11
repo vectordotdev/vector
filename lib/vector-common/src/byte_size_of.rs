@@ -3,6 +3,7 @@ use std::{
     mem,
 };
 
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value as JsonValue};
 use smallvec::SmallVec;
@@ -28,6 +29,18 @@ pub trait ByteSizeOf {
     /// bytes for `String` and `Vec<u8>` instances but not the exterior bytes
     /// for `BTreeMap`.
     fn allocated_bytes(&self) -> usize;
+}
+
+impl ByteSizeOf for Bytes {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ByteSizeOf for BytesMut {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
 }
 
 impl ByteSizeOf for String {

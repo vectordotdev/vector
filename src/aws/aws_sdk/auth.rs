@@ -1,45 +1,29 @@
-use aws_config::{
-    default_provider::credentials::default_provider,
-    meta::credentials::LazyCachingCredentialsProvider, profile::ProfileFileCredentialsProvider,
-    sts::AssumeRoleProviderBuilder,
-};
+use aws_config::{default_provider::credentials::default_provider, sts::AssumeRoleProviderBuilder};
 use aws_types::{credentials::SharedCredentialsProvider, Credentials};
 
 use crate::aws::auth::AwsAuthentication;
 
 impl AwsAuthentication {
-    pub async fn credentials_provider(&self) -> SharedCredentialsProvider {
+    pub async fn credentials_provider(&self) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::Static {
                 access_key_id,
                 secret_access_key,
-            } => SharedCredentialsProvider::new(Credentials::from_keys(
+            } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
                 access_key_id,
                 secret_access_key,
                 None,
-            )),
-            AwsAuthentication::File {
-                credentials_file,
-                profile,
-            } => {
-                warn!("Overriding the credentials file is not supported. `~/.aws/config` and `~/.aws/credentials` will be used instead of \"{}\"", credentials_file);
-                let mut file_provider = ProfileFileCredentialsProvider::builder();
-                if let Some(profile) = profile {
-                    file_provider = file_provider.profile_name(profile);
-                }
-                SharedCredentialsProvider::new(
-                    LazyCachingCredentialsProvider::builder()
-                        .load(file_provider.build())
-                        .build(),
-                )
+            ))),
+            AwsAuthentication::File { .. } => {
+                Err("Overriding the credentials file is not supported.".into())
             }
-            AwsAuthentication::Role { assume_role } => SharedCredentialsProvider::new(
+            AwsAuthentication::Role { assume_role } => Ok(SharedCredentialsProvider::new(
                 AssumeRoleProviderBuilder::new(assume_role)
                     .build(default_credentials_provider().await),
-            ),
-            AwsAuthentication::Default {} => {
-                SharedCredentialsProvider::new(default_credentials_provider().await)
-            }
+            )),
+            AwsAuthentication::Default {} => Ok(SharedCredentialsProvider::new(
+                default_credentials_provider().await,
+            )),
         }
     }
 

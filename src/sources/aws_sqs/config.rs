@@ -73,7 +73,7 @@ impl SourceConfig for AwsSqsConfig {
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         let mut config_builder = aws_sdk_sqs::config::Builder::new()
-            .credentials_provider(self.auth.credentials_provider().await);
+            .credentials_provider(self.auth.credentials_provider().await?);
 
         if let Some(endpoint_override) = self.region.endpoint()? {
             config_builder = config_builder.endpoint_resolver(endpoint_override);
