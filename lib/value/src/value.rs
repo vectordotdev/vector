@@ -1,4 +1,4 @@
-//! Contains the main "Value" type for Vector and VRL, as well as helper methods
+//! Contains the main "Value" type for Vector and VRL, as well as helper methods.
 
 mod convert;
 mod error;
