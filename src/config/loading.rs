@@ -5,6 +5,7 @@ use std::{
     sync::Mutex,
 };
 
+use crate::config::{EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition};
 use glob::glob;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
@@ -36,6 +37,202 @@ fn default_config_paths() -> Vec<ConfigPath> {
 
 lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
+}
+
+trait Loader<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    /// Takes an input `R` and the format, and returns a Result containing the deserialized
+    /// payload and a vector of deserialization warnings, or an Error containing a vector of
+    /// error strings.
+    fn load<R: std::io::Read>(
+        &self,
+        input: R,
+        format: Format,
+    ) -> Result<(T, Vec<String>), Vec<String>>;
+
+    /// Receives the deserialized value `T`, which can be stored by the implementor, and retrieved
+    /// using the `take` method.
+    fn add_value(&mut self, value: T) -> Result<(), Vec<String>>;
+
+    /// Add an IndexMap of sources.
+    fn add_sources(&mut self, sources: IndexMap<ComponentKey, SourceOuter>);
+
+    /// Add an IndexMap of transforms.
+    fn add_transforms(&mut self, transforms: IndexMap<ComponentKey, TransformOuter<String>>);
+
+    /// Add an IndexMap of sinks.
+    fn add_sink(&mut self, sinks: IndexMap<ComponentKey, SinkOuter<String>>);
+
+    /// Add an IndexMap of enrichment tables.
+    fn add_enrichment_tables(
+        &mut self,
+        enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    );
+
+    /// Add an IndexMap of tests.
+    fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>);
+
+    /// Consumes Self, and returns the final, deserialized `T`.
+    fn take(self) -> T;
+
+    /// Process an individual file. Assumes that the &Path provided is a file. This method
+    /// both opens the file and calls out to `load` to serialize it as `T`, before sending
+    /// it to a post-processor to decide how to store it.
+    fn process_file(
+        &mut self,
+        path: &Path,
+        format: Format,
+    ) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
+        let name = component_name(path)?;
+        if let Some(file) = open_file(path) {
+            let (component, warnings): (T, Vec<String>) = self.load(file, format)?;
+            Ok(Some((name, component, warnings)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
+        if let Some((_, value, warnings)) = self.process_file(path, format)? {
+            self.add_value(value)?;
+            Ok(warnings)
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn load_from_dir(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        let mut errors = Vec::new();
+
+        let (root, mut warnings) = load_files_from_dir(path)?;
+
+        // Pull out each serialized file, and pass each to the value processor. This will mean
+        // different things to different implementors, but will generally involve merging
+        // values against a 'base'.
+        for (_, value) in root {
+            self.add_value(value)?;
+        }
+
+        // If a sub-folder matches an opinionated "namespaced" name, dive into the folder
+        // (one level) and pass the deserialized values into named methods so that we can
+        // treat them as known components.
+        let sub_folder = path.join("enrichment_tables");
+        if sub_folder.exists() && sub_folder.is_dir() {
+            match load_files_from_dir(&sub_folder) {
+                Ok((inner, warns)) => {
+                    warnings.extend(warns);
+                    self.add_enrichment_tables(inner);
+                }
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        let sub_folder = path.join("sinks");
+        if sub_folder.exists() && sub_folder.is_dir() {
+            match load_files_from_dir(&sub_folder) {
+                Ok((inner, warns)) => {
+                    warnings.extend(warns);
+                    self.add_sink(inner);
+                }
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        let sub_folder = path.join("sources");
+        if sub_folder.exists() && sub_folder.is_dir() {
+            match load_files_from_dir(&sub_folder) {
+                Ok((inner, warns)) => {
+                    warnings.extend(warns);
+                    self.add_sources(inner);
+                }
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        let sub_folder = path.join("tests");
+        if sub_folder.exists() && sub_folder.is_dir() {
+            match load_files_from_dir(&sub_folder) {
+                Ok((inner, warns)) => {
+                    warnings.extend(warns);
+                    self.add_tests(inner);
+                }
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        let sub_folder = path.join("transforms");
+        if sub_folder.exists() && sub_folder.is_dir() {
+            let (value, warns) = super::recursive::load_dir(&sub_folder)?;
+            warnings.extend(warns);
+            match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TransformOuter<_>>>()
+            {
+                Ok(inner) => self.add_transforms(inner),
+                Err(err) => errors.push(format!("Unable to decode transform folder: {:?}", err)),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(warnings)
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+struct ConfigBuilderLoader {
+    builder: ConfigBuilder,
+}
+
+impl ConfigBuilderLoader {
+    pub fn new() -> Self {
+        Self {
+            builder: ConfigBuilder::default(),
+        }
+    }
+}
+
+impl Loader<ConfigBuilder> for ConfigBuilderLoader {
+    fn load<R: std::io::Read>(
+        &self,
+        input: R,
+        format: Format,
+    ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+        let (with_vars, warnings) = prepare_input(input)?;
+
+        format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
+    }
+
+    fn add_value(&mut self, value: ConfigBuilder) -> Result<(), Vec<String>> {
+        self.builder.append(value)
+    }
+
+    fn add_sources(&mut self, sources: IndexMap<ComponentKey, SourceOuter>) {
+        self.builder.sources.extend(sources)
+    }
+
+    fn add_transforms(&mut self, component: IndexMap<ComponentKey, TransformOuter<String>>) {
+        self.builder.transforms.extend(component);
+    }
+
+    fn add_sink(&mut self, component: IndexMap<ComponentKey, SinkOuter<String>>) {
+        self.builder.sinks.extend(component);
+    }
+
+    fn add_enrichment_tables(&mut self, component: IndexMap<ComponentKey, EnrichmentTableOuter>) {
+        self.builder.enrichment_tables.extend(component);
+    }
+
+    fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>) {
+        self.builder
+            .tests
+            .extend(component.into_iter().map(|(_, value)| value));
+    }
+
+    fn take(self) -> ConfigBuilder {
+        self.builder
+    }
 }
 
 pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
