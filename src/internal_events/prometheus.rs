@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -79,7 +79,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             message = "Parsing error.",
             url = %self.url,
             error = ?self.error,
-            error_type = "parse_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -94,7 +94,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
         );
@@ -117,7 +117,7 @@ impl InternalEvent for PrometheusHttpResponseError {
             code = %self.code,
             stage = error_stage::RECEIVING,
             error = self.code.canonical_reason().unwrap_or("unknown status code"),
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             internal_log_rate_secs = 10,
         );
     }
@@ -128,7 +128,7 @@ impl InternalEvent for PrometheusHttpResponseError {
             "code" => self.code.to_string(),
             "url" => self.url.to_string(),
             "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
-            "error_type" => "request_failed",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -148,7 +148,7 @@ impl InternalEvent for PrometheusHttpError {
             message = "HTTP request processing error.",
             url = %self.url,
             error = ?self.error,
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             internal_log_rate_secs = 10,
         );
@@ -159,7 +159,7 @@ impl InternalEvent for PrometheusHttpError {
             "component_errors_total", 1,
             "url" => self.url.to_string(),
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -177,7 +177,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         error!(
             message = "Could not decode request body.",
             error = ?self.error,
-            error_type = "parse_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -187,7 +187,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -203,7 +203,7 @@ impl InternalEvent for PrometheusNoNameError {
         error!(
             message = "Could not decode timeseries.",
             error = "Decoded timeseries is missing the __name__ field.",
-            error_type = "parse_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -213,7 +213,7 @@ impl InternalEvent for PrometheusNoNameError {
         counter!(
             "component_errors_total", 1,
             "error" => "Decoded timeseries is missing the __name__ field.",
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

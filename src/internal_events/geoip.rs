@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use std::net::AddrParseError;
 use vector_core::internal_event::InternalEvent;
@@ -14,7 +14,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
         error!(
             message = %format!("IP Address not parsed correctly: {:?}", self.error),
             error = "invalid_ip_address",
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             address = %self.address,
             internal_log_rate_secs = 30
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => "invalid_ip_address",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "address" => self.address.to_string(),
         );

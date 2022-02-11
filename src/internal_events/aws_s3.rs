@@ -7,7 +7,7 @@ pub mod source {
     };
     use vector_core::internal_event::InternalEvent;
 
-    use crate::internal_events::prelude::error_stage;
+    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
@@ -46,7 +46,7 @@ pub mod source {
             error!(
                 message = "Failed to fetch SQS events.",
                 error = %self.error,
-                error_type = "request_failed",
+                error_type = error_type::REQUEST_FAILED,
                 stage = error_stage::RECEIVING,
             );
         }
@@ -55,7 +55,7 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
-                "error_type" => "request_failed",
+                "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
             // deprecated
@@ -106,7 +106,7 @@ pub mod source {
                 message = "Failed to process SQS message.",
                 message_id = %self.message_id,
                 error = %self.error,
-                error_type = "processing_failed",
+                error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
             );
         }
@@ -115,7 +115,7 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
-                "error_type" => "processing_failed",
+                "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated
@@ -159,7 +159,7 @@ pub mod source {
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = "Unable to delete some of the messages.",
-                error_type = "acknowledgment_failed",
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
             );
         }
@@ -168,13 +168,15 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => "Unable to delete SQS message.",
-                "error_type" => "acknowledgment_failed",
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
         }
     }
+
+    const DELETION_FAILED: &str = "deletion_failed";
 
     #[derive(Debug)]
     pub struct SqsMessageDeleteBatchError {
@@ -191,7 +193,7 @@ pub mod source {
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = %self.error,
-                error_type = "deletion_failed",
+                error_type = DELETION_FAILED,
                 stage = error_stage::PROCESSING,
             );
         }
@@ -200,7 +202,7 @@ pub mod source {
             counter!(
                 "component_errors_total", 1,
                 "error" => self.error.to_string(),
-                "error_type" => "deletion_failed",
+                "error_type" => DELETION_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated

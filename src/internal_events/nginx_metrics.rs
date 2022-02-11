@@ -1,8 +1,6 @@
-// ## skip check-events ##
-
 use std::time::Instant;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -70,7 +68,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             message = "Nginx request error.",
             endpoint = %self.endpoint,
             error = %self.error,
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
         );
     }
@@ -80,7 +78,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             "component_errors_total", 1,
             "endpoint" => self.endpoint.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -99,7 +97,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             message = "NginxStubStatus parse error.",
             endpoint = %self.endpoint,
             error = %self.error,
-            error_type = "parse_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
     }
@@ -109,7 +107,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             "component_errors_total", 1,
             "endpoint" => self.endpoint.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
