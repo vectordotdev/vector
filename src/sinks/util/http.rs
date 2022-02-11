@@ -22,8 +22,8 @@ use vector_core::{buffers::Acker, ByteSizeOf};
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
-    TowerRequestConfig, TowerRequestSettings,
+    uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    TowerRequestSettings,
 };
 use crate::{
     event::Event,
@@ -37,7 +37,7 @@ pub trait HttpSink: Send + Sync + 'static {
     type Output;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input>;
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>>;
 }
 
 /// Provides a simple wrapper around internal tower and
@@ -61,14 +61,14 @@ pub struct BatchedHttpSink<
     SL = sink::StdServiceLogic<http::Response<Bytes>>,
 > where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
     inner: TowerBatchedSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
         B,
         RL,
         SL,
@@ -82,7 +82,7 @@ pub struct BatchedHttpSink<
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -109,7 +109,7 @@ where
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -127,11 +127,10 @@ where
         let sink = Arc::new(sink);
 
         let sink1 = Arc::clone(&sink);
-        let request_builder =
-            move |b| -> BoxFuture<'static, crate::Result<http::Request<Vec<u8>>>> {
-                let sink = Arc::clone(&sink1);
-                Box::pin(async move { sink.build_request(b).await })
-            };
+        let request_builder = move |b| -> BoxFuture<'static, crate::Result<http::Request<Bytes>>> {
+            let sink = Arc::clone(&sink1);
+            Box::pin(async move { sink.build_request(b).await })
+        };
 
         let svc = HttpBatchService::new(client, request_builder);
         let inner = request_settings.batch_sink(
@@ -154,7 +153,7 @@ where
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -211,7 +210,7 @@ where
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -220,7 +219,7 @@ where
     sink: Arc<T>,
     #[pin]
     inner: TowerPartitionSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
         B,
         RL,
         K,
@@ -232,7 +231,7 @@ where
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -260,7 +259,7 @@ where
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
@@ -278,11 +277,10 @@ where
         let sink = Arc::new(sink);
 
         let sink1 = Arc::clone(&sink);
-        let request_builder =
-            move |b| -> BoxFuture<'static, crate::Result<http::Request<Vec<u8>>>> {
-                let sink = Arc::clone(&sink1);
-                Box::pin(async move { sink.build_request(b).await })
-            };
+        let request_builder = move |b| -> BoxFuture<'static, crate::Result<http::Request<Bytes>>> {
+            let sink = Arc::clone(&sink1);
+            Box::pin(async move { sink.build_request(b).await })
+        };
 
         let svc = HttpBatchService::new(client, request_builder);
         let inner = request_settings.partition_sink(
@@ -311,7 +309,7 @@ where
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -365,7 +363,7 @@ where
     }
 }
 
-pub struct HttpBatchService<F, B = Vec<u8>> {
+pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
 }
@@ -384,8 +382,8 @@ impl<F, B> HttpBatchService<F, B> {
 
 impl<F, B> Service<B> for HttpBatchService<F, B>
 where
-    F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-    B: ByteSizeOf + ElementCount + Send + 'static,
+    F: Future<Output = crate::Result<hyper::Request<Bytes>>> + Send + 'static,
+    B: ByteSizeOf + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -593,10 +591,10 @@ mod test {
             .parse::<Uri>()
             .unwrap();
 
-        let request = b"hello".to_vec();
+        let request = Bytes::from("hello");
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
-        let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
+        let mut service = HttpBatchService::new(client, move |body: Bytes| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),
             ))

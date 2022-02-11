@@ -34,7 +34,7 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         azure_common::{
             self,
