@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
+#[cfg(all(test, feature = "vector-unit-test-tests"))]
 mod tests;
 mod unit_test_components;
 
