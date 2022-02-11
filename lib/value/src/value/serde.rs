@@ -11,7 +11,7 @@ impl Value {
     /// Converts self into a Bytesy, using JSON for Map/Array
     pub fn as_bytes(&self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
             Value::Regex(regex) => regex.as_bytes(),
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             Value::Integer(num) => Bytes::from(format!("{}", num)),
