@@ -547,7 +547,7 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
-			_acknowledgements: {
+			_source_acknowledgements: {
 				common:      true
 				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings."
 				required:    false
