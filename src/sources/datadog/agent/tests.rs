@@ -1078,9 +1078,6 @@ fn test_config_outputs() {
             .map(|output| (output.port, output.schema_definition))
             .collect::<HashMap<_, _>>();
 
-        dbg!(&outputs);
-        dbg!(&want);
-
         for (name, want) in want {
             let got = outputs
                 .remove(&name.map(ToOwned::to_owned))
