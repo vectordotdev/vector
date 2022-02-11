@@ -36,7 +36,7 @@ pub struct Opts {
     #[structopt(use_delimiter(true), long)]
     inputs_of: Vec<String>,
 
-    /// Verbose output includes event notifications (pattern matched/not matched)
+    /// Quiet output includes only events
     #[structopt(short, long)]
-    verbose: bool,
+    quiet: bool,
 }
