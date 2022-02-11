@@ -109,19 +109,18 @@ impl SourceConfig for DatadogAgentConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
-        let log_service = source.clone().event_service(
-            acknowledgements.enabled(),
-            cx.out.clone(),
-            self.multiple_outputs,
-        );
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let log_service =
+            source
+                .clone()
+                .event_service(acknowledgements, cx.out.clone(), self.multiple_outputs);
         let series_v1_service = source.clone().series_v1_service(
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out.clone(),
             self.multiple_outputs,
         );
         let sketches_service = source.clone().sketches_service(
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out.clone(),
             self.multiple_outputs,
         );
@@ -175,6 +174,10 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

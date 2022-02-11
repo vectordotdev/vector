@@ -19,6 +19,7 @@ pub use vector_core::{
 use crate::{
     conditions,
     event::Metric,
+    serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
@@ -127,14 +128,14 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) {
-        for sink in self.sinks.values_mut() {
-            sink.acknowledgements.merge(&self.global.acknowledgements);
-        }
-
         let inputs: Vec<_> = self
             .sinks
             .values()
-            .filter(|sink| sink.acknowledgements.enabled())
+            .filter(|sink| {
+                sink.acknowledgements
+                    .merge_default(&self.global.acknowledgements)
+                    .enabled()
+            })
             .flat_map(|sink| sink.inputs.clone())
             .collect();
         self.propagate_acks_rec(inputs);
@@ -145,11 +146,7 @@ impl Config {
             if input.port.is_some() {
                 let component = &input.component;
                 if let Some(source) = self.sources.get_mut(component) {
-                    if !source.inner.can_acknowledge() {
-                        warn!("FIXME");
-                    } else {
-                        source.acknowledgements.enable();
-                    }
+                    source.enable_acknowledgements();
                 } else if let Some(transform) = self.transforms.get(component) {
                     let inputs = transform.inputs.clone();
                     self.propagate_acks_rec(inputs);
@@ -217,7 +214,7 @@ pub struct SourceOuter {
         skip_deserializing,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub sink_acknowledgements: bool,
 }
 
 impl SourceOuter {
@@ -225,7 +222,15 @@ impl SourceOuter {
         Self {
             inner: Box::new(source),
             proxy: Default::default(),
-            acknowledgements: false.into(),
+            sink_acknowledgements: false,
+        }
+    }
+
+    fn enable_acknowledgements(&mut self) {
+        if !self.inner.can_acknowledge() {
+            todo!("FIXME");
+        } else {
+            self.sink_acknowledgements = true;
         }
     }
 }
@@ -255,6 +260,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
+    pub acknowledgements: bool,
 }
 
 impl SourceContext {
@@ -272,6 +278,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
+                acknowledgements: false,
             },
             shutdown,
         )
@@ -285,7 +292,15 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
+            acknowledgements: false,
         }
+    }
+
+    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
+        config
+            .merge_default(&self.globals.acknowledgements)
+            .merge_default(&self.acknowledgements.into())
+            .enabled()
     }
 }
 
@@ -319,6 +334,7 @@ pub struct SinkOuter<T> {
 
     #[serde(
         default,
+        deserialize_with = "bool_or_struct",
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
@@ -333,7 +349,7 @@ impl<T> SinkOuter<T> {
             healthcheck_uri: None,
             inner,
             proxy: Default::default(),
-            acknowledgements: false.into(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -385,7 +401,7 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
-            acknowledgements: false.into(),
+            acknowledgements: Default::default(),
         }
     }
 }

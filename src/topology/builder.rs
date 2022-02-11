@@ -193,6 +193,7 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
+            acknowledgements: source.sink_acknowledgements,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {

@@ -95,18 +95,13 @@ pub struct AcknowledgementsConfig {
 }
 
 impl AcknowledgementsConfig {
-    pub fn merge(&self, other: &Self) -> Self {
-        Self {
-            enabled: other.enabled.or(self.enabled),
-        }
+    pub fn merge_default(&self, other: &Self) -> Self {
+        let enabled = self.enabled.or(other.enabled);
+        Self { enabled }
     }
 
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
-    }
-
-    pub fn enable(&mut self) {
-        self.enabled = Some(true);
     }
 }
 

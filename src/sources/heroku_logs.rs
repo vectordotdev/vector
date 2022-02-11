@@ -119,6 +119,10 @@ impl SourceConfig for LogplexConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs

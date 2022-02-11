@@ -234,14 +234,14 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            acknowledgements.enabled(),
+            acknowledgements,
         ))
     }
 
@@ -251,6 +251,10 @@ impl SourceConfig for FileConfig {
 
     fn source_type(&self) -> &'static str {
         "file"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

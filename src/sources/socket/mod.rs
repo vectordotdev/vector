@@ -615,6 +615,7 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
+                acknowledgements: false,
             })
             .await
             .unwrap();
