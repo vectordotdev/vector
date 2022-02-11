@@ -1,6 +1,7 @@
 mod config_builder;
 mod loader;
 mod recursive;
+mod source;
 
 use std::{
     collections::HashMap,
@@ -20,6 +21,7 @@ use once_cell::sync::Lazy;
 
 pub use config_builder::*;
 pub use loader::*;
+pub use source::*;
 
 pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
 
@@ -202,18 +204,21 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-pub fn load_builder_from_paths(
+fn loader_from_paths<T, L>(
+    mut loader: L,
     config_paths: &[ConfigPath],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<(T, Vec<String>), Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+    L: Loader<T> + private::Process<T>,
+{
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
-
-    let mut builder = ConfigBuilderLoader::new();
 
     for config_path in config_paths {
         match config_path {
             ConfigPath::File(path, format_hint) => {
-                match builder.load_from_file(
+                match loader.load_from_file(
                     path,
                     format_hint
                         .or_else(move || Format::from_path(&path).ok())
@@ -224,7 +229,7 @@ pub fn load_builder_from_paths(
                 };
             }
             ConfigPath::Dir(path) => {
-                match builder.load_from_dir(path) {
+                match loader.load_from_dir(path) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };
@@ -233,10 +238,16 @@ pub fn load_builder_from_paths(
     }
 
     if errors.is_empty() {
-        Ok((builder.take(), warnings))
+        Ok((loader.take(), warnings))
     } else {
         Err(errors)
     }
+}
+
+pub fn load_builder_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+    loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {

@@ -54,7 +54,7 @@ pub(super) mod private {
         );
 
         /// Add an IndexMap of tests.
-        fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>);
+        fn add_tests(&mut self, tests: IndexMap<ComponentKey, TestDefinition<String>>);
 
         /// Process an individual file. Assumes that the &Path provided is a file. This method
         /// both opens the file and calls out to `load` to serialize it as `T`, before sending

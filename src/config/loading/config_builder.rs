@@ -49,10 +49,10 @@ impl loader::private::Process<ConfigBuilder> for ConfigBuilderLoader {
         self.builder.enrichment_tables.extend(component);
     }
 
-    fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>) {
+    fn add_tests(&mut self, tests: IndexMap<ComponentKey, TestDefinition<String>>) {
         self.builder
             .tests
-            .extend(component.into_iter().map(|(_, value)| value));
+            .extend(tests.into_iter().map(|(_, value)| value));
     }
 }
 

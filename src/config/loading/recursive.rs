@@ -5,11 +5,11 @@ use toml::{value::Map, Value};
 use super::{component_name, load, open_file, read_dir};
 use crate::config::Format;
 
-fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
+pub fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
     serde_toml_merge::merge(value, other).map_err(|err| vec![format!("{}", err)])
 }
 
-fn merge_with_value(
+pub fn merge_with_value(
     res: &mut toml::map::Map<String, toml::Value>,
     name: String,
     value: toml::Value,

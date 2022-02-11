@@ -15,21 +15,21 @@ pub struct Opts {
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
 pub fn cmd(opts: &Opts, config_paths: &[ConfigPath]) -> exitcode::ExitCode {
-    let builder = match process_paths(&config_paths) {
+    let _paths = match process_paths(&config_paths) {
         Some(paths) => match load_builder_from_paths(&paths) {
-            Ok((builder, _)) => builder,
+            Ok(_) => paths,
             Err(errs) => return handle_config_errors(errs),
         },
         None => return exitcode::CONFIG,
     };
 
-    let json = if opts.pretty {
-        serde_json::to_string_pretty(&builder)
-    } else {
-        serde_json::to_string(&builder)
-    };
-
-    println!("{}", json.expect("config should be serializable"));
+    // let json = if opts.pretty {
+    //     serde_json::to_string_pretty(&builder)
+    // } else {
+    //     serde_json::to_string(&builder)
+    // };
+    //
+    // println!("{}", json.expect("config should be serializable"));
 
     exitcode::OK
 }
