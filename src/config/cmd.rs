@@ -10,8 +10,8 @@ pub struct Opts {
     pretty: bool,
 }
 
-/// Function used by the `vector out-config` subcommand for outputting a normalized configuration.
-/// The purpose of this func is to serialize a `ConfigBuilder`, after processing all paths,
+/// Function used by the `vector config` subcommand for outputting a normalized configuration.
+/// The purpose of this func is to combine user configuration after processing all paths,
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
 pub fn cmd(opts: &Opts, config_paths: &[ConfigPath]) -> exitcode::ExitCode {
