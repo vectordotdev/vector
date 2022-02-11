@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn int(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Integer(_) => Ok(v),
-        v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
+        v => Err(format!(r#"expected integer, got {}"#, v.kind_vrl()).into()),
     }
 }
 

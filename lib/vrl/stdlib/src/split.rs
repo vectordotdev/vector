@@ -93,7 +93,7 @@ impl Expression for SplitFn {
                     .into())
             }
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.kind_vrl(),
                 expected: Kind::regex() | Kind::bytes(),
             }
             .into()),

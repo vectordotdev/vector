@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{TimeZone, Utc};
+use ordered_float::NotNan;
 use regex::Regex;
 
 use super::Value;
@@ -25,8 +26,12 @@ pub use ::value::{
     Kind,
 };
 
-impl Value {
-    pub fn kind(&self) -> Kind {
+pub trait VrlValueKind {
+    fn kind_vrl(&self) -> Kind;
+}
+
+impl VrlValueKind for Value {
+    fn kind_vrl(&self) -> Kind {
         self.into()
     }
 }
@@ -51,11 +56,11 @@ impl DefaultValue for Kind {
         }
 
         if self.is_integer() {
-            return value!(0);
+            return value!(0_i64);
         }
 
         if self.is_float() {
-            return value!(0.0);
+            return value!(NotNan::new(0.0).unwrap());
         }
 
         if self.is_boolean() {

@@ -60,10 +60,12 @@ impl Expression for CeilFn {
         };
 
         match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::ceil).into()),
+            Value::Float(f) => Ok(Value::from_f64_or_zero(
+                round_to_precision(*f, precision, f64::ceil).into(),
+            )),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.kind_vrl(),
                 expected: Kind::float() | Kind::integer(),
             }
             .into()),

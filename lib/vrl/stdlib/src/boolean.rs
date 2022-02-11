@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn boolean(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Boolean(_) => Ok(v),
-        v => Err(format!("expected boolean, got {}", v.kind()).into()),
+        v => Err(format!("expected boolean, got {}", v.kind_vrl()).into()),
     }
 }
 

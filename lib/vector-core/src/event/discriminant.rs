@@ -60,7 +60,7 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         // Non-trivial.
         (Value::Float(this), Value::Float(other)) => f64_eq(this.into_inner(), other.into_inner()),
         (Value::Array(this), Value::Array(other)) => array_eq(this, other),
-        (Value::Map(this), Value::Map(other)) => map_eq(this, other),
+        (Value::Object(this), Value::Object(other)) => map_eq(this, other),
         // Type mismatch.
         _ => false,
     }
@@ -128,7 +128,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         // Non-trivial.
         Value::Float(val) => hash_f64(hasher, val.into_inner()),
         Value::Array(val) => hash_array(hasher, val),
-        Value::Map(val) => hash_map(hasher, val),
+        Value::Object(val) => hash_map(hasher, val),
         Value::Null => hash_null(hasher),
     }
 }

@@ -296,7 +296,9 @@ fn enrich_syslog_event(
         log.insert("source_ip", default_host.clone());
     }
 
-    let parsed_hostname = log.get("hostname").map(|hostname| hostname.as_bytes());
+    let parsed_hostname = log
+        .get("hostname")
+        .map(|hostname| hostname.coerce_to_bytes());
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         log.insert(host_key, parsed_host);
     }

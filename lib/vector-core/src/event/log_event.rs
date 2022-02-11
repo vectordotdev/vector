@@ -36,7 +36,7 @@ pub struct LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
-            fields: Arc::new(Value::Map(BTreeMap::new())),
+            fields: Arc::new(Value::Object(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }
     }
@@ -58,14 +58,14 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Arc::new(Value::Map(Default::default())),
+            fields: Arc::new(Value::Object(Default::default())),
             metadata,
         }
     }
 
     ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let fields = Value::Map(map);
+        let fields = Value::Object(map);
         Self {
             fields: Arc::new(fields),
             metadata,
@@ -207,7 +207,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         match self.fields.as_ref() {
-            Value::Map(map) => util::log::keys(map),
+            Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
         }
     }
@@ -225,7 +225,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         match self.fields.as_ref() {
-            Value::Map(map) => map,
+            Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
@@ -233,7 +233,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
         match Arc::make_mut(&mut self.fields) {
-            Value::Map(ref mut map) => map,
+            Value::Object(ref mut map) => map,
             _ => unreachable!(),
         }
     }
@@ -259,7 +259,7 @@ impl LogEvent {
         for (_index, segment) in walker {
             current_pointer = match (segment, current_pointer) {
                 (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
-                    Value::Map(map) => map.entry(field),
+                    Value::Object(map) => map.entry(field),
                     v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
                 },
                 (Segment::Field(field), Entry::Vacant(entry)) => {
@@ -332,7 +332,7 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Arc::new(Value::Map(map)),
+            fields: Arc::new(Value::Object(map)),
             metadata: EventMetadata::default(),
         }
     }
@@ -342,7 +342,7 @@ impl From<LogEvent> for BTreeMap<String, Value> {
     fn from(mut event: LogEvent) -> BTreeMap<String, Value> {
         Arc::make_mut(&mut event.fields);
         match Arc::try_unwrap(event.fields).expect("already cloned") {
-            Value::Map(map) => map,
+            Value::Object(map) => map,
             _ => unreachable!(),
         }
     }

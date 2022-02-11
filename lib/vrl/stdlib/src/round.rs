@@ -69,10 +69,14 @@ impl Expression for RoundFn {
         let precision = self.precision.resolve(ctx)?.try_integer()?;
 
         match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
+            Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+                f.into_inner(),
+                precision,
+                f64::round,
+            ))),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.kind_vrl(),
                 expected: Kind::float() | Kind::integer(),
             }
             .into()),

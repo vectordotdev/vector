@@ -38,7 +38,7 @@ impl Encoder<Event> for RawMessageSerializer {
         let bytes = match event {
             Event::Log(log) => log
                 .get(log_schema().message_key())
-                .map(|value| value.as_bytes()),
+                .map(|value| value.coerce_to_bytes()),
             Event::Metric(_) => None,
         };
 

@@ -71,7 +71,12 @@ impl Expression for ParseCsvFn {
             .map_err(|err| format!("invalid csv record: {}", err).into()) // shouldn't really happen
             .map(|record| {
                 record
-                    .map(|record| record.iter().map(Into::into).collect::<Vec<Value>>())
+                    .map(|record| {
+                        record
+                            .iter()
+                            .map(|x| Bytes::copy_from_slice(x).into())
+                            .collect::<Vec<Value>>()
+                    })
                     .unwrap_or_default()
                     .into()
             })

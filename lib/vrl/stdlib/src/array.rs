@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn array(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Array(_) => Ok(v),
-        v => Err(format!("expected array, got {}", v.kind()).into()),
+        v => Err(format!("expected array, got {}", v.kind_vrl()).into()),
     }
 }
 

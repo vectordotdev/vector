@@ -12,7 +12,7 @@ fn to_bool(value: Value) -> std::result::Result<Value, ExpressionError> {
         Bytes(v) => Conversion::Boolean
             .convert(v)
             .map_err(|e| e.to_string().into()),
-        v => Err(format!("unable to coerce {} into boolean", v.kind()).into()),
+        v => Err(format!("unable to coerce {} into boolean", v.kind_vrl()).into()),
     }
 }
 

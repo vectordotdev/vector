@@ -82,7 +82,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
 
         let message = log
             .get(&self.field)
-            .map(|s| s.as_bytes())
+            .map(|s| s.coerce_to_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
                     .map_err(|error| emit!(&AwsCloudwatchLogsSubscriptionParserError { error }))

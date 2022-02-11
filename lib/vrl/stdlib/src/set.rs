@@ -118,7 +118,7 @@ impl Expression for SetFn {
                         value => {
                             return Err(format!(
                                 r#"path segment must be either string or integer, not {}"#,
-                                value.kind()
+                                value.kind_vrl()
                             )
                             .into())
                         }
@@ -131,7 +131,7 @@ impl Expression for SetFn {
             }
             value => {
                 return Err(value::Error::Expected {
-                    got: value.kind(),
+                    got: value.kind_vrl(),
                     expected: Kind::array(Collection::any()) | Kind::bytes(),
                 }
                 .into())

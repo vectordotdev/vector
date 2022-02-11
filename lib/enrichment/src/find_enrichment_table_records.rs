@@ -128,7 +128,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
                     .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
-                    got: value.kind(),
+                    got: value.kind_vrl(),
                     expected: Kind::array(Collection::any()),
                 }),
             })

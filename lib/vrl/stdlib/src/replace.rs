@@ -109,18 +109,21 @@ impl Expression for ReplaceFn {
             }
             Value::Regex(regex) => {
                 let replaced = match count {
-                    i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_ref())
-                        .as_bytes()
-                        .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
+                    i if i > 0 => Bytes::copy_from_slice(
+                        regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
+                    )
+                    .into(),
+                    i if i < 0 => {
+                        Bytes::copy_from_slice(regex.replace_all(&value, with.as_ref()).as_bytes())
+                            .into()
+                    }
                     _ => value.into(),
                 };
 
                 Ok(replaced)
             }
             value => Err(value::Error::Expected {
-                got: value.kind(),
+                got: value.kind_vrl(),
                 expected: Kind::regex() | Kind::bytes(),
             }
             .into()),
