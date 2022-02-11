@@ -791,6 +791,19 @@ dnstap-integration-tests = ["sources-dnstap", "bollard"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+vector-unit-test-tests = [
+  "sources-demo_logs",
+  "transforms-add_fields",
+  "transforms-remap",
+  "transforms-route",
+  "transforms-filter",
+  "transforms-reduce",
+  "transforms-compound",
+  "transforms-add_tags",
+  "transforms-log_to_metric",
+  "transforms-remove_fields",
+  "sinks-console"
+]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
