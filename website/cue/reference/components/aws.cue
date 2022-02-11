@@ -251,9 +251,9 @@ components: _aws_new_sdk: {
 		}
 
 		endpoint: components._aws.configuration.endpoint
-		region: components._aws.configuration.region
+		region:   components._aws.configuration.region
 	}
 
-	env_vars: components._aws.env_vars
+	env_vars:     components._aws.env_vars
 	how_it_works: components._aws.how_it_works
 }
