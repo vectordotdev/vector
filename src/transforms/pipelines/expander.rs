@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
+    config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
     transforms::Transform,
 };
 
@@ -42,11 +42,11 @@ impl TransformConfig for ExpanderConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
+    fn input(&self) -> Input {
         self.inner
             .first()
-            .map(|(_, item)| item.input_type())
-            .unwrap_or(DataType::Any)
+            .map(|(_, item)| item.input())
+            .unwrap_or_else(Input::any)
     }
 
     fn outputs(&self) -> Vec<Output> {

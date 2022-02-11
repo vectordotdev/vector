@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessage},
@@ -161,8 +161,8 @@ impl SinkConfig for HttpSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

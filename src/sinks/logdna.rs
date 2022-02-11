@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -99,8 +99,8 @@ impl SinkConfig for LogdnaConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

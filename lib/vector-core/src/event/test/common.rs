@@ -562,7 +562,13 @@ impl Arbitrary for Value {
                 Value::Bytes(Bytes::from(bytes))
             }
             1 => Value::Integer(i64::arbitrary(g)),
-            2 => Value::Float(f64::arbitrary(g) % MAX_F64_SIZE),
+            2 => {
+                let mut f = f64::arbitrary(g) % MAX_F64_SIZE;
+                if f.is_nan() {
+                    f = 0.0;
+                }
+                Value::from(f)
+            }
             3 => Value::Boolean(bool::arbitrary(g)),
             4 => Value::Timestamp(datetime(g)),
             5 => {

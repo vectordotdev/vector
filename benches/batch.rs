@@ -102,7 +102,7 @@ fn benchmark_batch(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // noisy benchmarks; 10% encapsulates what we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.10);
     targets = benchmark_batch
 );

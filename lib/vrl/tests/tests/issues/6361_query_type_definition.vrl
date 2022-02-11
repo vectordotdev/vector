@@ -1,4 +1,4 @@
-# issue: https://github.com/timberio/vector/issues/6361
+# issue: https://github.com/vectordotdev/vector/issues/6361
 # result: "1"
 
 foo = [{ "foo": to_string(1) }]

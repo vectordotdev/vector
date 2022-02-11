@@ -42,7 +42,7 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
     event["nested"]["field"] = 5
     ```
 
-    See [#706](https://github.com/timberio/vector/issues/706) and [#1406](https://github.com/timberio/vector/issues/1406).
+    See [#706](https://github.com/vectordotdev/vector/issues/706) and [#1406](https://github.com/vectordotdev/vector/issues/1406).
 
 *   **Setup Code**
 
@@ -77,13 +77,13 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
     end
     ```
 
-    See [#1864](https://github.com/timberio/vector/issues/1864).
+    See [#1864](https://github.com/vectordotdev/vector/issues/1864).
 
 *   **Control Flow**
 
     It should be possible to define channels for output events, similarly to how it is done in [`swimlanes`](https://vector.dev/docs/reference/transforms/swimlanes/) transform.
 
-    See [#1942](https://github.com/timberio/vector/issues/1942).
+    See [#1942](https://github.com/vectordotdev/vector/issues/1942).
 
 ## Motivating Examples
 

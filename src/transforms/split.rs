@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::{SplitConvertFailed, SplitFieldMissing},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -54,8 +54,8 @@ impl TransformConfig for SplitConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -115,7 +115,7 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(&SplitConvertFailed { field: name, error });
+                        emit!(&ParserConversionError { name, error });
                     }
                 }
             }
@@ -123,7 +123,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&SplitFieldMissing { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);
@@ -146,6 +146,7 @@ mod tests {
         config::TransformConfig,
         event::{Event, LogEvent, Value},
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -251,7 +252,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::Float(NotNan::new(42.3).unwrap()));
         assert_eq!(log["flag"], Value::Boolean(true));
         assert_eq!(log["code"], Value::Integer(1234));
         assert_eq!(log["rest"], Value::Bytes("word".into()));

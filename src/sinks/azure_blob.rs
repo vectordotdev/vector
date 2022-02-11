@@ -9,7 +9,7 @@ use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Finalizable},
     sinks::{
         azure_common::{
@@ -79,8 +79,8 @@ impl SinkConfig for AzureBlobSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

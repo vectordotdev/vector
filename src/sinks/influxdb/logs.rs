@@ -9,7 +9,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -150,8 +150,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -248,7 +248,7 @@ impl InfluxDbLogsConfig {
 fn to_field(value: &Value) -> Field {
     match value {
         Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
+        Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
         _ => Field::String(value.to_string_lossy()),
     }

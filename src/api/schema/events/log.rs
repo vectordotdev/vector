@@ -1,5 +1,6 @@
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
@@ -52,6 +53,8 @@ impl Log {
                 .expect("JSON serialization of log event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
+            EventEncodingType::Logfmt => encode_logfmt::to_string(self.event.as_map())
+                .expect("logfmt serialization of log event failed. Please report."),
         }
     }
 

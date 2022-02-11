@@ -161,7 +161,7 @@ impl Expression for DelFn {
     // immutable fields for now, but we'll circle back to this in the near
     // future to potentially improve this situation.
     //
-    // see tracking issue: https://github.com/timberio/vector/issues/5887
+    // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         del(&self.query, ctx)
     }

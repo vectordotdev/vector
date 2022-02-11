@@ -549,7 +549,7 @@ const fn default_max_read_bytes() -> usize {
 
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
+    // https://github.com/vectordotdev/vector/issues/6967
     //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.

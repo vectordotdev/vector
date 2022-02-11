@@ -100,11 +100,11 @@ common protocols with the exception of the Regex Parsing test.
 
 |                                                                                                               Test |     Vector      | Filebeat |    FluentBit    |  FluentD  | Logstash  |    SplunkUF     | SplunkHF |
 |-------------------------------------------------------------------------------------------------------------------:|:---------------:|:--------:|:---------------:|:---------:|:---------:|:---------------:|:--------:|
-| [TCP to Blackhole](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) |  _**86mib/s**_  |   n/a    |    64.4mib/s    | 27.7mib/s | 40.6mib/s |       n/a       |   n/a    |
-|           [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | _**76.7mib/s**_ | 7.8mib/s |     35mib/s     | 26.1mib/s | 3.1mib/s  |    40.1mib/s    | 39mib/s  |
-|       [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) |    13.2mib/s    |   n/a    | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  |       n/a       | 7.8mib/s |
-|           [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ |   n/a    |    19.6mib/s    |  <1mib/s  | 2.7mib/s  |       n/a       |   n/a    |
-|             [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) |    69.9mib/s    |  5mib/s  |    67.1mib/s    | 3.9mib/s  |  10mib/s  | _**70.4mib/s**_ | 7.6mib/s |
+| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) |  _**86mib/s**_  |   n/a    |    64.4mib/s    | 27.7mib/s | 40.6mib/s |       n/a       |   n/a    |
+|           [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance) | _**76.7mib/s**_ | 7.8mib/s |     35mib/s     | 26.1mib/s | 3.1mib/s  |    40.1mib/s    | 39mib/s  |
+|       [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance) |    13.2mib/s    |   n/a    | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  |       n/a       | 7.8mib/s |
+|           [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ |   n/a    |    19.6mib/s    |  <1mib/s  | 2.7mib/s  |       n/a       |   n/a    |
+|             [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) |    69.9mib/s    |  5mib/s  |    67.1mib/s    | 3.9mib/s  |  10mib/s  | _**70.4mib/s**_ | 7.6mib/s |
 
 To learn more about our performance tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -115,12 +115,12 @@ fundamental differences in quality and attention to detail:
 
 |                                                                                                                             Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 |---------------------------------------------------------------------------------------------------------------------------------:|:------:|:--------:|:---------:|:-------:|:--------:|:---------:|:---------:|
-| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  |    ✓     |           |         |    ⚠     |     ✓     |     ✓     |
-|         [File Rotate (create)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-| [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          |     ✓     |     ✓     |
-|                   [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-|                         [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |          |           |         |    ⚠     |     ✓     |     ✓     |
-|                     [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+| [Disk Buffer Persistence](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  |    ✓     |           |         |    ⚠     |     ✓     |     ✓     |
+|         [File Rotate (create)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+| [File Rotate (copytruncate)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          |     ✓     |     ✓     |
+|                   [File Truncation](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_truncate_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|                         [Process (SIGHUP)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |          |           |         |    ⚠     |     ✓     |     ✓     |
+|                     [JSON (wrapped)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -151,7 +151,7 @@ Vector is an end-to-end, unified, open data platform.
 ---
 
 <p align="center">
-  Developed with ❤️ by <strong><a href="https://datadoghq.com">Datadog</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
+  Developed with ❤️ by <strong><a href="https://datadoghq.com">Datadog</a></strong> - <a href="https://github.com/vectordotdev/vector/security/policy">Security Policy</a> - <a href="https://github.com/vectordotdev/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
 [docs.about.concepts]: https://vector.dev/docs/about/concepts/
@@ -211,20 +211,20 @@ Vector is an end-to-end, unified, open data platform.
 [docs.under-the-hood.architecture]: https://vector.dev/docs/about/under-the-hood/architecture/
 [docs.under-the-hood.guarantees]: https://vector.dev/docs/about/under-the-hood/guarantees/
 [docs.under-the-hood.networking]: https://vector.dev/docs/about/under-the-hood/networking/
-[urls.production_users]: https://github.com/timberio/vector/issues/790
+[urls.production_users]: https://github.com/vectordotdev/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_calendar]: https://calendar.vector.dev
 [urls.vector_chat]: https://chat.vector.dev
-[urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
+[urls.vector_code_of_conduct]: https://github.com/vectordotdev/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
-[urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
-[urls.vector_release_policy]: https://github.com/timberio/vector/blob/master/RELEASING.md
+[urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
+[urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
-[urls.vector_releases_policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[urls.vector_releases_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [urls.vector_roadmap]: https://roadmap.vector.dev
-[urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
-[urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy
+[urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
-[urls.vector_versioning_policy]: https://github.com/timberio/vector/blob/master/VERSIONING.md
-[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+[urls.vector_versioning_policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md
+[urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
 
