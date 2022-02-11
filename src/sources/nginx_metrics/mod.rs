@@ -278,7 +278,7 @@ mod integration_tests {
 
         let (sender, mut recv) = SourceSender::new_test();
 
-        let mut ctx = SourceContext::new_test(sender);
+        let mut ctx = SourceContext::new_test(sender, None);
         ctx.proxy = proxy;
 
         tokio::spawn(async move {

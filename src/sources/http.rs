@@ -270,7 +270,7 @@ mod tests {
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,

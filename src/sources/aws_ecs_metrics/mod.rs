@@ -534,7 +534,7 @@ mod test {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -595,7 +595,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);

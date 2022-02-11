@@ -169,7 +169,7 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source.build(SourceContext::new_test(tx, None)).await.unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 

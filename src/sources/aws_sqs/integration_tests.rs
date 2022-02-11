@@ -81,7 +81,7 @@ pub async fn test() {
     let (tx, rx) = SourceSender::new_test();
     tokio::spawn(async move {
         config
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap()
             .await

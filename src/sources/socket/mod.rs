@@ -266,7 +266,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -288,7 +288,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -312,7 +312,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -344,7 +344,7 @@ mod test {
         ));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -380,7 +380,7 @@ mod test {
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -424,7 +424,7 @@ mod test {
         }));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -777,7 +777,7 @@ mod test {
             Mode::UnixDatagram(config)
         };
         let server = SocketConfig { mode }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
         tokio::spawn(server);
