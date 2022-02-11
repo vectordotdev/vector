@@ -1082,7 +1082,7 @@ impl Value {
     }
 }
 
-/// Converts a timestamp to a String
+/// Converts a timestamp to a `String`.
 #[must_use]
 pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
