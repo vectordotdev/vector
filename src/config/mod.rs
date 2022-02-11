@@ -1218,8 +1218,8 @@ mod test {
         .unwrap();
 
         for source in config.sources.values() {
-            assert_eq!(
-                source.sink_acknowledgements, false,
+            assert!(
+                !source.sink_acknowledgements,
                 "Source `sink_acknowledgements` should be `false` before propagation"
             );
         }
@@ -1227,9 +1227,9 @@ mod test {
         let config = config.build().unwrap();
 
         let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
-        assert_eq!(get("in1").sink_acknowledgements, false);
-        assert_eq!(get("in2").sink_acknowledgements, true);
-        assert_eq!(get("in3").sink_acknowledgements, true);
+        assert!(!get("in1").sink_acknowledgements);
+        assert!(get("in2").sink_acknowledgements);
+        assert!(get("in3").sink_acknowledgements);
     }
 }
 
