@@ -70,7 +70,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Transform {
-                    in_ty: config.inner.input_type(),
+                    in_ty: config.inner.input().data_type(),
                     outputs: config.inner.outputs(),
                 },
             );
@@ -80,7 +80,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Sink {
-                    ty: config.inner.input_type(),
+                    ty: config.inner.input().data_type(),
                 },
             );
         }

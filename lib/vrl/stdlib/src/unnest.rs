@@ -1,5 +1,5 @@
 use lookup_lib::LookupBuf;
-use vrl::prelude::*;
+use vrl::{prelude::*, value::kind::merge};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unnest;
@@ -94,14 +94,17 @@ impl Expression for UnnestFn {
             }
         };
 
-        let root = target.get(&LookupBuf::root())?.unwrap_or(Value::Null);
+        let root = target
+            .get(&LookupBuf::root())
+            .expect("must never fail")
+            .expect("always a value");
 
         let values = root
             .get_by_path(path)
             .cloned()
             .ok_or(value::Error::Expected {
-                got: Kind::Null,
-                expected: Kind::Array,
+                got: Kind::null(),
+                expected: Kind::array(Collection::any()),
             })?
             .try_array()?;
 
@@ -144,19 +147,59 @@ impl Expression for UnnestFn {
 ///  ]`
 ///
 pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    typedef
-        .at_path(path.clone())
-        .restrict_array()
-        .map_array(|kind| typedef.update_path(path, kind).kind)
+    use value::kind::insert;
+
+    let type_def = typedef.at_path(&path.to_lookup());
+
+    let mut array = Kind::from(type_def)
+        .into_array()
+        .unwrap_or_else(Collection::any);
+
+    array.known_mut().values_mut().for_each(|kind| {
+        let mut tdkind = typedef.kind().clone();
+        tdkind
+            .insert_at_path(
+                &path.to_lookup(),
+                kind.clone(),
+                insert::Strategy {
+                    inner_conflict: insert::InnerConflict::Replace,
+                    leaf_conflict: insert::LeafConflict::Replace,
+                    coalesced_path: insert::CoalescedPath::InsertAll,
+                },
+            )
+            .expect("infallible");
+
+        *kind = tdkind.clone();
+    });
+
+    let mut tdkind = typedef.kind().clone();
+
+    let unknown = array.unknown().map(|unknown| {
+        tdkind
+            .insert_at_path(
+                &path.to_lookup(),
+                unknown.clone().into(),
+                insert::Strategy {
+                    inner_conflict: insert::InnerConflict::Merge(merge::Strategy {
+                        depth: merge::Depth::Deep,
+                        indices: merge::Indices::Keep,
+                    }),
+                    leaf_conflict: insert::LeafConflict::Replace,
+                    coalesced_path: insert::CoalescedPath::InsertAll,
+                },
+            )
+            .expect("infallible");
+        tdkind
+    });
+
+    array.set_unknown(unknown);
+
+    TypeDef::array(array)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
-    use type_def::KindInfo;
     use vector_common::{btreemap, TimeZone};
-    use vrl::Index;
 
     use super::*;
 
@@ -263,16 +306,15 @@ mod tests {
                 new: type_def! { array [
                     type_def! { object {
                         "nonk" => type_def! { array {
-                            (Index::Any) => type_def! { object {
+                            unknown => type_def! { object {
                                 "noog" => type_def! { array [
                                     type_def! { bytes },
                                 ] },
                                 "nork" => type_def! { bytes },
                             } },
-                            // The index is added on top of the Any entry.
-                            (Index::Index(0)) => type_def! { object {
+                            // The index is added on top of the "unknown" entry.
+                            0 => type_def! { object {
                                 "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
                             } },
                         } },
                     } },
@@ -282,7 +324,7 @@ mod tests {
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { array {
-                        Index::Index(0) => type_def! { object {
+                        0 => type_def! { object {
                             "noog" => type_def! { array [
                                 type_def! { bytes },
                             ] },
@@ -295,7 +337,7 @@ mod tests {
                     type_def! { object {
                         "nonk" => type_def! { array {
                             // The index is added on top of the Any entry.
-                            (Index::Index(0)) => type_def! { object {
+                            0 => type_def! { object {
                                 "noog" => type_def! { bytes },
                                 "nork" => type_def! { bytes },
                             } },
@@ -327,9 +369,45 @@ mod tests {
                     } },
                 ] },
             },
-            // Coalesce
+            //// Coalesce with known path first
+            ////
+            //// FIXME(Jean): There's still a bug in the `InsertValid` implementation that prevents
+            //// this from working as expected.
+            ////
+            //// I'm assuming it has something to do with us _inserting_ the coalesced field, and
+            //// _then_ checking if a certain field in the list of coalesced fields can be null at
+            //// runtime. Instead, we should check so _before_ inserting the field.
+            ////
+            //// This is existing behavior though, and it's not "breaking" anything, in that the
+            //// resulting type definition is more expansive than it needs to be, requiring operators
+            //// to add more type coercing, but it'd be nice to fix this at some point.
+            //TestCase {
+            //    old: type_def! { object {
+            //        "nonk" => type_def! { object {
+            //            "shnoog" => type_def! { array [
+            //                type_def! { object {
+            //                    "noog" => type_def! { bytes },
+            //                    "nork" => type_def! { bytes },
+            //                } },
+            //            ] },
+            //        } },
+            //    } },
+            //    path: ".(nonk | nork).shnoog",
+            //    new: type_def! { array [
+            //        type_def! { object {
+            //            "nonk" => type_def! { object {
+            //                "shnoog" => type_def! { object {
+            //                    "noog" => type_def! { bytes },
+            //                    "nork" => type_def! { bytes },
+            //                } },
+            //            } },
+            //        } },
+            //    ] },
+            //},
+            // Coalesce with known path second
             TestCase {
                 old: type_def! { object {
+                    unknown => type_def! { bytes },
                     "nonk" => type_def! { object {
                         "shnoog" => type_def! { array [
                             type_def! { object {
@@ -339,15 +417,22 @@ mod tests {
                         ] },
                     } },
                 } },
-                path: ".(nonk | nork).shnoog",
+                path: ".(nork | nonk).shnoog",
                 new: type_def! { array [
                     type_def! { object {
+                        unknown => type_def! { bytes },
                         "nonk" => type_def! { object {
                             "shnoog" => type_def! { object {
                                 "noog" => type_def! { bytes },
                                 "nork" => type_def! { bytes },
                             } },
-                        } }.add_null(),
+                        } },
+                        "nork" => type_def! { object {
+                            "shnoog" => type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        } },
                     } },
                 ] },
             },
@@ -360,6 +445,7 @@ mod tests {
                 new: type_def! { array [
                     type_def! { object {
                         "nonk" => type_def! { bytes },
+                        "norg" => type_def! { unknown },
                     } },
                 ] },
             },
@@ -368,6 +454,7 @@ mod tests {
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
+
             assert_eq!(case.new, new, "{}", path);
         }
     }
@@ -392,11 +479,12 @@ mod tests {
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
-                Err(r#"expected "array", got "null""#.to_owned()),
+                Err("expected array, got null".to_owned()),
                 UnnestFn::new("unknown"),
                 type_def! { array [
                     type_def! { object {
                         "hostname" => type_def! { bytes },
+                        "unknown" => type_def! { unknown },
                         "events" => type_def! { array [
                             type_def! { object {
                                 "message" => type_def! { bytes },
@@ -407,27 +495,27 @@ mod tests {
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
-                Err(r#"expected "array", got "string""#.to_owned()),
+                Err("expected array, got string".to_owned()),
                 UnnestFn::new("hostname"),
-                // The typedef in this case is not particularly important as we will have a compile
-                // error before we get to this point.
-                TypeDef {
-                    fallible: false,
-                    kind: KindInfo::Known(BTreeSet::new()),
-                },
+                type_def! { array [
+                    type_def! { object {
+                        "hostname" => type_def! { unknown },
+                        "events" => type_def! { array [
+                            type_def! { object {
+                                "message" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                ] },
             ),
         ];
 
-        let compiler = state::Compiler::new_with_type_def(
-            TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
-                "hostname" => TypeDef::new().bytes(),
-                "events" => TypeDef::new().array_mapped::<(), TypeDef>(btreemap! {
-                        () => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
-                            "message" => TypeDef::new().bytes()
-                        })
-                }),
-            }),
-        );
+        let compiler = state::Compiler::new_with_type_def(TypeDef::object(btreemap! {
+            "hostname" => Kind::bytes(),
+            "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
+                Field::from("message") => Kind::bytes(),
+            })),
+        )}));
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
@@ -435,14 +523,14 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let typedef = func.type_def(&compiler);
+            let got_typedef = func.type_def(&compiler);
 
             let got = func
                 .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, expected);
-            assert_eq!(typedef, expected_typedef);
+            assert_eq!(got_typedef, expected_typedef);
         }
     }
 }

@@ -1,3 +1,4 @@
+use value::kind::remove;
 use vrl::prelude::*;
 
 fn del(
@@ -160,20 +161,33 @@ impl Expression for DelFn {
     // immutable fields for now, but we'll circle back to this in the near
     // future to potentially improve this situation.
     //
-    // see tracking issue: https://github.com/timberio/vector/issues/5887
+    // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         del(&self.query, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().unknown()
+        TypeDef::any()
     }
 
     fn update_state(
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        self.query.delete_type_def(state);
+        // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
+        // supported.
+        if self.query.is_external() {
+            match self.query.delete_type_def(state) {
+                Err(remove::Error::RootPath)
+                | Err(remove::Error::CoalescedPath)
+                | Err(remove::Error::NegativeIndexPath) => {
+                    // This function is (currently) infallible, so we ignore any errors here.
+                    //
+                    // see: https://github.com/vectordotdev/vector/issues/11264
+                }
+                Ok(_) => {}
+            }
+        }
         Ok(())
     }
 }

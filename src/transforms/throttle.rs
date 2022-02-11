@@ -8,7 +8,7 @@ use snafu::Snafu;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     template::Template,
@@ -37,8 +37,8 @@ impl TransformConfig for ThrottleConfig {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {

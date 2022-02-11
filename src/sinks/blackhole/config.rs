@@ -2,7 +2,7 @@ use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
 };
 
@@ -30,8 +30,8 @@ impl SinkConfig for BlackholeConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::all()
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {

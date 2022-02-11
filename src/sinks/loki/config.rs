@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::sinks::util::Compression;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
@@ -123,8 +123,8 @@ impl SinkConfig for LokiConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

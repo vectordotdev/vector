@@ -1,4 +1,5 @@
 use bytes::BytesMut;
+use ordered_float::NotNan;
 
 use super::{query_value::QueryValue, Function};
 use crate::{
@@ -47,8 +48,14 @@ impl Arithmetic {
 #[allow(clippy::cast_precision_loss)]
 fn coerce_number_types(left: Value, right: Value) -> (Value, Value) {
     match (&left, &right) {
-        (Value::Float(lf), Value::Integer(ri)) => (Value::Float(*lf), Value::Float(*ri as f64)),
-        (Value::Integer(li), Value::Float(rf)) => (Value::Float(*li as f64), Value::Float(*rf)),
+        (Value::Float(lf), Value::Integer(ri)) => (
+            Value::Float(*lf),
+            Value::Float(NotNan::new(*ri as f64).unwrap()),
+        ),
+        (Value::Integer(li), Value::Float(rf)) => (
+            Value::Float(NotNan::new(*li as f64).unwrap()),
+            Value::Float(*rf),
+        ),
         _ => (left, right),
     }
 }
@@ -65,7 +72,9 @@ fn compare_number_types(
         (Value::Integer(li), Value::Integer(ri)) => {
             Ok(Value::Boolean(compare_fn(li as f64, ri as f64)))
         }
-        (Value::Float(lf), Value::Float(rf)) => Ok(Value::Boolean(compare_fn(lf, rf))),
+        (Value::Float(lf), Value::Float(rf)) => {
+            Ok(Value::Boolean(compare_fn(lf.into_inner(), rf.into_inner())))
+        }
         (l, r) => Err(format!(
             "unable to numerically compare field types {:?} and {:?}",
             l, r
@@ -139,7 +148,9 @@ impl Function for Arithmetic {
                         }
                     },
                     Value::Integer(il) => match right {
-                        Value::Integer(ir) => Value::Float(il as f64 / ir as f64),
+                        Value::Integer(ir) => Value::Float(
+                            NotNan::new(il as f64).unwrap() / NotNan::new(ir as f64).unwrap(),
+                        ),
                         vr => {
                             return Err(format!("unable to divide right-hand field type {:?}", vr))
                         }
@@ -276,7 +287,7 @@ mod tests {
                     event.as_mut_log().insert("bar", Value::Integer(10));
                     event
                 },
-                Ok(Value::Float(2.0)),
+                Ok(Value::from(2.0)),
                 Arithmetic::new(
                     Box::new(Path::from("bar")),
                     Box::new(Path::from("foo")),
@@ -334,9 +345,9 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::Float(17.0)),
+                Ok(Value::from(17.0)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(20.0))),
+                    Box::new(Literal::from(Value::from(20.0))),
                     Box::new(Literal::from(Value::Integer(3))),
                     Operator::Subtract,
                 ),
@@ -345,7 +356,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(20.0))),
+                    Box::new(Literal::from(Value::from(20.0))),
                     Box::new(Literal::from(Value::Integer(20))),
                     Operator::Equal,
                 ),
@@ -363,7 +374,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(21.0))),
+                    Box::new(Literal::from(Value::from(21.0))),
                     Box::new(Literal::from(Value::Integer(18))),
                     Operator::Greater,
                 ),
@@ -372,7 +383,7 @@ mod tests {
                 Event::from(""),
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Box::new(Literal::from(Value::Integer(18))),
                     Operator::Greater,
                 ),
@@ -382,7 +393,7 @@ mod tests {
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(17))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::GreaterOrEqual,
                 ),
             ),
@@ -391,7 +402,7 @@ mod tests {
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::GreaterOrEqual,
                 ),
             ),
@@ -400,7 +411,7 @@ mod tests {
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::Less,
                 ),
             ),
@@ -409,7 +420,7 @@ mod tests {
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
-                    Box::new(Literal::from(Value::Float(18.0))),
+                    Box::new(Literal::from(Value::from(18.0))),
                     Operator::LessOrEqual,
                 ),
             ),

@@ -13,7 +13,7 @@ use std::{collections::BTreeMap, fmt};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use error::Error;
-pub use kind::Kind;
+pub use kind::{Collection, Field, Index, Kind};
 use ordered_float::NotNan;
 
 pub use self::regex::Regex;

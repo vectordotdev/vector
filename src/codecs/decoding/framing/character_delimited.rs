@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
     }
 
-    // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
+    // Regression test for [infinite loop bug](https://github.com/vectordotdev/vector/issues/2564)
     // Derived from https://github.com/tokio-rs/tokio/issues/1483
     #[test]
     fn decode_discard_repeat() {

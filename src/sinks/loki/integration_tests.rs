@@ -92,7 +92,7 @@ async fn json() {
     }
 }
 
-// https://github.com/timberio/vector/issues/7815
+// https://github.com/vectordotdev/vector/issues/7815
 #[tokio::test]
 async fn json_nested_fields() {
     let (stream, sink) = build_sink("json").await;

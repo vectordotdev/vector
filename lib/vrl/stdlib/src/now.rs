@@ -40,6 +40,6 @@ impl Expression for NowFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().timestamp()
+        TypeDef::timestamp()
     }
 }

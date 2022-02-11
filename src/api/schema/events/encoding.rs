@@ -5,4 +5,5 @@ use async_graphql::Enum;
 pub enum EventEncodingType {
     Json,
     Yaml,
+    Logfmt,
 }

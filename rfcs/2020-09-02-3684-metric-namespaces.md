@@ -13,9 +13,9 @@ This RFC will cover:
 ## Motivation
 
 As we add `metric` sources like
-[`apache_metrics`](https://github.com/timberio/vector/blob/master/rfcs/2020-08-21-3092-apache-metrics)
+[`apache_metrics`](https://github.com/vectordotdev/vector/blob/master/rfcs/2020-08-21-3092-apache-metrics)
 and
-[`postgresql_metrics`](https://github.com/timberio/vector/blob/master/rfcs/2020-08-27-3603-postgres-metrics.md),
+[`postgresql_metrics`](https://github.com/vectordotdev/vector/blob/master/rfcs/2020-08-27-3603-postgres-metrics.md),
 that set their own namespaces (defaulting to `apache` and `postgresql`), it is
 becoming more clear that we may want to maintain the `namespace` separate from
 the metric name to allow for:
@@ -40,7 +40,7 @@ name).
 ## Internal Proposal
 
 Add `namespace` to
-[`Metric`](https://github.com/timberio/vector/blob/75844bc0f67d24ad1b54bfa130d074810ad2aa50/src/event/metric.rs#L10-L17):
+[`Metric`](https://github.com/vectordotdev/vector/blob/75844bc0f67d24ad1b54bfa130d074810ad2aa50/src/event/metric.rs#L10-L17):
 
 ```rust
 pub struct Metric {
@@ -57,7 +57,7 @@ pub struct Metric {
 Metric sources can then optionally assign a `namespace` for the metric.
 
 For example, the upcoming [MongoDB
-source](https://github.com/timberio/vector/pull/3681) would set this to
+source](https://github.com/vectordotdev/vector/pull/3681) would set this to
 `mongodb`.
 
 Sinks can then decide what to do with this prefix. For example, the
@@ -111,7 +111,7 @@ Where the `prometheus` sink would simply output metrics with name prefixed by
 field in AWS API calls.
 
 Once [Make the `namespace` option on metrics sinks optional #3609](
-https://github.com/timberio/vector/issues/3609) is done. The sinks could look
+https://github.com/vectordotdev/vector/issues/3609) is done. The sinks could look
 something like:
 
 ```toml

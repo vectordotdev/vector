@@ -32,7 +32,7 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
     event::{Event, EventArray, EventContainer},
@@ -248,7 +248,7 @@ pub async fn build_pieces(
             key: key.clone(),
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
-            input_type: transform.inner.input_type(),
+            input_details: transform.inner.input(),
             outputs: transform.inner.outputs(),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
@@ -282,7 +282,7 @@ pub async fn build_pieces(
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
-        let input_type = sink.inner.input_type();
+        let input_type = sink.inner.input().data_type();
 
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
@@ -465,7 +465,7 @@ struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
     inputs: Vec<OutputId>,
-    input_type: DataType,
+    input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
 }
@@ -479,9 +479,13 @@ fn build_transform(
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
         Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
-        Transform::Task(t) => {
-            build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
+        Transform::Task(t) => build_task_transform(
+            t,
+            input_rx,
+            node.input_details.data_type(),
+            node.typetag,
+            &node.key,
+        ),
     }
 }
 
@@ -492,7 +496,7 @@ fn build_sync_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs);
 
-    let runner = Runner::new(t, input_rx, node.input_type, outputs);
+    let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
     } else {

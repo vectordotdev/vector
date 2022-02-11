@@ -3,7 +3,7 @@ pub mod v2;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription};
+use crate::config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -68,8 +68,8 @@ impl SinkConfig for VectorConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::all()
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {

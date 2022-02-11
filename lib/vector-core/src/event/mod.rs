@@ -44,6 +44,7 @@ pub mod proto;
 mod test;
 pub mod util;
 mod value;
+mod value_regex;
 #[cfg(feature = "vrl")]
 mod vrl_target;
 

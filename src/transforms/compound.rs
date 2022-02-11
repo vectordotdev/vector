@@ -3,7 +3,7 @@ use serde::{self, Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     transforms::Transform,
@@ -62,8 +62,8 @@ impl TransformConfig for CompoundConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::all()
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
