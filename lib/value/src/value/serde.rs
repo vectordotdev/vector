@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 impl Value {
-    /// Converts self into a Bytesy, using JSON for Map/Array
+    /// Converts self into a `Bytes`, using JSON for Map/Array.
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
