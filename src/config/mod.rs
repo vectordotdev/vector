@@ -655,7 +655,10 @@ impl TestDefinition<String> {
                         conditions: old.conditions,
                     })
                 } else {
-                    errors.push(format!(r#"Invalid extract_from target in test '{}': transform '{}' does not exist"#, name, old.extract_from));
+                    errors.push(format!(
+                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                        name, old.extract_from
+                    ));
                     None
                 }
             })
@@ -667,7 +670,10 @@ impl TestDefinition<String> {
                 if let Some(output_id) = output_map.get(&o) {
                     Some(output_id.clone())
                 } else {
-                    errors.push(format!(r#"Invalid no_outputs_from target in test '{}': transform '{}' does not exist"#, name, o));
+                    errors.push(format!(
+                        r#"Invalid no_outputs_from target in test '{}': '{}' does not exist"#,
+                        name, o
+                    ));
                     None
                 }
             })

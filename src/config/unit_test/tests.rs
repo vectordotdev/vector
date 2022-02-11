@@ -158,7 +158,7 @@ async fn parse_invalid_output_targets() {
         errs,
         vec![indoc! {r#"
             Failed to build test 'broken test':
-              Invalid extract_from target in test 'broken test': transform 'non-existent' does not exist"#}
+              Invalid extract_from target in test 'broken test': 'non-existent' does not exist"#}
         .to_owned(),]
     );
 
@@ -184,7 +184,7 @@ async fn parse_invalid_output_targets() {
         errs,
         vec![indoc! {r#"
             Failed to build test 'broken test':
-              Invalid no_outputs_from target in test 'broken test': transform 'non-existent' does not exist"#}
+              Invalid no_outputs_from target in test 'broken test': 'non-existent' does not exist"#}
         .to_owned(),]
     );
 }
