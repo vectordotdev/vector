@@ -52,7 +52,7 @@ impl Input {
 
     pub fn new(ty: DataType) -> Self {
         Self {
-            ty: ty,
+            ty,
             schema_requirement: schema::Requirement,
         }
     }
