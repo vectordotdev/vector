@@ -39,60 +39,75 @@ lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
 }
 
-trait Loader<T>
+mod private {
+    use super::{component_name, open_file};
+    use crate::config::{
+        ComponentKey, EnrichmentTableOuter, Format, SinkOuter, SourceOuter, TestDefinition,
+        TransformOuter,
+    };
+    use indexmap::IndexMap;
+    use std::path::Path;
+
+    pub trait Loader<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        /// Takes an input `R` and the format, and returns a Result containing the deserialized
+        /// payload and a vector of deserialization warnings, or an Error containing a vector of
+        /// error strings.
+        fn load<R: std::io::Read>(
+            &self,
+            input: R,
+            format: Format,
+        ) -> Result<(T, Vec<String>), Vec<String>>;
+
+        /// Receives the deserialized value `T`, which can be stored by the implementor, and retrieved
+        /// using the `take` method.
+        fn add_value(&mut self, value: T) -> Result<(), Vec<String>>;
+
+        /// Add an IndexMap of sources.
+        fn add_sources(&mut self, sources: IndexMap<ComponentKey, SourceOuter>);
+
+        /// Add an IndexMap of transforms.
+        fn add_transforms(&mut self, transforms: IndexMap<ComponentKey, TransformOuter<String>>);
+
+        /// Add an IndexMap of sinks.
+        fn add_sink(&mut self, sinks: IndexMap<ComponentKey, SinkOuter<String>>);
+
+        /// Add an IndexMap of enrichment tables.
+        fn add_enrichment_tables(
+            &mut self,
+            enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+        );
+
+        /// Add an IndexMap of tests.
+        fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>);
+
+        /// Process an individual file. Assumes that the &Path provided is a file. This method
+        /// both opens the file and calls out to `load` to serialize it as `T`, before sending
+        /// it to a post-processor to decide how to store it.
+        fn process_file(
+            &mut self,
+            path: &Path,
+            format: Format,
+        ) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
+            let name = component_name(path)?;
+            if let Some(file) = open_file(path) {
+                let (component, warnings): (T, Vec<String>) = self.load(file, format)?;
+                Ok(Some((name, component, warnings)))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
+
+trait Loader<T>: private::Loader<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    /// Takes an input `R` and the format, and returns a Result containing the deserialized
-    /// payload and a vector of deserialization warnings, or an Error containing a vector of
-    /// error strings.
-    fn load<R: std::io::Read>(
-        &self,
-        input: R,
-        format: Format,
-    ) -> Result<(T, Vec<String>), Vec<String>>;
-
-    /// Receives the deserialized value `T`, which can be stored by the implementor, and retrieved
-    /// using the `take` method.
-    fn add_value(&mut self, value: T) -> Result<(), Vec<String>>;
-
-    /// Add an IndexMap of sources.
-    fn add_sources(&mut self, sources: IndexMap<ComponentKey, SourceOuter>);
-
-    /// Add an IndexMap of transforms.
-    fn add_transforms(&mut self, transforms: IndexMap<ComponentKey, TransformOuter<String>>);
-
-    /// Add an IndexMap of sinks.
-    fn add_sink(&mut self, sinks: IndexMap<ComponentKey, SinkOuter<String>>);
-
-    /// Add an IndexMap of enrichment tables.
-    fn add_enrichment_tables(
-        &mut self,
-        enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
-    );
-
-    /// Add an IndexMap of tests.
-    fn add_tests(&mut self, component: IndexMap<ComponentKey, TestDefinition<String>>);
-
     /// Consumes Self, and returns the final, deserialized `T`.
     fn take(self) -> T;
-
-    /// Process an individual file. Assumes that the &Path provided is a file. This method
-    /// both opens the file and calls out to `load` to serialize it as `T`, before sending
-    /// it to a post-processor to decide how to store it.
-    fn process_file(
-        &mut self,
-        path: &Path,
-        format: Format,
-    ) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
-        let name = component_name(path)?;
-        if let Some(file) = open_file(path) {
-            let (component, warnings): (T, Vec<String>) = self.load(file, format)?;
-            Ok(Some((name, component, warnings)))
-        } else {
-            Ok(None)
-        }
-    }
 
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
         if let Some((_, value, warnings)) = self.process_file(path, format)? {
@@ -193,7 +208,7 @@ impl ConfigBuilderLoader {
     }
 }
 
-impl Loader<ConfigBuilder> for ConfigBuilderLoader {
+impl private::Loader<ConfigBuilder> for ConfigBuilderLoader {
     fn load<R: std::io::Read>(
         &self,
         input: R,
@@ -229,7 +244,9 @@ impl Loader<ConfigBuilder> for ConfigBuilderLoader {
             .tests
             .extend(component.into_iter().map(|(_, value)| value));
     }
+}
 
+impl Loader<ConfigBuilder> for ConfigBuilderLoader {
     fn take(self) -> ConfigBuilder {
         self.builder
     }
