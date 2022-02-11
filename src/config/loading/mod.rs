@@ -204,6 +204,7 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
+/// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
 fn loader_from_paths<T, L>(
     mut loader: L,
     config_paths: &[ConfigPath],
@@ -244,10 +245,18 @@ where
     }
 }
 
+/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, deserializing to a `ConfigBuilder`.
 pub fn load_builder_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
+}
+
+/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
+pub fn load_source_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<(SourceMap, Vec<String>), Vec<String>> {
+    loader_from_paths(SourceLoader::new(), config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
