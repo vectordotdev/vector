@@ -4,7 +4,9 @@ releases: "0.20.0": {
 	date:     "2022-02-08"
 	codename: ""
 
-	known_issues: []
+	known_issues: [
+		"If non-existent extract_from/no_outputs_from targets are included in unit testing configurations, `vector test` will panic. Fixed in `0.20.1`.",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.20.0!
