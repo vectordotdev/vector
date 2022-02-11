@@ -147,14 +147,14 @@ mod tests {
             (
                 "integer",
                 TestCase {
-                    value: value!(3),
+                    value: value!(3_i64),
                     want: Kind::integer(),
                 },
             ),
             (
                 "float",
                 TestCase {
-                    value: value!(3.3),
+                    value: value!(NotNan::new(3.3).unwrap()),
                     want: Kind::float(),
                 },
             ),
@@ -189,7 +189,7 @@ mod tests {
             (
                 "object",
                 TestCase {
-                    value: value!({ "foo": { "bar": 12 }, "baz": true }),
+                    value: value!({ "foo": { "bar": 12_i64 }, "baz": true }),
                     want: Kind::object(BTreeMap::from([
                         (
                             "foo".into(),
@@ -202,7 +202,7 @@ mod tests {
             (
                 "array",
                 TestCase {
-                    value: value!([12, true, "foo", { "bar": null }]),
+                    value: value!([12_i64, true, "foo", { "bar": null }]),
                     want: Kind::array(BTreeMap::from([
                         (0.into(), Kind::integer()),
                         (1.into(), Kind::boolean()),
