@@ -269,22 +269,24 @@ impl SplunkSource {
                         };
 
                         let mut error = None;
-                        let events = EventIterator::new(
+                        let mut events = Vec::new();
+                        let iter = EventIterator::new(
                             Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
                             xff,
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
-                        )
-                        .map_while(|result| match result {
-                            Ok(event) => Some(event),
-                            Err(err) => {
-                                error = Some(err);
-                                None
+                        );
+                        for result in iter {
+                            match result {
+                                Ok(event) => events.push(event),
+                                Err(err) => {
+                                    error = Some(err);
+                                    break;
+                                }
                             }
-                        })
-                        .collect::<Vec<Event>>();
+                        }
 
                         if !events.is_empty() {
                             emit!(&EventsReceived {
