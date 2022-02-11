@@ -31,7 +31,7 @@ use tracing::{instrument, trace, trace_span};
 
 use crate::value::regex::ValueRegex;
 
-/// A boxed `std::error::Error`
+/// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// The main value type used in Vector events, and VRL
