@@ -414,142 +414,29 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-fn load_builder_from_file(
-    path: &Path,
-    format: Format,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    match load_from_file(path, format)? {
-        Some((_, loaded, warnings)) => {
-            builder.append(loaded)?;
-            Ok(warnings)
-        }
-        None => Ok(Vec::new()),
-    }
-}
-
-fn load_builder_from_dir(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let readdir = read_dir(path)?;
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-    for res in readdir {
-        match res {
-            Ok(direntry) => {
-                let entry_path = direntry.path();
-                if entry_path.is_file() {
-                    // skip any unknown file formats
-                    if let Ok(format) = Format::from_path(direntry.path()) {
-                        match load_builder_from_file(&direntry.path(), format, builder) {
-                            Ok(warns) => warnings.extend(warns),
-                            Err(errs) => errors.extend(errs),
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                errors.push(format!(
-                    "Could not read file in config dir: {:?}, {}.",
-                    path, err
-                ));
-            }
-        }
-    }
-
-    // for components other that `transforms`, we can use `load_files_from_dir` to keep the serde
-    // validation of the components. This avoids doing some conversion and avoids knowing where and
-    // in which file the configuration errors.
-
-    let subfolder = path.join("enrichment_tables");
-    if subfolder.exists() && subfolder.is_dir() {
-        match load_files_from_dir(&subfolder) {
-            Ok((inner, warns)) => {
-                warnings.extend(warns);
-                builder.enrichment_tables.extend(inner);
-            }
-            Err(errs) => errors.extend(errs),
-        }
-    }
-
-    let subfolder = path.join("sinks");
-    if subfolder.exists() && subfolder.is_dir() {
-        match load_files_from_dir(&subfolder) {
-            Ok((inner, warns)) => {
-                warnings.extend(warns);
-                builder.sinks.extend(inner);
-            }
-            Err(errs) => errors.extend(errs),
-        }
-    }
-
-    let subfolder = path.join("sources");
-    if subfolder.exists() && subfolder.is_dir() {
-        match load_files_from_dir(&subfolder) {
-            Ok((inner, warns)) => {
-                warnings.extend(warns);
-                builder.sources.extend(inner);
-            }
-            Err(errs) => errors.extend(errs),
-        }
-    }
-
-    let subfolder = path.join("tests");
-    if subfolder.exists() && subfolder.is_dir() {
-        match load_files_from_dir(&subfolder) {
-            Ok((inner, warns)) => {
-                warnings.extend(warns);
-                builder
-                    .tests
-                    .extend(inner.into_iter().map(|(_, value)| value));
-            }
-            Err(errs) => errors.extend(errs),
-        }
-    }
-
-    let subfolder = path.join("transforms");
-    if subfolder.exists() && subfolder.is_dir() {
-        let (value, warns) = super::recursive::load_dir(&subfolder)?;
-        warnings.extend(warns);
-        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TransformOuter<_>>>() {
-            Ok(inner) => {
-                builder.transforms.extend(inner);
-            }
-            Err(err) => errors.push(format!("Unable to decode transform folder: {:?}", err)),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(warnings)
-    } else {
-        Err(errors)
-    }
-}
-
 pub fn load_builder_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
-    let mut result = ConfigBuilder::default();
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
+
+    let mut builder = ConfigBuilderLoader::new();
 
     for config_path in config_paths {
         match config_path {
             ConfigPath::File(path, format_hint) => {
-                match load_builder_from_file(
+                match builder.load_from_file(
                     path,
                     format_hint
                         .or_else(move || Format::from_path(&path).ok())
                         .unwrap_or_default(),
-                    &mut result,
                 ) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };
             }
             ConfigPath::Dir(path) => {
-                match load_builder_from_dir(path, &mut result) {
+                match builder.load_from_dir(path) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };
@@ -558,7 +445,7 @@ pub fn load_builder_from_paths(
     }
 
     if errors.is_empty() {
-        Ok((result, warnings))
+        Ok((builder.take(), warnings))
     } else {
         Err(errors)
     }
