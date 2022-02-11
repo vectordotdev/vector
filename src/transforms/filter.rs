@@ -67,11 +67,11 @@ impl TransformConfig for FilterConfig {
 #[derivative(Debug)]
 pub struct Filter {
     #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
+    condition: Condition,
 }
 
 impl Filter {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
+    pub fn new(condition: Condition) -> Self {
         Self { condition }
     }
 }
@@ -89,11 +89,7 @@ impl FunctionTransform for Filter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        conditions::{is_log::IsLogConfig, ConditionConfig},
-        event::Event,
-        transforms::test::transform_one,
-    };
+    use crate::{conditions::Condition, event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -103,7 +99,7 @@ mod test {
     #[test]
     fn passes_metadata() {
         let mut filter = Filter {
-            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
+            condition: Condition::IsLog(Default::default()),
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();

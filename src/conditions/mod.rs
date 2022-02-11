@@ -1,19 +1,56 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{config::component::ComponentDescription, event::Event};
+use crate::event::Event;
+use std::collections::BTreeMap;
 
-pub mod check_fields;
-pub mod datadog_search;
+// pub mod check_fields;
+// pub mod datadog_search;
 pub mod is_log;
 pub mod is_metric;
 pub mod not;
 pub mod vrl;
 
-pub use check_fields::CheckFieldsConfig;
+//pub use check_fields::CheckFieldsConfig;
 
-pub use self::vrl::VrlConfig;
+//pub use self::vrl::VrlConfig;
 
-pub trait Condition: Send + Sync + dyn_clone::DynClone {
+#[derive(Debug, Clone)]
+pub enum Condition {
+    IsLog(is_log::IsLog),
+    IsMetric(is_metric::IsMetric),
+    Not(not::Not),
+    // CheckFields(check_fields::CheckFields),
+    // DatadogSearch(datadog_search::DatadogSearchRunner),
+    Vrl(vrl::Vrl),
+}
+
+impl Condition {
+    pub(crate) fn check(&self, e: &Event) -> bool {
+        match self {
+            Condition::IsLog(x) => x.check(e),
+            Condition::IsMetric(x) => x.check(e),
+            Condition::Not(x) => x.check(e),
+            // Condition::CheckFields(x) => x.check(e),
+            // Condition::DatadogSearch(x) => x.check(e),
+            Condition::Vrl(x) => x.check(e),
+        }
+    }
+
+    /// Provides context for a failure. This is potentially mildly expensive if
+    /// it involves string building and so should be avoided in hot paths.
+    pub(crate) fn check_with_context(&self, e: &Event) -> Result<(), String> {
+        match self {
+            Condition::IsLog(x) => x.check_with_context(e),
+            Condition::IsMetric(x) => x.check_with_context(e),
+            Condition::Not(x) => x.check_with_context(e),
+            // Condition::CheckFields(x) => x.check_with_context(e),
+            // Condition::DatadogSearch(x) => x.check_with_context(e),
+            Condition::Vrl(x) => x.check_with_context(e),
+        }
+    }
+}
+
+pub(crate) trait Conditional {
     fn check(&self, e: &Event) -> bool;
 
     /// Provides context for a failure. This is potentially mildly expensive if
@@ -27,21 +64,37 @@ pub trait Condition: Send + Sync + dyn_clone::DynClone {
     }
 }
 
-dyn_clone::clone_trait_object!(Condition);
+//dyn_clone::clone_trait_object!(Condition);
 
-#[typetag::serde(tag = "type")]
-pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>>;
+// #[typetag::serde(tag = "type")]
+// pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+//     fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition>;
+// }
+
+//dyn_clone::clone_trait_object!(ConditionConfig);
+
+// pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
+
+// inventory::collect!(ConditionDescription);
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlainVariant {
+    IsLog,
+    IsMetric,
 }
 
-dyn_clone::clone_trait_object!(ConditionConfig);
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckFieldsVariant {
+    CheckFields,
+}
 
-pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
-
-inventory::collect!(ConditionDescription);
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum VrlVariant {
+    Vrl,
+}
 
 /// A condition can either be a raw string such as
 /// `condition = '.message == "hooray"'`.
@@ -62,30 +115,49 @@ inventory::collect!(ConditionDescription);
 /// This will result in an error when serializing to json
 /// which we need to do when determining which transforms have changed
 /// when a config is reloaded.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(untagged)]
+#[serde(rename_all = "snake_case")]
 pub enum AnyCondition {
-    String(String),
-    Map(Box<dyn ConditionConfig>),
+    BareVrl(String),
+    Plain {
+        #[serde(rename = "type")]
+        kind: PlainVariant,
+    },
+    CheckFields {
+        #[serde(rename = "type")]
+        kind: CheckFieldsVariant,
+        #[serde(flatten)]
+        fields: BTreeMap<String, String>,
+    },
+    Vrl {
+        #[serde(rename = "type")]
+        kind: VrlVariant,
+        source: String,
+    },
 }
 
 impl AnyCondition {
     pub fn build(
         &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        match self {
-            AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),
-            AnyCondition::Map(m) => m.build(enrichment_tables),
-        }
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
+        unimplemented!()
+        // match self {
+        //     AnyCondition::IsLog => Ok(Condition::IsLog(is_log::IsLog::default())),
+        //     AnyCondition::IsMetric => Ok(Condition::IsMetric(is_metric::IsMetric::default())),
+        //     //AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),
+        //     //            AnyCondition::Map(m) => m.build(enrichment_tables),
+        // }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::conditions::{AnyCondition, CheckFieldsVariant, PlainVariant, VrlVariant};
     use indoc::indoc;
-
-    use super::*;
+    use serde::Deserialize;
+    use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
     struct Test {
@@ -93,11 +165,33 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_anycondition_default() {
+    fn deserialize_is_log() {
+        let conf: Test = toml::from_str(r#"condition.type = "is_log""#).unwrap();
+        assert_eq!(
+            AnyCondition::Plain {
+                kind: PlainVariant::IsLog
+            },
+            conf.condition
+        )
+    }
+
+    #[test]
+    fn deserialize_is_metric() {
+        let conf: Test = toml::from_str(r#"condition.type = "is_metric""#).unwrap();
+        assert_eq!(
+            AnyCondition::Plain {
+                kind: PlainVariant::IsMetric
+            },
+            conf.condition
+        )
+    }
+
+    #[test]
+    fn deserialize_default() {
         let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
         assert_eq!(
-            r#"String(".nork == false")"#,
-            format!("{:?}", conf.condition)
+            AnyCondition::BareVrl(r#".nork == false"#.to_string()),
+            conf.condition
         )
     }
 
@@ -106,12 +200,20 @@ mod tests {
         let conf: Test = toml::from_str(indoc! {r#"
             condition.type = "check_fields"
             condition."norg.equals" = "nork"
+            condition."foobar" = "raboof"
         "#})
         .unwrap();
 
+        let mut expected_fields: BTreeMap<String, String> = BTreeMap::new();
+        expected_fields.insert("norg.equals".to_string(), "nork".to_string());
+        expected_fields.insert("foobar".to_string(), "raboof".to_string());
+
         assert_eq!(
-            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} })"#,
-            format!("{:?}", conf.condition)
+            AnyCondition::CheckFields {
+                kind: CheckFieldsVariant::CheckFields,
+                fields: expected_fields
+            },
+            conf.condition
         )
     }
 
@@ -119,13 +221,16 @@ mod tests {
     fn deserialize_anycondition_vrl() {
         let conf: Test = toml::from_str(indoc! {r#"
             condition.type = "vrl"
-            condition.source = '.nork == true'
+            condition.source = ".nork == true"
         "#})
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true" })"#,
-            format!("{:?}", conf.condition)
+            AnyCondition::Vrl {
+                kind: VrlVariant::Vrl,
+                source: ".nork == true".to_string(),
+            },
+            conf.condition
         )
     }
 }

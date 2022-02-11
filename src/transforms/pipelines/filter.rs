@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::expander::ExpanderConfig;
 use crate::{
-    conditions::{not::NotConfig, AnyCondition},
+    conditions::{AnyCondition, TaggedCondition},
     config::{ExpandType, Input, Output, TransformConfig, TransformContext},
     transforms::{filter::FilterConfig, Transform},
 };
@@ -38,9 +38,10 @@ impl PipelineFilterConfig {
     }
 
     fn falsy_path(&self) -> Box<dyn TransformConfig> {
-        Box::new(FilterConfig::from(AnyCondition::Map(Box::new(
-            NotConfig::from(self.condition.clone()),
-        ))))
+        Box::new(FilterConfig::from(AnyCondition::Tagged {
+            kind: TaggedCondition::Not,
+            subcondition: Some(Box::new(self.condition.clone())),
+        }))
     }
 }
 

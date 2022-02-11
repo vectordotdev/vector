@@ -93,12 +93,12 @@ impl TransformConfig for SampleCompatConfig {
 pub struct Sample {
     rate: u64,
     key_field: Option<String>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     count: u64,
 }
 
 impl Sample {
-    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Box<dyn Condition>>) -> Self {
+    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Condition>) -> Self {
         Self {
             rate,
             key_field,
@@ -148,19 +148,16 @@ mod tests {
 
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, VrlConfig},
-        config::log_schema,
-        event::Event,
-        test_util::random_lines,
-        transforms::test::transform_one,
+        config::log_schema, event::Event, test_util::random_lines, transforms::test::transform_one,
     };
 
-    fn condition_contains(key: &str, needle: &str) -> Box<dyn Condition> {
-        VrlConfig {
-            source: format!(r#"contains!(."{}", "{}")"#, key, needle),
-        }
-        .build(&Default::default())
-        .unwrap()
+    fn condition_contains(key: &str, needle: &str) -> Condition {
+        // VrlConfig {
+        //     source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+        // }
+        // .build(&Default::default())
+        // .unwrap()
+        unimplemented!()
     }
 
     #[test]

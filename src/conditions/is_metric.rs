@@ -1,37 +1,32 @@
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::Event,
-};
+use crate::{conditions::Conditional, event::Event};
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct IsMetricConfig {}
+// #[derive(Deserialize, Serialize, Debug, Default, Clone)]
+// pub struct IsMetricConfig {}
 
-inventory::submit! {
-    ConditionDescription::new::<IsMetricConfig>("is_metric")
-}
+// inventory::submit! {
+//     ConditionDescription::new::<IsMetricConfig>("is_metric")
+// }
 
-impl_generate_config_from_default!(IsMetricConfig);
+// impl_generate_config_from_default!(IsMetricConfig);
 
-#[typetag::serde(name = "is_metric")]
-impl ConditionConfig for IsMetricConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        Ok(Box::new(IsMetric {}))
-    }
-}
+// #[typetag::serde(name = "is_metric")]
+// impl ConditionConfig for IsMetricConfig {
+//     fn build(
+//         &self,
+//         _enrichment_tables: &enrichment::TableRegistry,
+//     ) -> crate::Result<Box<dyn Condition>> {
+//         Ok(Box::new(IsMetric {}))
+//     }
+// }
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IsMetric {}
 
-impl Condition for IsMetric {
+impl Conditional for IsMetric {
     fn check(&self, e: &Event) -> bool {
         matches!(e, Event::Metric(_))
     }
@@ -47,28 +42,28 @@ impl Condition for IsMetric {
 
 //------------------------------------------------------------------------------
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    };
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+//     use crate::event::{
+//         metric::{Metric, MetricKind, MetricValue},
+//         Event,
+//     };
 
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<IsMetricConfig>();
-    }
+//     #[test]
+//     fn generate_config() {
+//         crate::test_util::test_generate_config::<IsMetricConfig>();
+//     }
 
-    #[test]
-    fn is_metric_basic() {
-        let cond = IsMetricConfig {}.build(&Default::default()).unwrap();
+//     #[test]
+//     fn is_metric_basic() {
+//         let cond = IsMetricConfig {}.build(&Default::default()).unwrap();
 
-        assert!(!cond.check(&Event::from("just a log")));
-        assert!(cond.check(&Event::from(Metric::new(
-            "test metric",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        ))),);
-    }
-}
+//         assert!(!cond.check(&Event::from("just a log")));
+//         assert!(cond.check(&Event::from(Metric::new(
+//             "test metric",
+//             MetricKind::Incremental,
+//             MetricValue::Counter { value: 1.0 },
+//         ))),);
+//     }
+// }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use vector_datadog_filter::EventFilter;
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::{Event, LogEvent},
 };
 
@@ -21,29 +21,29 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 
 /// Runner that contains the boxed `Matcher` function to check whether an `Event` matches
 /// a Datadog Search Syntax query.
-#[derive(Clone)]
-struct DatadogSearchRunner {
+#[derive(Clone, Debug)]
+pub(crate) struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
 }
 
-impl Condition for DatadogSearchRunner {
+impl Conditional for DatadogSearchRunner {
     fn check(&self, e: &Event) -> bool {
         self.matcher.run(e)
     }
 }
 
-#[typetag::serde(name = "datadog_search")]
-impl ConditionConfig for DatadogSearchConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
+// #[typetag::serde(name = "datadog_search")]
+// impl ConditionConfig for DatadogSearchConfig {
+//     fn build(
+//         &self,
+//         _enrichment_tables: &enrichment::TableRegistry,
+//     ) -> crate::Result<Box<dyn Condition>> {
+//         let node = parse(&self.source)?;
+//         let matcher = as_log(build_matcher(&node, &EventFilter::default()));
 
-        Ok(Box::new(DatadogSearchRunner { matcher }))
-    }
-}
+//         Ok(Box::new(DatadogSearchRunner { matcher }))
+//     }
+// }
 
 /// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
 fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {

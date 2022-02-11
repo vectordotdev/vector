@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::{Event, Value},
 };
 
@@ -503,56 +503,56 @@ fn build_predicates(
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct CheckFieldsConfig {
-    #[serde(flatten, default)]
-    predicates: IndexMap<String, CheckFieldsPredicateArg>,
-}
+// #[derive(Deserialize, Serialize, Debug, Default, Clone)]
+// pub struct CheckFieldsConfig {
+//     #[serde(flatten, default)]
+//     predicates: IndexMap<String, CheckFieldsPredicateArg>,
+// }
 
-inventory::submit! {
-    ConditionDescription::new::<CheckFieldsConfig>("check_fields")
-}
+// inventory::submit! {
+//     ConditionDescription::new::<CheckFieldsConfig>("check_fields")
+// }
 
-impl_generate_config_from_default!(CheckFieldsConfig);
+// impl_generate_config_from_default!(CheckFieldsConfig);
 
-impl CheckFieldsConfig {
-    #[cfg(test)]
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
-        Self { predicates }
-    }
-}
+// impl CheckFieldsConfig {
+//     #[cfg(test)]
+//     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
+//     pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
+//         Self { predicates }
+//     }
+// }
 
-#[typetag::serde(name = "check_fields")]
-impl ConditionConfig for CheckFieldsConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
-        build_predicates(&self.predicates)
-            .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
-            .map_err(|errs| {
-                if errs.len() > 1 {
-                    let mut err_fmt = errs.join("\n");
-                    err_fmt.insert_str(0, "failed to parse predicates:\n");
-                    err_fmt
-                } else {
-                    errs[0].clone()
-                }
-                .into()
-            })
-    }
-}
+// #[typetag::serde(name = "check_fields")]
+// impl ConditionConfig for CheckFieldsConfig {
+//     fn build(
+//         &self,
+//         _enrichment_tables: &enrichment::TableRegistry,
+//     ) -> crate::Result<Box<dyn Condition>> {
+//         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
+//         build_predicates(&self.predicates)
+//             .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
+//             .map_err(|errs| {
+//                 if errs.len() > 1 {
+//                     let mut err_fmt = errs.join("\n");
+//                     err_fmt.insert_str(0, "failed to parse predicates:\n");
+//                     err_fmt
+//                 } else {
+//                     errs[0].clone()
+//                 }
+//                 .into()
+//             })
+//     }
+// }
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
-impl Condition for CheckFields {
+impl Conditional for CheckFields {
     fn check(&self, e: &Event) -> bool {
         self.predicates.iter().all(|(_, p)| p.check(e))
     }
