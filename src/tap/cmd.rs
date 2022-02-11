@@ -98,9 +98,9 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if opts.verbose {
                                     match ev.notification {
-                                        EventNotificationType::MATCHED => println!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
+                                        EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
                                         EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
-                                        _ => {},
+                                        EventNotificationType::Other(_) => {},
                                     }
                                 }
                             },
