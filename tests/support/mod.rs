@@ -391,13 +391,8 @@ impl SinkConfig for MockSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 
-<<<<<<< HEAD
-    fn input_type(&self) -> DataType {
-        DataType::all()
-=======
     fn input(&self) -> Input {
-        Input::any()
->>>>>>> origin/master
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {
