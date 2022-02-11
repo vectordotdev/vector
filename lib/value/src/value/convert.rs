@@ -5,7 +5,7 @@ use ordered_float::NotNan;
 use std::collections::BTreeMap;
 
 impl Value {
-    /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Map`
+    /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Map`.
     pub fn as_map(&self) -> Option<&BTreeMap<String, Self>> {
         match &self {
             Value::Map(map) => Some(map),
@@ -13,7 +13,7 @@ impl Value {
         }
     }
 
-    /// Returns self as `NotNan<f64>`, only if self is `Value::Float`
+    /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
     pub fn as_float(&self) -> Option<NotNan<f64>> {
         match self {
             Value::Float(f) => Some(*f),
@@ -21,7 +21,7 @@ impl Value {
         }
     }
 
-    /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`
+    /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`.
     pub fn into_map(self) -> Option<BTreeMap<String, Self>> {
         match self {
             Value::Map(map) => Some(map),
@@ -29,7 +29,7 @@ impl Value {
         }
     }
 
-    /// Returns self as `&DateTime<Utc>`, only if self is `Value::Timestamp`
+    /// Returns self as `&DateTime<Utc>`, only if self is `Value::Timestamp`.
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
@@ -37,7 +37,7 @@ impl Value {
         }
     }
 
-    /// Returns self as a mutable `BTreeMap<String, Value>`
+    /// Returns self as a mutable `BTreeMap<String, Value>`.
     ///
     /// # Panics
     ///
@@ -49,7 +49,7 @@ impl Value {
         }
     }
 
-    /// Returns self as a `Vec<Value>`
+    /// Returns self as a `Vec<Value>`.
     ///
     /// # Panics
     ///
@@ -61,7 +61,7 @@ impl Value {
         }
     }
 
-    /// Returns self as a mutable `Vec<Value>`
+    /// Returns self as a mutable `Vec<Value>`.
     ///
     /// # Panics
     ///
