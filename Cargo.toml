@@ -7,43 +7,7 @@ description = "A lightweight and ultra-fast tool for building observability pipe
 homepage = "https://vector.dev"
 license = "MPL-2.0"
 readme = "README.md"
-publish = false
 default-run = "vector"
-
-[workspace]
-members = [
-  ".",
-  "lib/enrichment",
-  "lib/vector-buffers",
-  "lib/vector-common",
-  "lib/vector-core",
-  "lib/dnsmsg-parser",
-  "lib/fakedata",
-  "lib/file-source",
-  "lib/k8s-e2e-tests",
-  "lib/k8s-test-framework",
-  "lib/portpicker",
-  "lib/prometheus-parser",
-  "lib/tracing-limit",
-  "lib/vector-api-client",
-  "lib/lookup",
-  "lib/value",
-  "lib/vrl/cli",
-  "lib/vrl/compiler",
-  "lib/vrl/core",
-  "lib/vrl/diagnostic",
-  "lib/vrl/parser",
-  "lib/vrl/stdlib",
-  "lib/vrl/tests",
-  "lib/vrl/proptests",
-  "lib/vector-vrl-functions",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
-  "lib/datadog/filter",
-  "lib/datadog/filter-test",
-  "lib/vector-datadog-filter",
-  "lib/soak"
-]
 
 [dependencies]
 # Internal libs
@@ -301,41 +265,10 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 
 [features]
-# Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-# Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-# Default features for *-pc-windows-msvc
-# TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-api-client = ["api", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-vrl-cli = ["api", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
-tokio-console = ["console-subscriber", "tokio/tracing"]
+target-x86_64-unknown-linux-musl = ["rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
-all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
-all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datadog-pipelines"]
-
-# Target specific release features.
-# The `make` tasks will select this according to the appropriate triple.
-# Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-# Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-# currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-
-# Enables `rdkafka` dependency.
-# This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
-# The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
 rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 # This feature is less portable, but doesn't require `cmake` as build dependency
-rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
@@ -351,26 +284,6 @@ vendor-libz = ["libz-sys/static"]
 kubernetes = ["k8s-openapi", "evmap"]
 
 docker = ["bollard", "dirs-next"]
-
-# API
-api = [
-  "async-graphql",
-  "async-graphql-warp",
-  "base64",
-  "itertools",
-  "vector_core/api",
-  "warp",
-]
-
-# API client
-api-client = [
-  "crossterm",
-  "num-format",
-  "number_prefix",
-  "tui",
-  "vector_core/api",
-  "vector-api-client",
-]
 
 # Anything that requires Protocol Buffers.
 protobuf-build = ["tonic-build", "prost-build"]
@@ -736,18 +649,3 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap", "bollard"]
 
 disable-resolv-conf = []
-shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
-vector-unit-test-tests = [
-  "sources-demo_logs",
-  "transforms-add_fields",
-  "transforms-remap",
-  "transforms-route",
-  "transforms-filter",
-  "transforms-reduce",
-  "transforms-compound",
-  "transforms-add_tags",
-  "transforms-log_to_metric",
-  "transforms-remove_fields",
-  "sinks-console"
-]
