@@ -34,36 +34,36 @@ use crate::value::regex::ValueRegex;
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-/// The main value type used in Vector events, and VRL
+/// The main value type used in Vector events, and VRL.
 #[derive(PartialOrd, Debug, Clone)]
 pub enum Value {
-    /// Bytes - usually representing a UTF8 String
+    /// Bytes - usually representing a UTF8 String.
     Bytes(Bytes),
 
-    /// Regex
+    /// Regex.
     /// When used in the context of Vector this is treated identically to Bytes. It has
-    /// additional meaning in the context of VRL
+    /// additional meaning in the context of VRL.
     Regex(ValueRegex),
 
-    /// Integer
+    /// Integer.
     Integer(i64),
 
-    /// Float - not NaN
+    /// Float - not NaN.
     Float(NotNan<f64>),
 
-    /// Boolean
+    /// Boolean.
     Boolean(bool),
 
-    /// Timetamp (UTC)
+    /// Timetamp (UTC).
     Timestamp(DateTime<Utc>),
 
-    /// Map
+    /// Map.
     Map(BTreeMap<String, Value>),
 
-    /// Array
+    /// Array.
     Array(Vec<Value>),
 
-    /// Null
+    /// Null.
     Null,
 }
 
