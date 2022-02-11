@@ -6,7 +6,7 @@ use vector_common::TimeZone;
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -90,7 +90,7 @@ impl FunctionTransform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            emit!(&LogfmtParserConversionFailed {
+                            emit!(&ParserConversionError {
                                 name: key.as_ref(),
                                 error
                             });
@@ -105,7 +105,7 @@ impl FunctionTransform for Logfmt {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&LogfmtParserMissingField { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);

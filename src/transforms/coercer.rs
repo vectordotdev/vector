@@ -6,7 +6,7 @@ use vector_common::TimeZone;
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
-    internal_events::CoercerConversionFailed,
+    internal_events::CoercerConversionError,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -81,7 +81,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
                 }
             }
@@ -94,7 +94,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
                 }
             }

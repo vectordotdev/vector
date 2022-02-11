@@ -8,7 +8,7 @@ use crate::{
         TransformDescription,
     },
     event::Event,
-    internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
+    internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -138,58 +138,66 @@ impl FunctionTransform for Geoip {
             .get(&self.source)
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
-            if let Ok(ip) = FromStr::from_str(ipaddress) {
-                if self.has_isp_db() {
-                    if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
-                        if let Some(as_number) = data.autonomous_system_number {
-                            isp.autonomous_system_number = as_number as i64;
+            match FromStr::from_str(ipaddress) {
+                Ok(ip) => {
+                    if self.has_isp_db() {
+                        if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
+                            if let Some(as_number) = data.autonomous_system_number {
+                                isp.autonomous_system_number = as_number as i64;
+                            }
+                            if let Some(as_organization) = data.autonomous_system_organization {
+                                isp.autonomous_system_organization = as_organization;
+                            }
+                            if let Some(isp_name) = data.isp {
+                                isp.isp = isp_name;
+                            }
+                            if let Some(organization) = data.organization {
+                                isp.organization = organization;
+                            }
                         }
-                        if let Some(as_organization) = data.autonomous_system_organization {
-                            isp.autonomous_system_organization = as_organization;
+                    } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
+                        if let Some(city_names) = data.city.and_then(|c| c.names) {
+                            if let Some(city_name) = city_names.get("en") {
+                                city.city_name = city_name;
+                            }
                         }
-                        if let Some(isp_name) = data.isp {
-                            isp.isp = isp_name;
+
+                        if let Some(continent_code) = data.continent.and_then(|c| c.code) {
+                            city.continent_code = continent_code;
                         }
-                        if let Some(organization) = data.organization {
-                            isp.organization = organization;
+
+                        if let Some(country_code) = data.country.and_then(|cy| cy.iso_code) {
+                            city.country_code = country_code;
+                        };
+
+                        if let Some(time_zone) = data.location.clone().and_then(|loc| loc.time_zone)
+                        {
+                            city.timezone = time_zone;
                         }
-                    }
-                } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                    if let Some(city_names) = data.city.and_then(|c| c.names) {
-                        if let Some(city_name) = city_names.get("en") {
-                            city.city_name = city_name;
+
+                        if let Some(latitude) = data.location.clone().and_then(|loc| loc.latitude) {
+                            city.latitude = latitude.to_string();
                         }
-                    }
 
-                    if let Some(continent_code) = data.continent.and_then(|c| c.code) {
-                        city.continent_code = continent_code;
-                    }
+                        if let Some(longitude) = data.location.clone().and_then(|loc| loc.longitude)
+                        {
+                            city.longitude = longitude.to_string();
+                        }
 
-                    if let Some(country_code) = data.country.and_then(|cy| cy.iso_code) {
-                        city.country_code = country_code;
-                    };
-
-                    if let Some(time_zone) = data.location.clone().and_then(|loc| loc.time_zone) {
-                        city.timezone = time_zone;
-                    }
-
-                    if let Some(latitude) = data.location.clone().and_then(|loc| loc.latitude) {
-                        city.latitude = latitude.to_string();
-                    }
-
-                    if let Some(longitude) = data.location.clone().and_then(|loc| loc.longitude) {
-                        city.longitude = longitude.to_string();
-                    }
-
-                    if let Some(postal_code) = data.postal.clone().and_then(|p| p.code) {
-                        city.postal_code = postal_code;
+                        if let Some(postal_code) = data.postal.clone().and_then(|p| p.code) {
+                            city.postal_code = postal_code;
+                        }
                     }
                 }
-            } else {
-                emit!(&GeoipIpAddressParseError { address: ipaddress });
+                Err(error) => {
+                    emit!(&GeoipIpAddressParseError {
+                        error,
+                        address: ipaddress
+                    });
+                }
             }
         } else {
-            emit!(&GeoipFieldDoesNotExist {
+            emit!(&ParserMissingFieldError {
                 field: &self.source
             });
         };

@@ -7,7 +7,7 @@ use vector_common::{tokenize::parse, TimeZone};
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -114,7 +114,7 @@ impl FunctionTransform for Tokenizer {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        emit!(&TokenizerConvertFailed { field: name, error });
+                        emit!(&ParserConversionError { name, error });
                     }
                 }
             }
@@ -122,7 +122,7 @@ impl FunctionTransform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&TokenizerFieldMissing { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event)

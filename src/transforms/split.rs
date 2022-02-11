@@ -7,7 +7,7 @@ use vector_common::TimeZone;
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::{SplitConvertFailed, SplitFieldMissing},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -115,7 +115,7 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(&SplitConvertFailed { field: name, error });
+                        emit!(&ParserConversionError { name, error });
                     }
                 }
             }
@@ -123,7 +123,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&SplitFieldMissing { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);
