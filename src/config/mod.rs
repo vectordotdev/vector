@@ -130,24 +130,40 @@ impl Config {
     pub fn propagate_acknowledgements(&mut self) {
         let inputs: Vec<_> = self
             .sinks
-            .values()
-            .filter(|sink| {
+            .iter()
+            .filter(|(_, sink)| {
                 sink.acknowledgements
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
-            .flat_map(|sink| sink.inputs.clone())
+            .flat_map(|(name, sink)| {
+                sink.inputs
+                    .iter()
+                    .map(|input| (name.clone(), input.clone()))
+            })
             .collect();
         self.propagate_acks_rec(inputs);
     }
 
-    fn propagate_acks_rec(&mut self, inputs: Vec<OutputId>) {
-        for input in inputs {
+    fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
+        for (sink, input) in sink_inputs {
             let component = &input.component;
             if let Some(source) = self.sources.get_mut(component) {
-                source.enable_acknowledgements();
+                if source.inner.can_acknowledge() {
+                    source.sink_acknowledgements = true;
+                } else {
+                    warn!(
+                        message = "Source has acknowledgements enabled by sink, but acknowledgements are not supported.",
+                        source = component.id(),
+                        sink = sink.id(),
+                    );
+                }
             } else if let Some(transform) = self.transforms.get(component) {
-                let inputs = transform.inputs.clone();
+                let inputs = transform
+                    .inputs
+                    .iter()
+                    .map(|input| (sink.clone(), input.clone()))
+                    .collect();
                 self.propagate_acks_rec(inputs);
             }
         }
@@ -221,14 +237,6 @@ impl SourceOuter {
             inner: Box::new(source),
             proxy: Default::default(),
             sink_acknowledgements: false,
-        }
-    }
-
-    fn enable_acknowledgements(&mut self) {
-        if !self.inner.can_acknowledge() {
-            todo!("FIXME");
-        } else {
-            self.sink_acknowledgements = true;
         }
     }
 }
