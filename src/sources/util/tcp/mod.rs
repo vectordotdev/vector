@@ -1,7 +1,7 @@
 mod request_limiter;
 
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
@@ -20,6 +20,7 @@ use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
 use super::{AfterReadExt as _, StreamDecodingError};
+use crate::source_sender::ClosedError;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
@@ -311,14 +312,13 @@ async fn handle_stream<T>(
                             permit.decoding_finished(events.len());
                         }
 
-
                         if let Some(batch) = batch {
                             for event in &mut events {
                                 event.add_batch_notifier(Arc::clone(&batch));
                             }
                         }
                         source.handle_events(&mut events, host.clone(), byte_size);
-                        match out.send_all(&mut stream::iter(events)).await {
+                        match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,
@@ -348,7 +348,7 @@ async fn handle_stream<T>(
                                     break;
                                 }
                             }
-                            Err(_) => {
+                            Err(ClosedError) => {
                                 warn!("Failed to send event.");
                                 break;
                             }
