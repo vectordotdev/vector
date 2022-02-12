@@ -232,6 +232,13 @@ impl Value {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        NotNan::new(f).unwrap().into()
+    }
+}
+
 impl From<NotNan<f64>> for Value {
     fn from(v: NotNan<f64>) -> Self {
         Value::Float(v)
