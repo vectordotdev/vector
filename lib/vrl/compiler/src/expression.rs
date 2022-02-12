@@ -315,7 +315,7 @@ impl From<Value> for Expr {
             }
             Array(v) => {
                 let array = crate::expression::Array::from(
-                    v.into_iter().map(|v| Expr::from(v)).collect::<Vec<_>>(),
+                    v.into_iter().map(Expr::from).collect::<Vec<_>>(),
                 );
 
                 Container::new(container::Variant::from(array)).into()

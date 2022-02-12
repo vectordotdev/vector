@@ -24,8 +24,8 @@ pub trait VrlValueConvert: Sized {
     fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
     fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
 
-    fn try_into_i64(self: &Self) -> Result<i64, Error>;
-    fn try_into_f64(self: &Self) -> Result<f64, Error>;
+    fn try_into_i64(&self) -> Result<i64, Error>;
+    fn try_into_f64(&self) -> Result<f64, Error>;
 
     fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error>;
 }
@@ -64,7 +64,7 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_into_f64(self: &Self) -> Result<f64, Error> {
+    fn try_into_f64(&self) -> Result<f64, Error> {
         match self {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(v.into_inner()),
@@ -227,7 +227,7 @@ impl Value {
     // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
     pub fn from_f64_or_zero(value: f64) -> Value {
         NotNan::new(value)
-            .map(|f| Value::Float(f))
+            .map(Value::Float)
             .unwrap_or_else(|_| Value::Float(NotNan::new(0.0).unwrap()))
     }
 }
@@ -293,11 +293,11 @@ impl From<Cow<'_, str>> for Value {
     }
 }
 
-// impl From<&[u8]> for Value {
-//     fn from(v: &[u8]) -> Self {
-//         Value::Bytes(Bytes::copy_from_slice(v))
-//     }
-// }
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Self::Null
+    }
+}
 
 impl From<String> for Value {
     fn from(v: String) -> Self {

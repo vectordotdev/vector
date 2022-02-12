@@ -108,8 +108,8 @@ mod tests {
         }
 
         invalid_utf8 {
-            args: func_args![value: value!(&b"foo,b\xFFar"[..])],
-            want: Ok(value!(vec!["foo".into(), value!(&b"b\xFFar"[..])])),
+            args: func_args![value: value!(Bytes::copy_from_slice(&b"foo,b\xFFar"[..]))],
+            want: Ok(value!(vec!["foo".into(), value!(Bytes::copy_from_slice(&b"b\xFFar"[..]))])),
             tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
