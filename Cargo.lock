@@ -1827,6 +1827,7 @@ version = "0.1.0"
 dependencies = [
  "datadog-search-syntax",
  "dyn-clone",
+ "memoize",
  "regex",
 ]
 
@@ -3898,6 +3899,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "memoize"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76f58373c9600033ce4829bca4b6f36a65de097c4ca7e8d66ee7cfbba3ec878a"
+dependencies = [
+ "lazy_static",
+ "memoize-inner",
+]
+
+[[package]]
+name = "memoize-inner"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "217a1e7f586ba063a4dc87a2dfb26f7700e150c9b378cb2aef511cd42013f8a3"
+dependencies = [
+ "lazy_static",
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "syn 1.0.84",
 ]
 
 [[package]]

@@ -1,6 +1,8 @@
+use memoize::memoize;
 use regex::Regex;
 
 /// Returns compiled word boundary regex.
+#[memoize(Capacity: 1023)]
 pub fn word_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         r#"\b{}\b"#,
@@ -10,6 +12,7 @@ pub fn word_regex(to_match: &str) -> Regex {
 }
 
 /// Returns compiled wildcard regex.
+#[memoize(Capacity: 1023)]
 pub fn wildcard_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         "^{}$",
