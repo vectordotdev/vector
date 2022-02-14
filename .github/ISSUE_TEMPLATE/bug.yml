@@ -33,7 +33,7 @@ body:
   attributes:
     label: Configuration
     description: |
-      Paste the relevant parts of your `vector.toml` configuration.
+      Paste the relevant parts of your Vector configuration file.
 
       !! If your config files contain sensitive information please remove it !!
     render: text
@@ -45,7 +45,7 @@ body:
     description: |
       Please paste the output of running `vector --version`.
 
-			If you are not running the latest version of Vector, please try upgrading
+      If you are not running the latest version of Vector, please try upgrading
       because your issue may have already been fixed.
     render: text
   validations:
