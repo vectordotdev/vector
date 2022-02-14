@@ -37,7 +37,7 @@ struct SematextMetricsService {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SematextMetricsDefaultBatchSettings;
+pub(crate) struct SematextMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
