@@ -153,7 +153,7 @@ impl Config {
                     source.sink_acknowledgements = true;
                 } else {
                     warn!(
-                        message = "Source has acknowledgements enabled by sink, but acknowledgements are not supported.",
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Data loss could occur.",
                         source = component.id(),
                         sink = sink.id(),
                     );
