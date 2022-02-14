@@ -529,7 +529,10 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
     }
 }
 
-pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceValueMerger>, String> {
+pub(crate) fn get_value_merger(
+    v: Value,
+    m: &MergeStrategy,
+) -> Result<Box<dyn ReduceValueMerger>, String> {
     match m {
         MergeStrategy::Sum => match v {
             Value::Integer(i) => Ok(Box::new(AddNumbersMerger::new(i.into()))),
