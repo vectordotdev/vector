@@ -95,7 +95,7 @@ pub struct UnitTestSinkConfig {
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tx = self.result_tx.lock().await.take().unwrap();
+        let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
             test_name: self.test_name.clone(),
             transform_id: self.transform_id.clone(),
@@ -119,7 +119,8 @@ impl SinkConfig for UnitTestSinkConfig {
 pub struct UnitTestSink {
     pub test_name: String,
     pub transform_id: String,
-    pub result_tx: oneshot::Sender<UnitTestSinkResult>,
+    // None for NoOp test sinks
+    pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
     pub check: UnitTestSinkCheck,
 }
 
@@ -196,8 +197,10 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOp => {}
         }
 
-        if self.result_tx.send(result).is_err() {
-            error!(message = "Sending unit test results failed in unit test sink.");
+        if let Some(tx) = self.result_tx {
+            if tx.send(result).is_err() {
+                error!(message = "Sending unit test results failed in unit test sink.");
+            }
         }
         Ok(())
     }
