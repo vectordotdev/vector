@@ -196,10 +196,10 @@ impl HttpRequestBuilder {
 
     pub fn build_request(
         &self,
-        body: Vec<u8>,
+        body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
-    ) -> Result<Request<Vec<u8>>, crate::Error> {
+    ) -> Result<Request<Bytes>, crate::Error> {
         let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
 
         let mut builder = Request::post(uri)
@@ -284,7 +284,7 @@ mod tests {
     }
 
     fn get_hec_request() -> HecRequest {
-        let body = String::from("test-message").into_bytes();
+        let body = Bytes::from("test-message");
         let events_byte_size = body.len();
         HecRequest {
             body,

@@ -55,7 +55,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     clock: C,
 }
 

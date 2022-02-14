@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
         util::{
