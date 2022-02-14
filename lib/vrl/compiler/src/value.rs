@@ -3,9 +3,6 @@ mod convert;
 mod error;
 pub mod kind;
 mod r#macro;
-// mod path;
-// mod regex;
-mod serde;
 mod target;
 
 pub use error::Error;
