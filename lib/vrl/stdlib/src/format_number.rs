@@ -76,7 +76,7 @@ impl Expression for FormatNumberFn {
             Value::Integer(v) => v.into(),
             Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
             value => {
-                return Err(value::VrlValueError::Expected {
+                return Err(value::Error::Expected {
                     got: value.kind(),
                     expected: Kind::integer() | Kind::float(),
                 }

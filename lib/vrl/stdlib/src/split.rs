@@ -92,7 +92,7 @@ impl Expression for SplitFn {
                     .collect::<Vec<_>>()
                     .into())
             }
-            value => Err(value::VrlValueError::Expected {
+            value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::regex() | Kind::bytes(),
             }

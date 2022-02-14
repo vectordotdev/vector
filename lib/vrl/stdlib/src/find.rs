@@ -88,7 +88,7 @@ impl FindFn {
                 regex,
                 offset,
             )),
-            other => Err(value::VrlValueError::Expected {
+            other => Err(value::Error::Expected {
                 got: other.kind(),
                 expected: Kind::bytes() | Kind::regex(),
             }

@@ -35,7 +35,7 @@ fn slice(
         Value::Array(mut v) => range(v.len() as i64)
             .map(|range| v.drain(range).collect::<Vec<_>>())
             .map(Value::from),
-        value => Err(value::VrlValueError::Expected {
+        value => Err(value::Error::Expected {
             got: value.kind(),
             expected: Kind::bytes() | Kind::array(Collection::any()),
         }

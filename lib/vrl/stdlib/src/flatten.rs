@@ -12,7 +12,7 @@ fn flatten(value: Value) -> Resolved {
                 .map(|(k, v)| (k, v.clone()))
                 .collect(),
         )),
-        value => Err(value::VrlValueError::Expected {
+        value => Err(value::Error::Expected {
             got: value.kind(),
             expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
         }

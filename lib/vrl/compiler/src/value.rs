@@ -8,7 +8,7 @@ mod r#macro;
 mod serde;
 mod target;
 
-pub use error::VrlValueError;
+pub use error::Error;
 pub use kind::{Collection, Field, Index, Kind};
 
 pub use self::arithmetic::VrlValueArithmetic;

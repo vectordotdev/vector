@@ -75,7 +75,7 @@ impl Expression for RoundFn {
                 f64::round,
             ))),
             value @ Value::Integer(_) => Ok(value),
-            value => Err(value::VrlValueError::Expected {
+            value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::float() | Kind::integer(),
             }
