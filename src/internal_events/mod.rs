@@ -323,7 +323,7 @@ macro_rules! emit {
 
 const ELLIPSIS: &str = "[...]";
 
-pub fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+pub(super) fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
         let mut len = maxlen - ELLIPSIS.len();
         while !s.is_char_boundary(len) {
