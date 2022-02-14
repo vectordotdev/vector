@@ -224,178 +224,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "ComponentEventsInThroughput",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "throughput",
-              "description": "Events processed throughput",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsInTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Total incoming events metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsInTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsOutThroughput",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "throughput",
-              "description": "Events processed throughput",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsOutTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Total outgoing events metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsOutTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "ENUM",
           "name": "ComponentKind",
           "description": null,
@@ -5132,37 +4960,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsInTotal",
-              "description": "Total incoming events metrics",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsInTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use received_events_total instead"
-            },
-            {
               "name": "receivedEventsTotal",
               "description": "Total received events metrics",
               "args": [
@@ -5190,39 +4987,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInThroughput",
-              "description": "Total incoming events throughput sampled over the provided millisecond `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
               "isDeprecated": true,
-              "deprecationReason": "Use received_events_throughput instead"
+              "deprecationReason": "Use component_received_events_totals instead"
             },
             {
               "name": "receivedEventsThroughput",
@@ -5250,45 +5016,6 @@
                   "kind": "SCALAR",
                   "name": "Int",
                   "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentEventsInThroughputs",
-              "description": "Total incoming component events throughput metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsInThroughput",
-                      "ofType": null
-                    }
-                  }
                 }
               },
               "isDeprecated": true,
@@ -5334,45 +5061,6 @@
               "deprecationReason": null
             },
             {
-              "name": "componentEventsInTotals",
-              "description": "Total incoming component event metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsInTotal",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use component_received_events_totals instead"
-            },
-            {
               "name": "componentReceivedEventsTotals",
               "description": "Total received component event metrics over `interval`",
               "args": [
@@ -5412,37 +5100,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events metrics",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsOutTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use sent_events_total instead"
-            },
-            {
               "name": "sentEventsTotal",
               "description": "Total sent events metrics",
               "args": [
@@ -5470,39 +5127,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsOutThroughput",
-              "description": "Total outgoing events throughput sampled over the provided millisecond `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
               "isDeprecated": true,
-              "deprecationReason": "Use sent_events_throughput instead"
+              "deprecationReason": "Use component_sent_events_totals instead"
             },
             {
               "name": "sentEventsThroughput",
@@ -5530,45 +5156,6 @@
                   "kind": "SCALAR",
                   "name": "Int",
                   "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentEventsOutThroughputs",
-              "description": "Total outgoing component event throughput metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsOutThroughput",
-                      "ofType": null
-                    }
-                  }
                 }
               },
               "isDeprecated": true,
@@ -5612,45 +5199,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "componentEventsOutTotals",
-              "description": "Total outgoing component event metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsOutTotal",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use component_sent_events_totals instead"
             },
             {
               "name": "componentSentEventsTotals",
