@@ -30,7 +30,7 @@ struct EventStoreDbConfig {
     default_namespace: Option<String>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
