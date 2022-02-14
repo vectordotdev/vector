@@ -92,9 +92,10 @@ impl Function for Path {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
     use crate::event::Value;
-    use serde_json::json;
 
     #[test]
     fn check_path_query() {

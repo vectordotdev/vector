@@ -13,6 +13,7 @@ updates:
       - "domain: deps"
     commit-message:
       prefix: "chore(deps)"
+    open-pull-requests-limit: 10
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

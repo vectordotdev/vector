@@ -232,7 +232,7 @@ Name | Description
 | `sources-aws_kinesis_firehose`                       | Enables building the [`aws_kinesis_firehose` source](/docs/reference/configuration/sources/aws_kinesis_firehose)
 | `sources-docker_logs`                                | Enables building the [`docker_logs` source](/docs/reference/configuration/sources/docker_logs). Requires `unix` feature to be also enabled for support of Unix domain sockets.
 | `sources-file`                                       | Enables building the [`file` source](/docs/reference/configuration/sources/file).
-| `sources-generator`                                  | Enables building the [`generator` source](/docs/reference/configuration/sources/generator)
+| `sources-demo_logs`                                  | Enables building the [`demo_logs` source](/docs/reference/configuration/sources/demo_logs)
 | `sources-host_metrics`                               | Enables building the [`host_metrics` source](/docs/reference/configuration/sources/host_metrics)
 | `sources-http`                                       | Enables building the [`http` source](/docs/reference/configuration/sources/http)
 | `sources-journald`                                   | Enables building the [`journald` source](/docs/reference/configuration/sources/journald)
@@ -266,6 +266,7 @@ Name | Description
 | `sinks-blackhole`                                    | Enables building the [`blackhole` sink](/docs/reference/configuration/sinks/blackhole)
 | `sinks-clickhouse`                                   | Enables building the [`clickhouse` sink](/docs/reference/configuration/sinks/clickhouse)
 | `sinks-console`                                      | Enables building the [`console` sink](/docs/reference/configuration/sinks/console)
+| `sinks-datadog_events`                               | Enables building the [`datadog_events` sink](/docs/reference/configuration/sinks/datadog_events)
 | `sinks-datadog_logs`                                 | Enables building the [`datadog_logs` sink](/docs/reference/configuration/sinks/datadog_logs)
 | `sinks-datadog_metrics`                              | Enables building the [`datadog_metrics` sink](/docs/reference/configuration/sinks/datadog_metrics)
 | `sinks-elasticsearch`                                | Enables building the [`elasticsearch` sink](/docs/reference/configuration/sinks/elasticsearch)
@@ -283,6 +284,7 @@ Name | Description
 | `sinks-logdna`                                       | Enables building the [`logdna` sink](/docs/reference/configuration/sinks/logdna)
 | `sinks-loki`                                         | Enables building the [`loki` sink](/docs/reference/configuration/sinks/loki)
 | `sinks-new_relic_logs`                               | Enables building the [`new_relic_logs` sink](/docs/reference/configuration/sinks/new_relic_logs)
+| `sinks-new_relic`                                    | Enables building the [`new_relic` sink](/docs/reference/configuration/sinks/new_relic)
 | `sinks-papertrail`                                   | Enables building the [`papertrail` sink](/docs/reference/configuration/sinks/papertrail)
 | `sinks-prometheus`                                   | Enables building the [`prometheus_exporter`](/docs/reference/configuration/sinks/prometheus_exporter) and [`prometheus_remote_write`](/docs/reference/configuration/sinks/prometheus_remote_write) sinks
 | `sinks-pulsar`                                       | Enables building the [`pulsar` sink](/docs/reference/configuration/sinks/pulsar)

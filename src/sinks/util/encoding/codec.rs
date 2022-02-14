@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use vector_core::{config::log_schema, event::Event};
 
 use super::Encoder;
+use crate::event::LogEvent;
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -23,6 +24,16 @@ pub enum StandardEncodings {
     Text,
     Json,
     Ndjson,
+}
+
+impl StandardEncodings {
+    pub const fn content_type(&self) -> &str {
+        match self {
+            StandardEncodings::Text => "text/plain",
+            StandardEncodings::Json => "application/json",
+            StandardEncodings::Ndjson => "application/x-ndjson",
+        }
+    }
 }
 
 impl StandardEncodings {
@@ -147,18 +158,25 @@ impl Encoder<Vec<Event>> for StandardEncodings {
 ///
 /// All event types will be serialized to JSON, without pretty printing.  Uses
 /// [`serde_json::to_writer`] under the hood, so all caveats mentioned therein apply here.
+#[derive(PartialEq, Debug, Default)]
 pub struct StandardJsonEncoding;
 
 impl Encoder<Event> for StandardJsonEncoding {
     fn encode_input(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         match event {
-            Event::Log(log) => as_tracked_write(writer, &log, |writer, item| {
-                serde_json::to_writer(writer, item)
-            }),
+            Event::Log(log) => self.encode_input(log, writer),
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
         }
+    }
+}
+
+impl Encoder<LogEvent> for StandardJsonEncoding {
+    fn encode_input(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        as_tracked_write(writer, &log, |writer, item| {
+            serde_json::to_writer(writer, item)
+        })
     }
 }
 
@@ -189,7 +207,7 @@ impl Encoder<Event> for StandardTextEncoding {
     }
 }
 
-fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
+pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
 where
     F: FnOnce(&mut dyn io::Write, I) -> Result<(), E>,
     E: Into<io::Error> + 'static,

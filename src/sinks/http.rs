@@ -1,15 +1,6 @@
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::io::Write;
+
+use bytes::{BufMut, Bytes, BytesMut};
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -20,7 +11,20 @@ use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::io::Write;
+
+use crate::{
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -48,7 +52,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
@@ -138,10 +142,7 @@ impl SinkConfig for HttpSinkConfig {
         config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
-        let batch = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config
             .request
             .tower
@@ -156,13 +157,13 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
-        let sink = super::VectorSink::Sink(Box::new(sink));
+        let sink = super::VectorSink::from_event_sink(sink);
 
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -172,8 +173,8 @@ impl SinkConfig for HttpSinkConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
@@ -182,29 +183,28 @@ impl HttpSink for HttpSinkConfig {
         let body = match &self.encoding.codec() {
             Encoding::Text => {
                 if let Some(v) = event.get(crate::config::log_schema().message_key()) {
-                    let mut b = v.to_string_lossy().into_bytes();
-                    b.push(b'\n');
-                    b
+                    let mut body = BytesMut::new();
+                    body.put_slice(&v.to_string_lossy().into_bytes());
+                    body.put_u8(b'\n');
+                    body
                 } else {
                     emit!(&HttpEventMissingMessage);
                     return None;
                 }
             }
-
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b'\n');
-                b
+                body.put_u8(b'\n');
+                body
             }
-
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b',');
-                b
+                body.put_u8(b',');
+                body
             }
         };
 
@@ -215,7 +215,7 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
@@ -232,9 +232,17 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Text => "text/plain",
             Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
-                body.insert(0, b'[');
-                body.pop(); // remove trailing comma from last record
-                body.push(b']');
+                // TODO(https://github.com/vectordotdev/vector/issues/11253):
+                // Prepend before building a request body to eliminate the
+                // additional copy here.
+                let message = body.split();
+                body.put_u8(b'[');
+                if !message.is_empty() {
+                    body.unsplit(message);
+                    // remove trailing comma from last record
+                    body.truncate(body.len() - 1);
+                }
+                body.put_u8(b']');
                 "application/json"
             }
         };
@@ -248,9 +256,10 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let mut w = GzEncoder::new(Vec::new(), level);
+                let buffer = BytesMut::new();
+                let mut w = GzEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w.finish().expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
             Compression::None => {}
         }
@@ -259,7 +268,7 @@ impl HttpSink for HttpSinkConfig {
             builder = builder.header(header.as_str(), value.as_str());
         }
 
-        let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(body.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
@@ -292,8 +301,10 @@ fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crat
             return Err("Authorization header can not be used with defined auth options".into());
         }
 
-        HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
-        HeaderValue::from_bytes(value.as_bytes()).with_context(|| InvalidHeaderValue { value })?;
+        HeaderName::from_bytes(name.as_bytes())
+            .with_context(|_| InvalidHeaderNameSnafu { name })?;
+        HeaderValue::from_bytes(value.as_bytes())
+            .with_context(|_| InvalidHeaderValueSnafu { value })?;
     }
 
     Ok(())
@@ -301,6 +312,20 @@ fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crat
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        io::{BufRead, BufReader},
+        sync::{atomic, Arc},
+    };
+
+    use bytes::{Buf, Bytes};
+    use flate2::read::MultiGzDecoder;
+    use futures::{channel::mpsc, stream, StreamExt};
+    use headers::{Authorization, HeaderMapExt};
+    use http::request::Parts;
+    use hyper::{Method, Response, StatusCode};
+    use serde::Deserialize;
+    use vector_core::event::{BatchNotifier, BatchStatus};
+
     use super::*;
     use crate::{
         assert_downcast_matches,
@@ -314,16 +339,6 @@ mod tests {
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
-    use bytes::{Buf, Bytes};
-    use flate2::read::MultiGzDecoder;
-    use futures::{channel::mpsc, stream, StreamExt};
-    use headers::{Authorization, HeaderMapExt};
-    use http::request::Parts;
-    use hyper::{Method, Response, StatusCode};
-    use serde::Deserialize;
-    use std::io::{BufRead, BufReader};
-    use std::sync::{atomic, Arc};
-    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -353,6 +368,7 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
+        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,
@@ -579,14 +595,14 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
         let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();

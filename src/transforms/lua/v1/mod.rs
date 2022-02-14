@@ -1,14 +1,16 @@
-use crate::transforms::TaskTransform;
-use crate::{
-    config::DataType,
-    event::{Event, Value},
-    internal_events::{LuaGcTriggered, LuaScriptError},
-    transforms::Transform,
-};
+use std::{future::ready, pin::Pin};
+
 use futures::{stream, Stream, StreamExt};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{future::ready, pin::Pin};
+
+use crate::{
+    config::{DataType, Input, Output},
+    event::{Event, Value},
+    internal_events::{LuaGcTriggered, LuaScriptError},
+    transforms::{TaskTransform, Transform},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -32,15 +34,15 @@ pub struct LuaConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::task)
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Log
+    pub fn input(&self) -> Input {
+        Input::log()
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Log
+    pub fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     pub const fn transform_type(&self) -> &'static str {
@@ -101,16 +103,16 @@ impl Lua {
             let package = lua
                 .globals()
                 .get::<_, mlua::Table<'_>>("package")
-                .context(InvalidLua)?;
+                .context(InvalidLuaSnafu)?;
             let current_paths = package
                 .get::<_, String>("path")
                 .unwrap_or_else(|_| ";".to_string());
             let paths = format!("{};{}", additional_paths, current_paths);
-            package.set("path", paths).context(InvalidLua)?;
+            package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 
-        let func = lua.load(&source).into_function().context(InvalidLua)?;
-        let vector_func = lua.create_registry_value(func).context(InvalidLua)?;
+        let func = lua.load(&source).into_function().context(InvalidLuaSnafu)?;
+        let vector_func = lua.create_registry_value(func).context(InvalidLuaSnafu)?;
 
         Ok(Self {
             source,
@@ -157,7 +159,7 @@ impl Lua {
     }
 }
 
-impl TaskTransform for Lua {
+impl TaskTransform<Event> for Lua {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -200,8 +202,10 @@ impl mlua::UserData for LuaEvent {
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
-                    Some(mlua::Value::Number(number)) => {
-                        this.inner.as_mut_log().insert(key, Value::Float(number));
+                    Some(mlua::Value::Number(number)) if !number.is_nan() => {
+                        this.inner
+                            .as_mut_log()
+                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
@@ -395,7 +399,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
     #[test]
@@ -508,8 +512,7 @@ mod tests {
 
     #[test]
     fn lua_load_file() {
-        use std::fs::File;
-        use std::io::Write;
+        use std::{fs::File, io::Write};
         crate::test_util::trace_init();
 
         let dir = tempfile::tempdir().unwrap();

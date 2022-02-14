@@ -1,17 +1,29 @@
-use crate::http::HttpClient;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::Compression;
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
+
+use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
-use http::{Request, StatusCode, Uri};
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    Request, StatusCode, Uri,
+};
 use hyper::Body;
 use snafu::Snafu;
-use std::sync::Arc;
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::buffers::Ackable;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    http::HttpClient,
+    sinks::util::{retries::RetryLogic, Compression},
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct LogApiRetry;
@@ -35,8 +47,9 @@ pub struct LogApiRequest {
     pub batch_size: usize,
     pub api_key: Arc<str>,
     pub compression: Compression,
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub finalizers: EventFinalizers,
+    pub events_byte_size: usize,
 }
 
 impl Ackable for LogApiRequest {
@@ -64,18 +77,22 @@ pub enum LogApiError {
 }
 
 #[derive(Debug)]
-pub enum LogApiResponse {
-    /// Client sent a request and all was well with it.
-    Ok,
-    /// Client request has likely invalid API key.
-    PermissionIssue,
+pub struct LogApiResponse {
+    event_status: EventStatus,
+    count: usize,
+    events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for LogApiResponse {
-    fn as_ref(&self) -> &EventStatus {
-        match self {
-            LogApiResponse::Ok => &EventStatus::Delivered,
-            LogApiResponse::PermissionIssue => &EventStatus::Errored,
+impl DriverResponse for LogApiResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -137,6 +154,8 @@ impl Service<LogApiRequest> for LogApiService {
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 
+        let count = request.batch_size;
+        let events_byte_size = request.events_byte_size;
         Box::pin(async move {
             match client.call(http_request).in_current_span().await {
                 Ok(response) => {
@@ -154,8 +173,16 @@ impl Service<LogApiRequest> for LogApiService {
                     //      time
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse::Ok),
+                        StatusCode::FORBIDDEN => Ok(LogApiResponse {
+                            event_status: EventStatus::Errored,
+                            count,
+                            events_byte_size,
+                        }),
+                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse {
+                            event_status: EventStatus::Delivered,
+                            count,
+                            events_byte_size,
+                        }),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),
                     }

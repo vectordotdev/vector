@@ -1,7 +1,8 @@
 // ## skip check-events ##
 
-use metrics::counter;
 use std::fmt::Debug;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

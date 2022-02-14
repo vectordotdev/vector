@@ -28,7 +28,7 @@ remap: functions: split: {
 	]
 	internal_failure_reasons: []
 	return: {
-		types: ["string"]
+		types: ["array"]
 		rules: [
 			"If `limit` is specified, the remainder of the string is returned unsplit after `limit` has been reached.",
 		]

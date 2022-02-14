@@ -1,4 +1,6 @@
-use metrics::gauge;
+use std::borrow::Cow;
+
+use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
@@ -15,12 +17,36 @@ impl InternalEvent for FileOpen {
     }
 }
 
+#[derive(Debug)]
+pub struct FileBytesSent<'a> {
+    pub byte_size: usize,
+    pub file: Cow<'a, str>,
+}
+
+impl InternalEvent for FileBytesSent<'_> {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = "file", file = %self.file);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "file",
+            "file" => self.file.clone().into_owned(),
+        );
+    }
+}
+
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
-    use super::{FileOpen, InternalEvent};
+    use std::{io::Error, path::Path, time::Duration};
+
     use file_source::FileSourceInternalEvents;
     use metrics::counter;
-    use std::{io::Error, path::Path, time::Duration};
+
+    use super::{FileOpen, InternalEvent};
+    use crate::emit;
+    use crate::internal_events::prelude::error_stage;
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -118,7 +144,7 @@ mod source {
                 file = %self.file.display(),
                 error_type = "read_failed",
                 error = %self.error,
-                stage = "receiving",
+                stage = error_stage::RECEIVING,
             );
         }
 
@@ -131,7 +157,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "read_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving",
+                "stage" => error_stage::RECEIVING,
             );
         }
     }
@@ -161,7 +187,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "delete_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving"
+                "stage" => error_stage::RECEIVING
             );
         }
     }
@@ -221,7 +247,7 @@ mod source {
                 file = %self.file.display(),
                 error_type = "watch_failed",
                 error = %self.error,
-                stage = "receiving"
+                stage = error_stage::RECEIVING,
             );
         }
 
@@ -234,7 +260,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "watch_failed",
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving"
+                "stage" => error_stage::RECEIVING
             );
         }
     }
@@ -314,7 +340,7 @@ mod source {
                 message = "Failed writing checkpoints.",
                 error_type = "write_error",
                 error = %self.error,
-                stage = "receiving"
+                stage = error_stage::RECEIVING
             );
         }
 
@@ -323,7 +349,7 @@ mod source {
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "write_error",
-                "stage" => "receiving"
+                "stage" => error_stage::RECEIVING
             );
         }
     }
@@ -341,7 +367,7 @@ mod source {
                 path = %self.path.display(),
                 error_type = "glob_failed",
                 error = %self.error,
-                stage = "receiving"
+                stage = error_stage::RECEIVING
             );
         }
 
@@ -354,7 +380,7 @@ mod source {
                 "component_errors_total", 1,
                 "error_type" => "glob_failed",
                 "path" => self.path.to_string_lossy().into_owned(),
-                "stage" => "receiving"
+                "stage" => error_stage::RECEIVING
             );
         }
     }

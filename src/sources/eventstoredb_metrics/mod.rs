@@ -1,19 +1,23 @@
-use self::types::Stats;
-use crate::{
-    config::{self, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    http::HttpClient,
-    internal_events::{
-        EventStoreDbMetricsHttpError, EventStoreDbMetricsReceived, EventStoreDbStatsParsingError,
-    },
-    tls::TlsSettings,
-};
-use futures::{stream, FutureExt, SinkExt, StreamExt};
+use std::time::Duration;
+
+use futures::{stream, FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
+
+use self::types::Stats;
+use crate::{
+    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    http::HttpClient,
+    internal_events::{
+        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
+        EventStoreDbStatsParsingError, StreamClosedError,
+    },
+    tls::TlsSettings,
+};
 
 pub mod types;
 
@@ -52,8 +56,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -65,11 +69,8 @@ fn eventstoredb(
     endpoint: &str,
     interval: u64,
     namespace: Option<String>,
-    cx: SourceContext,
+    mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
-    let mut out = cx
-        .out
-        .sink_map_err(|error| error!(message = "Error sending metric.", %error));
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
@@ -102,6 +103,10 @@ fn eventstoredb(
                                 continue;
                             }
                         };
+                        emit!(&BytesReceived {
+                            byte_size: bytes.len(),
+                            protocol: "http",
+                        });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
@@ -111,14 +116,14 @@ fn eventstoredb(
 
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
+                                let count = metrics.len();
+                                let byte_size = metrics.size_of();
 
-                                emit!(&EventStoreDbMetricsReceived {
-                                    events: metrics.len(),
-                                    byte_size: bytes.len(),
-                                });
+                                emit!(&EventStoreDbMetricsEventsReceived { count, byte_size });
 
-                                let mut metrics = stream::iter(metrics).map(Event::Metric).map(Ok);
-                                if out.send_all(&mut metrics).await.is_err() {
+                                let mut metrics = stream::iter(metrics).map(Event::Metric);
+                                if let Err(error) = cx.out.send_all(&mut metrics).await {
+                                    emit!(&StreamClosedError { count, error });
                                     break;
                                 }
                             }
@@ -134,9 +139,10 @@ fn eventstoredb(
 
 #[cfg(all(test, feature = "eventstoredb_metrics-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{test_util, Pipeline};
     use tokio::time::Duration;
+
+    use super::*;
+    use crate::{test_util, SourceSender};
 
     const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
 
@@ -149,7 +155,7 @@ mod integration_tests {
             default_namespace: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);

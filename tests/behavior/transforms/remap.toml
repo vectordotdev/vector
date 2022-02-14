@@ -2204,3 +2204,82 @@
       source = '''
         .host == "localhost"
       '''
+
+[enrichment_tables.test]
+type = "file"
+file.path = "./tests/data/enrichment.csv"
+file.encoding.type = "csv"
+schema.id = "integer"
+
+[transforms.remap_function_get_enrichment_table_row]
+  inputs = []
+  type = "remap"
+  source = '''
+    . = get_enrichment_table_record!("test", { "id": .id })
+  '''
+[[tests]]
+  name = "remap_function_get_enrichment_table_row"
+  [tests.input]
+    insert_at = "remap_function_get_enrichment_table_row"
+    type = "log"
+    [tests.input.log_fields]
+      id = 3
+  [[tests.outputs]]
+    extract_from = "remap_function_get_enrichment_table_row"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .tree == "yew"
+      '''
+
+[transforms.remap_function_find_enrichment_table_rows]
+  inputs = []
+  type = "remap"
+  source = '''
+    .trees = find_enrichment_table_records!("test", { "tree": .tree })
+  '''
+[[tests]]
+  name = "remap_function_find_enrichment_table_rows"
+  [tests.input]
+    insert_at = "remap_function_find_enrichment_table_rows"
+    type = "log"
+    [tests.input.log_fields]
+      tree = "yew"
+  [[tests.outputs]]
+    extract_from = "remap_function_find_enrichment_table_rows"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .trees == [{"id": 3, "tree": "yew"},
+                   {"id": 5, "tree": "yew"},
+                   {"id": 7, "tree": "yew"}]
+      '''
+
+[transforms.remap_metadata]
+  inputs = []
+  type = "remap"
+  source = '''
+      set_metadata_field("datadog_api_key", "iamanapikey")
+      .key = get_metadata_field("datadog_api_key")
+      remove_metadata_field("datadog_api_key")
+      .empty_key = get_metadata_field("datadog_api_key")
+
+      set_metadata_field("splunk_hec_token", "iamasplunkhectoken")
+      .splunk_hec_token = get_metadata_field("splunk_hec_token")
+      remove_metadata_field("splunk_hec_token")
+      .empty_splunk_hec_token = get_metadata_field("splunk_hec_token")
+  '''
+[[tests]]
+  name = "remap_metadata"
+  [tests.input]
+    insert_at = "remap_metadata"
+    type = "log"
+    log_fields = {}
+  [[tests.outputs]]
+    extract_from = "remap_metadata"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .key == "iamanapikey" && .empty_key == null &&
+        .splunk_hec_token == "iamasplunkhectoken" && .empty_splunk_hec_token == null
+      '''

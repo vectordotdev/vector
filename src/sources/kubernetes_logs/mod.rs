@@ -5,33 +5,38 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{Event, LogEvent};
-use crate::internal_events::{
-    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-    KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
-};
-use crate::kubernetes as k8s;
-use crate::kubernetes::hash_value::HashKey;
-use crate::{
-    config::{
-        ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
-        SourceContext, SourceDescription,
-    },
-    shutdown::ShutdownSignal,
-    sources,
-    transforms::{FunctionTransform, TaskTransform},
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
 };
+use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::convert::TryInto;
-use std::path::PathBuf;
-use std::time::Duration;
+use vector_common::TimeZone;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    config::{
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, ProxyConfig,
+        SourceConfig, SourceContext, SourceDescription,
+    },
+    event::{Event, LogEvent},
+    internal_events::{
+        BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
+        KubernetesLogsEventsReceived, StreamClosedError,
+    },
+    kubernetes as k8s,
+    kubernetes::hash_value::HashKey,
+    shutdown::ShutdownSignal,
+    sources,
+    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
+    SourceSender,
+};
 
 mod k8s_paths_provider;
 mod lifecycle;
@@ -43,7 +48,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
+use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use namespace_metadata_annotator::NamespaceMetadataAnnotator;
@@ -90,7 +95,7 @@ pub struct Config {
 
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
-    /// This allows distributing the reads more or less evenly accross
+    /// This allows distributing the reads more or less evenly across
     /// the files.
     max_read_bytes: usize,
 
@@ -121,6 +126,10 @@ pub struct Config {
     /// Optional path to a kubeconfig file readable by Vector. If not set,
     /// Vector will try to connect to Kubernetes using in-cluster configuration.
     kube_config_file: Option<PathBuf>,
+
+    /// How long to delay removing entries from our map when we receive a deletion
+    /// event from the watched stream.
+    delay_deletion_ms: usize,
 }
 
 inventory::submit! {
@@ -156,6 +165,7 @@ impl Default for Config {
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
+            delay_deletion_ms: default_delay_deletion_ms(),
         }
     }
 }
@@ -174,8 +184,8 @@ impl SourceConfig for Config {
         })))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -199,6 +209,7 @@ struct Source {
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
+    delay_deletion: Duration,
 }
 
 impl Source {
@@ -227,6 +238,13 @@ impl Source {
                 "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
             ));
 
+        let delay_deletion = Duration::from_millis(
+            config
+                .delay_deletion_ms
+                .try_into()
+                .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
+        );
+
         Ok(Self {
             client,
             data_dir,
@@ -242,14 +260,15 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
+            delay_deletion,
         })
     }
 
-    async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
-    where
-        O: Sink<Event> + Send + 'static + Unpin,
-        <O as Sink<Event>>::Error: std::error::Error,
-    {
+    async fn run(
+        self,
+        mut out: SourceSender,
+        global_shutdown: ShutdownSignal,
+    ) -> crate::Result<()> {
         let Self {
             client,
             data_dir,
@@ -265,6 +284,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
+            delay_deletion,
         } = self;
 
         let watcher =
@@ -277,8 +297,7 @@ impl Source {
             HashKey::Uid,
         );
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
-        let state_writer =
-            k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
+        let state_writer = k8s::state::delayed_delete::Writer::new(state_writer, delay_deletion);
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,
@@ -302,7 +321,7 @@ impl Source {
         );
         let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
         let ns_state_writer =
-            k8s::state::delayed_delete::Writer::new(ns_state_writer, Duration::from_secs(60));
+            k8s::state::delayed_delete::Writer::new(ns_state_writer, delay_deletion);
 
         let mut ns_reflector = k8s::reflector::Reflector::new(
             ns_watcher,
@@ -326,7 +345,7 @@ impl Source {
             paths_provider,
             // Max amount of bytes to read from a single file before switching
             // over to the next file.
-            // This allows distributing the reads more or less evenly accross
+            // This allows distributing the reads more or less evenly across
             // the files.
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
@@ -363,13 +382,9 @@ impl Source {
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
-            // We expect the files distribution to not be a concern because of
-            // the way we pick files for gathering: for each container, only the
-            // last log file is currently picked. Thus there's no need for
-            // ordering, as each logical log stream is guaranteed to start with
-            // just one file, makis it impossible to interleave with other
-            // relevant log lines in the absense of such relevant log lines.
-            oldest_first: false,
+            // We'd like to consume rotated pod log files first to release our file handle and let
+            // the space be reclaimed
+            oldest_first: true,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.
@@ -388,6 +403,11 @@ impl Source {
         let events = events.flatten();
         let events = events.map(move |line| {
             let byte_size = line.text.len();
+            emit!(&BytesReceived {
+                byte_size,
+                protocol: "http",
+            });
+
             let mut event = create_event(
                 line.text,
                 &line.filename,
@@ -395,14 +415,14 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(&KubernetesLogsEventReceived {
+            emit!(&KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size,
+                byte_size: event.size_of(),
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
 
             if file_info.is_none() {
-                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(&KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -410,7 +430,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(&KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
                 }
             }
@@ -419,15 +439,14 @@ impl Source {
             event
         });
         let events = events.flat_map(move |event| {
-            let mut buf = Vec::with_capacity(1);
+            let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
-            futures::stream::iter(buf)
+            futures::stream::iter(buf.into_events())
         });
+        let (events_count, _) = events.size_hint();
 
-        let event_processing_loop = partial_events_merger
-            .transform(Box::pin(events))
-            .map(Ok)
-            .forward(out);
+        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let event_processing_loop = out.send_all(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
         {
@@ -435,9 +454,10 @@ impl Source {
             let fut =
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Reflector process exited with an error.", %error)
-                    }
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Reflector process exited with an error."
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -446,9 +466,10 @@ impl Source {
             let fut =
                 util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Namespace reflector process exited with an error.", %error)
-                    }
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Namespace reflector process exited with an error.",
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -457,7 +478,10 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => error!(message = "File server exited with an error.", %error),
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        message: "File server exited with an error.",
+                        error,
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -471,14 +495,14 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => error!(
-                        message = "Event processing loop exited with an error.",
-                        %error
-                    ),
-                    Err(error) => error!(
-                        message = "Event processing loop timed out during the shutdown.",
-                        %error
-                    ),
+                    Ok(Err(error)) => emit!(&StreamClosedError {
+                        error,
+                        count: events_count
+                    }),
+                    Err(error) => emit!(&KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                    }),
                 };
             });
             slot.bind(Box::pin(fut));
@@ -494,18 +518,17 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.insert(
-        crate::config::log_schema().source_type_key(),
-        COMPONENT_ID.to_owned(),
-    );
+    event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
 
     // Add file.
     event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event.insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, Utc::now());
     }
+
+    event.try_insert(log_schema().timestamp_key(), Utc::now());
 
     event.into()
 }
@@ -526,7 +549,7 @@ const fn default_max_read_bytes() -> usize {
 
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
+    // https://github.com/vectordotdev/vector/issues/6967
     //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.
@@ -543,6 +566,10 @@ const fn default_glob_minimum_cooldown_ms() -> usize {
 
 const fn default_fingerprint_lines() -> usize {
     1
+}
+
+const fn default_delay_deletion_ms() -> usize {
+    60_000
 }
 
 // This function constructs the patterns we exclude from file watching, created
@@ -669,7 +696,7 @@ mod tests {
     fn prepare_field_selector() {
         let cases = vec![
             // We're not testing `Config::default()` or empty `self_node_name`
-            // as passing env vars in the concurrent tests is diffucult.
+            // as passing env vars in the concurrent tests is difficult.
             (
                 Config {
                     self_node_name: "qwe".to_owned(),

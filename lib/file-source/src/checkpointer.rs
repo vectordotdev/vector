@@ -1,19 +1,20 @@
-use super::{
-    fingerprinter::{FileFingerprint, Fingerprinter},
-    FilePosition,
-};
-use chrono::{DateTime, Utc};
-use dashmap::DashMap;
-use glob::glob;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
     fs, io,
     path::{Path, PathBuf},
-    sync::Arc,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
+
+use chrono::{DateTime, Utc};
+use dashmap::DashMap;
+use glob::glob;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
+
+use super::{
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    FilePosition,
+};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 const STABLE_FILE_NAME: &str = "checkpoints.json";
@@ -418,13 +419,14 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod test {
+    use chrono::{Duration, Utc};
+    use pretty_assertions::assert_eq;
+    use tempfile::tempdir;
+
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
         Checkpoint, Checkpointer, FileFingerprint, FilePosition, STABLE_FILE_NAME, TMP_FILE_NAME,
     };
-    use chrono::{Duration, Utc};
-    use pretty_assertions::assert_eq;
-    use tempfile::tempdir;
 
     #[test]
     fn test_checkpointer_basics() {

@@ -44,6 +44,16 @@ follows:
 
 There are a couple of things to be aware of:
 
+#### Removed options
+
+There are some configuration options that are no longer valid with version 2 of
+the source and sink:
+
+- `vector` source: `keepalive` and `receive_buffer_bytes`
+- `vector` sink: `keepalive` and `send_buffer_bytes`
+
+As these were specific to the TCP-based version 1 of the protocol.
+
 #### Upgrade both the source _and_ sink
 
 You **have** to upgrade **both** the source and sink to `v2`, or none at all,

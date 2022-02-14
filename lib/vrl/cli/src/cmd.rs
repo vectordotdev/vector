@@ -1,14 +1,18 @@
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{self, Read},
+    iter::IntoIterator,
+    path::PathBuf,
+};
+
+use structopt::StructOpt;
+use vector_common::TimeZone;
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
+
 #[cfg(feature = "repl")]
 use super::repl;
 use super::Error;
-use shared::TimeZone;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{self, Read};
-use std::iter::IntoIterator;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]
@@ -80,7 +84,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match run(opts) {
         Ok(_) => exitcode::OK,
         Err(err) => {
-            eprintln!("{}", err);
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("{}", err);
+            }
             exitcode::SOFTWARE
         }
     }
@@ -107,7 +114,9 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let state = state::Runtime::default();
+            let runtime = Runtime::new(state);
+            let result = execute(&mut object, &program, &tz, runtime, stdlib::all()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -115,6 +124,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 }
             });
 
+            #[allow(clippy::print_stdout)]
+            #[allow(clippy::print_stderr)]
             match result {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
@@ -125,25 +136,41 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
+#[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
-    if cfg!(feature = "repl") {
-        repl::run(objects, timezone);
-        Ok(())
-    } else {
-        Err(Error::ReplFeature)
-    }
+    repl::run(objects, timezone);
+    Ok(())
 }
 
+#[cfg(not(feature = "repl"))]
+fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
+    Err(Error::ReplFeature)
+}
+
+#[cfg(not(feature = "vrl-vm"))]
 fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
+    mut runtime: Runtime,
+    _functions: Vec<Box<dyn vrl::Function>>,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
-
     runtime
         .resolve(object, program, timezone)
+        .map_err(Error::Runtime)
+}
+
+#[cfg(feature = "vrl-vm")]
+fn execute(
+    object: &mut impl Target,
+    program: &Program,
+    timezone: &TimeZone,
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
+) -> Result<Value, Error> {
+    let vm = runtime.compile(functions, program).unwrap();
+    runtime
+        .run_vm(&vm, object, timezone)
         .map_err(Error::Runtime)
 }
 

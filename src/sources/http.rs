@@ -1,25 +1,36 @@
-use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{Event, Value},
-    serde::{default_decoding, default_framing_stream_based},
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    tls::TlsConfig,
-};
+use std::{collections::HashMap, net::SocketAddr};
+
 use bytes::{Bytes, BytesMut};
+use chrono::Utc;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
 use tokio_util::codec::Decoder;
-
 use warp::http::{HeaderMap, HeaderValue};
+
+use crate::{
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
+        NewlineDelimitedDecoderConfig,
+    },
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
+    },
+    event::{Event, Value},
+    serde::{bool_or_struct, default_decoding, default_framing_stream_based},
+    sources::util::{
+        add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
+    tls::TlsConfig,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
     address: SocketAddr,
+    #[serde(default)]
+    encoding: Option<Encoding>,
     #[serde(default)]
     headers: Vec<String>,
     #[serde(default)]
@@ -32,10 +43,10 @@ pub struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
-    #[serde(default = "default_framing_stream_based")]
-    framing: Box<dyn FramingConfig>,
-    #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    framing: Option<FramingConfig>,
+    decoding: Option<DeserializerConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -46,6 +57,7 @@ impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
+            encoding: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -53,8 +65,9 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
-            framing: default_framing_stream_based(),
-            decoding: default_decoding(),
+            framing: Some(default_framing_stream_based()),
+            decoding: Some(default_decoding()),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -108,12 +121,12 @@ impl HttpSource for SimpleHttpSource {
         add_query_parameters(&mut events, &self.query_parameters, query_parameters);
         add_path(&mut events, self.path_key.as_str(), request_path);
 
-        // Add source type
-        let key_source_type = log_schema().source_type_key();
+        let now = Utc::now();
         for event in &mut events {
-            event
-                .as_mut_log()
-                .try_insert(key_source_type, Bytes::from("http"));
+            let log = event.as_mut_log();
+
+            log.try_insert(log_schema().source_type_key(), Bytes::from("http"));
+            log.try_insert(log_schema().timestamp_key(), now);
         }
 
         Ok(events)
@@ -124,7 +137,43 @@ impl HttpSource for SimpleHttpSource {
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
+            return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
+        }
+
+        let (framing, decoding) = if let Some(encoding) = self.encoding {
+            match encoding {
+                Encoding::Text => (
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
+                ),
+                Encoding::Json => (
+                    BytesDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
+                ),
+                Encoding::Ndjson => (
+                    NewlineDelimitedDecoderConfig::new().into(),
+                    JsonDeserializerConfig::new().into(),
+                ),
+                Encoding::Binary => (
+                    BytesDecoderConfig::new().into(),
+                    BytesDeserializerConfig::new().into(),
+                ),
+            }
+        } else {
+            (
+                match self.framing.as_ref() {
+                    Some(framing) => framing.clone(),
+                    None => default_framing_stream_based(),
+                },
+                match self.decoding.as_ref() {
+                    Some(decoding) => decoding.clone(),
+                    None => default_decoding(),
+                },
+            )
+        };
+
+        let decoder = DecodingConfig::new(framing, decoding).build();
         let source = SimpleHttpSource {
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
@@ -138,11 +187,12 @@ impl SourceConfig for SimpleHttpConfig {
             &self.tls,
             &self.auth,
             cx,
+            self.acknowledgements,
         )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -158,7 +208,7 @@ fn add_path(events: &mut [Event], key: &str, path: &str) {
     for event in events.iter_mut() {
         event
             .as_mut_log()
-            .insert(key, Value::from(path.to_string()));
+            .try_insert(key, Value::from(path.to_string()));
     }
 }
 
@@ -167,7 +217,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
         for event in events.iter_mut() {
-            event.as_mut_log().insert(
+            event.as_mut_log().try_insert_flat(
                 header_name as &str,
                 Value::from(value.map(Bytes::copy_from_slice)),
             );
@@ -177,15 +227,8 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
-    use super::SimpleHttpConfig;
-    use crate::{
-        codecs::{BytesDecoderConfig, FramingConfig, JsonParserConfig, ParserConfig},
-        config::{log_schema, SourceConfig, SourceContext},
-        event::{Event, EventStatus, Value},
-        serde::{default_decoding, default_framing_stream_based},
-        test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
-        Pipeline,
-    };
+    use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+
     use flate2::{
         write::{GzEncoder, ZlibEncoder},
         Compression,
@@ -193,9 +236,18 @@ mod tests {
     use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-    use std::io::Write;
-    use std::net::SocketAddr;
+
+    use super::SimpleHttpConfig;
+    use crate::{
+        codecs::{
+            decoding::{DeserializerConfig, FramingConfig},
+            BytesDecoderConfig, JsonDeserializerConfig,
+        },
+        config::{log_schema, SourceConfig, SourceContext},
+        event::{Event, EventStatus, Value},
+        test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -210,28 +262,29 @@ mod tests {
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Option<Box<dyn ParserConfig>>,
+        framing: Option<FramingConfig>,
+        decoding: Option<DeserializerConfig>,
     ) -> (impl Stream<Item = Event> + 'a, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        let context = SourceContext::new_test(sender);
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
                 headers,
+                encoding: None,
                 query_parameters,
                 tls: None,
                 auth: None,
                 strict_path,
                 path_key,
                 path,
-                framing: framing.unwrap_or_else(default_framing_stream_based),
-                decoding: decoding.unwrap_or_else(default_decoding),
+                framing,
+                decoding,
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await
@@ -399,7 +452,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            Some(Box::new(BytesDecoderConfig::new())),
+            Some(BytesDecoderConfig::new().into()),
             None,
         )
         .await;
@@ -429,7 +482,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -470,7 +523,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -514,7 +567,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -557,7 +610,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -632,7 +685,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -671,7 +724,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -746,7 +799,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -778,7 +831,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -828,7 +881,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(JsonDeserializerConfig::new().into()),
         )
         .await;
 
@@ -846,7 +899,7 @@ mod tests {
             "http_path",
             "/",
             true,
-            EventStatus::Failed,
+            EventStatus::Rejected,
             true,
             None,
             None,
@@ -872,7 +925,7 @@ mod tests {
             "http_path",
             "/",
             true,
-            EventStatus::Failed,
+            EventStatus::Rejected,
             false,
             None,
             None,

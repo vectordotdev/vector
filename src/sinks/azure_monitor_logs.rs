@@ -1,28 +1,32 @@
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt};
+use http::{
+    header,
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Request, StatusCode, Uri,
+};
+use hyper::Body;
+use once_cell::sync::Lazy;
+use openssl::{base64, hash, pkey, sign};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytesize::ByteSize;
-use futures::{FutureExt, SinkExt};
-use http::{
-    header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
-};
-use hyper::Body;
-use lazy_static::lazy_static;
-use openssl::{base64, hash, pkey, sign};
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 
 fn default_host() -> String {
     "ods.opinsights.azure.com".into()
@@ -43,7 +47,7 @@ pub struct AzureMonitorLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -57,16 +61,15 @@ pub enum Encoding {
     Default,
 }
 
-lazy_static! {
-    static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
-    static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
-    static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
-    static ref X_MS_AZURE_RESOURCE_HEADER: HeaderName =
-        HeaderName::from_static("x-ms-azureresourceid");
-    static ref TIME_GENERATED_FIELD_HEADER: HeaderName =
-        HeaderName::from_static("time-generated-field");
-    static ref CONTENT_TYPE_VALUE: HeaderValue = HeaderValue::from_static(CONTENT_TYPE);
-}
+static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
+static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));
+static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("x-ms-azureresourceid"));
+static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("time-generated-field"));
+static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
+
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
@@ -74,7 +77,7 @@ inventory::submit! {
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
-const MAX_BATCH_SIZE_MB: u64 = 30;
+const MAX_BATCH_SIZE: usize = 30 * 1024 * 1024;
 /// API endpoint for submitting logs
 const RESOURCE: &str = "/api/logs";
 /// JSON content type of logs
@@ -90,21 +93,11 @@ const API_VERSION: &str = "2016-04-01";
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = BatchSettings::default()
-            .bytes(5_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-
-        let batch_bytes = batch_settings.size.bytes as u64;
-
-        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
-            return Err(format!(
-                "provided batch size is too big for Azure Monitor: {}, max is {}",
-                ByteSize::b(batch_bytes),
-                ByteSize::mb(MAX_BATCH_SIZE_MB)
-            )
-            .into());
-        }
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batch_settings()?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
@@ -124,11 +117,11 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -174,7 +167,7 @@ impl HttpSink for AzureMonitorLogsSink {
         Some(entry)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         self.build_request_sync(events)
     }
 }
@@ -233,8 +226,8 @@ impl AzureMonitorLogsSink {
         })
     }
 
-    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Vec<u8>>> {
-        let body = serde_json::to_vec(&events)?;
+    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
+        let body = crate::serde::json::to_bytes(&events)?.freeze();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body)?;
@@ -303,9 +296,10 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
+    use serde_json::value::RawValue;
+
     use super::*;
     use crate::event::LogEvent;
-    use serde_json::value::RawValue;
 
     #[test]
     fn generate_config() {

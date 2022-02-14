@@ -312,7 +312,7 @@ You can read more about how Vector tests in our
 
 Unit tests refer to the majority of inline tests throughout Vector's code. A
 defining characteristic of unit tests is that they do not require external
-services to run, therfore they should be much quicker. You can run them with:
+services to run, therefore they should be much quicker. You can run them with:
 
 ```bash
 cargo test
@@ -343,7 +343,7 @@ make test-integration-<name>
 ### Blackbox tests
 
 Vector also offers blackbox testing via
-[Vector's test harness](https://github.com/timberio/vector-test-harness). This
+[Vector's test harness](https://github.com/vectordotdev/vector-test-harness). This
 is a complex testing suite that tests Vector's performance in real-world
 environments. It is typically used for benchmarking, but also correctness
 testing.
@@ -422,7 +422,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make bench` command. In addition, Vector
-maintains a full [test harness](https://github.com/timberio/vector-test-harness)
+maintains a full [test harness](https://github.com/vectordotdev/vector-test-harness)
 for complex end-to-end integration and performance testing.
 
 ## Profiling
@@ -658,7 +658,7 @@ Notes:
 >   suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
 >   registry.
 > - E2E tests expect to have enough resources to perform a full Vector build,
->   usually 8GB of RAM with 2CPUs are sufficient to succesfully complete E2E tests
+>   usually 8GB of RAM with 2CPUs are sufficient to successfully complete E2E tests
 >   locally.
 
 ###### Tutorial

@@ -1,23 +1,23 @@
-use super::util::framestream::{build_framestream_unix_source, FrameHandler};
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseDataError},
-    Result,
-};
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
+
+use super::util::framestream::{build_framestream_unix_source, FrameHandler};
+use crate::{
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{BytesReceived, DnstapEventsReceived, DnstapParseError},
+    Result,
+};
+
 pub mod parser;
-pub use parser::parse_dnstap_data;
-pub use parser::DnstapParser;
+pub use parser::{parse_dnstap_data, DnstapParser};
 
 pub mod schema;
+use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
-
-use dnsmsg_parser::dns_message;
-use dnsmsg_parser::dns_message_parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
@@ -98,8 +98,8 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -173,11 +173,13 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        emit!(&BytesReceived {
+            byte_size: frame.len(),
+            protocol: "protobuf",
+        });
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
-
-        let frame_size = frame.len();
 
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
@@ -188,21 +190,21 @@ impl FrameHandler for DnstapFrameHandler {
                 &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventReceived {
-                byte_size: frame_size
+            emit!(&DnstapEventsReceived {
+                byte_size: event.size_of(),
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseDataError {
+                    emit!(&DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventReceived {
-                        byte_size: frame_size
+                    emit!(&DnstapEventsReceived {
+                        byte_size: event.size_of(),
                     });
                     Some(event)
                 }
@@ -244,17 +246,23 @@ impl FrameHandler for DnstapFrameHandler {
 
 #[cfg(all(test, feature = "dnstap-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{event::Value, test_util::trace_init, Pipeline};
+    #![allow(clippy::print_stdout)] // tests
+
+    use bollard::exec::{CreateExecOptions, StartExecOptions};
+    use bollard::Docker;
+    use std::{env, path::Path};
+
     use futures::StreamExt;
     use serde_json::json;
-    use std::{env, path::Path, process::Command, thread};
     use tokio::time;
+
+    use super::*;
+    use crate::{event::Value, test_util::trace_init, SourceSender};
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
         trace_init();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             let socket = get_socket(raw_data, query_type);
@@ -292,7 +300,7 @@ mod integration_tests {
                     break;
                 }
                 Err(e) => {
-                    println!("Error: {}", e.to_string());
+                    println!("Error: {}", e);
                     break;
                 }
             }
@@ -300,28 +308,28 @@ mod integration_tests {
 
         verify_events(raw_data, query_type, &events);
 
-        cleanup(raw_data, query_type);
+        cleanup(raw_data, query_type).await;
     }
 
     fn send_query(raw_data: bool, query_type: &'static str) {
         tokio::spawn(async move {
             let socket = get_socket(raw_data, query_type);
             let dnstap_sock_file = Path::new(&socket);
-            let container_tool = get_container_tool();
             let (bind, port) = get_bind_and_port(raw_data, query_type);
 
             loop {
-                thread::sleep(time::Duration::from_millis(100));
+                time::sleep(time::Duration::from_millis(100)).await;
+                time::sleep(time::Duration::from_millis(100)).await;
                 if dnstap_sock_file.exists() {
-                    thread::sleep(time::Duration::from_millis(100));
-                    start_bind(&container_tool, bind, port);
-                    thread::sleep(time::Duration::from_millis(100));
+                    time::sleep(time::Duration::from_millis(100)).await;
+                    start_bind(bind, port).await;
+                    time::sleep(time::Duration::from_millis(100)).await;
                     match query_type {
                         "query" => {
-                            nslookup(&container_tool, port);
+                            nslookup(port).await;
                         }
                         "update" => {
-                            nsupdate(&container_tool);
+                            nsupdate().await;
                         }
                         _ => (),
                     }
@@ -418,111 +426,86 @@ mod integration_tests {
         }
     }
 
-    fn get_socket(raw_data: bool, query_type: &'static str) -> PathBuf {
-        let socket_folder = "tests/data/dnstap/socket/".to_owned();
-        match query_type {
-            "query" => {
-                if raw_data {
-                    env::current_dir()
-                        .unwrap()
-                        .join(socket_folder + "dnstap.sock1")
-                } else {
-                    env::current_dir()
-                        .unwrap()
-                        .join(socket_folder + "dnstap.sock2")
-                }
-            }
-            "update" => env::current_dir()
-                .unwrap()
-                .join(socket_folder + "dnstap.sock3"),
-            _ => env::current_dir()
-                .unwrap()
-                .join(socket_folder + "dnstap.sock.default"),
-        }
+    fn get_container() -> String {
+        std::env::var("CONTAINER_NAME").unwrap_or_else(|_| "vector_dnstap".into())
     }
 
-    fn get_container_tool() -> String {
-        match env::var_os("CONTAINER_TOOL") {
-            Some(val) => val.to_str().unwrap().to_owned(),
-            None => String::from("podman"),
+    fn get_socket(raw_data: bool, query_type: &'static str) -> PathBuf {
+        let socket_folder = std::env::var("BIND_SOCKET")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                env::current_dir()
+                    .unwrap()
+                    .join("tests")
+                    .join("data")
+                    .join("dnstap")
+                    .join("socket")
+            });
+        match query_type {
+            "query" if raw_data => socket_folder.join("dnstap.sock1"),
+            "query" => socket_folder.join("dnstap.sock2"),
+            "update" => socket_folder.join("dnstap.sock3"),
+            _ => socket_folder.join("dnstap.sock4"),
         }
     }
 
     fn get_bind_and_port(raw_data: bool, query_type: &'static str) -> (&str, &str) {
         match query_type {
-            "query" => {
-                if raw_data {
-                    ("/bind1", "8001")
-                } else {
-                    ("/bind2", "8002")
-                }
-            }
+            "query" if raw_data => ("/bind1", "8001"),
+            "query" => ("/bind2", "8002"),
             "update" => ("/bind3", "8003"),
             _ => ("", ""),
         }
     }
 
-    fn start_bind(container: &str, bind: &'static str, port: &'static str) {
-        Command::new(container)
-            .arg("exec")
-            .arg("vector_dnstap")
-            .arg("/usr/sbin/named")
-            .arg("-p")
-            .arg(port)
-            .arg("-t")
-            .arg(bind)
-            .output()
-            .expect("Failed to execute command!");
+    async fn dnstap_exec(cmd: Vec<&str>) {
+        let docker = Docker::connect_with_unix_defaults().expect("failed binding to docker socket");
+        let config = CreateExecOptions {
+            cmd: Some(cmd),
+            attach_stdout: Some(true),
+            attach_stderr: Some(true),
+            ..Default::default()
+        };
+        let result = docker
+            .create_exec(get_container().as_str(), config)
+            .await
+            .expect("failed to execute command");
+        docker
+            .start_exec(&result.id, None::<StartExecOptions>)
+            .await
+            .expect("failed to execute command");
     }
 
-    fn nslookup(container: &str, port: &'static str) {
-        Command::new(container)
-            .arg("exec")
-            .arg("vector_dnstap")
-            .arg("nslookup")
-            .arg("-type=A")
-            .arg("-port=".to_owned() + port)
-            .arg("h1.example.com.")
-            .arg("localhost")
-            .output()
-            .expect("Failed to execute command!");
+    async fn start_bind(bind: &str, port: &str) {
+        dnstap_exec(vec!["/usr/sbin/named", "-p", port, "-t", bind]).await
     }
 
-    fn nsupdate(container: &str) {
-        Command::new(container)
-            .arg("exec")
-            .arg("vector_dnstap")
-            .arg("nsupdate")
-            .arg("-v")
-            .arg("/bind3/etc/bind/nsupdate.txt")
-            .output()
-            .expect("Failed to execute command!");
+    async fn nslookup(port: &str) {
+        dnstap_exec(vec![
+            "nslookup",
+            "-type=A",
+            format!("-port={}", port).as_str(),
+            "h1.example.com",
+            "localhost",
+        ])
+        .await
+    }
+
+    async fn nsupdate() {
+        dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await
     }
 
     fn get_rndc_port(raw_data: bool, query_type: &'static str) -> &str {
         match query_type {
-            "query" => {
-                if raw_data {
-                    "9001"
-                } else {
-                    "9002"
-                }
-            }
+            "query" if raw_data => "9001",
+            "query" => "9002",
             "update" => "9003",
             _ => "",
         }
     }
 
-    fn stop_bind(container: &str, port: &'static str) {
-        Command::new(container)
-            .arg("exec")
-            .arg("vector_dnstap")
-            .arg("rndc")
-            .arg("-p")
-            .arg(port)
-            .arg("stop")
-            .output()
-            .expect("Failed to execute command!");
+    async fn stop_bind(port: &str) {
+        dnstap_exec(vec!["rndc", "-p", port, "stop"]).await
     }
 
     fn remove_socket(raw_data: bool, query_type: &'static str) {
@@ -531,8 +514,8 @@ mod integration_tests {
         let _ = std::fs::remove_file(dnstap_sock_file);
     }
 
-    fn cleanup(raw_data: bool, query_type: &'static str) {
-        stop_bind(&get_container_tool(), get_rndc_port(raw_data, query_type));
+    async fn cleanup(raw_data: bool, query_type: &'static str) {
+        stop_bind(get_rndc_port(raw_data, query_type)).await;
         remove_socket(raw_data, query_type);
     }
 

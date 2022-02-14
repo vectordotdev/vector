@@ -19,7 +19,7 @@ components: sinks: sematext_metrics: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    30000000
+				max_events:   20
 				timeout_secs: 1
 			}
 			compression: enabled: false
@@ -35,16 +35,6 @@ components: sinks: sematext_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -64,7 +54,6 @@ components: sinks: sematext_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

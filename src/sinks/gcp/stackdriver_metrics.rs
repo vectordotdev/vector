@@ -1,17 +1,35 @@
-use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
-use crate::event::{Event, Metric, MetricValue};
-use crate::http::HttpClient;
-use crate::sinks::gcp;
-use crate::sinks::util::buffer::metrics::MetricsBuffer;
-use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::tls::{TlsOptions, TlsSettings};
+use std::num::NonZeroU64;
+
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
-use http::header::AUTHORIZATION;
-use http::{HeaderValue, Uri};
+use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Metric, MetricValue},
+    http::HttpClient,
+    sinks::{
+        gcp,
+        util::{
+            buffer::metrics::MetricsBuffer,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StackdriverMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +42,7 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
 }
 
@@ -62,9 +80,7 @@ impl SinkConfig for StackdriverConfig {
         });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let batch = BatchSettings::default()
-            .events(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
 
         let sink = HttpEventSink {
             config: self.clone(),
@@ -74,9 +90,9 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            MetricsBuffer::new(batch.size),
+            MetricsBuffer::new(batch_settings.size),
             request,
-            batch.timeout,
+            batch_settings.timeout,
             client,
             cx.acker(),
         )
@@ -84,11 +100,11 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -123,7 +139,7 @@ impl HttpSink for HttpEventSink {
     async fn build_request(
         &self,
         mut metrics: Self::Output,
-    ) -> crate::Result<hyper::Request<Vec<u8>>> {
+    ) -> crate::Result<hyper::Request<Bytes>> {
         let metric = metrics.pop().expect("only one metric");
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -184,7 +200,8 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = serde_json::to_vec(&series).unwrap();
+        let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
+
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
             self.config.project_id

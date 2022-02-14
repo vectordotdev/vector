@@ -35,7 +35,6 @@ components: transforms: wasm: {
 			"armv7-unknown-linux-musleabihf": false
 			"x86_64-apple-darwin":            false
 			"x86_64-pc-windows-msv":          false
-			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      false
 		}
 
@@ -57,7 +56,7 @@ components: transforms: wasm: {
 		]
 		notices: [
 			"""
-			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this tranform. The
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this transform. The
 			[Vector Remap Language](\(urls.vrl_reference)) is designed for safe, performant, and easy data mapping. It
 			is intended to cover the vast majority of data mapping use cases leaving WASM for very advanced and
 			edge-case situations.
@@ -69,7 +68,6 @@ components: transforms: wasm: {
 		artifact_cache: {
 			description: "The directory where Vector should store the artifact it builds of this WASM module. Typically, all WASM modules share this."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: [
 					"/etc/vector/artifacts",
@@ -83,7 +81,6 @@ components: transforms: wasm: {
 			common:      false
 			description: "The maximum size of the heap of this module, in bytes. (This includes the module itself, default is 10 MB.)"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 10485760
 				unit:    "bytes"
@@ -92,7 +89,6 @@ components: transforms: wasm: {
 		module: {
 			description: "The file path of the `.wasm` or `.wat` module."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: [
 					"./modules/example.wasm",

@@ -1,15 +1,7 @@
-use crate::{
-    async_read::VecAsyncReadExt,
-    codecs, emit,
-    event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
-    shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
-    Pipeline,
-};
-use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt};
 use std::{fs::remove_file, path::PathBuf, time::Duration};
+
+use bytes::Bytes;
+use futures::{stream, FutureExt, StreamExt};
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -20,6 +12,16 @@ use tokio_util::codec::FramedRead;
 use tracing::field;
 use tracing_futures::Instrument;
 
+use crate::{
+    async_read::VecAsyncReadExt,
+    codecs,
+    event::Event,
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
+    shutdown::ShutdownSignal,
+    sources::{util::codecs::StreamDecodingError, Source},
+    SourceSender,
+};
+
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
@@ -29,10 +31,8 @@ pub fn build_unix_stream_source(
     decoder: codecs::Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
-
     Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
@@ -82,8 +82,8 @@ pub fn build_unix_stream_source(
                             Some(Ok((mut events, byte_size))) => {
                                 handle_events(&mut events, received_from.clone(), byte_size);
 
-                                for event in events {
-                                    let _ = out.send(event).await;
+                                if let Err(error) = out.send_all(stream::iter(events)).await {
+                                    error!(message = "Error sending line.", %error);
                                 }
                             }
                             Some(Err(error)) => {

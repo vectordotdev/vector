@@ -1,40 +1,51 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::config::SinkContext;
-    use crate::rusoto::RegionOrEndpoint;
-    use crate::sinks::aws_s3::S3SinkConfig;
-    use crate::sinks::s3_common::config::S3Options;
-    use crate::sinks::util::encoding::StandardEncodings;
-    use crate::sinks::util::BatchConfig;
-    use crate::sinks::util::Compression;
-    use crate::sinks::util::TowerRequestConfig;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    use std::{
+        io::{BufRead, BufReader},
+        time::Duration,
+    };
+
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
     use rusoto_core::{region::Region, RusotoError};
-    use rusoto_s3::S3Client;
-    use rusoto_s3::S3;
-    use std::io::{BufRead, BufReader};
-    use std::time::Duration;
+    use rusoto_s3::{S3Client, S3};
     use tokio_stream::StreamExt;
-    use vector_core::config::proxy::ProxyConfig;
-    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
+    };
+
+    use crate::{
+        aws::rusoto::RegionOrEndpoint,
+        config::SinkContext,
+        sinks::{
+            aws_s3::S3SinkConfig,
+            s3_common::config::S3Options,
+            util::{encoding::StandardEncodings, BatchConfig, Compression, TowerRequestConfig},
+        },
+        test_util::{random_lines_with_stream, random_string},
+    };
+
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     #[tokio::test]
-    async fn s3_insert_message_into() {
+    async fn s3_insert_message_into_with_flat_key_prefix() {
         let cx = SinkContext::new_test();
 
         let bucket = uuid::Uuid::new_v4().to_string();
 
         create_bucket(&bucket, false).await;
 
-        let config = config(&bucket, 1000000);
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -44,6 +55,43 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
+        let key_parts = key.split('/');
+        assert!(key_parts.count() == 1);
+        assert!(key.starts_with("test-prefix"));
+        assert!(key.ends_with(".log"));
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn s3_insert_message_into_with_folder_key_prefix() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix/".to_string());
+        let prefix = config.key_prefix.clone();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
+
+        let (lines, events, receiver) = make_events_batch(100, 10);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
+
+        let key = keys[0].clone();
+        let key_parts = key.split('/').collect::<Vec<_>>();
+        assert!(key_parts.len() == 2);
+        assert!(*key_parts.get(0).unwrap() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;
@@ -68,8 +116,8 @@ mod integration_tests {
             ..config(&bucket, 10)
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -86,7 +134,7 @@ mod integration_tests {
             Event::from(e)
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -127,8 +175,8 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         sink.run(events).await.unwrap();
@@ -183,8 +231,8 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -215,12 +263,12 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Failed);
+        assert_eq!(receiver.await, BatchStatus::Rejected);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;
         assert_eq!(objects, None);
@@ -233,21 +281,25 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        config.build_healthcheck(client).unwrap();
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        config.build_healthcheck(service.client()).unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        assert!(config.build_healthcheck(client).unwrap().await.is_err());
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        assert!(config
+            .build_healthcheck(service.client())
+            .unwrap()
+            .await
+            .is_err());
     }
 
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         use rusoto_core::HttpClient;
@@ -260,6 +312,10 @@ mod integration_tests {
     }
 
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(batch_size);
+        batch.timeout_secs = Some(5);
+
         S3SinkConfig {
             bucket: bucket.to_string(),
             key_prefix: Some(random_string(10) + "/date=%F"),
@@ -267,14 +323,10 @@ mod integration_tests {
             filename_append_uuid: None,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(batch_size),
-                timeout_secs: Some(5),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig::default(),
             assume_role: None,
             auth: Default::default(),
@@ -284,13 +336,15 @@ mod integration_tests {
     fn make_events_batch(
         len: usize,
         count: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
-        let (lines, events) = random_lines_with_stream(len, count, None);
-
+    ) -> (
+        Vec<String>,
+        impl Stream<Item = EventArray>,
+        BatchStatusReceiver,
+    ) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+        let (lines, events) = random_lines_with_stream(len, count, Some(batch));
 
-        (lines, events, receiver)
+        (lines, events.map(Into::into), receiver)
     }
 
     async fn create_bucket(bucket: &str, object_lock_enabled: bool) {

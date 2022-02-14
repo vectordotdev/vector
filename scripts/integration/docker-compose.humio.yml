@@ -1,0 +1,38 @@
+services:
+  humio:
+    image: humio/humio:${HUMIO_VERSION:-1.13.1}
+    network_mode: host
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    network_mode: host
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "humio-integration-tests"
+      - "--lib"
+      - "sinks::humio::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - HUMIO_ADDRESS=http://localhost:8080
+    depends_on:
+      - humio
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

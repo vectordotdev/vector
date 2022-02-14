@@ -28,13 +28,13 @@ remap: expressions: function_call: {
 					`abort` represents a literal `!` that can optionally be used with fallible functions to abort
 					the program when the function fails:
 
-					```vrl
+					```coffee
 					result = f!()
 					```
 
 					Otherwise, errors must be handled:
 
-					```vrl
+					```coffee
 					result, err = f()
 					```
 
@@ -55,7 +55,7 @@ remap: expressions: function_call: {
 							_All_ function arguments in VRL are assigned names, including required leading arguments.
 							Named arguments are suffixed with a colon (`:`), with the value proceeding the name:
 
-							```vrl
+							```coffee
 							argument_name: "value"
 							argument_name: (1 + 2)
 							```
@@ -69,7 +69,7 @@ remap: expressions: function_call: {
 							Function calls support nameless positional arguments. Arguments must be supplied in the order
 							they are documented:
 
-							```vrl
+							```coffee
 							f(1, 2)
 							```
 							"""
@@ -79,13 +79,13 @@ remap: expressions: function_call: {
 						description: """
 							Function arguments enforce type safety when the type of the value supplied is known:
 
-							```vrl
+							```coffee
 							round("not a number") # fails at compile time
 							```
 
 							If the type of the value is not known, you need to handle the potential argument error:
 
-							```vrl
+							```coffee
 							number = int(.message) ?? 0
 							round(number)
 							```

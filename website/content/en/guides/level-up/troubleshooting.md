@@ -94,7 +94,7 @@ Vector rate limits logs in the hot path. As a result, dropping to the
 {{< tab title="Env Var" >}}
 
 ```shell
-LOG=debug vector --config=/etc/vector/vector.toml
+VECTOR_LOG=debug vector --config=/etc/vector/vector.toml
 ```
 
 {{< /tab >}}

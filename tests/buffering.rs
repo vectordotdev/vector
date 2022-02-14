@@ -1,7 +1,6 @@
 #![cfg(feature = "leveldb")]
 
 use futures::{SinkExt, StreamExt};
-use shared::assert_event_data_eq;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -14,6 +13,7 @@ use vector::{
     },
     topology,
 };
+use vector_common::assert_event_data_eq;
 
 mod support;
 
@@ -28,7 +28,7 @@ fn test_buffering() {
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
-    trace!(message = "Test data dir", ?data_dir);
+    trace!(message = "Test data dir.", ?data_dir);
 
     let num_events: usize = 10;
     let line_length = 100;

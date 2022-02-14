@@ -1,20 +1,22 @@
-use super::Region;
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
-    sinks::util::{
-        encoding::EncodingConfigWithDefault, http::RequestConfig, BatchConfig, Compression,
-        TowerRequestConfig,
-    },
-    sinks::{Healthcheck, VectorSink},
-};
-use futures::{
-    future::{self, BoxFuture},
-    FutureExt, SinkExt,
-};
+use async_trait::async_trait;
+use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+
+use super::Region;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    event::EventArray,
+    sinks::{
+        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -28,13 +30,13 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
 
     #[serde(default)]
     request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 }
 
 inventory::submit! {
@@ -68,8 +70,15 @@ impl SinkConfig for SematextLogsConfig {
         let (sink, healthcheck) = ElasticSearchConfig {
             endpoint,
             compression: Compression::None,
-            doc_type: Some("logs".to_string()),
-            index: Some(self.token.clone()),
+            doc_type: Some(
+                "\
+            logs"
+                    .to_string(),
+            ),
+            bulk: Some(BulkConfig {
+                action: None,
+                index: Some(self.token.clone()),
+            }),
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,
@@ -81,13 +90,14 @@ impl SinkConfig for SematextLogsConfig {
         .build(cx)
         .await?;
 
-        let sink = Box::new(sink.into_sink().with(map_timestamp));
+        let stream = sink.into_stream();
+        let mapped_stream = MapTimestampStream { inner: stream };
 
-        Ok((VectorSink::Sink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -95,32 +105,52 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
+struct MapTimestampStream {
+    inner: Box<dyn StreamSink<EventArray> + Send>,
+}
+
+#[async_trait]
+impl StreamSink<EventArray> for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
+        let mapped_input = input.map(map_timestamp).boxed();
+        self.inner.run(mapped_input).await
+    }
+}
+
 /// Used to map `timestamp` to `@timestamp`.
-fn map_timestamp(mut event: Event) -> BoxFuture<'static, Result<Event, ()>> {
-    let log = event.as_mut_log();
+fn map_timestamp(mut events: EventArray) -> EventArray {
+    match &mut events {
+        EventArray::Logs(logs) => {
+            for log in logs {
+                if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
+                    log.insert("@timestamp", ts);
+                }
 
-    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
-        log.insert("@timestamp", ts);
+                if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
+                    log.insert("os.host", host);
+                }
+            }
+        }
+        _ => unreachable!("This sink only accepts logs"),
     }
 
-    if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
-        log.insert("os.host", host);
-    }
-
-    future::ok(event).boxed()
+    events
 }
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use indoc::indoc;
+
     use super::*;
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server, load_sink},
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            next_addr, random_lines_with_stream,
+        },
     };
-    use futures::StreamExt;
-    use indoc::indoc;
 
     #[test]
     fn generate_config() {

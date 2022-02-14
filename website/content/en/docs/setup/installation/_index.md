@@ -17,7 +17,7 @@ artifacts can be useful in stripped-down environments that don't provide a built
 
 {{< warning title="musl performance issues" >}}
 Please note that musl, as of this writing, has a significantly worse performance profile than [glibc] when Vector is
-running in multiple threads (Vector defaults to the number of available cores). We recommand that you use [glibc] when
+running in multiple threads (Vector defaults to the number of available cores). We recommend that you use [glibc] when
 available *unless* you're running Vector on a single CPU.
 
 [glibc]: https://www.gnu.org/software/libc

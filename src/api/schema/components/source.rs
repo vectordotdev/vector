@@ -1,16 +1,17 @@
+use std::cmp;
+
+use async_graphql::{Enum, InputObject, Object};
+
 use super::{sink, state, transform, Component};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, IntoSourceMetrics},
+        metrics::{self, outputs_by_component_key, IntoSourceMetrics, Output},
         sort,
     },
-    config::DataType,
-    config::{ComponentKey, OutputId},
+    config::{ComponentKey, DataType, OutputId},
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Object};
-use std::cmp;
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
@@ -34,6 +35,7 @@ pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
     pub output_type: DataType,
+    pub outputs: Vec<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -56,6 +58,9 @@ impl Source {
     }
     pub fn get_output_type(&self) -> SourceOutputType {
         self.0.output_type.into()
+    }
+    pub fn get_outputs(&self) -> &[String] {
+        self.0.outputs.as_ref()
     }
 }
 
@@ -91,6 +96,11 @@ impl Source {
     /// Source output type
     pub async fn output_type(&self) -> SourceOutputType {
         self.get_output_type()
+    }
+
+    /// Source output streams
+    pub async fn outputs(&self) -> Vec<Output> {
+        outputs_by_component_key(self.get_component_key(), self.get_outputs())
     }
 
     /// Transform outputs
@@ -161,18 +171,21 @@ mod tests {
         vec![
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Any,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ]
     }
@@ -235,19 +248,22 @@ mod tests {
     fn sort_component_type_asc() {
         let mut sources = vec![
             Source(Data {
-                component_key: ComponentKey::from("gen1"),
+                component_key: ComponentKey::from("gen2"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
-            }),
-            Source(Data {
-                component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
-                output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
+                component_type: "demo_logs".to_string(),
+                output_type: DataType::Log,
+                outputs: vec![],
+            }),
+            Source(Data {
+                component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 
@@ -266,19 +282,22 @@ mod tests {
     fn sort_component_type_desc() {
         let mut sources = vec![
             Source(Data {
-                component_key: ComponentKey::from("gen1"),
+                component_key: ComponentKey::from("gen3"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
-                component_key: ComponentKey::from("gen3"),
+                component_key: ComponentKey::from("gen1"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 
@@ -288,7 +307,7 @@ mod tests {
         }];
         sort::by_fields(&mut sources, &fields);
 
-        for (i, component_id) in ["gen2", "gen1", "gen3"].iter().enumerate() {
+        for (i, component_id) in ["gen3", "gen1", "gen2"].iter().enumerate() {
             assert_eq!(sources[i].get_component_key().to_string(), *component_id);
         }
     }
@@ -300,16 +319,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 
@@ -331,16 +353,19 @@ mod tests {
                 component_key: ComponentKey::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo_logs".to_string(),
                 output_type: DataType::Log,
+                outputs: vec![],
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
+                outputs: vec![],
             }),
         ];
 

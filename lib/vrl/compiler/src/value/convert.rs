@@ -1,13 +1,16 @@
-use super::{Error, Kind, Regex, Value};
-use crate::expression::{container, Container, Expr, Literal};
-use crate::Expression;
+use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::iter::FromIterator;
+use value::kind::Collection;
+use value::Value as VectorValue;
+
+use super::{Error, Kind, Regex, Value};
+use crate::{
+    expression::{container, Container, Expr, Literal},
+    Expression,
+};
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -69,7 +72,7 @@ impl Value {
             Value::Integer(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Integer,
+                expected: Kind::integer(),
             }),
         }
     }
@@ -130,7 +133,7 @@ impl TryFrom<&Value> for i64 {
         match v {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(v.into_inner() as i64),
-            _ => Err(Error::Coerce(v.kind(), Kind::Integer)),
+            _ => Err(Error::Coerce(v.kind(), Kind::integer())),
         }
     }
 }
@@ -154,7 +157,7 @@ impl Value {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Float,
+                expected: Kind::float(),
             }),
         }
     }
@@ -173,12 +176,12 @@ impl TryFrom<&Value> for f64 {
         match v {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Coerce(v.kind(), Kind::Float)),
+            _ => Err(Error::Coerce(v.kind(), Kind::float())),
         }
     }
 }
 
-// TODO: this exists to satisfy the `shared::Convert` utility.
+// TODO: this exists to satisfy the `vector_common::Convert` utility.
 //
 // We'll have to fix that so that we can remove this impl.
 impl From<f64> for Value {
@@ -216,7 +219,7 @@ impl Value {
             Value::Bytes(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Bytes,
+                expected: Kind::bytes(),
             }),
         }
     }
@@ -226,7 +229,7 @@ impl Value {
             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Bytes,
+                expected: Kind::bytes(),
             }),
         }
     }
@@ -308,7 +311,7 @@ impl Value {
             Value::Boolean(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Boolean,
+                expected: Kind::boolean(),
             }),
         }
     }
@@ -339,7 +342,7 @@ impl Value {
             Value::Regex(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Regex,
+                expected: Kind::regex(),
             }),
         }
     }
@@ -376,7 +379,7 @@ impl Value {
             Value::Null => Ok(()),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Null,
+                expected: Kind::null(),
             }),
         }
     }
@@ -423,7 +426,7 @@ impl Value {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Array,
+                expected: Kind::array(Collection::any()),
             }),
         }
     }
@@ -467,7 +470,7 @@ impl Value {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Object,
+                expected: Kind::object(Collection::any()),
             }),
         }
     }
@@ -504,7 +507,7 @@ impl Value {
             Value::Timestamp(v) => Ok(v),
             _ => Err(Error::Expected {
                 got: self.kind(),
-                expected: Kind::Timestamp,
+                expected: Kind::timestamp(),
             }),
         }
     }
@@ -513,5 +516,43 @@ impl Value {
 impl From<DateTime<Utc>> for Value {
     fn from(v: DateTime<Utc>) -> Self {
         Value::Timestamp(v)
+    }
+}
+
+impl From<Value> for VectorValue {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Bytes(v) => VectorValue::Bytes(v),
+            Value::Integer(v) => VectorValue::Integer(v),
+            Value::Float(v) => VectorValue::Float(v),
+            Value::Boolean(v) => VectorValue::Boolean(v),
+            Value::Object(v) => {
+                VectorValue::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+            Value::Array(v) => VectorValue::Array(v.into_iter().map(Into::into).collect()),
+            Value::Timestamp(v) => VectorValue::Timestamp(v),
+            Value::Regex(v) => {
+                VectorValue::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes()))
+            }
+            Value::Null => VectorValue::Null,
+        }
+    }
+}
+
+impl From<VectorValue> for Value {
+    fn from(v: VectorValue) -> Self {
+        match v {
+            VectorValue::Bytes(v) => v.into(),
+            VectorValue::Regex(regex) => regex.into_inner().into(),
+            VectorValue::Integer(v) => v.into(),
+            VectorValue::Float(v) => v.into(),
+            VectorValue::Boolean(v) => v.into(),
+            VectorValue::Map(v) => {
+                Value::Object(v.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+            VectorValue::Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            VectorValue::Timestamp(v) => v.into(),
+            VectorValue::Null => Value::Null,
+        }
     }
 }

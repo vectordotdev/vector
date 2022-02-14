@@ -19,11 +19,16 @@ components: sinks: loki: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    102400
-				max_events:   100000
+				max_bytes:    1_000_000
+				max_events:   100_000
 				timeout_secs: 1
 			}
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -33,9 +38,8 @@ components: sinks: loki: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:     true
-				concurrency: 5
-				headers:     false
+				enabled: true
+				headers: false
 			}
 			tls: {
 				enabled:                true
@@ -59,16 +63,6 @@ components: sinks: loki: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -80,7 +74,6 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
-				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -95,7 +88,6 @@ components: sinks: loki: {
 				unique label keys and values.
 				"""
 			required: true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -128,12 +120,10 @@ components: sinks: loki: {
 				with those events.
 				"""
 			required: false
-			warnings: []
 			type: string: {
-				syntax:  "literal"
 				default: "drop"
 				enum: {
-					"drop":              "Drop the event, with a warning."
+					"drop":              "Drop the event."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
@@ -142,14 +132,13 @@ components: sinks: loki: {
 			common:      false
 			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
+
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		tenant_id: {
@@ -161,7 +150,6 @@ components: sinks: loki: {
 				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]

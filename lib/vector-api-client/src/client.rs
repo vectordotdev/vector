@@ -20,6 +20,8 @@ impl Client {
     }
 
     pub async fn new_with_healthcheck(url: Url) -> Option<Self> {
+        #![allow(clippy::print_stderr)]
+
         use crate::gql::HealthQueryExt;
 
         // Create a new API client for connecting to the local/remote Vector instance.

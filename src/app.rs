@@ -1,3 +1,17 @@
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+
+use futures::StreamExt;
+use once_cell::race::OnceNonZeroUsize;
+use tokio::{
+    runtime::{self, Runtime},
+    sync::mpsc,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
+#[cfg(windows)]
+use crate::service;
+#[cfg(feature = "api")]
+use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, graph, heartbeat, list, metrics,
@@ -5,21 +19,10 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::mpsc,
-};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
-#[cfg(windows)]
-use crate::service;
+pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
@@ -51,31 +54,38 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
-            "off" => "off".to_owned(),
-            #[cfg(feature = "tokio-console")]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                "runtime=trace".to_owned(),
-                "tokio=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-            #[cfg(not(feature = "tokio-console"))]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-        });
+        let level = std::env::var("VECTOR_LOG")
+            .or_else(|_| {
+                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+                std::env::var("LOG")
+            })
+            .unwrap_or_else(|_| match opts.log_level() {
+                "off" => "off".to_owned(),
+                #[cfg(feature = "tokio-console")]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    "runtime=trace".to_owned(),
+                    "tokio=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                    format!("buffers={}", level),
+                ]
+                .join(","),
+                #[cfg(not(feature = "tokio-console"))]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                    format!("buffers={}", level),
+                ]
+                .join(","),
+            });
 
         let root_opts = opts.root;
 
@@ -105,6 +115,9 @@ impl Application {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             } else {
+                WORKER_THREADS
+                    .set(NonZeroUsize::new(threads).expect("already checked"))
+                    .expect("double thread initialization");
                 rt_builder.worker_threads(threads);
             }
         }
@@ -235,12 +248,13 @@ impl Application {
             #[cfg(feature = "api")]
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
+                use std::sync::{Arc, atomic::AtomicBool};
                 emit!(&ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), topology.watch()))
+                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

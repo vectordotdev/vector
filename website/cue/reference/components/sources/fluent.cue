@@ -40,16 +40,6 @@ components: sources: fluent: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -60,13 +50,22 @@ components: sources: fluent: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 	}
@@ -79,7 +78,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -92,7 +90,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["dummy.0"]
-					syntax: "literal"
 				}
 			}
 			"*": {
@@ -100,7 +97,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -144,7 +140,7 @@ components: sources: fluent: {
 				"""
 		}
 
-		fluentd_configuartion: {
+		fluentd_configuration: {
 			title: "Fluentd configuration"
 			body: """
 				To configure Fluentd to forward to a Vector instance, you can use the following output configuration:
@@ -192,16 +188,6 @@ components: sources: fluent: {
 				And so these options of the secure forward output plugins for Fluent and Fluent Bit cannot be used.
 
 				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7532).
-				"""
-		}
-
-		acking: {
-			title: "Acknowledgement support"
-			body:  """
-				The `fluent` source currently does not support the acknowledgement parts of the Fluent protocol and so
-				the `require_ack_response` option forward output plugins for Fluent and Fluent Bit cannot be used.
-
-				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7533).
 				"""
 		}
 	}

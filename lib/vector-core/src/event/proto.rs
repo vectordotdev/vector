@@ -1,9 +1,16 @@
-use crate::event::{self, BTreeMap, WithMetadata};
 use chrono::TimeZone;
+use ordered_float::NotNan;
+
+use crate::{
+    event::{self, BTreeMap, WithMetadata},
+    metrics::AgentDDSketch,
+};
 
 include!(concat!(env!("OUT_DIR"), "/event.rs"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
+
+use super::metric::MetricSketch;
 
 impl From<Event> for EventWrapper {
     fn from(event: Event) -> Self {
@@ -95,6 +102,11 @@ impl From<Metric> for event::Metric {
                 quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
                 count: summary.count,
                 sum: summary.sum,
+            },
+            MetricValue::Sketch(sketch) => match sketch.sketch.unwrap() {
+                sketch::Sketch::AgentDdSketch(ddsketch) => event::MetricValue::Sketch {
+                    sketch: ddsketch.into(),
+                },
             },
         };
 
@@ -194,6 +206,26 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 count,
                 sum,
             }),
+            event::MetricValue::Sketch { sketch } => match sketch {
+                MetricSketch::AgentDDSketch(ddsketch) => {
+                    let bin_map = ddsketch.bin_map();
+                    let (keys, counts) = bin_map.into_parts();
+                    let keys = keys.into_iter().map(i32::from).collect();
+                    let counts = counts.into_iter().map(u32::from).collect();
+
+                    MetricValue::Sketch(Sketch {
+                        sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
+                            count: ddsketch.count(),
+                            min: ddsketch.min().unwrap_or(f64::MAX),
+                            max: ddsketch.max().unwrap_or(f64::MIN),
+                            sum: ddsketch.sum().unwrap_or(0.0),
+                            avg: ddsketch.avg().unwrap_or(0.0),
+                            k: keys,
+                            n: counts,
+                        })),
+                    })
+                }
+            },
         };
 
         let data = Metric {
@@ -235,6 +267,58 @@ impl From<event::Event> for WithMetadata<EventWrapper> {
     }
 }
 
+impl From<AgentDDSketch> for Sketch {
+    fn from(ddsketch: AgentDDSketch) -> Self {
+        let bin_map = ddsketch.bin_map();
+        let (keys, counts) = bin_map.into_parts();
+        let ddsketch = sketch::AgentDdSketch {
+            count: ddsketch.count(),
+            min: ddsketch.min().unwrap_or(f64::MAX),
+            max: ddsketch.max().unwrap_or(f64::MIN),
+            sum: ddsketch.sum().unwrap_or(0.0),
+            avg: ddsketch.avg().unwrap_or(0.0),
+            k: keys.into_iter().map(i32::from).collect(),
+            n: counts.into_iter().map(u32::from).collect(),
+        };
+        Sketch {
+            sketch: Some(sketch::Sketch::AgentDdSketch(ddsketch)),
+        }
+    }
+}
+
+impl From<sketch::AgentDdSketch> for MetricSketch {
+    fn from(sketch: sketch::AgentDdSketch) -> Self {
+        // These safe conversions are annoying because the Datadog Agent internally uses i16/u16,
+        // but the proto definition uses i32/u32, so we have to jump through these hoops.
+        let keys = sketch
+            .k
+            .into_iter()
+            .map(|k| (k, k > 0))
+            .map(|(k, pos)| {
+                k.try_into()
+                    .unwrap_or_else(|_| if pos { i16::MAX } else { i16::MIN })
+            })
+            .collect::<Vec<_>>();
+        let counts = sketch
+            .n
+            .into_iter()
+            .map(|n| n.try_into().unwrap_or(u16::MAX))
+            .collect::<Vec<_>>();
+        MetricSketch::AgentDDSketch(
+            AgentDDSketch::from_raw(
+                sketch.count as u32,
+                sketch.min,
+                sketch.max,
+                sketch.sum,
+                sketch.avg,
+                &keys,
+                &counts,
+            )
+            .expect("keys/counts were unexpectedly mismatched"),
+        )
+    }
+}
+
 fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
@@ -242,7 +326,7 @@ fn decode_value(input: Value) -> Option<event::Value> {
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
         Some(value::Kind::Integer(value)) => Some(event::Value::Integer(value)),
-        Some(value::Kind::Float(value)) => Some(event::Value::Float(value)),
+        Some(value::Kind::Float(value)) => Some(event::Value::Float(NotNan::new(value).unwrap())),
         Some(value::Kind::Boolean(value)) => Some(event::Value::Boolean(value)),
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),
@@ -282,12 +366,13 @@ fn encode_value(value: event::Value) -> Value {
     Value {
         kind: match value {
             event::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            event::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
             event::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,
             })),
             event::Value::Integer(value) => Some(value::Kind::Integer(value)),
-            event::Value::Float(value) => Some(value::Kind::Float(value)),
+            event::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
             event::Value::Boolean(value) => Some(value::Kind::Boolean(value)),
             event::Value::Map(fields) => Some(value::Kind::Map(encode_map(fields))),
             event::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),

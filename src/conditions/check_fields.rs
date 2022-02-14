@@ -1,13 +1,14 @@
-use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::{Event, Value},
-};
+use std::{net::IpAddr, str::FromStr};
+
 use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
-use std::str::FromStr;
+
+use crate::{
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    event::{Event, Value},
+};
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -61,11 +62,11 @@ impl CheckFieldsPredicate for EqualsPredicate {
                 }
                 CheckFieldsPredicateArg::Integer(i) => match v {
                     Value::Integer(vi) => *i == *vi,
-                    Value::Float(vf) => *i == *vf as i64,
+                    Value::Float(vf) => *i == vf.into_inner() as i64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Float(f) => match v {
-                    Value::Float(vf) => *f == *vf,
+                    Value::Float(vf) => *f == vf.into_inner(),
                     Value::Integer(vi) => *f == *vi as f64,
                     _ => false,
                 },
@@ -524,13 +525,10 @@ impl CheckFieldsConfig {
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
-            .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
+            .map(|preds| -> Condition { Condition::CheckFields(CheckFields { predicates: preds }) })
             .map_err(|errs| {
                 if errs.len() > 1 {
                     let mut err_fmt = errs.join("\n");
@@ -546,19 +544,12 @@ impl ConditionConfig for CheckFieldsConfig {
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
-impl CheckFields {
-    #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
-    pub(crate) fn new(predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>) -> Self {
-        Self { predicates }
-    }
-}
-
-impl Condition for CheckFields {
+impl Conditional for CheckFields {
     fn check(&self, e: &Event) -> bool {
         self.predicates.iter().all(|(_, p)| p.check(e))
     }

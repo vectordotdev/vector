@@ -1,15 +1,6 @@
-use crate::buffers::Acker;
-use crate::sinks::util::adaptive_concurrency::{
-    AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-};
-use crate::sinks::util::retries::{FixedRetryPolicy, RetryLogic};
-pub use crate::sinks::util::service::concurrency::{concurrency_is_none, Concurrency};
-pub use crate::sinks::util::service::map::Map;
-use crate::sinks::util::service::map::MapLayer;
-use crate::sinks::util::sink::{Response, ServiceLogic};
-use crate::sinks::util::{Batch, BatchSink, Partition, PartitionBatchSink};
-use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Duration};
+
+use serde::{Deserialize, Serialize};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -17,6 +8,21 @@ use tower::{
     timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
+};
+use vector_buffers::Acker;
+
+pub use crate::sinks::util::service::{
+    concurrency::{concurrency_is_none, Concurrency},
+    map::Map,
+};
+use crate::sinks::util::{
+    adaptive_concurrency::{
+        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+    },
+    retries::{FixedRetryPolicy, RetryLogic},
+    service::map::MapLayer,
+    sink::{Response, ServiceLogic},
+    Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
 mod concurrency;
@@ -64,7 +70,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // 1024
+    pub concurrency: Concurrency, // adaptive
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -103,13 +109,37 @@ impl TowerRequestConfig {
         }
     }
 
-    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
-        self.rate_limit_num = Some(rate_limit_num);
+    pub const fn const_default() -> Self {
+        Self::new(CONCURRENCY_DEFAULT)
+    }
+
+    pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = Some(timeout_secs);
         self
     }
 
     pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
         self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self
+    }
+
+    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
+        self.rate_limit_num = Some(rate_limit_num);
+        self
+    }
+
+    pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
+        self.retry_attempts = Some(retry_attempts);
+        self
+    }
+
+    pub const fn retry_max_duration_secs(mut self, retry_max_duration_secs: u64) -> Self {
+        self.retry_max_duration_secs = Some(retry_max_duration_secs);
+        self
+    }
+
+    pub const fn retry_initial_backoff_secs(mut self, retry_initial_backoff_secs: u64) -> Self {
+        self.retry_initial_backoff_secs = Some(retry_initial_backoff_secs);
         self
     }
 
@@ -289,21 +319,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        buffers::Acker,
-        sinks::util::{
-            retries::{RetryAction, RetryLogic},
-            sink::StdServiceLogic,
-            BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
-        },
-    };
-    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use std::sync::{
         atomic::{AtomicBool, Ordering::AcqRel},
         Arc, Mutex,
     };
+
+    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+
+    use super::*;
+    use crate::sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        sink::StdServiceLogic,
+        BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -334,6 +363,13 @@ mod tests {
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
+    #[test]
+    fn config_merging_defaults_concurrency_to_none_if_unset() {
+        let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        assert_eq!(cfg.concurrency, None);
+    }
+
     #[tokio::test]
     async fn partition_sink_retry_concurrency() {
         let cfg = TowerRequestConfig {
@@ -342,7 +378,7 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
@@ -360,11 +396,14 @@ mod tests {
             })
         };
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
         let mut sink = settings.partition_sink(
             RetryAlways,
             svc,
-            PartitionBuffer::new(VecBuffer::new(batch.size)),
+            PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
             acker,
             StdServiceLogic::default(),

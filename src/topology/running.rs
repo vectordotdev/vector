@@ -1,31 +1,37 @@
-use crate::topology::builder;
-use crate::topology::fanout::{ControlChannel, ControlMessage};
-use crate::topology::{
-    build_or_log_errors, handle_errors, retain, take_healthchecks, BuiltBuffer, Outputs,
-    TaskHandle, WatchRx, WatchTx,
-};
-use crate::{
-    buffers,
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
-    event::Event,
-    shutdown::SourceShutdownCoordinator,
-    topology::{builder::Pieces, task::TaskOutput},
-    trigger::DisabledTrigger,
-};
-use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
+
+use futures::{future, Future, FutureExt};
 use tokio::{
     sync::{mpsc, watch},
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
+use vector_buffers::topology::channel::BufferSender;
+
+use crate::{
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
+    event::Event,
+    shutdown::SourceShutdownCoordinator,
+    topology::{
+        build_or_log_errors, builder,
+        builder::Pieces,
+        fanout::{ControlChannel, ControlMessage},
+        handle_errors, retain, take_healthchecks,
+        task::TaskOutput,
+        BuiltBuffer, Outputs, TaskHandle, WatchRx, WatchTx,
+    },
+    trigger::DisabledTrigger,
+};
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<ComponentKey, buffers::BufferInputCloner<Event>>,
+    inputs: HashMap<ComponentKey, BufferSender<Event>>,
     outputs: HashMap<OutputId, ControlChannel>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
@@ -34,6 +40,7 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
+    pub(crate) running: Arc<AtomicBool>,
 }
 
 impl RunningTopology {
@@ -48,6 +55,7 @@ impl RunningTopology {
             tasks: HashMap::new(),
             abort_tx,
             watch: watch::channel(HashMap::new()),
+            running: Arc::new(AtomicBool::new(true)),
         }
     }
 
@@ -76,6 +84,8 @@ impl RunningTopology {
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
     pub fn stop(self) -> impl Future<Output = ()> {
+        // Update the API's health endpoint to signal shutdown
+        self.running.store(false, Ordering::Relaxed);
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
@@ -163,7 +173,7 @@ impl RunningTopology {
     }
 
     /// On Error, topology is in invalid state.
-    /// May change componenets even if reload fails.
+    /// May change components even if reload fails.
     pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
         if self.config.global != new_config.global {
             error!(
@@ -179,8 +189,8 @@ impl RunningTopology {
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
-        // released by shutdown componenets.
-        // Issue: https://github.com/timberio/vector/issues/3035
+        // released by shutdown components.
+        // Issue: https://github.com/vectordotdev/vector/issues/3035
         if cfg!(windows) {
             // This value is guess work.
             tokio::time::sleep(Duration::from_millis(200)).await;
@@ -416,7 +426,7 @@ impl RunningTopology {
                 if reuse_buffers.contains(key) {
                     let tx = self.inputs.remove(key).unwrap();
                     let (rx, acker) = match buffer {
-                        TaskOutput::Sink(rx, acker) => (rx, acker),
+                        TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
                         _ => unreachable!(),
                     };
 
@@ -585,7 +595,7 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.send(ControlMessage::Remove(key.clone())).await;
+                    let _ = output.send(ControlMessage::Remove(key.clone()));
                 }
             }
         }
@@ -593,7 +603,7 @@ impl RunningTopology {
 
     async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
-        for (port, mut output) in outputs {
+        for (port, output) in outputs {
             let id = OutputId {
                 component: key.clone(),
                 port,
@@ -603,9 +613,10 @@ impl RunningTopology {
                     // Sink may have been removed with the new config so it may not
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
-                        let _ = output
-                            .send(ControlMessage::Add(sink_key.clone(), input.get()))
-                            .await;
+                        let _ = output.send(ControlMessage::Add(
+                            sink_key.clone(),
+                            Box::pin(input.clone()),
+                        ));
                     }
                 }
             }
@@ -614,9 +625,10 @@ impl RunningTopology {
                     // Transform may have been removed with the new config so it may
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
-                        let _ = output
-                            .send(ControlMessage::Add(transform_key.clone(), input.get()))
-                            .await;
+                        let _ = output.send(ControlMessage::Add(
+                            transform_key.clone(),
+                            Box::pin(input.clone()),
+                        ));
                     }
                 }
             }
@@ -634,8 +646,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), tx.get()))
-                .await;
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
         }
 
         self.inputs.insert(key.clone(), tx);
@@ -686,7 +697,7 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.send(ControlMessage::Remove(key.clone())).await;
+                let _ = output.send(ControlMessage::Remove(key.clone()));
             }
         }
 
@@ -696,8 +707,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), tx.get()))
-                .await;
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
         }
 
         for &input in inputs_to_replace {
@@ -706,8 +716,10 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(key.clone(), Some(tx.get())))
-                .await;
+                .send(ControlMessage::Replace(
+                    key.clone(),
+                    Some(Box::pin(tx.clone())),
+                ));
         }
 
         self.inputs.insert(key.clone(), tx);
@@ -732,8 +744,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(key.clone(), None))
-                .await;
+                .send(ControlMessage::Replace(key.clone(), None));
         }
     }
 

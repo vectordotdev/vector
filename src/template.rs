@@ -1,28 +1,24 @@
-use crate::{
-    config::log_schema,
-    event::{EventRef, Metric, Value},
-};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
 use snafu::Snafu;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
-use std::hash::Hash;
-use std::path::PathBuf;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
-}
+use crate::{
+    config::log_schema,
+    event::{EventRef, Metric, Value},
+};
+
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 #[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
@@ -239,10 +235,11 @@ impl Serialize for Template {
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeZone;
+    use vector_common::btreemap;
+
     use super::*;
     use crate::event::{Event, MetricKind, MetricValue};
-    use chrono::TimeZone;
-    use shared::btreemap;
 
     #[test]
     fn get_fields() {

@@ -1,19 +1,15 @@
+#![allow(clippy::print_stdout)] // tests
+
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use crate::event::Value;
-    use crate::kafka::KafkaCompression;
-    use crate::sinks::kafka::config::{KafkaRole, KafkaSinkConfig};
-    use crate::sinks::kafka::sink::KafkaSink;
-    use crate::sinks::kafka::*;
-    use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-    use crate::sinks::util::{BatchConfig, StreamSink};
-    use crate::{
-        buffers::Acker,
-        kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{random_lines_with_stream, random_string, wait_for},
-        tls::TlsOptions,
+    use std::{
+        collections::{BTreeMap, HashMap},
+        future::ready,
+        thread,
+        time::Duration,
     };
+
     use bytes::Bytes;
     use futures::StreamExt;
     use rdkafka::{
@@ -21,9 +17,29 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use std::collections::HashMap;
-    use std::{collections::BTreeMap, future::ready, thread, time::Duration};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::{
+        buffers::Acker,
+        event::{BatchNotifier, BatchStatus},
+    };
+
+    use crate::{
+        event::Value,
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        sinks::{
+            kafka::{
+                config::{KafkaRole, KafkaSinkConfig},
+                sink::KafkaSink,
+                *,
+            },
+            util::{
+                encoding::{EncodingConfig, StandardEncodings},
+                BatchConfig, NoDefaultsBatchSettings,
+            },
+            VectorSink,
+        },
+        test_util::{components, random_lines_with_stream, random_string, wait_for},
+        tls::TlsOptions,
+    };
 
     #[tokio::test]
     async fn healthcheck() {
@@ -41,7 +57,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_field: None,
+            headers_key: None,
         };
 
         self::sink::healthcheck(config).await.unwrap();
@@ -78,7 +94,7 @@ mod integration_test {
     }
 
     async fn kafka_batch_options_overrides(
-        batch: BatchConfig,
+        batch: BatchConfig<NoDefaultsBatchSettings>,
         librdkafka_options: HashMap<String, String>,
     ) -> crate::Result<KafkaSink> {
         let topic = format!("test-{}", random_string(10));
@@ -96,9 +112,9 @@ mod integration_test {
             message_timeout_ms: 300000,
             batch,
             librdkafka_options,
-            headers_field: None,
+            headers_key: None,
         };
-        let (acker, _ack_counter) = Acker::new_for_testing();
+        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
@@ -108,12 +124,11 @@ mod integration_test {
     #[tokio::test]
     async fn kafka_batch_options_max_bytes_errors_on_double_set() {
         crate::test_util::trace_init();
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(1000);
+
         assert!(kafka_batch_options_overrides(
-            BatchConfig {
-                max_bytes: Some(1000),
-                max_events: None,
-                timeout_secs: None
-            },
+            batch,
             indexmap::indexmap! {
                 "batch.size".to_string() => 1.to_string(),
             }
@@ -127,27 +142,23 @@ mod integration_test {
     #[tokio::test]
     async fn kafka_batch_options_actually_sets() {
         crate::test_util::trace_init();
-        kafka_batch_options_overrides(
-            BatchConfig {
-                max_bytes: None,
-                max_events: Some(10),
-                timeout_secs: Some(2),
-            },
-            indexmap::indexmap! {}.into_iter().collect(),
-        )
-        .await
-        .unwrap();
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(10);
+        batch.timeout_secs = Some(2);
+
+        kafka_batch_options_overrides(batch, indexmap::indexmap! {}.into_iter().collect())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn kafka_batch_options_max_events_errors_on_double_set() {
         crate::test_util::trace_init();
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(10);
+
         assert!(kafka_batch_options_overrides(
-            BatchConfig {
-                max_bytes: None,
-                max_events: Some(10),
-                timeout_secs: None
-            },
+            batch,
             indexmap::indexmap! {
                 "batch.num.messages".to_string() => 1.to_string(),
             }
@@ -161,12 +172,11 @@ mod integration_test {
     #[tokio::test]
     async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
         crate::test_util::trace_init();
+        let mut batch = BatchConfig::default();
+        batch.timeout_secs = Some(10);
+
         assert!(kafka_batch_options_overrides(
-            BatchConfig {
-                max_bytes: None,
-                max_events: None,
-                timeout_secs: Some(10),
-            },
+            batch,
             indexmap::indexmap! {
                 "queue.buffering.max.ms".to_string() => 1.to_string(),
             }
@@ -244,12 +254,13 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_field: Some(headers_key.clone()),
+            headers_key: Some(headers_key.clone()),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = Box::new(KafkaSink::new(config, acker).unwrap());
+        let (acker, ack_counter) = Acker::basic();
+        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -257,18 +268,21 @@ mod integration_test {
 
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        let input_events = events.map(|mut event| {
+        let input_events = events.map(move |mut events| {
+            let headers_key = headers_key.clone();
             let mut header_values = BTreeMap::new();
             header_values.insert(
                 header_1_key.to_string(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            event
-                .as_mut_log()
-                .insert(headers_key.clone(), header_values);
-            event
+            events.for_each_log(move |log| {
+                log.insert(headers_key.clone(), header_values.clone());
+            });
+            events
         });
-        sink.run(Box::pin(input_events)).await.unwrap();
+        components::init_test();
+        sink.run(input_events).await.unwrap();
+        components::SINK_TESTS.assert(&["protocol"]);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

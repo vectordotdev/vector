@@ -114,9 +114,9 @@ source = '''
 Let's pretend we have a nice well behaved application piping Vector logs like the following:
 
 ```json
-{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
-{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
-{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+{ "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
 ```
 
 In our theoretical product, we're expanding into the EU and want to comply with the GDPR. In our case, that means our
@@ -142,14 +142,12 @@ type = "json_parser"
 [transforms.not_gdpr]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "false"
+condition = ".gdpr == false"
 
 [transforms.gdpr_to_strip]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "true"
+condition = ".gdpr == true"
 
 [transforms.gdpr_stripped]
 type = "remap"
@@ -171,13 +169,13 @@ Let's have a look:
 
 ```bash
 $ cat <<-EOF | cargo run -- --config test.toml
-{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
-{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
-{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+{ "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
 EOF
 Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::stdin: finished sending
-{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@timber.io","gdpr":false}
-{"gdpr":false,"host":"obsidian","email":"us-user2@timber.io","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
+{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@datadoghq.com","gdpr":false}
+{"gdpr":false,"host":"obsidian","email":"us-user2@datadoghq.com","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
 {"id":"user3","gdpr":true,"host":"obsidian","timestamp":"2020-02-06T00:13:59.241816010Z"}
 Feb 05 16:15:27.945  INFO vector: Shutting down.
 ```
@@ -203,7 +201,7 @@ Lets take a look at what that might look like:
 
 ```toml title="vector.toml"
 [sinks.output]
-  inputs = ["demo"]
+  inputs = ["demo_logs"]
   type = "kafka"
 
   # Put events in the host specific topic.

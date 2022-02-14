@@ -24,16 +24,6 @@ components: sinks: blackhole: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -44,7 +34,6 @@ components: sinks: blackhole: {
 			common:      false
 			description: "The number of seconds between reporting a summary of activity."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 1
 				examples: [10]
@@ -55,7 +44,6 @@ components: sinks: blackhole: {
 			common:      false
 			description: "Rates the amount of events that the sink can consume per second."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: null
 				examples: [1000]

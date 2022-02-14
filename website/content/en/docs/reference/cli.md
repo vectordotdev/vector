@@ -6,10 +6,6 @@ weight: 4
 
 Vector is a single binary that be managed through a command line interface. This page documents all of the available flags, options, subcommands, and environment variables.
 
-```shell
-vector [FLAGS] [OPTIONS] [SUBCOMMAND] [ARGS]
-```
-
 ## Commands
 
 {{< cli/commands >}}

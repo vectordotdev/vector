@@ -1,7 +1,9 @@
 use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
-use vector::event::Event;
-use vector::sources::dnstap::{schema::DnstapEventSchema, DnstapParser};
+use vector::{
+    event::Event,
+    sources::dnstap::{schema::DnstapEventSchema, DnstapParser},
+};
 
 fn benchmark_query_parsing(c: &mut Criterion) {
     let mut event = Event::new_empty_log();
@@ -52,7 +54,7 @@ fn benchmark_update_parsing(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates inherent CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_query_parsing,benchmark_update_parsing
 );

@@ -1,7 +1,3 @@
-use crate::buffers::{Acker, EventStream};
-use crate::config::{ComponentKey, ComponentScope};
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
@@ -9,11 +5,20 @@ use std::{
     task::{Context, Poll},
 };
 
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
+use vector_core::{
+    buffers::{topology::channel::BufferReceiver, Acker},
+    event::Event,
+};
+
+use crate::{config::ComponentKey, utilization::Utilization};
+
 pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiver<Event>>, Acker),
     Healthcheck,
 }
 
@@ -47,10 +52,6 @@ impl Task {
         self.key.id()
     }
 
-    pub const fn scope(&self) -> &ComponentScope {
-        self.key.scope()
-    }
-
     pub fn typetag(&self) -> &str {
         &self.typetag
     }
@@ -69,7 +70,6 @@ impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
-            .field("scope", &self.scope().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

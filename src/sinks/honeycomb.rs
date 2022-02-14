@@ -1,20 +1,24 @@
+use std::num::NonZeroU64;
+
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
-use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HoneycombConfig {
@@ -25,10 +29,19 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct HoneycombDefaultBatchSettings;
+
+impl SinkBatchSettings for HoneycombDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 inventory::submit! {
@@ -53,16 +66,15 @@ impl SinkConfig for HoneycombConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(100_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
+
+        let buffer = JsonArrayBuffer::new(batch_settings.size);
 
         let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings.size),
+            buffer,
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -72,11 +84,11 @@ impl SinkConfig for HoneycombConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -107,13 +119,12 @@ impl HttpSink for HoneycombConfig {
         Some(data)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
-        let buf = serde_json::to_vec(&events).unwrap();
-
-        request.body(buf).map_err(Into::into)
+        request.body(body).map_err(Into::into)
     }
 }
 

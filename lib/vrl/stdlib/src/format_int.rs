@@ -46,12 +46,12 @@ impl Function for FormatInt {
                 result: Ok("\"42\""),
             },
             Example {
-                title: "format hexidecimal integer",
+                title: "format hexadecimal integer",
                 source: r#"format_int!(42, 16)"#,
                 result: Ok("2a"),
             },
             Example {
-                title: "format negative hexidecimal integer",
+                title: "format negative hexadecimal integer",
                 source: r#"format_int!(-42, 16)"#,
                 result: Ok("-2a"),
             },
@@ -92,7 +92,7 @@ impl Expression for FormatIntFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+        TypeDef::integer().fallible()
     }
 }
 
@@ -135,19 +135,19 @@ mod tests {
         decimal {
             args: func_args![value: 42],
             want: Ok(value!("42")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         hexidecimal {
             args: func_args![value: 42, base: 16],
             want: Ok(value!("2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         negative_hexidecimal {
             args: func_args![value: -42, base: 16],
             want: Ok(value!("-2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
     ];
 }

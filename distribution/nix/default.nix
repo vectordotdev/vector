@@ -31,7 +31,7 @@ rustPlatform.buildRustPackage rec {
 
   meta = with stdenv.lib; {
     description = "A lightweight and ultra-fast tool for building observability pipelines";
-    homepage    = "https://github.com/timberio/vector";
+    homepage    = "https://github.com/vectordotdev/vector";
     license     = with licenses; [ asl20 ];
     maintainers = with maintainers; [ thoughtpolice ];
     platforms   = platforms.all;

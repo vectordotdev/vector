@@ -1,16 +1,5 @@
-use crate::expiring_hash_map::ExpiringHashMap;
-use crate::{
-    buffers::Acker,
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    internal_events::FileOpen,
-    internal_events::TemplateRenderingFailed,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        StreamSink,
-    },
-    template::Template,
-};
+use std::time::{Duration, Instant};
+
 use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -20,15 +9,27 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
-
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
+use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+
+use crate::{
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, EventStatus, Finalizable},
+    expiring_hash_map::ExpiringHashMap,
+    internal_events::{FileBytesSent, FileOpen, TemplateRenderingError},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
+    template::Template,
+};
 mod bytes_path;
-use bytes_path::BytesPath;
 use std::convert::TryFrom;
+
+use bytes_path::BytesPath;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -130,13 +131,13 @@ impl SinkConfig for FileSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx.acker());
         Ok((
-            super::VectorSink::Stream(Box::new(sink)),
+            super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -172,7 +173,7 @@ impl FileSink {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("path"),
                     drop_event: true,
@@ -249,7 +250,7 @@ impl FileSink {
         Ok(())
     }
 
-    async fn process_event(&mut self, event: Event) {
+    async fn process_event(&mut self, mut event: Event) {
         let path = match self.partition_event(&event) {
             Some(path) => path,
             None => {
@@ -257,6 +258,7 @@ impl FileSink {
                 // file.
                 // This is already logged at `partition_event`, so
                 // here we just skip the event.
+                event.metadata().update_status(EventStatus::Errored);
                 return;
             }
         };
@@ -276,6 +278,7 @@ impl FileSink {
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
                     error!(message = "Unable to open the file.", path = ?path, %error);
+                    event.metadata().update_status(EventStatus::Errored);
                     return;
                 }
             };
@@ -290,8 +293,25 @@ impl FileSink {
         };
 
         trace!(message = "Writing an event to file.", path = ?path);
-        if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
-            error!(message = "Failed to write file.", path = ?path, %error);
+        let event_size = event.size_of();
+        let finalizers = event.take_finalizers();
+        match write_event_to_file(file, event, &self.encoding).await {
+            Ok(byte_size) => {
+                finalizers.update_status(EventStatus::Delivered);
+                emit!(&EventsSent {
+                    count: 1,
+                    byte_size: event_size,
+                    output: None,
+                });
+                emit!(&FileBytesSent {
+                    byte_size,
+                    file: String::from_utf8_lossy(&path),
+                });
+            }
+            Err(error) => {
+                finalizers.update_status(EventStatus::Errored);
+                error!(message = "Failed to write file.", path = ?path, %error);
+            }
         }
     }
 }
@@ -328,14 +348,14 @@ async fn write_event_to_file(
     file: &mut OutFile,
     event: Event,
     encoding: &EncodingConfig<Encoding>,
-) -> Result<(), std::io::Error> {
+) -> Result<usize, std::io::Error> {
     let mut buf = encode_event(encoding, event);
     buf.push(b'\n');
-    file.write_all(&buf[..]).await
+    file.write_all(&buf[..]).await.map(|()| buf.len())
 }
 
 #[async_trait]
-impl StreamSink for FileSink {
+impl StreamSink<Event> for FileSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         FileSink::run(&mut self, input)
             .await
@@ -346,13 +366,17 @@ impl StreamSink for FileSink {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
+
+    use futures::{stream, SinkExt};
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::test_util::{
+        components::{self, FILE_SINK_TAGS, SINK_TESTS},
         lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
         temp_dir, temp_file, trace_init,
     };
-    use futures::{stream, SinkExt};
-    use std::convert::TryInto;
 
     #[test]
     fn generate_config() {
@@ -361,6 +385,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition() {
+        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -372,11 +397,12 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -386,6 +412,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_gzip() {
+        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -397,11 +424,12 @@ mod tests {
             compression: Compression::Gzip,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -411,6 +439,7 @@ mod tests {
 
     #[tokio::test]
     async fn many_partitions() {
+        components::init_test();
         trace_init();
 
         let directory = temp_dir();
@@ -427,7 +456,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -449,6 +478,7 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -495,8 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn reopening() {
-        use pretty_assertions::assert_eq;
-
+        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -508,7 +537,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
@@ -534,5 +563,7 @@ mod tests {
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);
         assert_eq!(input, output);
+
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
     }
 }

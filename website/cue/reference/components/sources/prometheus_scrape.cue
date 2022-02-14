@@ -42,16 +42,6 @@ components: sources: prometheus_scrape: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -69,7 +59,6 @@ components: sources: prometheus_scrape: {
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:9090/metrics"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -77,7 +66,6 @@ components: sources: prometheus_scrape: {
 			common:      true
 			description: "The interval between scrapes, in seconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 15
 				unit:    "seconds"
@@ -90,10 +78,8 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's host:port.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["instance"]
 			}
 		}
@@ -104,10 +90,8 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's endpoint.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["endpoint"]
 			}
 		}
@@ -121,7 +105,6 @@ components: sources: prometheus_scrape: {
 				configuration.
 				"""
 			required: false
-			warnings: []
 			type: bool: {
 				default: false
 			}
@@ -161,14 +144,18 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

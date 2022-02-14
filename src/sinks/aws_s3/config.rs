@@ -1,37 +1,30 @@
-use crate::config::SinkContext;
-use crate::sinks::s3_common::sink::S3Sink;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BatchSettings;
+use std::convert::TryInto;
+
+use rusoto_s3::S3Client;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
+use vector_core::sink::VectorSink;
+
+use super::sink::S3RequestOptions;
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
+    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
-            partitioner::KeyPartitioner,
             service::S3Service,
+            sink::S3Sink,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, ServiceBuilderExt,
+            encoding::{EncodingConfig, StandardEncodings},
+            partitioner::KeyPartitioner,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
     },
 };
-use rusoto_s3::S3Client;
-use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-use tower::ServiceBuilder;
-use vector_core::sink::VectorSink;
-
-use super::sink::S3RequestOptions;
-
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
-    .bytes(10_000_000)
-    .timeout(300);
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
@@ -53,7 +46,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -87,14 +80,14 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_processor(client, cx)?;
+        let service = self.create_service(&cx.proxy)?;
+        let healthcheck = self.build_healthcheck(service.client())?;
+        let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -103,20 +96,22 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3SinkConfig {
-    pub fn build_processor(&self, client: S3Client, cx: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        service: S3Service,
+        cx: SinkContext,
+    ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
-            .service(S3Service::new(client));
+            .service(service);
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix = self
             .key_prefix
             .as_ref()
@@ -147,15 +142,15 @@ impl S3SinkConfig {
 
         let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
-        s3_common::config::create_client(&self.region, &self.auth, self.assume_role.clone(), proxy)
+    pub fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
     }
 }
 

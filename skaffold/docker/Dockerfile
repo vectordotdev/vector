@@ -10,8 +10,8 @@ RUN apt-get update \
 ENTRYPOINT ["/usr/bin/vector"]
 STOPSIGNAL SIGTERM
 
-ARG LOG=debug,vector=trace
-ENV LOG="$LOG"
+ARG VECTOR_LOG=debug,vector=trace
+ENV VECTOR_LOG="$VECTOR_LOG"
 
 COPY vector /usr/bin/vector
 

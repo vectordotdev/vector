@@ -1,0 +1,15 @@
+{
+  "name": "Vector",
+  "icons": [
+    {
+      "src": "/icons/vector-32x32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "/icons/vector-64x64.png",
+      "type": "image/png",
+      "sizes": "64x64"
+    }
+  ]
+}

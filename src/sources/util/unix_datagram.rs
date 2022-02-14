@@ -1,17 +1,19 @@
-use crate::{
-    codecs, emit,
-    event::Event,
-    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
-    shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
-    Pipeline,
-};
-use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt};
 use std::{fs::remove_file, path::PathBuf};
+
+use bytes::{Bytes, BytesMut};
+use futures::{stream, StreamExt};
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+
+use crate::{
+    codecs,
+    event::Event,
+    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
+    shutdown::ShutdownSignal,
+    sources::{util::codecs::StreamDecodingError, Source},
+    SourceSender,
+};
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
@@ -23,7 +25,7 @@ pub fn build_unix_datagram_source(
     decoder: codecs::Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     Box::pin(async move {
         let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
@@ -49,16 +51,15 @@ async fn listen(
     decoder: codecs::Decoder,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
     let mut buf = BytesMut::with_capacity(max_length);
     loop {
         buf.resize(max_length, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::Error::FramingError(error.into());
+                    let error = codecs::decoding::Error::FramingError(error.into());
                     emit!(&SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
@@ -83,8 +84,9 @@ async fn listen(
                         Some(Ok((mut events, byte_size))) => {
                             handle_events(&mut events, received_from.clone(), byte_size);
 
-                            for event in events {
-                                out.send(event).await?;
+                            if let Err(error) = out.send_all(stream::iter(events)).await {
+                                error!(message = "Error sending line.", %error);
+                                return Err(());
                             }
                         },
                         Some(Err(error)) => {

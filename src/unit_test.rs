@@ -1,6 +1,7 @@
-use crate::config;
-use colored::*;
+use crate::config::{self, UnitTestResult};
 use std::path::PathBuf;
+
+use colored::*;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -56,8 +57,7 @@ impl Opts {
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut aggregated_test_inspections = Vec::new();
-    let mut aggregated_test_errors = Vec::new();
+    let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -65,47 +65,57 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    println!("Running tests");
-    match config::build_unit_tests(&paths).await {
-        Ok(mut tests) => {
-            tests.iter_mut().for_each(|t| {
-                let (test_inspections, test_errors) = t.run();
-                if !test_inspections.is_empty() {
-                    aggregated_test_inspections.push((t.name.clone(), test_inspections));
-                }
-                if !test_errors.is_empty() {
-                    println!("test {} ... {}", t.name, "failed".red());
-                    aggregated_test_errors.push((t.name.clone(), test_errors));
-                } else {
-                    println!("test {} ... {}", t.name, "passed".green());
-                }
-            });
+    #[allow(clippy::print_stdout)]
+    {
+        println!("Running tests");
+    }
+    match config::build_unit_tests_main(&paths).await {
+        Ok(tests) => {
             if tests.is_empty() {
-                println!("{}", "No tests found.".yellow());
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{}", "No tests found.".yellow());
+                }
+            } else {
+                for test in tests {
+                    let name = test.name.clone();
+                    let UnitTestResult { errors } = test.run().await;
+                    if !errors.is_empty() {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "failed".red());
+                        }
+                        aggregated_test_errors.push((name, errors));
+                    } else {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "passed".green());
+                        }
+                    }
+                }
             }
         }
-        Err(errs) => {
-            error!("Failed to execute tests:\n{}.", errs.join("\n"));
+        Err(errors) => {
+            error!("Failed to execute tests:\n{}", errors.join("\n"));
             return exitcode::CONFIG;
         }
     }
 
-    if !aggregated_test_inspections.is_empty() {
-        println!("\ninspections:");
-        for (test_name, inspection) in aggregated_test_inspections {
-            println!("\ntest {}:\n", test_name);
-            for inspect in inspection {
-                println!("{}\n", inspect);
-            }
-        }
-    }
-
     if !aggregated_test_errors.is_empty() {
-        println!("\nfailures:");
+        #[allow(clippy::print_stdout)]
+        {
+            println!("\nfailures:");
+        }
         for (test_name, fails) in aggregated_test_errors {
-            println!("\ntest {}:\n", test_name);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("\ntest {}:\n", test_name);
+            }
             for fail in fails {
-                println!("{}\n", fail);
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{}\n", fail);
+                }
             }
         }
 

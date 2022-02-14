@@ -1,17 +1,5 @@
-use super::util::finalizer::OrderedFinalizer;
-use super::util::{EncodingConfig, MultilineConfig};
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
-    internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
-    },
-    line_agg::{self, LineAgg},
-    shutdown::ShutdownSignal,
-    trace::{current_span, Instrument},
-    Pipeline,
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
+
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
@@ -21,15 +9,30 @@ use file_source::{
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    FutureExt, SinkExt,
+    FutureExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
-use std::path::PathBuf;
-use std::time::Duration;
 use tokio::task::spawn_blocking;
+
+use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    encoding_transcode::{Decoder, Encoder},
+    event::{BatchNotifier, Event, LogEvent},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
+    line_agg::{self, LineAgg},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    trace::{current_span, Instrument},
+    SourceSender,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -91,6 +94,8 @@ pub struct FileConfig {
     pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -192,6 +197,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -224,21 +230,23 @@ impl SourceConfig for FileConfig {
 
             if let Some(ref indicator) = self.message_start_indicator {
                 Regex::new(indicator)
-                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
+                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
             }
         }
+
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements,
+            acknowledgements.enabled(),
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -250,7 +258,7 @@ pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     acknowledgements: bool,
 ) -> super::Source {
     let ignore_before = config
@@ -326,7 +334,7 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
-        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+        let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -368,25 +376,22 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
-        let mut messages = messages
-            .map(move |line| {
-                let _enter = span2.enter();
-                let mut event =
-                    create_event(line.text, line.filename, &host_key, &hostname, &file_key);
-                if let Some(finalizer) = &finalizer {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    event = event.with_batch_notifier(&batch);
-                    let entry = FinalizerEntry {
-                        file_id: line.file_id,
-                        offset: line.offset,
-                    };
-                    finalizer.add(entry, receiver);
-                } else {
-                    checkpoints.update(line.file_id, line.offset);
-                }
-                event
-            })
-            .map(Ok);
+        let mut messages = messages.map(move |line| {
+            let _enter = span2.enter();
+            let mut event = create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+            if let Some(finalizer) = &finalizer {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                event = event.with_batch_notifier(&batch);
+                let entry = FinalizerEntry {
+                    file_id: line.file_id,
+                    offset: line.offset,
+                };
+                finalizer.add(entry, receiver);
+            } else {
+                checkpoints.update(line.file_id, line.offset);
+            }
+            event
+        });
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
@@ -477,6 +482,18 @@ fn create_event(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        future::Future,
+        io::{Seek, Write},
+    };
+
+    use encoding_rs::UTF_16LE;
+    use pretty_assertions::assert_eq;
+    use tempfile::tempdir;
+    use tokio::time::{sleep, timeout, Duration};
+
     use super::*;
     use crate::{
         config::Config,
@@ -485,16 +502,6 @@ mod tests {
         sources::file,
         test_util::components::{self, SOURCE_TESTS},
     };
-    use encoding_rs::UTF_16LE;
-    use pretty_assertions::assert_eq;
-    use std::{
-        collections::HashSet,
-        fs::{self, File},
-        future::Future,
-        io::{Seek, Write},
-    };
-    use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -690,7 +697,7 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    // https://github.com/timberio/vector/issues/8363
+    // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
         let n = 5;
@@ -1141,8 +1148,10 @@ mod tests {
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
     async fn file_start_position_ignore_old_files() {
-        use std::os::unix::io::AsRawFd;
-        use std::time::{Duration, SystemTime};
+        use std::{
+            os::unix::io::AsRawFd,
+            time::{Duration, SystemTime},
+        };
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1456,7 +1465,7 @@ mod tests {
         );
     }
 
-    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    // Ignoring on mac: https://github.com/vectordotdev/vector/issues/8373
     #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {
@@ -1651,10 +1660,10 @@ mod tests {
         components::init_test();
 
         let (tx, rx) = if acking_mode == Acks {
-            let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
         } else {
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, rx) = SourceSender::new_test();
             (tx, rx.boxed())
         };
 

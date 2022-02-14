@@ -1,14 +1,17 @@
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+};
+
+use chrono::{DateTime, NaiveDateTime, Utc};
+use quickcheck::{empty_shrinker, Arbitrary, Gen};
+
 use crate::event::{
     metric::{Bucket, MetricData, MetricName, MetricSeries, Quantile, Sample},
     Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value,
 };
-use bytes::Bytes;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use quickcheck::{empty_shrinker, Arbitrary, Gen};
-use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
-const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
 const MAX_STR_SIZE: usize = 16;
 const ALPHABET: [&str; 27] = [
@@ -302,6 +305,15 @@ impl Arbitrary for MetricValue {
                         }),
                 )
             }
+            // Property testing a sketch doesn't actually make any sense, I don't think.
+            //
+            // We can't extract the values used to build it, which is by design, so all we could do
+            // is mess with the internal buckets, which isn't even exposed (and absolutely shouldn't
+            // be) and doing that is gauranteed to mess with the sketch in non-obvious ways that
+            // would not occur if we were actually seeding it with real samples.
+            MetricValue::Sketch { sketch } => Box::new(iter::once(MetricValue::Sketch {
+                sketch: sketch.clone(),
+            })),
         }
     }
 }
@@ -339,7 +351,7 @@ impl Arbitrary for Sample {
 impl Arbitrary for Quantile {
     fn arbitrary(g: &mut Gen) -> Self {
         Quantile {
-            upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
+            quantile: f64::arbitrary(g) % MAX_F64_SIZE,
             value: f64::arbitrary(g) % MAX_F64_SIZE,
         }
     }
@@ -348,11 +360,11 @@ impl Arbitrary for Quantile {
         let base = *self;
 
         Box::new(
-            base.upper_limit
+            base.quantile
                 .shrink()
                 .map(move |upper_limit| {
                     let mut quantile = base;
-                    quantile.upper_limit = upper_limit;
+                    quantile.quantile = upper_limit;
                     quantile
                 })
                 .flat_map(|quantile| {
@@ -532,36 +544,6 @@ impl Arbitrary for MetricData {
                     })
                 }),
         )
-    }
-}
-
-impl Arbitrary for Value {
-    fn arbitrary(g: &mut Gen) -> Self {
-        // Quickcheck can't derive Arbitrary for enums, see
-        // https://github.com/BurntSushi/quickcheck/issues/98.  The magical
-        // constant here are the number of fields in `Value`. Because the field
-        // total is a power of two we, happily, don't introduce a bias into the
-        // field picking.
-        match u8::arbitrary(g) % 8 {
-            0 => {
-                let bytes: Vec<u8> = Vec::arbitrary(g);
-                Value::Bytes(Bytes::from(bytes))
-            }
-            1 => Value::Integer(i64::arbitrary(g)),
-            2 => Value::Float(f64::arbitrary(g) % MAX_F64_SIZE),
-            3 => Value::Boolean(bool::arbitrary(g)),
-            4 => Value::Timestamp(datetime(g)),
-            5 => {
-                let mut gen = Gen::new(MAX_MAP_SIZE);
-                Value::Map(BTreeMap::arbitrary(&mut gen))
-            }
-            6 => {
-                let mut gen = Gen::new(MAX_ARRAY_SIZE);
-                Value::Array(Vec::arbitrary(&mut gen))
-            }
-            7 => Value::Null,
-            _ => unreachable!(),
-        }
     }
 }
 

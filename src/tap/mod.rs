@@ -1,15 +1,14 @@
 mod cmd;
 
+pub use cmd::cmd;
 use structopt::StructOpt;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
 
-pub use cmd::cmd;
-
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Interval to sample metrics at, in milliseconds
+    /// Interval to sample logs at, in milliseconds
     #[structopt(default_value = "500", short = "i", long)]
     interval: u32,
 
@@ -17,12 +16,12 @@ pub struct Opts {
     #[structopt(short, long)]
     url: Option<Url>,
 
-    /// Sample log events to the provided limit
+    /// Maximum number of events to sample each interval
     #[structopt(default_value = "100", short = "l", long)]
     limit: u32,
 
-    /// Encoding format for logs printed to screen
-    #[structopt(default_value = "json", possible_values = &["json", "yaml"], short = "f", long)]
+    /// Encoding format for events printed to screen
+    #[structopt(default_value = "json", possible_values = &["json", "yaml", "logfmt"], short = "f", long)]
     format: TapEncodingFormat,
 
     /// Components IDs to observe (comma-separated; accepts glob patterns)

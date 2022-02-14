@@ -1,16 +1,22 @@
-use crate::{
-    codecs::{self, FramingConfig, ParserConfig},
-    event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
-    serde::default_decoding,
-    sources::util::{SocketListenAddr, TcpSource},
-    tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
-};
 use bytes::Bytes;
+use chrono::Utc;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+
+use crate::{
+    codecs::{
+        self,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::log_schema,
+    event::Event,
+    internal_events::{SocketEventsReceived, SocketMode},
+    serde::default_decoding,
+    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
+    tcp::TcpKeepaliveConfig,
+    tls::TlsConfig,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
@@ -30,10 +36,11 @@ pub struct TcpConfig {
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
     #[getset(get = "pub", set = "pub")]
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: DeserializerConfig,
+    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -41,7 +48,7 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: Option<usize>,
@@ -49,8 +56,9 @@ impl TcpConfig {
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Box<dyn ParserConfig>,
+        framing: Option<FramingConfig>,
+        decoding: DeserializerConfig,
+        connection_limit: Option<u32>,
     ) -> Self {
         Self {
             address,
@@ -62,6 +70,7 @@ impl TcpConfig {
             receive_buffer_bytes,
             framing,
             decoding,
+            connection_limit,
         }
     }
 
@@ -76,6 +85,7 @@ impl TcpConfig {
             receive_buffer_bytes: None,
             framing: None,
             decoding: default_decoding(),
+            connection_limit: None,
         }
     }
 }
@@ -93,9 +103,10 @@ impl RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()
@@ -108,18 +119,22 @@ impl TcpSource for RawTcpSource {
             count: events.len()
         });
 
+        let now = Utc::now();
+
         for event in events {
             if let Event::Log(ref mut log) = event {
-                log.insert(
-                    crate::config::log_schema().source_type_key(),
-                    Bytes::from("socket"),
-                );
+                log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                log.try_insert(log_schema().timestamp_key(), now);
 
                 let host_key = (self.config.host_key.clone())
-                    .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+                    .unwrap_or_else(|| log_schema().host_key().to_string());
 
-                log.insert(host_key, host.clone());
+                log.try_insert(host_key, host.clone());
             }
         }
+    }
+
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
+        TcpNullAcker
     }
 }

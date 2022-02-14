@@ -12,13 +12,35 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 
 ## Install Vector
 
-We can install Vector using this installation script:
+We can install Vector using an installation script or Docker:
+
+{{< tabs default="Script" >}}
+{{< tab title="Script" >}}
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
 
-Or you can [choose your preferred installation method][install].
+{{< /tab >}}
+{{< tab title="Docker" >}}
+
+```shell
+docker pull timberio/vector:{{< version >}}-distroless
+```
+
+In addition to `distroless`, `alpine` and `debian` distributions are also available.
+
+If you install Vector using Docker, we recommend using an alias to run the commands throughout this tutorial:
+
+```shell
+alias vector='docker run -it --rm timberio/vector:{{< version >}}'
+```
+
+And now something after.
+{{< /tab >}}
+{{< /tabs >}}
+
+Other [installation methods][install] are available.
 
 Once Vector is installed, let's check to make sure that it's working correctly:
 
@@ -79,7 +101,7 @@ Echoing events into the console isn't terribly exciting. Let's see what we can d
 
 ```toml filename="vector.toml"
 [sources.generate_syslog]
-type = "generator"
+type = "demo_logs"
 format = "syslog"
 count = 100
 
@@ -97,16 +119,16 @@ type = "console"
 encoding.codec = "json"
 ```
 
-The first component uses the [`generator` source][generator], which creates sample log data that enables you to simulate different types of events in various formats.
+The first component uses the [`demo_logs` source][demo_logs], which creates sample log data that enables you to simulate different types of events in various formats.
 
 {{< warning >}}
-Wait, I though you said "real" observability data? We choose generated data here because it's hard for us to know which platform you're trying Vector on. That means it's also hard to document a single way for everyone to get data into Vector.
+Wait, I thought you said "real" observability data? We choose generated data here because it's hard for us to know which platform you're trying Vector on. That means it's also hard to document a single way for everyone to get data into Vector.
 {{< /warning >}}
 
 The second component is a transform called [`remap`][remap]. The `remap` transform is at the heart of what makes Vector so powerful for processing observability data. The transform exposes a simple language called [Vector Remap Language][vrl] that allows you to parse, manipulate, and decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
 data that can help you ask and answer questions about your environment's state.
 
-You can see we've added the `sources.generated_syslog` component. The `format` option tells the generator which type of logs to emit, here `syslog`, and the `count` option tells the generator how many lines to emit, here 100.
+You can see we've added the `sources.generated_syslog` component. The `format` option tells the `demo_logs` source which type of logs to emit, here `syslog`, and the `count` option tells the `demo_logs` source how many lines to emit, here 100.
 
 In our second component, `transforms.remap_syslog`, we've specified an `inputs` option of `generate_syslog`, which means it will receive events from our `generate_syslog` source. We've also specified the type of transform: `remap`.
 
@@ -147,7 +169,7 @@ We're just scatching the surface in this post. To get your hands dirty with Vect
 [console]: /docs/reference/configuration/sinks/console
 [config]: /docs/reference/configuration
 [deployment]: /docs/setup/deployment
-[generator]: /docs/reference/configuration/sources/generator
+[demo_logs]: /docs/reference/configuration/sources/demo_logs
 [install]: /docs/setup/installation
 [parse_syslog]: /docs/reference/vrl/functions/#parse_syslog
 [remap]: /docs/reference/configuration/transforms/remap

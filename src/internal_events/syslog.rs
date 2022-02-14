@@ -23,7 +23,7 @@ impl InternalEvent for SyslogEventReceived {
 #[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: crate::codecs::Error,
+    pub error: crate::codecs::decoding::Error,
 }
 
 #[cfg(feature = "codecs")]

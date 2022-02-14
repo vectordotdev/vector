@@ -18,8 +18,13 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
+
+#[cfg(feature = "tikv-jemallocator")]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
@@ -36,9 +41,11 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-pub mod buffers;
+#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+pub mod aws;
 #[cfg(feature = "codecs")]
 pub mod codecs;
+pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod graph;
@@ -49,11 +56,8 @@ pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
@@ -61,8 +65,9 @@ pub mod shutdown;
 pub mod signal;
 pub mod sink;
 pub mod sinks;
+pub mod source_sender;
 pub mod sources;
-pub(crate) mod stats;
+pub mod stats;
 pub mod stream;
 #[cfg(feature = "api-client")]
 mod tap;
@@ -84,9 +89,8 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use pipeline::Pipeline;
-
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use source_sender::SourceSender;
+pub use vector_core::{event, mapping, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

@@ -1,6 +1,6 @@
+use std::{error::Error, fmt};
+
 use serde::Serialize;
-use std::error::Error;
-use std::fmt;
 
 #[derive(Serialize, Debug)]
 pub struct ErrorMessage {
@@ -11,7 +11,7 @@ pub struct ErrorMessage {
 #[cfg(any(
     feature = "sources-utils-http-prelude",
     feature = "sources-utils-http-encoding",
-    feature = "sources-datadog"
+    feature = "sources-datadog_agent"
 ))]
 impl ErrorMessage {
     pub fn new(code: http::StatusCode, message: String) -> Self {

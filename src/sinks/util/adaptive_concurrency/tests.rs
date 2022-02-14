@@ -1,24 +1,19 @@
-#![cfg(all(test, feature = "sources-generator"))]
+#![cfg(all(test, feature = "sources-demo_logs"))]
+#![allow(clippy::print_stderr)] //tests
 
-use super::controller::ControllerStatistics;
-use crate::{
-    config::{self, DataType, SinkConfig, SinkContext},
-    event::{metric::MetricValue, Event},
-    metrics::{self},
-    sinks::{
-        util::{
-            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
-            TowerRequestConfig, VecBuffer,
-        },
-        Healthcheck, VectorSink,
-    },
-    sources::generator::GeneratorConfig,
-    test_util::{
-        start_topology,
-        stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
-    },
-};
 use core::task::Context;
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt,
+    fs::{read_dir, File},
+    future::pending,
+    io::Read,
+    path::PathBuf,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
+
 use futures::{
     channel::oneshot,
     future::{self, BoxFuture},
@@ -28,19 +23,27 @@ use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::pin::Pin;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt,
-    fs::{read_dir, File},
-    future::pending,
-    io::Read,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    task::Poll,
-};
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
+
+use super::controller::ControllerStatistics;
+use crate::{
+    config::{self, Input, SinkConfig, SinkContext},
+    event::{metric::MetricValue, Event},
+    metrics::{self},
+    sinks::{
+        util::{
+            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            TowerRequestConfig, VecBuffer,
+        },
+        Healthcheck, VectorSink,
+    },
+    sources::demo_logs::DemoLogsConfig,
+    test_util::{
+        start_topology,
+        stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
+    },
+};
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -153,14 +156,18 @@ struct TestConfig {
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
-        let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 1;
+        batch_settings.timeout = Duration::from_secs(9999);
+
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
             .batch_sink(
                 TestRetryLogic,
                 TestSink::new(self),
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )
@@ -177,11 +184,11 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -407,9 +414,8 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let generator =
-        GeneratorConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
-    config.add_source("in", generator);
+    let demo_logs = DemoLogsConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+    config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -436,6 +442,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = controller
         .capture_metrics()
+        .into_iter()
         .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them

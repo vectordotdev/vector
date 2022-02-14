@@ -25,16 +25,6 @@ components: transforms: lua: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -52,7 +42,6 @@ components: transforms: lua: {
 		hooks: {
 			description: "Configures hooks handlers."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -60,7 +49,6 @@ components: transforms: lua: {
 						common:      false
 						description: "A function which is called when the first event comes, before calling `hooks.process`"
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: [
@@ -71,13 +59,11 @@ components: transforms: lua: {
 				                """,
 								"init",
 							]
-							syntax: "literal"
 						}
 					}
 					process: {
 						description: "A function which is called for each incoming event. It can produce new events using `emit` function."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [
 								"""
@@ -91,14 +77,12 @@ components: transforms: lua: {
 				                """,
 								"process",
 							]
-							syntax: "literal"
 						}
 					}
 					shutdown: {
 						common:      false
 						description: "A function which is called when Vector is stopped. It can produce new events using `emit` function."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: [
@@ -109,7 +93,6 @@ components: transforms: lua: {
 				                """,
 								"shutdown",
 							]
-							syntax: "literal"
 						}
 					}
 				}
@@ -119,20 +102,16 @@ components: transforms: lua: {
 			common:      false
 			description: "A list of directories to search when loading a Lua file via the `require` function. If not specified, the modules are looked up in the directories of Vector's configs."
 			required:    false
-			warnings: []
 			type: array: {
 				default: null
 				items: type: string: {
-					examples: ["/etc/vector/lua"]
-					syntax: "literal"
-				}
+					examples: ["/etc/vector/lua"]}
 			}
 		}
 		source: {
 			common:      false
 			description: "The source which is evaluated when the transform is created."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: [
@@ -161,7 +140,6 @@ components: transforms: lua: {
 								timestamp = os.date("!*t"),
 								counter = {
 									value = value
-									syntax: "literal"
 								}
 						 	}
 						end
@@ -171,35 +149,30 @@ components: transforms: lua: {
 						require('custom_module')
 						""",
 				]
-				syntax: "literal"
 			}
 		}
 		timers: {
 			common:      false
 			description: "Configures timers which are executed periodically at given interval."
 			required:    false
-			warnings: []
+
 			type: array: {
 				default: null
-				items: type: object: {
-					options: {
-						handler: {
-							description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
-							required:    true
-							warnings: []
-							type: string: {
-								examples: ["timer_handler"]
-								syntax: "literal"
-							}
+
+				items: type: object: options: {
+					handler: {
+						description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
+						required:    true
+						type: string: {
+							examples: ["timer_handler"]
 						}
-						interval_seconds: {
-							description: "Defines the interval at which the timer handler would be executed."
-							required:    true
-							warnings: []
-							type: uint: {
-								examples: [1, 10, 30]
-								unit: "seconds"
-							}
+					}
+					interval_seconds: {
+						description: "Defines the interval at which the timer handler would be executed."
+						required:    true
+						type: uint: {
+							examples: [1, 10, 30]
+							unit: "seconds"
 						}
 					}
 				}
@@ -208,13 +181,9 @@ components: transforms: lua: {
 		version: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
 			required:    true
-			warnings: []
-			type: string: {
-				enum: {
-					"1": "Lua transform API version 1"
-					"2": "Lua transform API version 2"
-				}
-				syntax: "literal"
+			type: string: enum: {
+				"1": "Lua transform API version 1"
+				"2": "Lua transform API version 2"
 			}
 		}
 	}

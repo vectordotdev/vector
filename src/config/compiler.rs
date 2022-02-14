@@ -1,8 +1,8 @@
-use super::{
-    builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, ExpandType, OutputId,
-    TransformOuter,
-};
+use std::collections::HashSet;
+
 use indexmap::{IndexMap, IndexSet};
+
+use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -32,6 +32,16 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(output_errors) = validation::check_outputs(&builder) {
+        errors.extend(output_errors);
+    }
+
+    #[cfg(feature = "datadog-pipelines")]
+    let version = Some(builder.sha256_hash());
+
+    #[cfg(not(feature = "datadog-pipelines"))]
+    let version = None;
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
@@ -59,6 +69,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(e) = graph.check_for_cycles() {
+        errors.push(e);
+    }
+
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
     let sinks = sinks
@@ -75,6 +89,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, transform.with_inputs(inputs))
         })
         .collect();
+    let tests = tests
+        .into_iter()
+        .map(|test| test.resolve_outputs(&graph))
+        .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
         let config = Config {
@@ -83,6 +101,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             api,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
+            version,
             healthchecks,
             enrichment_tables,
             sources,
@@ -108,37 +127,16 @@ pub(super) fn expand_macros(
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
+    let parent_types = HashSet::new();
 
-    while let Some((k, mut t)) = config.transforms.pop() {
-        if let Some((expanded, expand_type)) = match t.inner.expand() {
-            Ok(e) => e,
-            Err(err) => {
-                errors.push(format!("failed to expand transform '{}': {}", k, err));
-                continue;
-            }
-        } {
-            let mut children = Vec::new();
-            let mut inputs = t.inputs.clone();
-
-            for (name, child) in expanded {
-                let full_name = ComponentKey::global(format!("{}.{}", k, name));
-
-                expanded_transforms.insert(
-                    full_name.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: child,
-                    },
-                );
-                children.push(full_name.clone());
-                inputs = match expand_type {
-                    ExpandType::Parallel => t.inputs.clone(),
-                    ExpandType::Serial => vec![full_name.to_string()],
-                }
-            }
-            expansions.insert(k.clone(), children);
-        } else {
-            expanded_transforms.insert(k, t);
+    while let Some((key, transform)) = config.transforms.pop() {
+        if let Err(error) = transform.expand(
+            key,
+            &parent_types,
+            &mut expanded_transforms,
+            &mut expansions,
+        ) {
+            errors.push(error);
         }
     }
     config.transforms = expanded_transforms;
@@ -151,21 +149,23 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-fn expand_globs(config: &mut ConfigBuilder) {
+pub fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
-        .keys()
-        .chain(config.transforms.keys())
-        .map(ToString::to_string)
+        .iter()
+        .flat_map(|(key, s)| {
+            s.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
+            })
+        })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.named_outputs().into_iter().map(move |port| {
-                OutputId {
-                    component: key.clone(),
-                    port: Some(port),
-                }
-                .to_string()
+            t.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
             })
         }))
+        .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
 
     for (id, transform) in config.transforms.iter_mut() {
@@ -219,18 +219,19 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 
 #[cfg(test)]
 mod test {
+    use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
+
     use super::*;
     use crate::{
         config::{
-            DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-            TransformContext,
+            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
         transforms::Transform,
     };
-    use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MockSourceConfig;
@@ -252,8 +253,8 @@ mod test {
             "mock"
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 
@@ -268,12 +269,12 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::any()
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::Any)]
         }
     }
 
@@ -288,8 +289,8 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::any()
         }
     }
 
