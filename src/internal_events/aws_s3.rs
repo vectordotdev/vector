@@ -44,8 +44,8 @@ pub mod source {
     impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = "Failed to fetch SQS events.",
-                error = %self.error,
+                message = %format!("Failed to fetch SQS events: {:?}", self.error),
+                error = "failed_fetching_sqs_events",
                 error_type = error_type::REQUEST_FAILED,
                 stage = error_stage::RECEIVING,
             );
@@ -54,7 +54,7 @@ pub mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error" => self.error.to_string(),
+                "error" => "failed_fetching_sqs_events",
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
@@ -103,9 +103,9 @@ pub mod source {
     impl<'a> InternalEvent for SqsMessageProcessingError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = "Failed to process SQS message.",
+                message = %format!("Failed to process SQS message: {:?}", self.error),
                 message_id = %self.message_id,
-                error = %self.error,
+                error = "failed_processing_sqs_message",
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
             );
@@ -114,7 +114,7 @@ pub mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error" => self.error.to_string(),
+                "error" => "failed_processing_sqs_message",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
@@ -158,7 +158,7 @@ pub mod source {
                     .map(|x| format!("{}/{}", x.id, x.code))
                     .collect::<Vec<_>>()
                     .join(", "),
-                error = "Unable to delete some of the messages.",
+                error = "failed_deleting_some_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
             );
@@ -167,7 +167,7 @@ pub mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error" => "Unable to delete SQS message.",
+                "error" => "failed_deleting_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
@@ -175,8 +175,6 @@ pub mod source {
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
         }
     }
-
-    const DELETION_FAILED: &str = "deletion_failed";
 
     #[derive(Debug)]
     pub struct SqsMessageDeleteBatchError {
@@ -187,13 +185,13 @@ pub mod source {
     impl InternalEvent for SqsMessageDeleteBatchError {
         fn emit_logs(&self) {
             error!(
-                message = "Deletion of SQS message(s) failed.",
+                message = %format!("Deletion of SQS message(s) failed: {:?}", self.error),
                 message_ids = %self.entries.iter()
                     .map(|x| x.id.to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                error = %self.error,
-                error_type = DELETION_FAILED,
+                error = "failed_deleting_all_sqs_messages",
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
             );
         }
@@ -201,8 +199,8 @@ pub mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error" => self.error.to_string(),
-                "error_type" => DELETION_FAILED,
+                "error" => "failed_deleting_all_sqs_messages",
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated
