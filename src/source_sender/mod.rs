@@ -143,21 +143,22 @@ impl SourceSender {
             .await
     }
 
-    pub async fn send_all(
-        &mut self,
-        events: impl Stream<Item = Event> + Unpin,
-    ) -> Result<(), ClosedError> {
+    pub async fn send_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    where
+        S: Stream<Item = E> + Unpin,
+        E: Into<Event> + ByteSizeOf,
+    {
         self.inner
             .as_mut()
             .expect("no default output")
-            .send_all(events)
+            .send_stream(events)
             .await
     }
 
-    pub async fn send_batch<T, I>(&mut self, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
     where
-        T: Into<Event> + ByteSizeOf,
-        I: IntoIterator<Item = T>,
+        E: Into<Event> + ByteSizeOf,
+        I: IntoIterator<Item = E>,
     {
         self.inner
             .as_mut()
@@ -166,10 +167,10 @@ impl SourceSender {
             .await
     }
 
-    pub async fn send_batch_named<T, I>(&mut self, name: &str, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), ClosedError>
     where
-        T: Into<Event> + ByteSizeOf,
-        I: IntoIterator<Item = T>,
+        E: Into<Event> + ByteSizeOf,
+        I: IntoIterator<Item = E>,
     {
         self.named_inners
             .get_mut(name)
@@ -203,10 +204,11 @@ impl Inner {
         Ok(())
     }
 
-    async fn send_all(
-        &mut self,
-        events: impl Stream<Item = Event> + Unpin,
-    ) -> Result<(), ClosedError> {
+    async fn send_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    where
+        S: Stream<Item = E> + Unpin,
+        E: Into<Event> + ByteSizeOf,
+    {
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(events) = stream.next().await {
             self.send_batch(events.into_iter()).await?;
@@ -214,10 +216,10 @@ impl Inner {
         Ok(())
     }
 
-    async fn send_batch<T, I>(&mut self, events: I) -> Result<(), ClosedError>
+    async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
     where
-        T: Into<Event> + ByteSizeOf,
-        I: IntoIterator<Item = T>,
+        E: Into<Event> + ByteSizeOf,
+        I: IntoIterator<Item = E>,
     {
         let mut count = 0;
         let mut byte_size = 0;

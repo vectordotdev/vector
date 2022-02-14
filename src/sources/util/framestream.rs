@@ -503,7 +503,7 @@ pub fn build_framestream_unix_source(
                 });
 
                 let handler = async move {
-                    if let Err(e) = event_sink.send_all(&mut events).await {
+                    if let Err(e) = event_sink.send_stream(&mut events).await {
                         error!("Error sending event: {:?}.", e);
                     }
 
