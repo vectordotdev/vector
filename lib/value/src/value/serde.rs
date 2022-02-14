@@ -9,7 +9,7 @@ use std::fmt;
 
 impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
-    pub fn as_bytes(&self) -> Bytes {
+    pub fn coerce_to_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
             Value::Regex(regex) => regex.as_bytes(),
@@ -17,7 +17,9 @@ impl Value {
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
             Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
+            Value::Object(map) => {
+                Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map"))
+            }
             Value::Array(arr) => {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
@@ -35,7 +37,7 @@ impl Value {
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
             Value::Boolean(b) => format!("{}", b),
-            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
+            Value::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
             Value::Null => "<null>".to_string(),
         }
@@ -55,7 +57,7 @@ impl Serialize for Value {
                 serializer.serialize_str(&self.to_string_lossy())
             }
             Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
-            Value::Map(m) => serializer.collect_map(m),
+            Value::Object(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
         }
@@ -156,7 +158,7 @@ impl<'de> Deserialize<'de> for Value {
                     map.insert(key, value);
                 }
 
-                Ok(Value::Map(map))
+                Ok(Value::Object(map))
             }
         }
 
@@ -181,7 +183,7 @@ impl From<serde_json::Value> for Value {
                 n.as_i64().map_or_else(float_or_byte, Self::Integer)
             }
             serde_json::Value::String(s) => Self::Bytes(Bytes::from(s)),
-            serde_json::Value::Object(obj) => Self::Map(
+            serde_json::Value::Object(obj) => Self::Object(
                 obj.into_iter()
                     .map(|(key, value)| (key, Self::from(value)))
                     .collect(),
@@ -202,7 +204,7 @@ impl TryInto<serde_json::Value> for Value {
             Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
             Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
             Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
-            Value::Map(v) => Ok(serde_json::to_value(v)?),
+            Value::Object(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
             Value::Null => Ok(serde_json::Value::Null),
             Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
@@ -266,7 +268,7 @@ mod test {
                                     Value::Integer(_) => expected_type.eq("integer"),
                                     Value::Bytes(_) => expected_type.eq("bytes"),
                                     Value::Array { .. } => expected_type.eq("array"),
-                                    Value::Map(_) => expected_type.eq("map"),
+                                    Value::Object(_) => expected_type.eq("map"),
                                     Value::Null => expected_type.eq("null"),
                                     _ => unreachable!("You need to add a new type handler here."),
                                 };

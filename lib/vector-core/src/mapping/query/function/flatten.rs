@@ -49,7 +49,7 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
 
         let next = self.values.next();
         match next {
-            Some((key, Value::Map(value))) => {
+            Some((key, Value::Object(value))) => {
                 self.inner = Some(Box::new(MapFlatten::new_from_parent(
                     self.new_key(key),
                     value.iter(),
@@ -125,7 +125,7 @@ impl Function for FlattenFn {
         Value::Array(arr) => Value::Array(
             ArrayFlatten::new(arr.iter()).cloned().collect()
         ),
-        Value::Map(map) => Value::Map(
+        Value::Object(map) => Value::Object(
             MapFlatten::new(map.iter()).map(|(k, v)| (k, v.clone())).collect()
         ));
 
@@ -138,7 +138,7 @@ impl Function for FlattenFn {
             accepts: |v| {
                 matches!(
                     v,
-                    QueryValue::Value(Value::Array(_)) | QueryValue::Value(Value::Map(_))
+                    QueryValue::Value(Value::Array(_)) | QueryValue::Value(Value::Object(_))
                 )
             },
             required: true,

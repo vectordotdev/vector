@@ -29,5 +29,8 @@ lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
+[dev-dependencies]
+vrl-compiler = { path = "../../vrl/compiler", features = ["test"] }
+
 [build-dependencies]
 lalrpop = { version = "0.19.7", default-features = false }

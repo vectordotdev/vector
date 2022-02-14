@@ -2,6 +2,7 @@ use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 
+use crate::value::VrlValueArithmetic;
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
