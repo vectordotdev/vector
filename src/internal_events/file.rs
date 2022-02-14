@@ -173,10 +173,11 @@ mod source {
     impl<'a> InternalEvent for FileDeleteError<'a> {
         fn emit_logs(&self) {
             warn!(
-                message = "Failed in deleting file.",
+                message = %format!("Failed in deleting file: {:?}", self.error),
                 file = %self.file.display(),
-                error = %self.error,
-                error_type = DELETION_FAILED,
+                error = DELETION_FAILED,
+                error_type = error_type::COMMAND_FAILED,
+                stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 1
             );
         }
@@ -188,9 +189,10 @@ mod source {
             );
             counter!(
                 "component_errors_total", 1,
-                "error_type" => DELETION_FAILED,
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING
+                "error" => DELETION_FAILED,
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
             );
         }
     }
@@ -248,10 +250,10 @@ mod source {
     impl<'a> InternalEvent for FileWatchError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = "Failed to watch file.",
+                message = %format!("Failed to watch file: {:?}", self.error),
                 file = %self.file.display(),
-                error_type = WATCH_FAILED,
-                error = %self.error,
+                error = WATCH_FAILED,
+                error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
             );
         }
@@ -263,8 +265,9 @@ mod source {
             );
             counter!(
                 "component_errors_total", 1,
-                "error_type" => WATCH_FAILED,
                 "file" => self.file.to_string_lossy().into_owned(),
+                "error" => WATCH_FAILED,
+                "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING
             );
         }
@@ -334,8 +337,6 @@ mod source {
         }
     }
 
-    const WRITER_FAILED: &str = "writer_failed";
-
     #[derive(Debug)]
     pub struct FileCheckpointWriteError {
         pub error: Error,
@@ -344,9 +345,9 @@ mod source {
     impl InternalEvent for FileCheckpointWriteError {
         fn emit_logs(&self) {
             error!(
-                message = "Failed writing checkpoints.",
-                error_type = WRITER_FAILED,
-                error = %self.error,
+                message = %format!("Failed writing checkpoints: {:?}", self.error),
+                error = "failed_writing_checkpoints",
+                error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING
             );
         }
@@ -355,13 +356,12 @@ mod source {
             counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
-                "error_type" => WRITER_FAILED,
+                "error" => "failed_writing_checkpoints",
+                "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING
             );
         }
     }
-
-    const GLOB_FAILED: &str = "glob_failed";
 
     #[derive(Debug)]
     pub struct PathGlobbingError<'a> {
@@ -372,10 +372,10 @@ mod source {
     impl<'a> InternalEvent for PathGlobbingError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = "Failed to glob path.",
+                message = %format!("Failed to glob path: {:?}", self.error),
                 path = %self.path.display(),
-                error_type = GLOB_FAILED,
-                error = %self.error,
+                error = "failed_globbing",
+                error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING
             );
         }
@@ -387,8 +387,9 @@ mod source {
             );
             counter!(
                 "component_errors_total", 1,
-                "error_type" => GLOB_FAILED,
                 "path" => self.path.to_string_lossy().into_owned(),
+                "error" => "failed_globbing",
+                "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING
             );
         }

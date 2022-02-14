@@ -18,4 +18,5 @@ pub mod error_type {
     pub const REQUEST_FAILED: &str = "request_failed";
     pub const TEMPLATE_FAILED: &str = "template_failed";
     pub const TIMED_OUT: &str = "timed_out";
+    pub const WRITER_FAILED: &str = "writer_failed";
 }
