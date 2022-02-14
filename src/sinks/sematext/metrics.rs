@@ -52,7 +52,7 @@ struct SematextMetricsConfig {
     pub endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
-    pub batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
+    pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

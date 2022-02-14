@@ -25,7 +25,7 @@ pub struct DnstapConfig {
     pub max_frame_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
-    pub raw_data_only: Option<bool>,
+    raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<u32>,
     pub socket_file_mode: Option<u32>,
