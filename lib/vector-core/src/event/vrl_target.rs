@@ -128,11 +128,12 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
+    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
         match self {
             VrlTarget::LogEvent(log, _) => log
                 .get(path)
-                .map(|val| val.map(|val| val.clone().into()))
+                .map(|val| val.cloned())
                 .map_err(|err| err.to_string()),
             VrlTarget::Metric(metric) => {
                 if path.is_root() {
@@ -210,7 +211,7 @@ impl vrl_core::Target for VrlTarget {
                     Ok(Some({
                         let mut map = Value::Object(BTreeMap::new());
                         std::mem::swap(log, &mut map);
-                        map.into()
+                        map
                     }))
                 } else {
                     log.remove(path, compact)
