@@ -622,7 +622,7 @@ mod tests {
         )
     }
 
-    pub fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+    pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
             .with_tags(Some(
