@@ -19,7 +19,7 @@ use async_graphql::{Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::EventsInTotal;
-pub use events_out::{ComponentEventsOutTotal, EventsOutTotal};
+pub use events_out::EventsOutTotal;
 pub use filter::*;
 pub use output::*;
 pub use processed_bytes::{
@@ -223,16 +223,6 @@ impl MetricsSubscription {
                 })
                 .collect()
         })
-    }
-
-    /// Total outgoing component event metrics over `interval`
-    #[graphql(deprecation = "Use component_sent_events_totals instead")]
-    async fn component_events_out_totals(
-        &self,
-        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
-    ) -> impl Stream<Item = Vec<ComponentEventsOutTotal>> {
-        component_counter_metrics(interval, &|m| m.name() == "events_out_total")
-            .map(|m| m.into_iter().map(ComponentEventsOutTotal::new).collect())
     }
 
     /// Total outgoing component event metrics over `interval`
