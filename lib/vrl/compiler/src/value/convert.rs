@@ -51,7 +51,6 @@ impl VrlValueConvert for Value {
             _ => Err(VrlValueError::Coerce(self.kind(), Kind::integer())),
         }
     }
-}
 
     fn try_float(self) -> Result<f64, VrlValueError> {
         match self {
@@ -189,4 +188,3 @@ impl VrlValueConvert for Value {
 //         }
 //     }
 // }
-
