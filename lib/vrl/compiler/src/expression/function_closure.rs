@@ -3,8 +3,7 @@ use std::collections::btree_map::BTreeMap;
 
 use crate::expression::Block;
 use crate::parser::{Ident, Node};
-use crate::Value;
-use crate::{value, Context, Expression, ExpressionError};
+use crate::{Context, Expression, ExpressionError, Value};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,7 +65,7 @@ impl FunctionClosure {
 
                             Ok(Output::Object { key, value })
                         }
-                        _ => Err(Error::ObjectArrayRequired.to_string()),
+                        _ => Err(Error::ObjectNonArray.to_string()),
                     }?;
 
                     func(ctx, output, &mut result)?;
@@ -78,7 +77,7 @@ impl FunctionClosure {
                 Ok(result)
             }
             Value::Array(array) => {
-                let mut result = Value::Array(Vec::default());
+                let mut result = Value::Array(Vec::with_capacity(array.len()));
 
                 let index_ident = self
                     .variables
@@ -118,7 +117,21 @@ impl FunctionClosure {
 impl fmt::Display for FunctionClosure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO
-        self.block.fmt(f)
+        f.write_str("{ |")?;
+
+        let mut iter = self.variables.iter().peekable();
+        while let Some(var) = iter.next() {
+            var.fmt(f)?;
+
+            if iter.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("|\n")?;
+        self.block.fmt(f)?;
+
+        f.write_str("\n}")
     }
 }
 
