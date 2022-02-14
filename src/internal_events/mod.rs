@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 pub mod prelude;
 
 mod adaptive_concurrency;
@@ -182,6 +180,8 @@ pub(crate) use self::aws_kinesis_firehose::*;
 pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub(crate) use self::aws_sqs::*;
+#[cfg(feature = "sinks-blackhole")]
+pub(crate) use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
@@ -243,6 +243,8 @@ pub(crate) use self::key_value_parser::*;
 pub(crate) use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
+#[cfg(feature = "sources-heroku_logs")]
+pub(crate) use self::logplex::*;
 #[cfg(feature = "sinks-loki")]
 pub(crate) use self::loki::*;
 #[cfg(feature = "transforms-lua")]
@@ -293,18 +295,30 @@ pub(crate) use self::splunk_hec::*;
 pub(crate) use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub(crate) use self::statsd_source::*;
+#[cfg(feature = "sources-stdin")]
+pub(crate) use self::stdin::*;
 #[cfg(feature = "sources-syslog")]
 pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub(crate) use self::throttle::*;
+#[cfg(all(
+    any(
+        feature = "sinks-socket",
+        feature = "sinks-statsd",
+        feature = "sources-dnstap"
+    ),
+    unix
+))]
+pub(crate) use self::unix::*;
+#[cfg(feature = "sources-vector")]
+pub(crate) use self::vector::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{
-    adaptive_concurrency::*, batch::*, blackhole::*, common::*, conditions::*,
-    encoding_transcode::*, heartbeat::*, logplex::*, open::*, process::*, socket::*, stdin::*,
-    tcp::*, template::*, udp::*, unix::*, vector::*,
+    adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
+    heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
@@ -325,27 +339,4 @@ macro_rules! emit {
     ($event:expr) => {
         vector_core::internal_event::emit($event)
     };
-}
-
-const ELLIPSIS: &str = "[...]";
-
-pub(super) fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
-    if s.len() >= maxlen {
-        let mut len = maxlen - ELLIPSIS.len();
-        while !s.is_char_boundary(len) {
-            len -= 1;
-        }
-        format!("{}{}", &s[..len], ELLIPSIS).into()
-    } else {
-        s.into()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn truncate_utf8() {
-        let message = "Hello 😁 this is test.";
-        assert_eq!("Hello [...]", super::truncate_string_at(message, 13));
-    }
 }
