@@ -2,7 +2,9 @@
 
 mod convert;
 mod error;
+mod path;
 mod regex;
+mod target;
 
 #[cfg(feature = "api")]
 mod api;
@@ -26,10 +28,11 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use error::ValueError;
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
+use std::fmt;
 use std::result::Result as StdResult;
 use tracing::{instrument, trace, trace_span};
 
-use crate::value::regex::ValueRegex;
+pub use crate::value::regex::ValueRegex;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -97,6 +100,45 @@ impl PartialEq<Self> for Value {
             (Value::Null, Value::Null) => true,
             (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
             _ => false,
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Bytes(val) => write!(
+                f,
+                r#""{}""#,
+                String::from_utf8_lossy(val)
+                    .replace(r#"\"#, r#"\\"#)
+                    .replace(r#"""#, r#"\""#)
+                    .replace("\n", r#"\n"#)
+            ),
+            Value::Integer(val) => write!(f, "{}", val),
+            Value::Float(val) => write!(f, "{}", val),
+            Value::Boolean(val) => write!(f, "{}", val),
+            Value::Object(map) => {
+                let joined = map
+                    .iter()
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{{ {} }}", joined)
+            }
+            Value::Array(array) => {
+                let joined = array
+                    .iter()
+                    .map(|val| format!("{}", val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", joined)
+            }
+            Value::Timestamp(val) => {
+                write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            }
+            Value::Regex(regex) => write!(f, "r'{}'", **regex),
+            Value::Null => write!(f, "null"),
         }
     }
 }

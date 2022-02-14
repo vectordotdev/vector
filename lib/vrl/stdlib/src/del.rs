@@ -1,4 +1,4 @@
-use value::kind::remove;
+use vrl::prelude::value::kind::remove;
 use vrl::prelude::*;
 
 fn del(

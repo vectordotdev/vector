@@ -26,6 +26,7 @@ pub use ::value::{
     Kind,
 };
 
+// TODO: remove this trait
 pub trait VrlValueKind {
     fn kind(&self) -> Kind;
 }
@@ -85,41 +86,6 @@ impl DefaultValue for Kind {
         }
 
         Value::Null
-    }
-}
-
-impl From<&Value> for Kind {
-    fn from(value: &Value) -> Self {
-        match value {
-            Value::Bytes(_) => Kind::bytes(),
-            Value::Integer(_) => Kind::integer(),
-            Value::Float(_) => Kind::float(),
-            Value::Boolean(_) => Kind::boolean(),
-            Value::Timestamp(_) => Kind::timestamp(),
-            Value::Regex(_) => Kind::regex(),
-            Value::Null => Kind::null(),
-
-            Value::Object(object) => Kind::object(
-                object
-                    .iter()
-                    .map(|(k, v)| (k.clone().into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-
-            Value::Array(array) => Kind::array(
-                array
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (i.into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-        }
-    }
-}
-
-impl From<Value> for Kind {
-    fn from(value: Value) -> Self {
-        (&value).into()
     }
 }
 

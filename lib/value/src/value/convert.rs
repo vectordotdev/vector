@@ -1,7 +1,10 @@
+use crate::value::regex::ValueRegex;
 use crate::Value;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
+use regex::Regex;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 impl Value {
@@ -72,6 +75,134 @@ impl Value {
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
         }
     }
+
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Value::Integer(_))
+    }
+
+    pub fn as_integer(&self) -> Option<i64> {
+        match self {
+            Value::Integer(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        matches!(self, Value::Float(_))
+    }
+
+    // This replaces the more implicit "From<f64>", but keeps the same behavior.
+    // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
+    pub fn from_f64_or_zero(value: f64) -> Value {
+        NotNan::new(value)
+            .map(Value::Float)
+            .unwrap_or_else(|_| Value::Float(NotNan::new(0.0).unwrap()))
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        matches!(self, Value::Bytes(_))
+    }
+
+    pub fn as_bytes(&self) -> Option<&Bytes> {
+        match self {
+            Value::Bytes(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Converts the Value into a byte representation regardless of its original type.
+    /// Object and Array are currently not supported, although technically there's no reason why it
+    /// couldn't in future should the need arise.
+    pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
+        match self {
+            Value::Bytes(bytes) => Ok(bytes.clone()),
+            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
+            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
+            Value::Boolean(b) => Ok(if *b {
+                Bytes::copy_from_slice(&[1_u8])
+            } else {
+                Bytes::copy_from_slice(&[0_u8])
+            }),
+            Value::Object(_o) => Err("cannot convert object to bytes.".to_string()),
+            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
+            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
+            Value::Regex(r) => Ok(r.to_string().into()),
+            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, Value::Boolean(_))
+    }
+
+    pub fn as_boolean(&self) -> Option<bool> {
+        match self {
+            Value::Boolean(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub fn is_regex(&self) -> bool {
+        matches!(self, Value::Regex(_))
+    }
+
+    pub fn as_regex(&self) -> Option<&Regex> {
+        match self {
+            Value::Regex(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Value::Null)
+    }
+
+    pub fn as_null(&self) -> Option<()> {
+        match self {
+            Value::Null => Some(()),
+            _ => None,
+        }
+    }
+
+    pub fn is_array(&self) -> bool {
+        matches!(self, Value::Array(_))
+    }
+
+    pub fn as_array(&self) -> Option<&[Value]> {
+        match self {
+            Value::Array(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+        match self {
+            Value::Array(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn is_object(&self) -> bool {
+        matches!(self, Value::Object(_))
+    }
+
+    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+        match self {
+            Value::Object(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+        match self {
+            Value::Object(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn is_timestamp(&self) -> bool {
+        matches!(self, Value::Timestamp(_))
+    }
 }
 
 impl From<Bytes> for Value {
@@ -95,14 +226,26 @@ impl From<String> for Value {
 }
 
 impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Self::Bytes(Vec::from(s.as_bytes()).into())
+    fn from(v: &str) -> Self {
+        Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))
     }
 }
 
 impl From<DateTime<Utc>> for Value {
     fn from(timestamp: DateTime<Utc>) -> Self {
         Self::Timestamp(timestamp)
+    }
+}
+
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Self::Null
+    }
+}
+
+impl From<Cow<'_, str>> for Value {
+    fn from(v: Cow<'_, str>) -> Self {
+        v.as_ref().into()
     }
 }
 
@@ -153,6 +296,18 @@ impl FromIterator<(String, Self)> for Value {
     }
 }
 
+impl From<Regex> for Value {
+    fn from(r: Regex) -> Self {
+        Value::Regex(ValueRegex::new(r))
+    }
+}
+
+impl From<ValueRegex> for Value {
+    fn from(r: ValueRegex) -> Self {
+        Value::Regex(r)
+    }
+}
+
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
         impl From<$t> for Value {
@@ -171,6 +326,8 @@ impl_valuekind_from_integer!(u32);
 impl_valuekind_from_integer!(u16);
 impl_valuekind_from_integer!(u8);
 impl_valuekind_from_integer!(isize);
+impl_valuekind_from_integer!(usize);
+impl_valuekind_from_integer!(u64);
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {

@@ -8647,6 +8647,7 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "value",
  "vector_common",
  "vrl",
  "woothee",
