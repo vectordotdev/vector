@@ -68,6 +68,10 @@ impl SourceConfig for AwsSqsConfig {
     fn source_type(&self) -> &'static str {
         "aws_sqs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl AwsSqsConfig {

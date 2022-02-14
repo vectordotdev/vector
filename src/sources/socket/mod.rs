@@ -201,6 +201,10 @@ impl SourceConfig for SocketConfig {
             Mode::UnixStream(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

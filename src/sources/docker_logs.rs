@@ -168,6 +168,10 @@ impl SourceConfig for DockerLogsConfig {
     fn source_type(&self) -> &'static str {
         "docker_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -191,6 +195,10 @@ impl SourceConfig for DockerCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "docker"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

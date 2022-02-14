@@ -258,6 +258,10 @@ mod test {
         fn outputs(&self) -> Vec<Output> {
             vec![Output::default(DataType::Any)]
         }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
     }
 
     #[async_trait]

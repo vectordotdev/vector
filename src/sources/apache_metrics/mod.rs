@@ -96,6 +96,10 @@ impl SourceConfig for ApacheMetricsConfig {
     fn source_type(&self) -> &'static str {
         "apache_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 trait UriExt {

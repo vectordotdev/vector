@@ -63,6 +63,10 @@ impl SourceConfig for EventStoreDbConfig {
     fn source_type(&self) -> &'static str {
         "eventstoredb_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn eventstoredb(

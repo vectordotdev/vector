@@ -113,6 +113,10 @@ impl SourceConfig for PrometheusScrapeConfig {
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -157,6 +161,10 @@ impl SourceConfig for PrometheusCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

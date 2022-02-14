@@ -251,9 +251,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
         Vec::new()
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
+    fn can_acknowledge(&self) -> bool;
 }
 
 pub struct SourceContext {

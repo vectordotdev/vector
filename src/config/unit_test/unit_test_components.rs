@@ -51,6 +51,10 @@ impl SourceConfig for UnitTestSourceConfig {
     fn source_type(&self) -> &'static str {
         "unit_test"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]

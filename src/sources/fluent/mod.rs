@@ -82,6 +82,10 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]

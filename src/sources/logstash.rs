@@ -85,6 +85,10 @@ impl SourceConfig for LogstashConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]

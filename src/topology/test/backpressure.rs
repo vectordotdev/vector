@@ -289,5 +289,9 @@ mod test_source {
         fn source_type(&self) -> &'static str {
             "test-backpressure-source"
         }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
     }
 }

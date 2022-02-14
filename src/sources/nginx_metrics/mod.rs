@@ -135,6 +135,10 @@ impl SourceConfig for NginxMetricsConfig {
     fn source_type(&self) -> &'static str {
         "nginx_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]

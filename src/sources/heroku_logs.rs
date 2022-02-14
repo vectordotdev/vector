@@ -147,6 +147,10 @@ impl SourceConfig for LogplexCompatConfig {
     fn resources(&self) -> Vec<Resource> {
         self.0.resources()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn decode_message(

@@ -191,6 +191,10 @@ impl SourceConfig for Config {
     fn source_type(&self) -> &'static str {
         COMPONENT_ID
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]

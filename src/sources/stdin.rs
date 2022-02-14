@@ -72,6 +72,10 @@ impl SourceConfig for StdinConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::Stdin]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 pub fn stdin_source<R>(
