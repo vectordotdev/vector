@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::{Event, Value},
 };
 
@@ -525,13 +525,10 @@ impl CheckFieldsConfig {
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
-            .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
+            .map(|preds| -> Condition { Condition::CheckFields(CheckFields { predicates: preds }) })
             .map_err(|errs| {
                 if errs.len() > 1 {
                     let mut err_fmt = errs.join("\n");
@@ -547,12 +544,12 @@ impl ConditionConfig for CheckFieldsConfig {
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
-impl Condition for CheckFields {
+impl Conditional for CheckFields {
     fn check(&self, e: &Event) -> bool {
         self.predicates.iter().all(|(_, p)| p.check(e))
     }

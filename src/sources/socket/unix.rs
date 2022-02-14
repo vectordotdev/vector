@@ -11,7 +11,6 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
@@ -47,18 +46,7 @@ impl UnixConfig {
 
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
 /// Takes a single line of a received message and handles an `Event` object.
-fn handle_events(
-    events: &mut [Event],
-    host_key: &str,
-    received_from: Option<Bytes>,
-    byte_size: usize,
-) {
-    emit!(&SocketEventsReceived {
-        mode: SocketMode::Unix,
-        byte_size,
-        count: events.len()
-    });
-
+fn handle_events(events: &mut [Event], host_key: &str, received_from: Option<Bytes>) {
     let now = Utc::now();
 
     for event in events {
@@ -85,9 +73,7 @@ pub(super) fn unix_datagram(
         path,
         max_length,
         decoder,
-        move |events, received_from, byte_size| {
-            handle_events(events, &host_key, received_from, byte_size)
-        },
+        move |events, received_from| handle_events(events, &host_key, received_from),
         shutdown,
         out,
     )
@@ -103,9 +89,7 @@ pub(super) fn unix_stream(
     build_unix_stream_source(
         path,
         decoder,
-        move |events, received_from, byte_size| {
-            handle_events(events, &host_key, received_from, byte_size)
-        },
+        move |events, received_from| handle_events(events, &host_key, received_from),
         shutdown,
         out,
     )

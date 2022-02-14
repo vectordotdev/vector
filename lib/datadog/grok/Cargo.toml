@@ -19,7 +19,7 @@ ordered-float = { version = "2", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
 regex = { version = "1.5", default-features = false, features = ["perf"] }
 serde = { version = "1.0.136", default-features = false  }
-serde_json = { version = "1.0.78", default-features = false }
+serde_json = { version = "1.0.79", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1.30", default-features = false }
