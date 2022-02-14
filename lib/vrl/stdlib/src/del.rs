@@ -9,7 +9,7 @@ fn del(
     if query.is_external() {
         return Ok(ctx
             .target_mut()
-            .remove(path, false)
+            .target_remove(path, false)
             .ok()
             .flatten()
             .unwrap_or(Value::Null));

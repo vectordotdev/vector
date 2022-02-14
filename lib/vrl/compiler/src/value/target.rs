@@ -5,17 +5,17 @@ use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use crate::{Target, Value};
 
 impl Target for Value {
-    fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         self.insert_by_path(path, value);
         Ok(())
     }
 
-    fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.get_by_path(path).cloned())
     }
 
-    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        let value = self.get(path)?;
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        let value = self.target_get(path)?;
         self.remove_by_path(path, compact);
 
         Ok(value)
@@ -484,7 +484,7 @@ mod tests {
             let value: Value = value;
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.get(&path), expect);
+            assert_eq!(value.target_get(&path), expect);
         }
     }
 
@@ -593,9 +593,12 @@ mod tests {
             println!("Inserting at {:?}", segments);
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(Target::insert(&mut target, &path, value.clone()), result);
+            assert_eq!(
+                Target::target_insert(&mut target, &path, value.clone()),
+                result
+            );
             assert_eq!(target, expect);
-            assert_eq!(Target::get(&target, &path), Ok(Some(value)));
+            assert_eq!(Target::target_get(&target, &path), Ok(Some(value)));
         }
     }
 
@@ -681,8 +684,11 @@ mod tests {
         for (mut target, segments, compact, value, expect) in cases {
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(Target::remove(&mut target, &path, compact), Ok(value));
-            assert_eq!(Target::get(&target, &LookupBuf::root()), Ok(expect));
+            assert_eq!(
+                Target::target_remove(&mut target, &path, compact),
+                Ok(value)
+            );
+            assert_eq!(Target::target_get(&target, &LookupBuf::root()), Ok(expect));
         }
     }
 }

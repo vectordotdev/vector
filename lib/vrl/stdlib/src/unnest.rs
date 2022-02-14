@@ -95,7 +95,7 @@ impl Expression for UnnestFn {
         };
 
         let root = target
-            .get(&LookupBuf::root())
+            .target_get(&LookupBuf::root())
             .expect("must never fail")
             .expect("always a value");
 
