@@ -109,7 +109,7 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error" => self.code.to_string(),
-            "error_type" => "http_error",
+            "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }
@@ -128,7 +128,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::RECEIVING,
-            error_type = "http_error",
+            error_type = error_type::REQUEST_FAILED,
         );
     }
 
@@ -138,7 +138,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error" => self.error.to_string(),
-            "error_type" => "http_error",
+            "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }
