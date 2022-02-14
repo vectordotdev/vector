@@ -78,13 +78,15 @@ impl Expression for ParseCsvFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().array::<Kind>(type_def())
+        TypeDef::array(inner_kind()).fallible()
     }
 }
 
 #[inline]
-fn type_def() -> Vec<Kind> {
-    vec![Kind::Bytes]
+fn inner_kind() -> Collection<Index> {
+    let mut v = Collection::any();
+    v.set_unknown(Kind::bytes());
+    v
 }
 
 #[cfg(test)]
@@ -97,43 +99,43 @@ mod tests {
         valid {
             args: func_args![value: value!("foo,bar,\"foo \"\", bar\"")],
             want: Ok(value!(["foo", "bar", "foo \", bar"])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         invalid_utf8 {
             args: func_args![value: value!(&b"foo,b\xFFar"[..])],
             want: Ok(value!(vec!["foo".into(), value!(&b"b\xFFar"[..])])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         custom_delimiter {
             args: func_args![value: value!("foo bar"), delimiter: value!(" ")],
             want: Ok(value!(["foo", "bar"])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         invalid_delimiter {
             args: func_args![value: value!("foo bar"), delimiter: value!(",,")],
             want: Err("delimiter must be a single character"),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         single_value {
             args: func_args![value: value!("foo")],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         empty_string {
             args: func_args![value: value!("")],
             want: Ok(value!([])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
 
         multiple_lines {
             args: func_args![value: value!("first,line\nsecond,line,with,more,fields")],
             want: Ok(value!(["first", "line"])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+            tdef: TypeDef::array(inner_kind()).fallible(),
         }
     ];
 }

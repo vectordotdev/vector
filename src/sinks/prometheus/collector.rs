@@ -60,12 +60,14 @@ pub(super) trait MetricCollector {
                 } => {
                     // convert distributions into aggregated histograms
                     let (buckets, count, sum) = samples_to_buckets(samples, buckets);
+                    let mut bucket_count = 0.0;
                     for bucket in buckets {
+                        bucket_count += bucket.count as f64;
                         self.emit_value(
                             timestamp,
                             name,
                             "_bucket",
-                            bucket.count as f64,
+                            bucket_count as f64,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );

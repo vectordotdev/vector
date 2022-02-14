@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use chrono::{offset::TimeZone, Datelike, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref REGEX_KLOG: Regex = Regex::new(
+static REGEX_KLOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                                        # Ignore whitespace and comments in the regex expression.
         ^\s*                                                           # Start with any number of whitespaces.
         (?P<level>\w)                                                  # Match one word character (expecting `I`,`W`,`E` or `F`).
@@ -18,9 +18,8 @@ lazy_static! {
         \]\s                                                           # Match `]` and one whitespace.
         (?P<message>.*?)                                               # Match any characters (non-greedily).
         \s*$                                                           # Match any number of whitespaces to be stripped from the end.
-    "#)
-    .expect("failed compiling regex for klog");
-}
+    "#).expect("failed compiling regex for klog")
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseKlog;
@@ -133,7 +132,7 @@ impl Expression for ParseKlogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<&str, Kind>(type_def())
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
@@ -147,15 +146,15 @@ fn resolve_year(month: Option<&str>) -> i32 {
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, Kind> {
-    map! {
-        "level": Kind::Bytes,
-        "timestamp": Kind::Timestamp,
-        "id": Kind::Integer,
-        "file": Kind::Bytes,
-        "line": Kind::Integer,
-        "message": Kind::Bytes,
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("level".into(), Kind::bytes()),
+        ("timestamp".into(), Kind::timestamp()),
+        ("id".into(), Kind::integer()),
+        ("file".into(), Kind::bytes()),
+        ("line".into(), Kind::integer()),
+        ("message".into(), Kind::bytes()),
+    ])
 }
 
 #[cfg(test)]
@@ -178,7 +177,7 @@ mod tests {
                 "line" => 70,
                 "message" => "hello from klog",
             }),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_strip_whitespace {
@@ -191,31 +190,31 @@ mod tests {
                 "line" => 70,
                 "message" => "hello from klog",
             }),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid {
             args: func_args![value: "not a klog line"],
             want: Err("failed parsing klog message"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_log_level {
             args: func_args![value: "X0505 17:59:40.692994   28133 klog.go:70] hello from klog"],
             want: Err(r#"unrecognized log level "X""#),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: "I0000 17:59:40.692994   28133 klog.go:70] hello from klog"],
             want: Err("failed parsing timestamp 0000 17:59:40.692994: input is out of range"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_id {
             args: func_args![value: "I0505 17:59:40.692994   99999999999999999999999999999 klog.go:70] hello from klog"],
             want: Err("failed parsing id"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

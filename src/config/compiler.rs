@@ -92,7 +92,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let tests = tests
         .into_iter()
         .map(|test| test.resolve_outputs(&graph))
-        .collect();
+        .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
         let config = Config {
@@ -225,7 +225,7 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
             TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
@@ -269,8 +269,8 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::any()
         }
 
         fn outputs(&self) -> Vec<Output> {
@@ -289,8 +289,8 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::any()
         }
     }
 

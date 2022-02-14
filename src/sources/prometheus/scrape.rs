@@ -8,6 +8,7 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use super::parser;
 use crate::{
@@ -16,8 +17,8 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
-        PrometheusParseError, PrometheusRequestCompleted,
+        BytesReceived, PrometheusEventsReceived, PrometheusHttpError, PrometheusHttpResponseError,
+        PrometheusParseError, PrometheusRequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -236,6 +237,10 @@ fn prometheus(
                     .and_then(|response| async move {
                         let (header, body) = response.into_parts();
                         let body = hyper::body::to_bytes(body).await?;
+                        emit!(&BytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http"
+                        });
                         Ok((header, body))
                     })
                     .into_stream()
@@ -250,13 +255,12 @@ fn prometheus(
                                     end: Instant::now()
                                 });
 
-                                let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
-                                        emit!(&PrometheusEventReceived {
-                                            byte_size,
+                                        emit!(&PrometheusEventsReceived {
+                                            byte_size: events.size_of(),
                                             count: events.len(),
                                             uri: url.clone()
                                         });
@@ -319,7 +323,7 @@ fn prometheus(
                                     }
                                     Err(error) => {
                                         if url.path() == "/" {
-                                            // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                             warn!(
                                                 message = PARSE_ERROR_NO_PATH,
                                                 endpoint = %url,
@@ -338,7 +342,7 @@ fn prometheus(
                                 if header.status == hyper::StatusCode::NOT_FOUND
                                     && url.path() == "/"
                                 {
-                                    // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                     warn!(
                                         message = NOT_FOUND_NO_PATH,
                                         endpoint = %url,
@@ -370,7 +374,8 @@ fn prometheus(
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
                 Err(())
             }
         }

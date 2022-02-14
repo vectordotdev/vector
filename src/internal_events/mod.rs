@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+pub mod prelude;
+
 mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
@@ -65,13 +67,11 @@ mod filter;
 mod fluent;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
-#[cfg(feature = "transforms-grok_parser")]
-mod grok_parser;
 mod heartbeat;
-#[cfg(feature = "sources-host_metrics")]
-mod host_metrics;
 mod http;
 pub mod http_client;
+#[cfg(feature = "sources-internal_logs")]
+mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 #[cfg(feature = "transforms-json_parser")]
@@ -84,8 +84,6 @@ mod key_value_parser;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
-#[cfg(feature = "transforms-logfmt_parser")]
-mod logfmt_parser;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
 mod loki;
@@ -100,6 +98,18 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(any(
+    feature = "transforms-geoip",
+    feature = "transforms-log_to_metric",
+    feature = "transforms-grok_parser",
+    feature = "transforms-json_parser",
+    feature = "transforms-key_value_parser",
+    feature = "transforms-logfmt_parser",
+    feature = "transforms-regex_parser",
+    feature = "transforms-split",
+    feature = "transforms-tokenizer",
+))]
+mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
@@ -110,8 +120,6 @@ mod pulsar;
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
-#[cfg(feature = "transforms-regex_parser")]
-mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
@@ -123,7 +131,6 @@ mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
-mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
@@ -138,8 +145,6 @@ mod tcp;
 mod template;
 #[cfg(feature = "transforms-throttle")]
 mod throttle;
-#[cfg(feature = "transforms-tokenizer")]
-mod tokenizer;
 mod udp;
 mod unix;
 mod vector;
@@ -213,10 +218,6 @@ pub use self::filter::*;
 pub use self::fluent::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
-#[cfg(feature = "transforms-grok_parser")]
-pub(crate) use self::grok_parser::*;
-#[cfg(feature = "sources-host_metrics")]
-pub(crate) use self::host_metrics::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
@@ -226,6 +227,8 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
+#[cfg(feature = "sources-internal_logs")]
+pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]
@@ -238,8 +241,6 @@ pub(crate) use self::key_value_parser::*;
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
-#[cfg(feature = "transforms-logfmt_parser")]
-pub use self::logfmt_parser::*;
 #[cfg(feature = "sinks-loki")]
 pub(crate) use self::loki::*;
 #[cfg(feature = "transforms-lua")]
@@ -250,6 +251,18 @@ pub(crate) use self::metric_to_log::*;
 pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[cfg(any(
+    feature = "transforms-geoip",
+    feature = "transforms-log_to_metric",
+    feature = "transforms-grok_parser",
+    feature = "transforms-json_parser",
+    feature = "transforms-key_value_parser",
+    feature = "transforms-logfmt_parser",
+    feature = "transforms-regex_parser",
+    feature = "transforms-split",
+    feature = "transforms-tokenizer",
+))]
+pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
@@ -258,8 +271,6 @@ pub(crate) use self::prometheus::*;
 pub use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
-#[cfg(feature = "transforms-regex_parser")]
-pub(crate) use self::regex_parser::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
@@ -275,19 +286,19 @@ pub(crate) use self::splunk_hec::*;
 pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
+#[cfg(feature = "sources-syslog")]
+pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub use self::throttle::*;
-#[cfg(feature = "transforms-tokenizer")]
-pub(crate) use self::tokenizer::*;
 #[cfg(windows)]
 pub use self::windows::*;
 pub use self::{
     adaptive_concurrency::*, add_fields::*, add_tags::*, aggregate::*, ansi_stripper::*, batch::*,
     blackhole::*, common::*, conditions::*, elasticsearch::*, encoding_transcode::*, heartbeat::*,
-    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, split::*, stdin::*, syslog::*,
-    tcp::*, template::*, udp::*, unix::*, vector::*,
+    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, stdin::*, tcp::*, template::*,
+    udp::*, unix::*, vector::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`

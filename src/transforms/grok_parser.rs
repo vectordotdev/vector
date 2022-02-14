@@ -8,10 +8,11 @@ use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
+    internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -68,8 +69,8 @@ impl TransformConfig for GrokParserConfig {
             .context(InvalidGrokSnafu)?)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -133,7 +134,7 @@ impl FunctionTransform for GrokParser {
                                 event.insert_path(path, value);
                             }
                         }
-                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(&ParserConversionError { name, error }),
                     }
                 }
 
@@ -141,12 +142,12 @@ impl FunctionTransform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                emit!(&GrokParserFailedMatch {
+                emit!(&ParserMatchError {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(&GrokParserMissingField {
+            emit!(&ParserMissingFieldError {
                 field: self.field.as_ref()
             });
         }

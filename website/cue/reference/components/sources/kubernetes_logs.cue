@@ -624,7 +624,7 @@ components: sources: kubernetes_logs: {
 				Vector is tested extensively against Kubernetes. In addition to Kubernetes
 				being Vector's most popular installation method, Vector implements a
 				comprehensive end-to-end test suite for all minor Kubernetes versions starting
-				with `1.15`.
+				with `1.19`.
 				"""
 		}
 

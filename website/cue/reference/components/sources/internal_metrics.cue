@@ -516,7 +516,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_received_bytes_total: {
-			description:       "The number of raw bytes accepted by this component from source origins."
+			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags

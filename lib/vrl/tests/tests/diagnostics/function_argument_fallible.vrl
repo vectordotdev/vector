@@ -3,7 +3,7 @@
 # error[E630]: fallible argument
 #   ┌─ :2:8
 #   │
-# 2 │ to_int(5 / 4)
+# 2 │ to_int(5 / 0)
 #   │        ^^^^^
 #   │        │
 #   │        this expression can fail
@@ -12,4 +12,4 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = see language documentation at https://vrl.dev
 
-to_int(5 / 4)
+to_int(5 / 0)

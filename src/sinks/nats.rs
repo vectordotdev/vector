@@ -7,9 +7,9 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -76,8 +76,8 @@ impl SinkConfig for NatsSinkConfig {
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -162,7 +162,7 @@ impl StreamSink<Event> for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("subject"),
                         drop_event: true,

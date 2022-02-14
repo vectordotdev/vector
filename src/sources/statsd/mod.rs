@@ -11,13 +11,18 @@ use vector_core::ByteSizeOf;
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        NewlineDelimitedDecoder,
+    },
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{
-        StatsdEventsReceived, StatsdInvalidRecordError, StatsdSocketError, StreamClosedError,
+        BytesReceived, EventsReceived, StatsdInvalidRecordError, StatsdSocketError,
+        StreamClosedError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -148,17 +153,23 @@ impl SourceConfig for StatsdConfig {
 #[derive(Debug, Clone)]
 pub struct StatsdDeserializer;
 
-impl Deserializer for StatsdDeserializer {
+impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        emit!(&BytesReceived {
+            protocol: "udp",
+            byte_size: bytes.len(),
+        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(&StatsdEventsReceived {
-                    byte_size: metric.size_of(),
+                let event = Event::Metric(metric);
+                emit!(&EventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
                 });
-                Ok(smallvec![Event::Metric(metric)])
+                Ok(smallvec![event])
             }
             Err(error) => {
                 emit!(&StatsdInvalidRecordError {
@@ -193,8 +204,8 @@ async fn statsd_udp(
     );
 
     let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -225,8 +236,8 @@ impl TcpSource for StatsdTcpSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(NewlineDelimitedDecoder::new()),
-            Box::new(StatsdDeserializer),
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )
     }
 

@@ -117,58 +117,66 @@ impl Expression for ParseApacheLogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .object(match self.format.as_ref() {
-                b"common" => type_def_common(),
-                b"combined" => type_def_combined(),
-                b"error" => type_def_error(),
-                _ => unreachable!(),
-            })
+        TypeDef::object(match self.format.as_ref() {
+            b"common" => kind_common(),
+            b"combined" => kind_combined(),
+            b"error" => kind_error(),
+            _ => unreachable!(),
+        })
+        .fallible()
     }
 }
 
-fn type_def_common() -> BTreeMap<&'static str, TypeDef> {
+fn kind_common() -> BTreeMap<Field, Kind> {
     map! {
-         "host": Kind::Bytes | Kind::Null,
-         "identity": Kind::Bytes | Kind::Null,
-         "user": Kind::Bytes | Kind::Null,
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "message": Kind::Bytes | Kind::Null,
-         "method": Kind::Bytes | Kind::Null,
-         "path": Kind::Bytes | Kind::Null,
-         "protocol": Kind::Bytes | Kind::Null,
-         "status": Kind::Integer | Kind::Null,
-         "size": Kind::Integer | Kind::Null,
+         "host": Kind::bytes() | Kind::null(),
+         "identity": Kind::bytes() | Kind::null(),
+         "user": Kind::bytes() | Kind::null(),
+         "timestamp": Kind::timestamp() | Kind::null(),
+         "message": Kind::bytes() | Kind::null(),
+         "method": Kind::bytes() | Kind::null(),
+         "path": Kind::bytes() | Kind::null(),
+         "protocol": Kind::bytes() | Kind::null(),
+         "status": Kind::integer() | Kind::null(),
+         "size": Kind::integer() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
-fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
+fn kind_combined() -> BTreeMap<Field, Kind> {
     map! {
-        "host": Kind::Bytes | Kind::Null,
-        "identity": Kind::Bytes | Kind::Null,
-        "user": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp | Kind::Null,
-        "message": Kind::Bytes | Kind::Null,
-        "method": Kind::Bytes | Kind::Null,
-        "path": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Bytes | Kind::Null,
-        "status": Kind::Integer | Kind::Null,
-        "size": Kind::Integer | Kind::Null,
-        "referrer": Kind::Bytes | Kind::Null,
-        "agent": Kind::Bytes | Kind::Null,
+        "host": Kind::bytes() | Kind::null(),
+        "identity": Kind::bytes() | Kind::null(),
+        "user": Kind::bytes() | Kind::null(),
+        "timestamp": Kind::timestamp() | Kind::null(),
+        "message": Kind::bytes() | Kind::null(),
+        "method": Kind::bytes() | Kind::null(),
+        "path": Kind::bytes() | Kind::null(),
+        "protocol": Kind::bytes() | Kind::null(),
+        "status": Kind::integer() | Kind::null(),
+        "size": Kind::integer() | Kind::null(),
+        "referrer": Kind::bytes() | Kind::null(),
+        "agent": Kind::bytes() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
-fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
+fn kind_error() -> BTreeMap<Field, Kind> {
     map! {
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "module": Kind::Bytes | Kind::Null,
-         "severity": Kind::Bytes | Kind::Null,
-         "thread": Kind::Bytes | Kind::Null,
-         "port": Kind::Bytes | Kind::Null,
-         "message": Kind::Bytes | Kind::Null,
+         "timestamp": Kind::timestamp() | Kind::null(),
+         "module": Kind::bytes() | Kind::null(),
+         "severity": Kind::bytes() | Kind::null(),
+         "thread": Kind::bytes() | Kind::null(),
+         "port": Kind::bytes() | Kind::null(),
+         "message": Kind::bytes() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
 #[cfg(test)]
@@ -197,7 +205,7 @@ mod tests {
                 "status" => 200,
                 "size" => 2326,
             }),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
+            tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -219,7 +227,7 @@ mod tests {
                 "referrer" => "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth",
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -239,7 +247,7 @@ mod tests {
                 "status" => 401,
                 "size" => 84170,
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -257,7 +265,7 @@ mod tests {
                 "client" => "147.159.108.175",
                 "port" => 24259
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -275,7 +283,7 @@ mod tests {
                 "client" => "eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc",
                 "port" => 24259
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -295,7 +303,7 @@ mod tests {
                 "port" => 35106
 
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
@@ -304,7 +312,7 @@ mod tests {
                              format: "common",
             ],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
+            tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -313,7 +321,7 @@ mod tests {
                              format: "common",
             ],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
+            tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -329,7 +337,7 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -342,7 +350,7 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
@@ -351,7 +359,7 @@ mod tests {
                              format: "common",
             ],
             want: Err("failed parsing common log line"),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
+            tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
 
@@ -360,7 +368,7 @@ mod tests {
                              format: "combined",
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
     ];

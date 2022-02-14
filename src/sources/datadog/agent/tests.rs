@@ -1,6 +1,10 @@
 use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg};
 use crate::{
-    codecs::{self, BytesDecoder, BytesDeserializer},
+    codecs::{
+        self,
+        decoding::{Deserializer, Framer},
+        BytesDecoder, BytesDeserializer,
+    },
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
@@ -53,8 +57,8 @@ fn test_decode_log_body() {
         let api_key = None;
 
         let decoder = codecs::Decoder::new(
-            Box::new(BytesDecoder::new()),
-            Box::new(BytesDeserializer::new()),
+            Framer::Bytes(BytesDecoder::new()),
+            Deserializer::Bytes(BytesDeserializer::new()),
         );
         let source = DatadogAgentSource::new(true, decoder, "http");
         let events = source.decode_log_body(body, api_key).unwrap();

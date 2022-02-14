@@ -16,12 +16,12 @@ pub struct Opts {
     #[structopt(short, long)]
     url: Option<Url>,
 
-    /// Maximum number of log events to sample each interval
+    /// Maximum number of events to sample each interval
     #[structopt(default_value = "100", short = "l", long)]
     limit: u32,
 
-    /// Encoding format for logs printed to screen
-    #[structopt(default_value = "json", possible_values = &["json", "yaml"], short = "f", long)]
+    /// Encoding format for events printed to screen
+    #[structopt(default_value = "json", possible_values = &["json", "yaml", "logfmt"], short = "f", long)]
     format: TapEncodingFormat,
 
     /// Components IDs to observe (comma-separated; accepts glob patterns)

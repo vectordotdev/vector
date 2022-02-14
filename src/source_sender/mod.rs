@@ -174,6 +174,18 @@ impl SourceSender {
             .await
     }
 
+    pub async fn send_batch_named(
+        &mut self,
+        name: &str,
+        events: Vec<Event>,
+    ) -> Result<(), ClosedError> {
+        self.named_inners
+            .get_mut(name)
+            .expect("unknown output")
+            .send_batch(events)
+            .await
+    }
+
     pub async fn send_result_stream<E>(
         &mut self,
         stream: impl Stream<Item = Result<Event, E>> + Unpin,

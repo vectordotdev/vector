@@ -212,8 +212,8 @@ remap: #Remap & {
 				1 │ upcase(42)
 				  │        ^^
 				  │        │
-				  │        this expression resolves to the exact type "integer"
-				  │        but the parameter "value" expects the exact type "string"
+				  │        this expression resolves to the exact type integer
+				  │        but the parameter "value" expects the exact type string
 				  │
 				  = try: ensuring an appropriate type at runtime
 				  =

@@ -81,7 +81,7 @@ impl Function for Get {
                 title: "invalid segment type",
                 source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "get" at (0:62): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "get" at (0:62): path segment must be either string or integer, not boolean"#,
                 ),
             },
         ]
@@ -120,7 +120,7 @@ impl Expression for GetFn {
                         Value::Integer(index) => SegmentBuf::Index(index as isize),
                         value => {
                             return Err(format!(
-                                r#"path segment must be either "string" or "integer", not {}"#,
+                                r#"path segment must be either string or integer, not {}"#,
                                 value.kind()
                             )
                             .into())
@@ -135,7 +135,7 @@ impl Expression for GetFn {
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Array,
+                    expected: Kind::array(Collection::any()),
                 }
                 .into())
             }
@@ -145,7 +145,7 @@ impl Expression for GetFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().unknown()
+        TypeDef::any().fallible()
     }
 }
 
@@ -159,7 +159,7 @@ mod tests {
         any {
             args: func_args![value: value!([42]), path: value!([0])],
             want: Ok(42),
-            tdef: TypeDef::new().fallible(),
+            tdef: TypeDef::any().fallible(),
         }
     ];
 }

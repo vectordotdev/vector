@@ -23,6 +23,7 @@ pub struct OutputEventsByComponentIdPatternsSubscription;
 pub enum TapEncodingFormat {
     Json,
     Yaml,
+    Logfmt,
 }
 
 /// String -> TapEncodingFormat, typically for parsing user input.
@@ -33,6 +34,7 @@ impl std::str::FromStr for TapEncodingFormat {
         match s {
             "json" => Ok(Self::Json),
             "yaml" => Ok(Self::Yaml),
+            "logfmt" => Ok(Self::Logfmt),
             _ => Err("Invalid encoding format".to_string()),
         }
     }
@@ -46,16 +48,18 @@ impl From<TapEncodingFormat>
         match encoding {
             TapEncodingFormat::Json => Self::JSON,
             TapEncodingFormat::Yaml => Self::YAML,
+            TapEncodingFormat::Logfmt => Self::LOGFMT,
         }
     }
 }
 
 impl output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns {
-    pub fn as_log(
+    pub fn as_string(
         &self,
-    ) -> Option<&output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatternsOnLog>{
+    ) -> Option<&str>{
         match self {
-            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev),
+            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev.string.as_ref()),
+            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => Some(ev.string.as_ref()),
             _ => None,
         }
     }
