@@ -77,31 +77,3 @@ impl ComponentEventsOutTotal {
         EventsOutTotal::new(self.metric.clone())
     }
 }
-
-pub struct ComponentEventsOutThroughput {
-    component_key: ComponentKey,
-    throughput: i64,
-}
-
-impl ComponentEventsOutThroughput {
-    /// Returns a new `ComponentEventsOutThroughput`, set to the provided id/throughput values
-    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
-        Self {
-            component_key,
-            throughput,
-        }
-    }
-}
-
-#[Object]
-impl ComponentEventsOutThroughput {
-    /// Component id
-    async fn component_id(&self) -> &str {
-        self.component_key.id()
-    }
-
-    /// Events processed throughput
-    async fn throughput(&self) -> i64 {
-        self.throughput
-    }
-}
