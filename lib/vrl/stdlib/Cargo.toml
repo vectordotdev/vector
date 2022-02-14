@@ -49,6 +49,7 @@ vector_common = { path = "../../vector-common", default-features = false, option
 anyhow = "1"
 criterion = "0.3"
 chrono-tz = "0.6"
+value = { path = "../../value", features = ["test"]}
 
 [features]
 default = [
