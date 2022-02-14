@@ -304,7 +304,7 @@ impl SourceContext {
 
     pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
         if config.enabled() {
-            warn!("The `acknowledgements` configuration on sources is deprecated and will be removed in a future version.");
+            warn!("Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.");
         }
 
         config
