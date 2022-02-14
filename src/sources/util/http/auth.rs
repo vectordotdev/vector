@@ -39,7 +39,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
 
 #[derive(Debug, Clone)]
 pub struct HttpSourceAuth {
-    pub token: Option<String>,
+    pub(self) token: Option<String>,
 }
 
 #[cfg(feature = "sources-utils-http-prelude")]

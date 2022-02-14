@@ -28,7 +28,7 @@ pub struct DnstapConfig {
     raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<u32>,
-    pub socket_file_mode: Option<u32>,
+    pub(self) socket_file_mode: Option<u32>,
     pub socket_receive_buffer_size: Option<usize>,
     pub socket_send_buffer_size: Option<usize>,
 }
