@@ -214,6 +214,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 lookup = { path = "lib/lookup" }
 
 # External libs
+arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -344,7 +345,7 @@ lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
-
+value = { path = "lib/value", features = ["test"] }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
@@ -789,8 +790,21 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap", "bollard"]
 
 disable-resolv-conf = []
-shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
+shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+vector-unit-test-tests = [
+  "sources-demo_logs",
+  "transforms-add_fields",
+  "transforms-remap",
+  "transforms-route",
+  "transforms-filter",
+  "transforms-reduce",
+  "transforms-compound",
+  "transforms-add_tags",
+  "transforms-log_to_metric",
+  "transforms-remove_fields",
+  "sinks-console"
+]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions

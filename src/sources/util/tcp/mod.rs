@@ -1,7 +1,7 @@
 mod request_limiter;
 
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
@@ -327,7 +327,7 @@ async fn handle_stream<T>(
                         }
 
                         source.handle_events(&mut events, host.clone());
-                        match out.send_all(&mut stream::iter(events)).await {
+                        match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,

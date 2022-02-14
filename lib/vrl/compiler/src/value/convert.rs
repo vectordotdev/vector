@@ -4,6 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use value::kind::Collection;
+use value::Value as VectorValue;
 
 use super::{Error, Kind, Regex, Value};
 use crate::{
@@ -515,5 +516,43 @@ impl Value {
 impl From<DateTime<Utc>> for Value {
     fn from(v: DateTime<Utc>) -> Self {
         Value::Timestamp(v)
+    }
+}
+
+impl From<Value> for VectorValue {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Bytes(v) => VectorValue::Bytes(v),
+            Value::Integer(v) => VectorValue::Integer(v),
+            Value::Float(v) => VectorValue::Float(v),
+            Value::Boolean(v) => VectorValue::Boolean(v),
+            Value::Object(v) => {
+                VectorValue::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+            Value::Array(v) => VectorValue::Array(v.into_iter().map(Into::into).collect()),
+            Value::Timestamp(v) => VectorValue::Timestamp(v),
+            Value::Regex(v) => {
+                VectorValue::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes()))
+            }
+            Value::Null => VectorValue::Null,
+        }
+    }
+}
+
+impl From<VectorValue> for Value {
+    fn from(v: VectorValue) -> Self {
+        match v {
+            VectorValue::Bytes(v) => v.into(),
+            VectorValue::Regex(regex) => regex.into_inner().into(),
+            VectorValue::Integer(v) => v.into(),
+            VectorValue::Float(v) => v.into(),
+            VectorValue::Boolean(v) => v.into(),
+            VectorValue::Map(v) => {
+                Value::Object(v.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+            VectorValue::Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            VectorValue::Timestamp(v) => v.into(),
+            VectorValue::Null => Value::Null,
+        }
     }
 }

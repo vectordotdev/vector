@@ -1009,7 +1009,7 @@ fn line_agg_adapter(
             .expect("stream must exist in the event");
 
         let stream = stream_value.as_bytes();
-        let message = message_value.into_bytes();
+        let message = message_value.as_bytes();
         (stream, message, log_event)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);

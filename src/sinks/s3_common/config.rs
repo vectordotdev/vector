@@ -140,7 +140,7 @@ pub fn create_service(
 #[cfg(test)]
 mod tests {
     use super::S3StorageClass;
-    use crate::serde::to_string;
+    use crate::serde::json::to_string;
 
     #[test]
     fn storage_class_names() {

@@ -164,9 +164,3 @@ impl<T> ElementCount for Vec<T> {
         self.len()
     }
 }
-
-impl ElementCount for serde_json::Value {
-    fn element_count(&self) -> usize {
-        1
-    }
-}
