@@ -28,6 +28,39 @@ impl Function for Map {
                 source: r#"map({"a" : 1, "b" : 2, "c" : 3}) -> |key, value| { [key, value + 1] }"#,
                 result: Ok(r#"{"a" :2, "b" : 3, "c" :4}"#),
             },
+            Example {
+                title: "string array value",
+                source: r#"map(["foo", "bar"]) ->   |index, value| { value + "_" + to_string(index) }"#,
+                result: Ok(r#"["foo_0", "bar_1"]"#),
+            },
+            Example {
+                title: "map to array of objects",
+                source: r#"map([1]) ->   |index, value| { { "a": 1} }"#,
+
+                result: Ok(r#"[{"a": 1}]"#),
+            },
+            Example {
+                title: "object iteration requires array return value",
+                source: r#"map({"b": 2}) ->   |index, value| { { "a": 1} }"#,
+
+                result: Err(
+                    r#"function call error for "map" at (0:47): object iteration requires returning a key/value array return value"#,
+                ),
+            },
+            Example {
+                title: "single value return array does not compile",
+                source: r#"map({ "a": 1}) -> |key, value| { [key]  }"#,
+                result: Err(
+                    r#"function call error for "map" at (0:41): object iteration requires a two-element array return value"#,
+                ),
+            },
+            Example {
+                title: "non-byte key type does not compile",
+                source: r#"map({ "a": 1}) -> |key, value| { [value, key]  }"#,
+                result: Err(
+                    r#"function call error for "map" at (0:48): object iteration requires the first element to be a string type"#,
+                ),
+            },
         ]
     }
 
