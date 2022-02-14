@@ -31,7 +31,7 @@ pub struct DatadogEventsConfig {
     pub default_api_key: String,
 
     // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
-    pub tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsConfig>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
