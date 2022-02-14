@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::{BufMut, BytesMut};
 use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
@@ -184,7 +185,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>> {
+fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMut> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -233,13 +234,14 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
 
     let message = encode_namespace(metric.namespace().or(default_namespace), '.', buf.join("|"));
 
-    let mut body: Vec<u8> = message.into_bytes();
-    body.push(b'\n');
+    let mut body = BytesMut::new();
+    body.put_slice(&message.into_bytes());
+    body.put_u8(b'\n');
 
     Some(body)
 }
 
-impl Service<Vec<u8>> for StatsdSvc {
+impl Service<BytesMut> for StatsdSvc {
     type Response = ();
     type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
@@ -248,8 +250,8 @@ impl Service<Vec<u8>> for StatsdSvc {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
-        self.inner.call(frame.into()).err_into().boxed()
+    fn call(&mut self, frame: BytesMut) -> Self::Future {
+        self.inner.call(frame).err_into().boxed()
     }
 }
 

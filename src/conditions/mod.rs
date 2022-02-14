@@ -9,11 +9,46 @@ pub mod is_metric;
 pub mod not;
 pub mod vrl;
 
+pub use self::vrl::VrlConfig;
 pub use check_fields::CheckFieldsConfig;
 
-pub use self::vrl::VrlConfig;
+#[derive(Debug, Clone)]
+pub enum Condition {
+    Not(not::Not),
+    IsLog(is_log::IsLog),
+    IsMetric(is_metric::IsMetric),
+    Vrl(vrl::Vrl),
+    CheckFields(check_fields::CheckFields),
+    DatadogSearch(datadog_search::DatadogSearchRunner),
+}
 
-pub trait Condition: Send + Sync + dyn_clone::DynClone {
+impl Condition {
+    pub(crate) fn check(&self, e: &Event) -> bool {
+        match self {
+            Condition::IsLog(x) => x.check(e),
+            Condition::IsMetric(x) => x.check(e),
+            Condition::Not(x) => x.check(e),
+            Condition::CheckFields(x) => x.check(e),
+            Condition::DatadogSearch(x) => x.check(e),
+            Condition::Vrl(x) => x.check(e),
+        }
+    }
+
+    /// Provides context for a failure. This is potentially mildly expensive if
+    /// it involves string building and so should be avoided in hot paths.
+    pub(crate) fn check_with_context(&self, e: &Event) -> Result<(), String> {
+        match self {
+            Condition::IsLog(x) => x.check_with_context(e),
+            Condition::IsMetric(x) => x.check_with_context(e),
+            Condition::Not(x) => x.check_with_context(e),
+            Condition::CheckFields(x) => x.check_with_context(e),
+            Condition::DatadogSearch(x) => x.check_with_context(e),
+            Condition::Vrl(x) => x.check_with_context(e),
+        }
+    }
+}
+
+pub trait Conditional {
     fn check(&self, e: &Event) -> bool;
 
     /// Provides context for a failure. This is potentially mildly expensive if
@@ -27,14 +62,9 @@ pub trait Condition: Send + Sync + dyn_clone::DynClone {
     }
 }
 
-dyn_clone::clone_trait_object!(Condition);
-
 #[typetag::serde(tag = "type")]
 pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>>;
+    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition>;
 }
 
 dyn_clone::clone_trait_object!(ConditionConfig);
@@ -70,10 +100,7 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
-    pub fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),
             AnyCondition::Map(m) => m.build(enrichment_tables),

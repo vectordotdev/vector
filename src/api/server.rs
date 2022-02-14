@@ -1,4 +1,8 @@
-use std::{convert::Infallible, net::SocketAddr};
+use std::{
+    convert::Infallible,
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig, WebSocketProtocols},
@@ -19,8 +23,12 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing.
-    pub fn start(config: &config::Config, watch_rx: topology::WatchRx) -> Self {
-        let routes = make_routes(config.api.playground, watch_rx);
+    pub fn start(
+        config: &config::Config,
+        watch_rx: topology::WatchRx,
+        running: Arc<AtomicBool>,
+    ) -> Self {
+        let routes = make_routes(config.api.playground, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
         let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
@@ -52,11 +60,17 @@ impl Server {
     }
 }
 
-fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(impl Reply,)> {
+fn make_routes(
+    playground: bool,
+    watch_tx: topology::WatchRx,
+    running: Arc<AtomicBool>,
+) -> BoxedFilter<(impl Reply,)> {
     // Routes...
 
     // Health.
-    let health = warp::path("health").and_then(handler::health);
+    let health = warp::path("health")
+        .and(with_shared(running))
+        .and_then(handler::health);
 
     // 404.
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
@@ -141,4 +155,10 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
                 .allow_methods(vec!["POST", "GET"]),
         )
         .boxed()
+}
+
+fn with_shared(
+    shared: Arc<AtomicBool>,
+) -> impl Filter<Extract = (Arc<AtomicBool>,), Error = Infallible> + Clone {
+    warp::any().map(move || Arc::<AtomicBool>::clone(&shared))
 }
