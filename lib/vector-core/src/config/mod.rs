@@ -68,7 +68,15 @@ pub struct Output {
     /// `Metric` variants, and two for the `Any` variant, one for log events and one for metrics).
     /// Alternatively, we could update this field to `log_schema_definition` and add a new
     /// `metric_schema_definition` as well.
-    pub schema_definition: schema::Definition,
+    ///
+    /// The `None` variant of a schema definition has two distinct meanings for a source component
+    /// versus a transform component:
+    ///
+    /// For *sources*, a `None` schema is identical to a `Some(Definition::undefined())` schema.
+    ///
+    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
+    /// of its inputs, without modifying the schema further.
+    pub schema_definition: Option<schema::Definition>,
 }
 
 impl Output {
@@ -80,13 +88,13 @@ impl Output {
         Self {
             port: None,
             ty,
-            schema_definition: schema::Definition::empty(),
+            schema_definition: None,
         }
     }
 
     /// Set the schema definition for this output.
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
-        self.schema_definition = schema_definition;
+        self.schema_definition = Some(schema_definition);
         self
     }
 }
@@ -96,7 +104,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
-            schema_definition: schema::Definition::empty(),
+            schema_definition: None,
         }
     }
 }

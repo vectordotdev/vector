@@ -70,6 +70,12 @@ impl EventMetadata {
         }
     }
 
+    /// Replace the schema ID with the given one.
+    pub fn with_schema_id(mut self, schema_id: schema::Id) -> Self {
+        self.schema_id = schema_id;
+        self
+    }
+
     /// Merge the other `EventMetadata` into this.
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
