@@ -272,7 +272,7 @@ pub use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-remove_fields")]
-pub use self::remove_fields::*;
+pub(crate) use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 #[cfg(feature = "transforms-route")]
