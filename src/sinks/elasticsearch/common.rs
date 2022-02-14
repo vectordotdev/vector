@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
-    pub id_key: Option<String>,
+    id_key: Option<String>,
     pub bulk_uri: Uri,
     pub authorization: Option<Auth>,
     pub credentials: Option<rusoto::AwsCredentialsProvider>,
