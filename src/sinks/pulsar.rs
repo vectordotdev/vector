@@ -37,7 +37,7 @@ pub struct PulsarSinkConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AuthConfig {
+struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
 }
