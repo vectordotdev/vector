@@ -48,7 +48,7 @@ pub struct KafkaSink {
     headers_key: Option<String>,
 }
 
-pub fn create_producer(
+pub(crate) fn create_producer(
     client_config: ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
