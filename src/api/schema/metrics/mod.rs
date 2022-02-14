@@ -127,19 +127,8 @@ impl MetricsSubscription {
         })
     }
 
-    /// Total incoming events metrics
-    #[graphql(deprecation = "Use received_events_total instead")]
-    async fn events_in_total(
-        &self,
-        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
-    ) -> impl Stream<Item = EventsInTotal> {
-        get_metrics(interval).filter_map(|m| match m.name() {
-            "events_in_total" => Some(EventsInTotal::new(m)),
-            _ => None,
-        })
-    }
-
     /// Total received events metrics
+    #[graphql(deprecation = "Use component_received_events_totals instead")]
     async fn received_events_total(
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
@@ -229,19 +218,8 @@ impl MetricsSubscription {
         )
     }
 
-    /// Total outgoing events metrics
-    #[graphql(deprecation = "Use sent_events_total instead")]
-    async fn events_out_total(
-        &self,
-        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
-    ) -> impl Stream<Item = EventsOutTotal> {
-        get_metrics(interval).filter_map(|m| match m.name() {
-            "events_out_total" => Some(EventsOutTotal::new(m)),
-            _ => None,
-        })
-    }
-
     /// Total sent events metrics
+    #[graphql(deprecation = "Use component_sent_events_totals instead")]
     async fn sent_events_total(
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
