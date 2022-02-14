@@ -1,0 +1,16 @@
+# result:
+#
+# error[E110]: invalid argument type
+#   ┌─ :2:5
+#   │
+# 2 │ map(5) -> |key, value| { [key, value + 1] }
+#   │     ^
+#   │     │
+#   │     this expression resolves to the exact type integer
+#   │     but the parameter "value" expects one of object or array
+#   │
+#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = see language documentation at https://vrl.dev
+
+map(5) -> |key, value| { [key, value + 1] }
+
