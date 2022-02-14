@@ -26,7 +26,7 @@ impl<'a> VmArgument<'a> {
     /// have already done the required typechecking.
     fn kind(&self) -> Option<Kind> {
         match self {
-            VmArgument::Value(value) => Some(Kind::from(value)),
+            VmArgument::Value(value) => Some(value.into()),
             VmArgument::Any(_) => None,
         }
     }

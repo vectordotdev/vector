@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn object(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Object(_) => Ok(v),
-        v => Err(format!("expected object, got {}", v.kind_vrl()).into()),
+        v => Err(format!("expected object, got {}", v.kind()).into()),
     }
 }
 

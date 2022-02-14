@@ -67,7 +67,7 @@ impl Expression for FloorFn {
             ))),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
-                got: value.kind_vrl(),
+                got: value.kind(),
                 expected: Kind::float() | Kind::integer(),
             }
             .into()),

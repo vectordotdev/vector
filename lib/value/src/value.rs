@@ -149,7 +149,7 @@ impl Hash for Value {
 
 impl Value {
     /// Returns a string description of the value type
-    pub const fn kind(&self) -> &str {
+    pub const fn kind_str(&self) -> &str {
         match self {
             Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",

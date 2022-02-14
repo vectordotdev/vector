@@ -14,7 +14,7 @@ fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {
         Bytes(v) => Conversion::Float
             .convert(v)
             .map_err(|e| e.to_string().into()),
-        v => Err(format!("unable to coerce {} into float", v.kind_vrl()).into()),
+        v => Err(format!("unable to coerce {} into float", v.kind()).into()),
     }
 }
 

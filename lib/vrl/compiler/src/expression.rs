@@ -307,7 +307,7 @@ impl From<Value> for Expr {
             Object(v) => {
                 let object = crate::expression::Object::from(
                     v.into_iter()
-                        .map(|(k, v)| (k, Expr::from(v)))
+                        .map(|(k, v)| (k, v.into()))
                         .collect::<BTreeMap<_, _>>(),
                 );
 

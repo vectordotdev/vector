@@ -27,11 +27,11 @@ pub use ::value::{
 };
 
 pub trait VrlValueKind {
-    fn kind_vrl(&self) -> Kind;
+    fn kind(&self) -> Kind;
 }
 
 impl VrlValueKind for Value {
-    fn kind_vrl(&self) -> Kind {
+    fn kind(&self) -> Kind {
         self.into()
     }
 }
@@ -215,7 +215,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(Kind::from(value), want, "{}", title);
+            assert_eq!(value.into(), want, "{}", title);
         }
     }
 }

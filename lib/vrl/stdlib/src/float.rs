@@ -3,7 +3,7 @@ use vrl::prelude::*;
 fn float(value: Value) -> std::result::Result<Value, ExpressionError> {
     match value {
         v @ Value::Float(_) => Ok(v),
-        v => Err(format!("expected float, got {}", v.kind_vrl()).into()),
+        v => Err(format!("expected float, got {}", v.kind()).into()),
     }
 }
 

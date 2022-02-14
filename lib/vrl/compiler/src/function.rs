@@ -193,7 +193,7 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match Expr::from(var.value().unwrap().clone()) {
+                    match var.value().unwrap().clone().into() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -347,7 +347,7 @@ impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
         Self(
             map.into_iter()
-                .map(|(k, v)| (k, Expr::from(v)))
+                .map(|(k, v)| (k, v.into()))
                 .collect::<HashMap<_, _>>(),
         )
     }

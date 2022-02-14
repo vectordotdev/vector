@@ -40,7 +40,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Integer(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::integer(),
             }),
         }
@@ -50,7 +50,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(v.into_inner() as i64),
-            _ => Err(Error::Coerce(self.kind_vrl(), Kind::integer())),
+            _ => Err(Error::Coerce(self.kind(), Kind::integer())),
         }
     }
 
@@ -58,7 +58,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::float(),
             }),
         }
@@ -68,7 +68,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Coerce(self.kind_vrl(), Kind::float())),
+            _ => Err(Error::Coerce(self.kind(), Kind::float())),
         }
     }
 
@@ -76,7 +76,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Bytes(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::bytes(),
             }),
         }
@@ -86,7 +86,7 @@ impl VrlValueConvert for Value {
         match self.as_bytes() {
             Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::bytes(),
             }),
         }
@@ -96,7 +96,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Boolean(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::boolean(),
             }),
         }
@@ -106,7 +106,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Regex(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::regex(),
             }),
         }
@@ -116,7 +116,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Null => Ok(()),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::null(),
             }),
         }
@@ -126,7 +126,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::array(Collection::any()),
             }),
         }
@@ -136,7 +136,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::object(Collection::any()),
             }),
         }
@@ -146,7 +146,7 @@ impl VrlValueConvert for Value {
         match self {
             Value::Timestamp(v) => Ok(v),
             _ => Err(Error::Expected {
-                got: self.kind_vrl(),
+                got: self.kind(),
                 expected: Kind::timestamp(),
             }),
         }

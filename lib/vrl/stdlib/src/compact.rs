@@ -182,7 +182,7 @@ impl Expression for CompactFn {
             Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
             value => Err(value::Error::Expected {
-                got: value.kind_vrl(),
+                got: value.kind(),
                 expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
             }
             .into()),

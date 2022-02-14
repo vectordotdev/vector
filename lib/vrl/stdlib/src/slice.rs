@@ -36,7 +36,7 @@ fn slice(
             .map(|range| v.drain(range).collect::<Vec<_>>())
             .map(Value::from),
         value => Err(value::Error::Expected {
-            got: value.kind_vrl(),
+            got: value.kind(),
             expected: Kind::bytes() | Kind::array(Collection::any()),
         }
         .into()),
