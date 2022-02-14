@@ -223,11 +223,7 @@ pub struct SourceOuter {
     pub proxy: ProxyConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
-    #[serde(
-        default,
-        skip_deserializing,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 }
 
