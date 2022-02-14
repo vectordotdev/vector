@@ -76,10 +76,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Integer`.
     pub fn is_integer(&self) -> bool {
         matches!(self, Value::Integer(_))
     }
 
+    /// Returns self as `f64`, only if self is `Value::Integer`.
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             Value::Integer(v) => Some(*v),
@@ -87,22 +89,26 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Float`.
     pub fn is_float(&self) -> bool {
         matches!(self, Value::Float(_))
     }
 
     // This replaces the more implicit "From<f64>", but keeps the same behavior.
     // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
+    /// Creates a Value from an f64. If the value is Nan, it is converted to 0.0
     pub fn from_f64_or_zero(value: f64) -> Value {
         NotNan::new(value)
             .map(Value::Float)
             .unwrap_or_else(|_| Value::Float(NotNan::new(0.0).unwrap()))
     }
 
+    /// Returns true if self is `Value::Bytes`.
     pub fn is_bytes(&self) -> bool {
         matches!(self, Value::Bytes(_))
     }
 
+    /// Returns self as `&Bytes`, only if self is `Value::Bytes`.
     pub fn as_bytes(&self) -> Option<&Bytes> {
         match self {
             Value::Bytes(v) => Some(v),
@@ -131,10 +137,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Boolean`.
     pub fn is_boolean(&self) -> bool {
         matches!(self, Value::Boolean(_))
     }
 
+    /// Returns self as `bool`, only if self is `Value::Boolean`.
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             Value::Boolean(v) => Some(*v),
@@ -142,10 +150,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Regex`.
     pub fn is_regex(&self) -> bool {
         matches!(self, Value::Regex(_))
     }
 
+    /// Returns self as `&ValueRegex`, only if self is `Value::Regex`.
     pub fn as_regex(&self) -> Option<&Regex> {
         match self {
             Value::Regex(v) => Some(v),
@@ -153,10 +163,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Null`.
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
 
+    /// Returns self as `())`, only if self is `Value::Null`.
     pub fn as_null(&self) -> Option<()> {
         match self {
             Value::Null => Some(()),
@@ -164,10 +176,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Array`.
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
 
+    /// Returns self as `&[Value]`, only if self is `Value::Array`.
     pub fn as_array(&self) -> Option<&[Value]> {
         match self {
             Value::Array(v) => Some(v),
@@ -175,6 +189,7 @@ impl Value {
         }
     }
 
+    /// Returns self as `&mut Vec<Value>`, only if self is `Value::Array`.
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
         match self {
             Value::Array(v) => Some(v),
@@ -182,10 +197,12 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Object`.
     pub fn is_object(&self) -> bool {
         matches!(self, Value::Object(_))
     }
 
+    /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
@@ -193,6 +210,7 @@ impl Value {
         }
     }
 
+    /// Returns self as `&mut BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
@@ -200,6 +218,7 @@ impl Value {
         }
     }
 
+    /// Returns true if self is `Value::Timestamp`.
     pub fn is_timestamp(&self) -> bool {
         matches!(self, Value::Timestamp(_))
     }

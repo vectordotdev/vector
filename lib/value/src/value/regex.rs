@@ -8,22 +8,27 @@ use std::{
     ops::Deref,
 };
 
+/// Wraps a `Regex` and provides several trait implementations, such as `PartialOrd`
 #[derive(Debug, Clone)]
 pub struct ValueRegex(regex::Regex);
 
 impl ValueRegex {
+    /// Create a new `ValueRegex` from the inner `Regex` that is wraps
     pub const fn new(regex: regex::Regex) -> Self {
         Self(regex)
     }
 
+    /// Returns a `Bytes`` of the string representation of the regex
     pub fn as_bytes(&self) -> Bytes {
         bytes::Bytes::copy_from_slice(self.as_bytes_slice())
     }
 
+    /// Returns a byte array of the string representation of the regex
     pub fn as_bytes_slice(&self) -> &[u8] {
         self.as_str().as_bytes()
     }
 
+    /// Returns the inner Regex value
     #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_inner(self) -> regex::Regex {
         self.0
