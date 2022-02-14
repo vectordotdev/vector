@@ -35,21 +35,6 @@ where
 }
 
 #[derive(Debug)]
-pub struct WsEventSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for WsEventSent {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct WsConnectionShutdown;
 
 impl InternalEvent for WsConnectionShutdown {

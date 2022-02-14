@@ -1,19 +1,3 @@
-use crate::{
-    buffers::Acker,
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns, emit,
-    event::Event,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished, WsConnectionFailed,
-        WsConnectionShutdown, WsEventSent,
-    },
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::ExponentialBackoff,
-        StreamSink,
-    },
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
-};
 use async_trait::async_trait;
 use futures::{
     future::{self},
@@ -22,7 +6,6 @@ use futures::{
     stream::BoxStream,
     Sink, Stream, StreamExt,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     fmt::Debug,
@@ -43,9 +26,30 @@ use tokio_tungstenite::{
     },
     WebSocketStream as WsStream,
 };
+use vector_core::{
+    buffers::Acker,
+    internal_event::{BytesSent, EventsSent},
+};
+
+use crate::{
+    dns, emit,
+    event::Event,
+    internal_events::{
+        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished, WsConnectionFailed,
+        WsConnectionShutdown,
+    },
+    sinks::util::{
+        encoding::{Encoder, EncodingConfig, StandardEncodings},
+        retries::ExponentialBackoff,
+        StreamSink,
+    },
+    sinks::websocket::config::WebSocketSinkConfig,
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
+};
 
 #[derive(Debug, Snafu)]
-enum WebSocketError {
+#[snafu(visibility(pub))]
+pub enum WebSocketError {
     #[snafu(display("Creating WebSocket client failed: {}", source))]
     CreateFailed { source: WsError },
     #[snafu(display("Connect error: {}", source))]
@@ -56,70 +60,8 @@ enum WebSocketError {
     NoAddresses,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct WebSocketSinkConfig {
-    uri: String,
-    tls: Option<TlsConfig>,
-    encoding: EncodingConfig<Encoding>,
-    ping_interval: Option<u64>,
-    ping_timeout: Option<u64>,
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
-inventory::submit! {
-    SinkDescription::new::<WebSocketSinkConfig>("websocket")
-}
-
-impl GenerateConfig for WebSocketSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"uri = "ws://127.0.0.1:9000/endpoint"
-            encoding.codec = "json""#,
-        )
-        .unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "websocket")]
-impl SinkConfig for WebSocketSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let connector = self.build_connector()?;
-        let ws_sink = WebSocketSink::new(&self, connector.clone(), cx.acker());
-
-        Ok((
-            super::VectorSink::Stream(Box::new(ws_sink)),
-            Box::pin(async move { connector.healthcheck().await }),
-        ))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "websocket"
-    }
-}
-
-impl WebSocketSinkConfig {
-    fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(ConnectError)?;
-        Ok(WebSocketConnector::new(self.uri.clone(), tls)?)
-    }
-}
-
 #[derive(Clone)]
-struct WebSocketConnector {
+pub struct WebSocketConnector {
     uri: String,
     host: String,
     port: u16,
@@ -127,9 +69,9 @@ struct WebSocketConnector {
 }
 
 impl WebSocketConnector {
-    fn new(uri: String, tls: MaybeTlsSettings) -> Result<Self, WebSocketError> {
-        let request = (&uri).into_client_request().context(CreateFailed)?;
-        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailed)?;
+    pub fn new(uri: String, tls: MaybeTlsSettings) -> Result<Self, WebSocketError> {
+        let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
+        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
 
         Ok(Self {
             uri,
@@ -164,7 +106,7 @@ impl WebSocketConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(WebSocketError::NoAddresses)?;
 
@@ -172,11 +114,13 @@ impl WebSocketConnector {
         self.tls
             .connect(&self.host, &addr)
             .await
-            .context(ConnectError)
+            .context(ConnectSnafu)
     }
 
     async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let request = (&self.uri).into_client_request().context(CreateFailed)?;
+        let request = (&self.uri)
+            .into_client_request()
+            .context(CreateFailedSnafu)?;
         let maybe_tls = self.tls_connect().await?;
 
         let ws_config = WebSocketConfig {
@@ -186,7 +130,7 @@ impl WebSocketConnector {
 
         let (ws_stream, _response) = client_async_with_config(request, maybe_tls, Some(ws_config))
             .await
-            .context(CreateFailed)?;
+            .context(CreateFailedSnafu)?;
 
         Ok(ws_stream)
     }
@@ -207,7 +151,7 @@ impl WebSocketConnector {
         }
     }
 
-    async fn healthcheck(&self) -> crate::Result<()> {
+    pub async fn healthcheck(&self) -> crate::Result<()> {
         self.connect().await.map(|_| ()).map_err(Into::into)
     }
 }
@@ -236,7 +180,7 @@ impl PingInterval {
 }
 
 pub struct WebSocketSink {
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfig<StandardEncodings>,
     connector: WebSocketConnector,
     acker: Acker,
     ping_interval: Option<u64>,
@@ -244,7 +188,7 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
+    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
         Self {
             encoding: config.encoding.clone(),
             connector,
@@ -328,7 +272,15 @@ impl WebSocketSink {
                         Some(msg) => {
                             let msg_len = msg.len();
                             ws_sink.send(msg).await.map(|_| {
-                                emit!(&WsEventSent { byte_size: msg_len });
+                                emit!(&EventsSent {
+                                    count: 1,
+                                    byte_size: msg_len,
+                                    output: None
+                                });
+                                emit!(&BytesSent {
+                                    byte_size: msg_len,
+                                    protocol: "websocket"
+                                });
                             })
                         },
                         None => {
@@ -356,7 +308,7 @@ impl WebSocketSink {
 }
 
 #[async_trait]
-impl StreamSink for WebSocketSink {
+impl StreamSink<Event> for WebSocketSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let input = input.fuse().peekable();
         pin_mut!(input);
@@ -389,31 +341,13 @@ fn is_closed(error: &WsError) -> bool {
     }
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Message> {
-    encoding.apply_rules(&mut event);
-
-    let msg = match encoding.codec() {
-        Encoding::Json => serde_json::to_string(event.as_log())
-            .map_err(|error| error!(message = "Unable to encode.", %error))
-            .ok(),
-        Encoding::Text => event
-            .as_log()
-            .get(crate::config::log_schema().message_key())
-            .map(|v| v.to_string_lossy()),
-    };
-
+fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<Message> {
+    let msg = encoding.encode_input_to_string(event).ok();
     msg.map(|msg| Message::text(msg))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        config::SinkContext,
-        event::{Event, Value as EventValue},
-        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
-        tls::{self, TlsOptions},
-    };
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
@@ -426,17 +360,22 @@ mod tests {
         },
     };
 
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<WebSocketSinkConfig>();
-    }
+    use crate::{
+        config::{SinkConfig, SinkContext},
+        event::{Event, Value as EventValue},
+        sinks::util::encoding::StandardEncodings,
+        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
+        tls::{self, TlsConfig, TlsOptions},
+    };
+
+    use super::*;
 
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
         assert_eq!(
             Message::text("foo"),
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
         );
     }
 
@@ -448,7 +387,7 @@ mod tests {
         log.insert("str", EventValue::from("bar"));
         log.insert("num", EventValue::from(10));
 
-        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
+        let encoded = encode_event(event, &EncodingConfig::from(StandardEncodings::Json));
         let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
         assert_eq!(expected, encoded.unwrap());
     }
@@ -461,7 +400,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr.to_string()),
             tls: None,
-            encoding: Encoding::Json.into(),
+            encoding: StandardEncodings::Json.into(),
             ping_interval: None,
             ping_timeout: None,
         };
@@ -490,7 +429,7 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: Encoding::Json.into(),
+            encoding: StandardEncodings::Json.into(),
             ping_timeout: None,
             ping_interval: None,
         };
@@ -506,7 +445,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr.to_string()),
             tls: None,
-            encoding: Encoding::Json.into(),
+            encoding: StandardEncodings::Json.into(),
             ping_interval: None,
             ping_timeout: None,
         };
