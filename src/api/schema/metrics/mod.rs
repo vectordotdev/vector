@@ -140,6 +140,7 @@ impl MetricsSubscription {
     }
 
     /// Total received events throughput sampled over the provided millisecond `interval`
+    #[graphql(deprecation = "Use component_received_events_throughputs instead")]
     async fn received_events_throughput(
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
