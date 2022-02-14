@@ -6,6 +6,7 @@ pub mod error_stage {
 
 pub mod error_type {
     pub const ACKNOWLEDGMENT_FAILED: &str = "acknowledgment_failed";
+    pub const COMMAND_FAILED: &str = "command_failed";
     pub const CONDITION_FAILED: &str = "condition_failed";
     pub const CONFIGURATION_FAILED: &str = "configuration_failed";
     pub const CONNECTION_FAILED: &str = "connection_failed";

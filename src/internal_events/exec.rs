@@ -43,10 +43,6 @@ impl InternalEvent for ExecEventsReceived<'_> {
     }
 }
 
-// only used by exec
-// should be moved to src/internal_events/prelude.rs if used somewhere else
-pub const COMMAND_FAILED: &str = "command_failed";
-
 #[derive(Debug)]
 pub struct ExecFailedError<'a> {
     pub command: &'a str,
@@ -59,7 +55,7 @@ impl InternalEvent for ExecFailedError<'_> {
             message = "Unable to exec.",
             command = %self.command,
             error = ?self.error,
-            error_type = COMMAND_FAILED,
+            error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
         );
     }
@@ -69,7 +65,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => COMMAND_FAILED,
+            "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -77,7 +73,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => COMMAND_FAILED,
+            "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
     }
