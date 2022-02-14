@@ -56,7 +56,7 @@ impl SourceConfig for UnitTestSourceConfig {
 #[derive(Clone)]
 pub enum UnitTestSinkCheck {
     // Check sets of conditions against received events
-    Checks(Vec<Vec<Box<dyn Condition>>>),
+    Checks(Vec<Vec<Condition>>),
     // Check that no events were received
     NoOutputs,
     // Do nothing

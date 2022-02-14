@@ -152,8 +152,8 @@ pub struct Reduce {
     group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
-    ends_when: Option<Box<dyn Condition>>,
-    starts_when: Option<Box<dyn Condition>>,
+    ends_when: Option<Condition>,
+    starts_when: Option<Condition>,
 }
 
 impl Reduce {
