@@ -54,7 +54,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array(&self) -> &Vec<Self> {
+    pub fn as_array_unwrap(&self) -> &Vec<Self> {
         match self {
             Value::Array(ref a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
@@ -66,7 +66,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array_mut(&mut self) -> &mut Vec<Self> {
+    pub fn as_array_mut_unwrap(&mut self) -> &mut Vec<Self> {
         match self {
             Value::Array(ref mut a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
