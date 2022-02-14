@@ -193,16 +193,7 @@ impl MetricsSubscription {
     }
 
     /// Total outgoing events throughput sampled over the provided millisecond `interval`
-    #[graphql(deprecation = "Use sent_events_throughput instead")]
-    async fn events_out_throughput(
-        &self,
-        #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
-    ) -> impl Stream<Item = i64> {
-        counter_throughput(interval, &|m| m.name() == "events_out_total")
-            .map(|(_, throughput)| throughput as i64)
-    }
-
-    /// Total outgoing events throughput sampled over the provided millisecond `interval`
+    #[graphql(deprecation = "Use component_sent_events_throughputs instead")]
     async fn sent_events_throughput(
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
