@@ -114,6 +114,16 @@ components: sources: socket: {
 				unit:    "seconds"
 			}
 		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
+			}
+		}
 	}
 
 	output: logs: line: {
@@ -144,15 +154,18 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total:     components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_established_total:         components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_send_errors_total:         components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_send_ack_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
+		connection_shutdown_total:            components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

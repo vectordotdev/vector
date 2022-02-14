@@ -1,8 +1,9 @@
 pub mod v1;
 pub mod v2;
 
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription};
 use serde::{Deserialize, Serialize};
+
+use crate::config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -13,7 +14,7 @@ enum V1 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV1 {
-    version: Option<V1>,
+    version: V1,
     #[serde(flatten)]
     config: v1::VectorConfig,
 }
@@ -27,7 +28,7 @@ enum V2 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV2 {
-    version: V2,
+    version: Option<V2>,
     #[serde(flatten)]
     config: v2::VectorConfig,
 }
@@ -67,8 +68,8 @@ impl SinkConfig for VectorConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
     fn sink_type(&self) -> &'static str {

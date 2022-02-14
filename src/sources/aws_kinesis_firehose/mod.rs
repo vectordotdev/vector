@@ -1,16 +1,18 @@
+use std::{fmt, net::SocketAddr};
+
+use futures::FutureExt;
+use serde::{Deserialize, Serialize};
+use warp::Filter;
+
 use crate::{
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use futures::FutureExt;
-use serde::{Deserialize, Serialize};
-use std::{fmt, net::SocketAddr};
-use warp::Filter;
 
 pub mod errors;
 mod filters;
@@ -24,9 +26,9 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -55,13 +57,14 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled(),
             cx.out,
         );
 
@@ -81,8 +84,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -107,7 +110,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -117,24 +120,26 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use super::*;
-    use crate::{
-        event::{Event, EventStatus},
-        log_event,
-        test_util::{collect_ready, next_addr, wait_for_tcp},
-        Pipeline,
+    use std::{
+        io::{Cursor, Read},
+        net::SocketAddr,
     };
+
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
     use pretty_assertions::assert_eq;
-    use shared::assert_event_data_eq;
-    use std::{
-        io::{Cursor, Read},
-        net::SocketAddr,
-    };
     use tokio::time::{sleep, Duration};
+    use vector_common::assert_event_data_eq;
+
+    use super::*;
+    use crate::{
+        event::{Event, EventStatus},
+        log_event,
+        test_util::{collect_ready, next_addr, wait_for_tcp},
+        SourceSender,
+    };
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
     const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";
@@ -173,7 +178,7 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {

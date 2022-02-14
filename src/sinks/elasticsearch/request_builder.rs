@@ -1,12 +1,16 @@
-use crate::sinks::util::{Compression, RequestBuilder};
-
-use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-
-use crate::sinks::elasticsearch::service::ElasticSearchRequest;
-
-use crate::event::{EventFinalizers, Finalizable};
-use crate::sinks::util::encoding::EncodingConfigFixed;
+use bytes::Bytes;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    event::{EventFinalizers, Finalizable},
+    sinks::{
+        elasticsearch::{
+            encoder::{ElasticSearchEncoder, ProcessedEvent},
+            service::ElasticSearchRequest,
+        },
+        util::{encoding::EncodingConfigFixed, Compression, RequestBuilder},
+    },
+};
 
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
@@ -23,7 +27,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     type Metadata = Metadata;
     type Events = Vec<ProcessedEvent>;
     type Encoder = EncodingConfigFixed<ElasticSearchEncoder>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = ElasticSearchRequest;
     type Error = std::io::Error;
 
@@ -50,7 +54,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Vec<u8>) -> Self::Request {
+    fn build_request(&self, metadata: Self::Metadata, payload: Bytes) -> Self::Request {
         ElasticSearchRequest {
             payload,
             finalizers: metadata.finalizers,

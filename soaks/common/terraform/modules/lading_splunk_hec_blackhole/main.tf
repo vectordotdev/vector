@@ -25,6 +25,11 @@ resource "kubernetes_service" "splunk-hec-blackhole" {
       port        = 9090
       target_port = 9090
     }
+    port {
+      name        = "ingress"
+      port        = 8080
+      target_port = 8080
+    }
     type = "ClusterIP"
   }
 }
@@ -90,6 +95,10 @@ resource "kubernetes_deployment" "splunk-hec-blackhole" {
           port {
             container_port = 9090
             name           = "prom-export"
+          }
+          port {
+            container_port = 8080
+            name           = "ingress"
           }
 
           liveness_probe {

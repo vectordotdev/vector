@@ -1,11 +1,15 @@
-use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
-    transforms::{FunctionTransform, Transform},
-};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::{
+    config::{
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::Event,
+    internal_events::{JsonParserError, ParserTargetExistsError},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -32,12 +36,16 @@ impl TransformConfig for JsonParserConfig {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -71,7 +79,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl FunctionTransform for JsonParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 
@@ -80,7 +88,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(&JsonParserFailedParse {
+                        emit!(&JsonParserError {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -103,7 +111,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&JsonParserTargetExists { target_field })
+                        emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);
@@ -132,9 +140,10 @@ impl FunctionTransform for JsonParser {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     use crate::{config::log_schema, event::Event, transforms::test::transform_one};
-    use serde_json::json;
 
     #[test]
     fn generate_config() {
@@ -190,7 +199,7 @@ mod test {
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
-    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    // This is a regression test, see: https://github.com/vectordotdev/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
         let mut parser = JsonParser::from(JsonParserConfig {

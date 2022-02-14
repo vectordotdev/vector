@@ -30,7 +30,7 @@ impl Function for GetMetadataField {
         _ctx: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let keys = vec![value!("datadog_api_key")];
+        let keys = vec![value!("datadog_api_key"), value!("splunk_hec_token")];
         let key = arguments
             .required_enum("key", &keys)?
             .try_bytes_utf8_lossy()
@@ -55,6 +55,6 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes().add_null()
+        TypeDef::bytes().add_null().infallible()
     }
 }

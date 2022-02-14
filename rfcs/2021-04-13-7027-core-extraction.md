@@ -73,7 +73,7 @@ cost -- and its tests end up clearly focused on VRL itself. This _does_ mean
 that integration tests remain to be written in the top-level of the project but
 the overall experience is improved. Changes in VRL are isolated to VRL, though
 experience with `Lookup`/`LookupBuf` -- see
-[5374](https://github.com/timberio/vector/pull/5374) -- does suggest that
+[5374](https://github.com/vectordotdev/vector/pull/5374) -- does suggest that
 aggressive integration of a cross-cutting concern will make things challenging.
 
 We hope to capture the benefits to development we've seen in the VRL sub-package

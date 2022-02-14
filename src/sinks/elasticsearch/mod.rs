@@ -13,31 +13,28 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
+use std::convert::TryFrom;
+
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticSearchEncoder;
-
-use crate::{
-    config::SinkDescription,
-    internal_events::TemplateRenderingFailed,
-    template::{Template, TemplateParseError},
-};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
     Request,
 };
-
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::SignedRequest;
 use serde::{Deserialize, Serialize};
-
 use snafu::{ResultExt, Snafu};
 
-use crate::aws::rusoto::{self, AwsAuthentication};
-use std::convert::TryFrom;
-
-use crate::event::{EventRef, LogEvent};
+use crate::{
+    aws::rusoto::{self, AwsAuthentication},
+    config::SinkDescription,
+    event::{EventRef, LogEvent},
+    internal_events::TemplateRenderingError,
+    template::{Template, TemplateParseError},
+};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -118,7 +115,7 @@ impl ElasticSearchCommonMode {
             Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -138,7 +135,7 @@ impl ElasticSearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(&TemplateRenderingError {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
@@ -184,7 +181,7 @@ async fn finish_signer(
     let credentials = credentials_provider
         .credentials()
         .await
-        .context(AwsCredentialsGenerateFailed)?;
+        .context(AwsCredentialsGenerateFailedSnafu)?;
 
     signer.sign(&credentials);
 

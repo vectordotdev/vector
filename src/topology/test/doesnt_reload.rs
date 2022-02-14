@@ -1,10 +1,14 @@
+use std::path::Path;
+
 use crate::{
     config::Config,
-    sinks::console::{ConsoleSinkConfig, Encoding, Target},
+    sinks::{
+        console::{ConsoleSinkConfig, Target},
+        util::encoding::StandardEncodings,
+    },
     sources::socket::SocketConfig,
     test_util::{next_addr, start_topology},
 };
-use std::path::Path;
 
 #[tokio::test]
 async fn topology_doesnt_reload_new_data_dir() {
@@ -15,7 +19,7 @@ async fn topology_doesnt_reload_new_data_dir() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());

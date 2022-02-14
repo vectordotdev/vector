@@ -1,11 +1,12 @@
-use vrl::prelude::*;
-
-use regex::{Regex, RegexBuilder};
-use roxmltree::{Document, Node, NodeType};
 use std::{
     borrow::Cow,
     collections::{btree_map::Entry, BTreeMap},
 };
+
+use once_cell::sync::Lazy;
+use regex::{Regex, RegexBuilder};
+use roxmltree::{Document, Node, NodeType};
+use vrl::prelude::*;
 
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,
@@ -210,15 +211,14 @@ impl Expression for ParseXmlFn {
     }
 }
 
-fn inner_kind() -> Kind {
-    Kind::Object
+fn type_def() -> TypeDef {
+    TypeDef::bytes()
+        .fallible()
+        .add_object(Collection::from_unknown(inner_kind()))
 }
 
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .bytes()
-        .add_object::<(), Kind>(map! { (): inner_kind() })
+fn inner_kind() -> Kind {
+    Kind::object(BTreeMap::default())
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -350,15 +350,16 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
     }
 }
 
-fn trim_xml(xml: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE: Regex = RegexBuilder::new(r">\s+?<")
-            .multi_line(true)
-            .build()
-            .expect("trim regex failed");
-    }
+static XML_RE: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new(r">\s+?<")
+        .multi_line(true)
+        .build()
+        .expect("trim regex failed")
+});
 
-    RE.replace_all(xml, "><")
+#[inline]
+fn trim_xml(xml: &str) -> Cow<str> {
+    XML_RE.replace_all(xml, "><")
 }
 
 #[cfg(test)]

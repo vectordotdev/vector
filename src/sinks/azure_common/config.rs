@@ -1,18 +1,18 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::sinks::{util::retries::RetryLogic, Healthcheck};
-use azure_core::prelude::*;
-use azure_core::HttpError;
-use azure_storage::blob::blob::responses::PutBlockBlobResponse;
-use azure_storage::blob::prelude::*;
-use azure_storage::core::prelude::*;
+use std::sync::Arc;
+
+use azure_core::{new_http_client, HttpError};
+use azure_storage::prelude::*;
+use azure_storage_blobs::{blob::responses::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use std::sync::Arc;
-use vector_core::buffers::Ackable;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    sinks::{util::retries::RetryLogic, Healthcheck},
+};
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
@@ -51,8 +51,8 @@ impl RetryLogic for AzureBlobRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            HttpError::UnexpectedStatusCode { received, .. } => {
-                received.is_server_error() || received == &StatusCode::TOO_MANY_REQUESTS
+            HttpError::StatusCode { status, .. } => {
+                status.is_server_error() || status == &StatusCode::TOO_MANY_REQUESTS
             }
             _ => false,
         }
@@ -75,6 +75,7 @@ impl DriverResponse for AzureBlobResponse {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -99,7 +100,7 @@ pub fn build_healthcheck(
         match request {
             Ok(_) => Ok(()),
             Err(reason) => Err(match reason.downcast_ref::<HttpError>() {
-                Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                Some(HttpError::StatusCode { status, .. }) => match *status {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
                         container: container_name,

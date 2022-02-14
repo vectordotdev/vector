@@ -6,7 +6,7 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes"}}
+{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations"}}
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     <div class="pb-8 md:pb-10 lg:pb-12">
@@ -46,6 +46,92 @@
       </div>
       {{ end }}
 
+      {{ with $release.known_issues }}
+      {{ if gt (len $release.known_issues) 0 }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Known issues" "level" 2) }}
+        </div>
+
+        <div class="mt-6 flex flex-col space-y-8">
+          <div>
+            <ul class="list-disc">
+              {{ range . }}
+                <li>
+                  <span class="prose dark:prose-dark">
+                    {{ .| markdownify }}
+                  </span>
+                </li>
+              {{ end }}
+            </ul>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ if gt (len $release.changelog) 0 }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+        </div>
+
+        <div class="mt-6 flex flex-col space-y-8">
+          {{ range $k, $v := $groups }}
+          {{ $changes := where $release.changelog ".type" "eq" $k }}
+          {{ if $changes }}
+          {{ $numChanges := len $changes }}
+          {{ $heading := printf "%d %s" $numChanges $v }}
+          <div>
+            <div class="prose dark:prose-dark max-w-none">
+              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+            </div>
+
+            <ul class="list-disc">
+              {{ range $changes }}
+                <li>
+                  <span class="prose dark:prose-dark">
+                    {{ .description | markdownify }}
+                  </span>
+                </li>
+              {{ end }}
+            </ul>
+          </div>
+          {{ end }}
+          {{ end }}
+        </div>
+      </div>
+      {{ else }}
+        {{ if gt (len $release.commits) 0 }}
+        <div class="mt-8">
+          <div class="prose dark:prose-dark max-w-none">
+            {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+          </div>
+
+          <div class="mt-6 flex flex-col space-y-8">
+            {{ range $k, $v := $groups }}
+            {{ $commits := where $release.commits ".type" "eq" $k }}
+            {{ if $commits }}
+            {{ $numCommits := len $commits }}
+            {{ $heading := printf "%d %s" $numCommits $v }}
+            <div>
+              <div class="prose dark:prose-dark max-w-none">
+                {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+              </div>
+
+              <div class="mt-4 flex flex-col space-y-2">
+                {{ range $commits }}
+                {{ template "commit" . }}
+                {{ end }}
+              </div>
+            </div>
+            {{ end }}
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+      {{ end }}
+
       {{ with $release.whats_next }}
       <div class="mt-8">
         <span class="prose dark:prose-dark max-w-none">
@@ -67,53 +153,33 @@
         </div>
       </div>
       {{ end }}
-
-      {{ with $release.commits }}
-      {{ if gt (len $release.commits) 0 }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
-        </div>
-
-        <div class="mt-6 flex flex-col space-y-8">
-          {{ range $k, $v := $groups }}
-          {{ $commits := where $release.commits ".type" "eq" $k }}
-          {{ if $commits }}
-          {{ $numCommits := len $commits }}
-          {{ $heading := printf "%d %s" $numCommits $v }}
-          <div>
-            <div class="prose dark:prose-dark max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
-            </div>
-
-            <div class="mt-4 flex flex-col space-y-2">
-              {{ range $commits }}
-              {{ template "commit" . }}
-              {{ end }}
-            </div>
-          </div>
-          {{ end }}
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
     </div>
-      <div class="mt-8">
-        <div class="lg:grid lg:grid-cols-3 gap-8">
-          <div class="col-span-2">
-            <div class="prose">
-              {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
-            </div>
-      
-            <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
-              {{ partial "download/download-matrix.html" (dict "version" $version) }}
-            </div>
+    <div class="mt-8">
+      <div class="lg:grid lg:grid-cols-3 gap-8">
+        <div class="col-span-2">
+          <div class="prose">
+            {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
+          </div>
+
+          <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+            {{ partial "download/download-matrix.html" (dict "version" $version) }}
           </div>
         </div>
       </div>
+    </div>
   </div>
 </div>
+{{ end }}
+
+{{ define "changelog_entry" }}
+<span class="flex items-center justify-between space-x-3">
+  <span class="flex items-center space-x-3">
+    {{/* Description */}}
+    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+      {{ .description | markdownify }}
+    </span>
+  </span>
+</span>
 {{ end }}
 
 {{ define "commit" }}

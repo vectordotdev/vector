@@ -1,9 +1,3 @@
-use crate::{Look, Lookup, LookupError};
-use inherent::inherent;
-#[cfg(any(test, feature = "arbitrary"))]
-use quickcheck::{Arbitrary, Gen};
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Cow,
     collections::VecDeque,
@@ -12,6 +6,16 @@ use std::{
     str,
     str::FromStr,
 };
+
+use inherent::inherent;
+#[cfg(any(test, feature = "arbitrary"))]
+use quickcheck::{Arbitrary, Gen};
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+
+use crate::{Look, Lookup, LookupError};
 
 #[cfg(test)]
 mod test;

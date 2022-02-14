@@ -1,12 +1,9 @@
 use getset::{Getters, Setters};
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
-
-lazy_static::lazy_static! {
-    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema::default();
-}
+static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
 /// Loads Log Schema from configurations and sets global schema. Once this is
 /// done, configurations can be correctly loaded using configured log schema
@@ -24,9 +21,10 @@ where
     F: FnOnce() -> Result<LogSchema, Vec<String>>,
 {
     let log_schema = builder()?;
-    if LOG_SCHEMA.set(log_schema).is_err() && deny_if_set {
-        panic!("Couldn't set schema");
-    }
+    assert!(
+        !(LOG_SCHEMA.set(log_schema).is_err() && deny_if_set),
+        "Couldn't set schema"
+    );
 
     Ok(())
 }

@@ -1,8 +1,9 @@
 //! Perform a version lookup.
-use super::Result;
-
 use std::process::Stdio;
+
 use tokio::process::Command;
+
+use super::Result;
 
 /// Exec a `kubectl` command to pull down the kubernetes version
 /// metadata for a running cluster for use in the test framework

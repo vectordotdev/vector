@@ -1,6 +1,16 @@
+use bytes::Bytes;
+use getset::Setters;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+
 use crate::{
-    codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
-    config::{DataType, GenerateConfig, Resource, SourceContext},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        LengthDelimitedDecoder,
+    },
+    config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
@@ -10,11 +20,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::Bytes;
-use getset::Setters;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -65,11 +70,12 @@ impl VectorConfig {
             self.receive_buffer_bytes,
             cx,
             false.into(),
+            None,
         )
     }
 
-    pub(super) const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub(super) fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -84,7 +90,7 @@ impl VectorConfig {
 #[derive(Debug, Clone)]
 struct VectorDeserializer;
 
-impl Deserializer for VectorDeserializer {
+impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
@@ -111,12 +117,12 @@ impl TcpSource for VectorSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(LengthDelimitedDecoder::new()),
-            Box::new(VectorDeserializer),
+            Framer::LengthDelimited(LengthDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(VectorDeserializer)),
         )
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+    fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
         TcpNullAcker
     }
 }
@@ -124,29 +130,14 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use super::VectorConfig;
-    use crate::shutdown::ShutdownSignal;
-    use crate::{
-        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
-        event::Event,
-        event::{
-            metric::{MetricKind, MetricValue},
-            Metric,
-        },
-        sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
-        Pipeline,
-    };
-    use futures::stream;
-    use shared::assert_event_data_eq;
     use std::net::SocketAddr;
+
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
-
+    use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -156,13 +147,27 @@ mod test {
         tokio_util::codec::{FramedWrite, LengthDelimitedCodec},
     };
 
+    use super::VectorConfig;
+    use crate::{
+        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
+        event::{
+            metric::{MetricKind, MetricValue},
+            Event, Metric,
+        },
+        shutdown::ShutdownSignal,
+        sinks::vector::v1::VectorConfig as SinkConfig,
+        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        tls::{TlsConfig, TlsOptions},
+        SourceSender,
+    };
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<VectorConfig>();
     }
 
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
@@ -187,7 +192,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 
@@ -234,7 +239,7 @@ mod test {
     #[tokio::test]
     async fn it_closes_stream_on_garbage_data() {
         trace_init();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
 
         let config = VectorConfig::from_address(addr.into());
@@ -271,7 +276,7 @@ mod test {
     #[cfg(not(target_os = "windows"))]
     async fn it_processes_stream_of_protobufs() {
         trace_init();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
 
         let config = VectorConfig::from_address(addr.into());

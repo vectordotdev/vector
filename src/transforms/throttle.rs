@@ -1,18 +1,19 @@
-use crate::conditions::{AnyCondition, Condition};
-use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
-use crate::event::Event;
-use crate::internal_events::{TemplateRenderingFailed, ThrottleEventDiscarded};
-use crate::template::Template;
-use crate::transforms::{TaskTransform, Transform};
+use std::{num::NonZeroU32, pin::Pin, time::Duration};
 
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::num::NonZeroU32;
-use std::pin::Pin;
-use std::time::Duration;
+
+use crate::{
+    conditions::{AnyCondition, Condition},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
+    template::Template,
+    transforms::{TaskTransform, Transform},
+};
 
 #[derive(Deserialize, Default, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -33,15 +34,15 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::task)
+        Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -54,7 +55,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     clock: C,
 }
 
@@ -97,10 +98,10 @@ where
     }
 }
 
-impl<C, I> TaskTransform for Throttle<C, I>
+impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send,
-    I: clock::Reference + Send,
+    C: clock::Clock<Instant = I> + Send + 'static,
+    I: clock::Reference + Send + 'static,
 {
     fn transform(
         self: Box<Self>,
@@ -132,7 +133,7 @@ where
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
-                                                    emit!(&TemplateRenderingFailed {
+                                                    emit!(&TemplateRenderingError {
                                                         error,
                                                         field: Some("key_field"),
                                                         drop_event: false,
@@ -184,10 +185,12 @@ pub enum ConfigError {
 
 #[cfg(test)]
 mod tests {
+    use std::task::Poll;
+
+    use futures::SinkExt;
+
     use super::*;
     use crate::event::Event;
-    use futures::SinkExt;
-    use std::task::Poll;
 
     #[test]
     fn generate_config() {
@@ -206,13 +209,13 @@ window_secs = 5
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future
@@ -272,13 +275,13 @@ exists(.special)
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future
@@ -345,13 +348,13 @@ key_field = "{{ bucket }}"
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
+            .map(Transform::event_task)
             .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
 
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future

@@ -1,7 +1,8 @@
-use bytes::Bytes;
+use std::{convert::Infallible, time::Duration};
+
+use bytes::{BufMut, Bytes, BytesMut};
 use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
-use std::{convert::Infallible, time::Duration};
 use vector::{
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
@@ -10,7 +11,7 @@ use vector::{
     },
     test_util::{random_lines, runtime},
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -29,7 +30,11 @@ fn benchmark_batch(c: &mut Criterion) {
 
     let input: Vec<_> = random_lines(event_len)
         .take(num_events)
-        .map(|s| s.into_bytes())
+        .map(|s| {
+            let mut bytes = BytesMut::new();
+            bytes.put_slice(s.as_bytes());
+            bytes
+        })
         .collect();
 
     for (compression, batch_size) in cases.iter() {
@@ -37,7 +42,7 @@ fn benchmark_batch(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let rt = runtime();
-                    let (acker, _) = Acker::new_for_testing();
+                    let (acker, _) = Acker::basic();
                     let mut batch = BatchSettings::default();
                     batch.size.bytes = *batch_size;
                     batch.size.events = num_events;
@@ -71,7 +76,7 @@ fn benchmark_batch(c: &mut Criterion) {
                 b.iter_batched(
                     || {
                         let rt = runtime();
-                        let (acker, _) = Acker::new_for_testing();
+                        let (acker, _) = Acker::basic();
                         let mut batch = BatchSettings::default();
                         batch.size.bytes = *batch_size;
                         batch.size.events = num_events;
@@ -101,7 +106,7 @@ fn benchmark_batch(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // noisy benchmarks; 10% encapsulates what we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.10);
     targets = benchmark_batch
 );
@@ -113,7 +118,7 @@ pub struct PartitionedBuffer {
 
 #[derive(Clone)]
 pub struct InnerBuffer {
-    pub(self) inner: Vec<u8>,
+    pub(self) inner: BytesMut,
     key: Bytes,
 }
 

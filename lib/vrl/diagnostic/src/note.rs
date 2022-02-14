@@ -1,6 +1,6 @@
+use std::{convert::Into, fmt};
+
 use crate::Urls;
-use std::convert::Into;
-use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Note {
@@ -15,6 +15,8 @@ pub enum Note {
     SeeDocs(String, String),
     #[doc(hidden)]
     Basic(String),
+    #[doc(hidden)]
+    UserErrorMessage(String),
 }
 
 impl Note {
@@ -63,6 +65,7 @@ impl fmt::Display for Note {
                 write!(f, "see documentation about {} at {}", kind, url)
             }
             Basic(string) => write!(f, "{}", string),
+            UserErrorMessage(message) => write!(f, "{}", message),
         }
     }
 }

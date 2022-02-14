@@ -1,5 +1,6 @@
-use bytes::BytesMut;
 use std::io;
+
+use bytes::BytesMut;
 use tokio_util::codec::Decoder;
 
 #[derive(Debug)]

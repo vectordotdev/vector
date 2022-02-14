@@ -284,6 +284,7 @@ Name | Description
 | `sinks-logdna`                                       | Enables building the [`logdna` sink](/docs/reference/configuration/sinks/logdna)
 | `sinks-loki`                                         | Enables building the [`loki` sink](/docs/reference/configuration/sinks/loki)
 | `sinks-new_relic_logs`                               | Enables building the [`new_relic_logs` sink](/docs/reference/configuration/sinks/new_relic_logs)
+| `sinks-new_relic`                                    | Enables building the [`new_relic` sink](/docs/reference/configuration/sinks/new_relic)
 | `sinks-papertrail`                                   | Enables building the [`papertrail` sink](/docs/reference/configuration/sinks/papertrail)
 | `sinks-prometheus`                                   | Enables building the [`prometheus_exporter`](/docs/reference/configuration/sinks/prometheus_exporter) and [`prometheus_remote_write`](/docs/reference/configuration/sinks/prometheus_remote_write) sinks
 | `sinks-pulsar`                                       | Enables building the [`pulsar` sink](/docs/reference/configuration/sinks/pulsar)

@@ -1,36 +1,25 @@
-use crate::{
-    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{BatchNotifier, Event, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    Pipeline,
-};
-use bytes::Bytes;
-use chrono::TimeZone;
-use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
-use lazy_static::lazy_static;
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
-use serde::{Deserialize, Serialize};
-use serde_json::{Error as JsonError, Value as JsonValue};
-use snafu::{ResultExt, Snafu};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
     iter::FromIterator,
+    path::{Path, PathBuf},
     process::Stdio,
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
+
+use bytes::Bytes;
+use chrono::TimeZone;
+use futures::{future, stream, stream::BoxStream, StreamExt};
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use serde_json::{Error as JsonError, Value as JsonValue};
+use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
@@ -39,6 +28,19 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, Event, LogEvent, Value},
+    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -52,9 +54,7 @@ const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
-lazy_static! {
-    static ref JOURNALCTL: PathBuf = "journalctl".into();
-}
+static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -172,6 +172,7 @@ impl SourceConfig for JournaldConfig {
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
         let journal_dir = self.journal_directory.clone();
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let start: StartJournalctlFn = Box::new(move |cursor| {
             let mut command = create_command(
@@ -191,14 +192,14 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: self.acknowledgements.enabled,
+                acknowledgements: acknowledgements.enabled(),
             }
             .run_shutdown(cx.shutdown, start),
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -212,7 +213,7 @@ struct JournaldSource {
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
-    out: Pipeline,
+    out: SourceSender,
     acknowledgements: bool,
 }
 
@@ -359,7 +360,7 @@ impl JournaldSource {
             if count > 0 {
                 emit!(&JournaldEventsReceived { count, byte_size });
                 if !events.is_empty() {
-                    match self.out.send_all(&mut stream::iter(events).map(Ok)).await {
+                    match self.out.send_all(&mut stream::iter(events)).await {
                         Ok(_) => {
                             if let Some(receiver) = receiver {
                                 // Ignore the received status, we can't do anything with failures here.
@@ -420,11 +421,11 @@ fn start_journalctl(
     BoxStream<'static, Result<Bytes, BoxedFramingError>>,
     StopJournalctlFn,
 )> {
-    let mut child = command.spawn().context(JournalctlSpawn)?;
+    let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        CharacterDelimitedDecoder::new('\n'),
+        CharacterDelimitedDecoder::new(b'\n'),
     )
     .boxed();
 
@@ -639,9 +640,10 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod checkpointer_tests {
-    use super::*;
     use tempfile::tempdir;
     use tokio::fs::read_to_string;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -683,16 +685,18 @@ mod checkpointer_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::EventStatus, test_util::components};
-    use futures::Stream;
-    use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
+        pin::Pin,
         task::{Context, Poll},
     };
+
+    use futures::Stream;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
+
+    use super::*;
+    use crate::{event::EventStatus, test_util::components};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -765,7 +769,7 @@ mod tests {
         cursor: Option<&str>,
     ) -> Vec<Event> {
         components::init_test();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
         let tempdir = tempdir().unwrap();
@@ -953,7 +957,7 @@ mod tests {
 
     #[tokio::test]
     async fn waits_for_acknowledgements() {
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
         let mut checkpoint_path = tempdir.path().to_path_buf();
@@ -983,7 +987,7 @@ mod tests {
         assert!(!handle.is_woken());
         // Acknowledge all the received events.
         let mut count = 0;
-        while let Ok(Some(event)) = rx.try_next() {
+        while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             event.metadata().update_status(EventStatus::Delivered);
             count += 1;
         }

@@ -81,9 +81,9 @@ more info navigating your solution.
 
 ### Before creating an RFC
 
-1. Search Github for [previous issues](https://github.com/timberio/vector/issues) and
-   [RFCs](https://github.com/timberio/vector/tree/master/rfcs) on this topic.
-1. If an RFC issue does not exist, [open one](https://github.com/timberio/vector/issues/new/choose).
+1. Search Github for [previous issues](https://github.com/vectordotdev/vector/issues) and
+   [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
+1. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
 1. Use the issue to obtain consensus that an RFC is necessary.
    * The change might be quickly rejected.
    * The change might be on our long term roadmap and get deferred.

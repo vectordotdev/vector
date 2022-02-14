@@ -1,5 +1,6 @@
-use shared::btreemap;
 use std::collections::BTreeMap;
+
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -78,14 +79,10 @@ impl Expression for TagTypesExternallyFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        match self.value.type_def(state).kind() {
-            kind if kind.is_array() => TypeDef::new()
-                .infallible()
-                .array_mapped::<(), Kind>(map! { (): Kind::all() }),
-            kind if kind.is_null() => TypeDef::new().infallible().null(),
-            _ => TypeDef::new()
-                .infallible()
-                .object::<(), Kind>(map! { (): Kind::all() }),
+        match self.value.type_def(state) {
+            td if td.is_array() => TypeDef::array(Collection::any()),
+            td if td.is_null() => TypeDef::null(),
+            _ => TypeDef::object(Collection::any()),
         }
     }
 }
@@ -129,10 +126,11 @@ fn tag_type_externally(value: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
     use regex::Regex;
-    use shared::btreemap;
+    use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         tag_types_externally => TagTypesExternally;
@@ -142,7 +140,7 @@ mod tests {
             want: Ok(btreemap! {
                 "string" => "foo",
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_integer {
@@ -150,7 +148,7 @@ mod tests {
             want: Ok(btreemap! {
                 "integer" => 123
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_float {
@@ -158,7 +156,7 @@ mod tests {
             want: Ok(btreemap! {
                 "float" => 123.45
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_boolean {
@@ -166,7 +164,7 @@ mod tests {
             want: Ok(btreemap! {
                 "boolean" => true
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_map {
@@ -176,7 +174,7 @@ mod tests {
                     "string" => "bar"
                 }
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_array {
@@ -186,7 +184,7 @@ mod tests {
                     "string" => "foo"
                 },
             ]),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         tag_timestamp {
@@ -194,7 +192,7 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_regex {
@@ -202,13 +200,13 @@ mod tests {
             want: Ok(btreemap! {
                 "regex" => Regex::new(".*").unwrap()
             }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         tag_null {
             args: func_args![value: Value::Null],
             want: Ok(Value::Null),
-            tdef: TypeDef::new().null(),
+            tdef: TypeDef::null(),
         }
     ];
 }

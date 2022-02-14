@@ -1,12 +1,20 @@
 extern crate pest;
 
+use ordered_float::NotNan;
+use std::{convert::TryFrom, str::FromStr};
+
+use pest::{
+    error::ErrorVariant,
+    iterators::{Pair, Pairs},
+    Parser,
+};
+
 use crate::{
     event::Value,
     mapping::{
         query::{
             self,
-            arithmetic::Arithmetic,
-            arithmetic::Operator,
+            arithmetic::{Arithmetic, Operator},
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
             query_value::QueryValue,
@@ -17,13 +25,6 @@ use crate::{
         OnlyFields, Result,
     },
 };
-use pest::{
-    error::ErrorVariant,
-    iterators::{Pair, Pairs},
-    Parser,
-};
-use std::convert::TryFrom;
-use std::str::FromStr;
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
 // updated in unexpected, and unsupported ways.
@@ -413,7 +414,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::float => Box::new(Literal::from(Value::from(
-            pair.as_str().parse::<f64>().unwrap(),
+            NotNan::new(pair.as_str().parse::<f64>().unwrap()).unwrap(),
         ))),
         Rule::integer => Box::new(Literal::from(Value::from(
             pair.as_str().parse::<i64>().unwrap(),

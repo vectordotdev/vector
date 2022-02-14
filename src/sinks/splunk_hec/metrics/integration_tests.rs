@@ -1,20 +1,23 @@
+use std::{convert::TryFrom, sync::Arc};
+
+use futures_util::stream;
+use serde_json::Value as JsonValue;
+use vector_common::btreemap;
+use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
+
 use super::config::HecMetricsSinkConfig;
-use crate::template::Template;
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{Metric, MetricKind},
     sinks::{
-        splunk_hec::common::integration_test_helpers::get_token,
+        splunk_hec::common::integration_test_helpers::{
+            get_token, splunk_api_address, splunk_hec_address,
+        },
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::Template,
     test_util::components::{self, HTTP_SINK_TAGS},
 };
-use futures_util::stream;
-use serde_json::Value as JsonValue;
-use shared::btreemap;
-use std::convert::TryFrom;
-use std::sync::Arc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
@@ -25,8 +28,8 @@ async fn config() -> HecMetricsSinkConfig {
 
     HecMetricsSinkConfig {
         default_namespace: None,
-        token: get_token().await,
-        endpoint: "http://localhost:8088/".into(),
+        default_token: get_token().await,
+        endpoint: splunk_hec_address(),
         host_key: "host".into(),
         index: None,
         sourcetype: None,
@@ -125,6 +128,7 @@ async fn splunk_insert_multiple_counter_metrics() {
         events.push(get_counter(Arc::clone(&batch)))
     }
     drop(batch);
+    let events = events.into_iter().map(Into::into);
     components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -151,6 +155,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
         events.push(get_gauge(Arc::clone(&batch)))
     }
     drop(batch);
+    let events = events.into_iter().map(Into::into);
     components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -197,9 +202,11 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
 
     let res = client
         .get(format!(
-            "https://localhost:8089/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
+            "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
+            splunk_api_address(),
             metric_name
         ))
+        .form(&vec![("filter", "index=*")])
         .basic_auth(USERNAME, Some(PASSWORD))
         .send()
         .await

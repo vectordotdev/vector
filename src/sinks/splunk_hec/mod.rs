@@ -4,16 +4,15 @@ pub mod common;
 pub mod logs;
 pub mod metrics;
 
-use self::logs::config::HecSinkLogsConfig;
-use self::metrics::config::HecMetricsSinkConfig;
+use self::{logs::config::HecLogsSinkConfig, metrics::config::HecMetricsSinkConfig};
 
 // legacy
 inventory::submit! {
-    SinkDescription::new::<HecSinkLogsConfig>("splunk_hec")
+    SinkDescription::new::<HecLogsSinkConfig>("splunk_hec")
 }
 
 inventory::submit! {
-    SinkDescription::new::<HecSinkLogsConfig>("splunk_hec_logs")
+    SinkDescription::new::<HecLogsSinkConfig>("splunk_hec_logs")
 }
 
 inventory::submit! {

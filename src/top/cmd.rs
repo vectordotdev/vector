@@ -1,10 +1,11 @@
+use url::Url;
+use vector_api_client::{connect_subscription_client, Client};
+
 use super::{
     dashboard::{init_dashboard, is_tty},
     metrics, state,
 };
 use crate::config;
-use url::Url;
-use vector_api_client::{connect_subscription_client, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets

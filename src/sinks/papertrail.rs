@@ -1,7 +1,11 @@
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use syslog::{Facility, Formatter3164, LogFormat, Severity};
+
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
@@ -11,10 +15,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-
-use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -74,8 +74,8 @@ impl SinkConfig for PapertrailConfig {
         })
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -99,7 +99,7 @@ fn encode_event(
         .and_then(|t| {
             t.render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("process"),
                         drop_event: false,
@@ -140,8 +140,9 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::convert::TryFrom;
+
+    use super::*;
 
     #[test]
     fn generate_config() {

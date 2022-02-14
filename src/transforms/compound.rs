@@ -1,12 +1,13 @@
+use indexmap::IndexMap;
+use serde::{self, Deserialize, Serialize};
+
 use crate::{
     config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     transforms::Transform,
 };
-use indexmap::IndexMap;
-use serde::{self, Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CompoundConfig {
@@ -61,12 +62,12 @@ impl TransformConfig for CompoundConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::any()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Any)]
     }
 
     fn transform_type(&self) -> &'static str {

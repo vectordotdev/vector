@@ -1,6 +1,6 @@
+use std::{error::Error, fmt};
+
 use serde::Serialize;
-use std::error::Error;
-use std::fmt;
 
 #[derive(Serialize, Debug)]
 pub struct ErrorMessage {

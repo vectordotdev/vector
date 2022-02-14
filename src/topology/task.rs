@@ -1,21 +1,24 @@
-use crate::config::ComponentKey;
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-use vector_core::buffers::Acker;
 
-use super::EventStream;
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
+use vector_core::{
+    buffers::{topology::channel::BufferReceiver, Acker},
+    event::Event,
+};
+
+use crate::{config::ComponentKey, utilization::Utilization};
 
 pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiver<Event>>, Acker),
     Healthcheck,
 }
 

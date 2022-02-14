@@ -1,31 +1,36 @@
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::http::{Auth, HttpClient};
-use crate::sinks::util::http::{HttpBatchService, RequestConfig};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    task::{Context, Poll},
+};
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Response, Uri};
-use hyper::service::Service;
-use hyper::{Body, Request};
-use std::task::{Context, Poll};
+use http::{header::HeaderName, Response, Uri};
+use hyper::{header::HeaderValue, service::Service, Body, Request};
+use rusoto_core::{
+    credential::{AwsCredentials, ProvideAwsCredentials},
+    signature::{SignedRequest, SignedRequestPayload},
+    Region,
+};
 use tower::ServiceExt;
-use vector_core::buffers::Ackable;
+use vector_core::{
+    buffers::Ackable, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+};
 
-use crate::aws::rusoto::AwsCredentialsProvider;
-use crate::sinks::util::{Compression, ElementCount};
-use http::header::HeaderName;
-use hyper::header::HeaderValue;
-use rusoto_core::credential::{AwsCredentials, ProvideAwsCredentials};
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::Region;
-use std::collections::HashMap;
-use std::sync::Arc;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
-use vector_core::ByteSizeOf;
+use crate::{
+    aws::rusoto::AwsCredentialsProvider,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    http::{Auth, HttpClient},
+    sinks::util::{
+        http::{HttpBatchService, RequestConfig},
+        Compression, ElementCount,
+    },
+};
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
     pub events_byte_size: usize,
@@ -58,7 +63,7 @@ impl Finalizable for ElasticSearchRequest {
 #[derive(Clone)]
 pub struct ElasticSearchService {
     batch_service: HttpBatchService<
-        BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>>,
+        BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
         ElasticSearchRequest,
     >,
 }
@@ -71,7 +76,7 @@ impl ElasticSearchService {
         let http_request_builder = Arc::new(http_request_builder);
         let batch_service = HttpBatchService::new(http_client, move |req| {
             let request_builder = Arc::clone(&http_request_builder);
-            let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+            let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
                 Box::pin(async move { request_builder.build_request(req).await });
             future
         });
@@ -93,7 +98,7 @@ impl HttpRequestBuilder {
     pub async fn build_request(
         &self,
         es_req: ElasticSearchRequest,
-    ) -> Result<Request<Vec<u8>>, crate::Error> {
+    ) -> Result<Request<Bytes>, crate::Error> {
         let mut builder = Request::post(&self.bulk_uri);
 
         let request = if let Some(credentials_provider) = &self.credentials_provider {
@@ -117,9 +122,9 @@ impl HttpRequestBuilder {
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder
-                    .body(body.to_vec())
-                    .expect("Invalid http request value used"),
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body).expect("Invalid http request value used")
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -192,6 +197,7 @@ impl DriverResponse for ElasticSearchResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

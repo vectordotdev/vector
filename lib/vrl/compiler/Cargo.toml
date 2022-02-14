@@ -1,15 +1,16 @@
 [package]
 name = "vrl-compiler"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
+vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
+value = { path = "../../value" }
 
 bitflags = "1"
 bytes = "1.1.0"
@@ -27,7 +28,7 @@ serde_json = { version = "1", default-features = false, features = ["std"] }
 [dev-dependencies]
 criterion = "0.3"
 indoc = "1"
-shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"
