@@ -103,22 +103,22 @@ impl std::fmt::Display for Kind {
 impl From<&Value> for Kind {
     fn from(value: &Value) -> Self {
         match value {
-            Value::Bytes(_) => Kind::bytes(),
-            Value::Integer(_) => Kind::integer(),
-            Value::Float(_) => Kind::float(),
-            Value::Boolean(_) => Kind::boolean(),
-            Value::Timestamp(_) => Kind::timestamp(),
-            Value::Regex(_) => Kind::regex(),
-            Value::Null => Kind::null(),
+            Value::Bytes(_) => Self::bytes(),
+            Value::Integer(_) => Self::integer(),
+            Value::Float(_) => Self::float(),
+            Value::Boolean(_) => Self::boolean(),
+            Value::Timestamp(_) => Self::timestamp(),
+            Value::Regex(_) => Self::regex(),
+            Value::Null => Self::null(),
 
-            Value::Object(object) => Kind::object(
+            Value::Object(object) => Self::object(
                 object
                     .iter()
                     .map(|(k, v)| (k.clone().into(), v.into()))
                     .collect::<BTreeMap<_, _>>(),
             ),
 
-            Value::Array(array) => Kind::array(
+            Value::Array(array) => Self::array(
                 array
                     .iter()
                     .enumerate()

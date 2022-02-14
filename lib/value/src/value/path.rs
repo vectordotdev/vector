@@ -13,23 +13,23 @@ impl Value {
                 SegmentBuf::Field(FieldBuf { name, .. }) => {
                     let mut map = BTreeMap::default();
                     map.insert(name.as_str().to_owned(), self);
-                    self = Value::Object(map);
+                    self = Self::Object(map);
                 }
                 SegmentBuf::Coalesce(fields) => {
                     let field = fields.last().unwrap();
                     let mut map = BTreeMap::default();
                     map.insert(field.as_str().to_owned(), self);
-                    self = Value::Object(map);
+                    self = Self::Object(map);
                 }
                 SegmentBuf::Index(index) => {
                     let mut array = vec![];
 
                     if *index > 0 {
-                        array.resize(*index as usize, Value::Null);
+                        array.resize(*index as usize, Self::Null);
                     }
 
                     array.push(self);
-                    self = Value::Array(array);
+                    self = Self::Array(array);
                 }
             }
         }

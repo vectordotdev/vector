@@ -97,10 +97,8 @@ impl Value {
     // This replaces the more implicit "From<f64>", but keeps the same behavior.
     // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
     /// Creates a Value from an f64. If the value is Nan, it is converted to 0.0
-    pub fn from_f64_or_zero(value: f64) -> Value {
-        NotNan::new(value)
-            .map(Value::Float)
-            .unwrap_or_else(|_| Value::Float(NotNan::new(0.0).unwrap()))
+    #[must_use] pub fn from_f64_or_zero(value: f64) -> Self {
+        NotNan::new(value).map_or_else(|_| Self::Float(NotNan::new(0.0).unwrap()), Value::Float)
     }
 
     /// Returns true if self is `Value::Bytes`.
@@ -182,7 +180,7 @@ impl Value {
     }
 
     /// Returns self as `&[Value]`, only if self is `Value::Array`.
-    pub fn as_array(&self) -> Option<&[Value]> {
+    pub fn as_array(&self) -> Option<&[Self]> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
@@ -190,7 +188,7 @@ impl Value {
     }
 
     /// Returns self as `&mut Vec<Value>`, only if self is `Value::Array`.
-    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Self>> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
@@ -203,7 +201,7 @@ impl Value {
     }
 
     /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Object`.
-    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<String, Self>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
@@ -211,7 +209,7 @@ impl Value {
     }
 
     /// Returns self as `&mut BTreeMap<String, Value>`, only if self is `Value::Object`.
-    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Self>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
@@ -251,7 +249,7 @@ impl From<String> for Value {
 
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
-        Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))
+        Self::Bytes(Bytes::copy_from_slice(v.as_bytes()))
     }
 }
 
@@ -322,13 +320,13 @@ impl FromIterator<(String, Self)> for Value {
 
 impl From<Regex> for Value {
     fn from(r: Regex) -> Self {
-        Value::Regex(ValueRegex::new(r))
+        Self::Regex(ValueRegex::new(r))
     }
 }
 
 impl From<ValueRegex> for Value {
     fn from(r: ValueRegex) -> Self {
-        Value::Regex(r)
+        Self::Regex(r)
     }
 }
 
