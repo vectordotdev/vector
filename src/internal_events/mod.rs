@@ -158,6 +158,14 @@ pub mod kubernetes;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
+#[cfg(feature = "transforms-add_fields")]
+pub(crate) use self::add_fields::*;
+#[cfg(feature = "transforms-add_tags")]
+pub(crate) use self::add_tags::*;
+#[cfg(feature = "transforms-aggregate")]
+pub(crate) use self::aggregate::*;
+#[cfg(feature = "transforms-ansi_stripper")]
+pub(crate) use self::ansi_stripper::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
@@ -194,6 +202,8 @@ pub(crate) use self::demo_logs::*;
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
+#[cfg(feature = "sinks-elasticsearch")]
+pub(crate) use self::elasticsearch::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
@@ -259,16 +269,22 @@ pub(crate) use self::parser::*;
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
+#[cfg(feature = "sinks-pulsar")]
+pub(crate) use self::pulsar::*;
 #[cfg(feature = "sinks-redis")]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
+#[cfg(feature = "transforms-remap")]
+pub(crate) use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub(crate) use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub(crate) use self::rename_fields::*;
 #[cfg(feature = "transforms-route")]
 pub(crate) use self::route::*;
+#[cfg(feature = "transforms-sample")]
+pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub(crate) use self::sematext_metrics::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -286,10 +302,9 @@ pub(crate) use self::throttle::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{
-    adaptive_concurrency::*, add_fields::*, add_tags::*, aggregate::*, ansi_stripper::*, batch::*,
-    blackhole::*, common::*, conditions::*, elasticsearch::*, encoding_transcode::*, heartbeat::*,
-    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, socket::*, stdin::*, tcp::*,
-    template::*, udp::*, unix::*, vector::*,
+    adaptive_concurrency::*, batch::*, blackhole::*, common::*, conditions::*,
+    encoding_transcode::*, heartbeat::*, logplex::*, open::*, process::*, socket::*, stdin::*,
+    tcp::*, template::*, udp::*, unix::*, vector::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
