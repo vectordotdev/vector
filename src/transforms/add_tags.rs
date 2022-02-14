@@ -18,7 +18,7 @@ use crate::{
 pub struct AddTagsConfig {
     tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(super) overwrite: bool,
 }
 
 #[derive(Clone, Debug)]
