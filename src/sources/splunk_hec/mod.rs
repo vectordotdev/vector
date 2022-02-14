@@ -49,7 +49,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct SplunkConfig {
+pub(self) struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
