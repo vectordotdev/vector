@@ -8,13 +8,8 @@ mod r#macro;
 mod serde;
 mod target;
 
-
-
-
-
 pub use error::VrlValueError;
 pub use kind::{Collection, Field, Index, Kind};
-
 
 pub use self::arithmetic::VrlValueArithmetic;
 pub use self::convert::VrlValueConvert;
