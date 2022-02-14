@@ -8123,6 +8123,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.1.0",
  "chrono",
+ "indoc",
  "lookup",
  "mlua",
  "ordered-float",
