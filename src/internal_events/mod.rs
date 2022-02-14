@@ -288,8 +288,8 @@ pub(crate) use self::windows::*;
 pub(crate) use self::{
     adaptive_concurrency::*, add_fields::*, add_tags::*, aggregate::*, ansi_stripper::*, batch::*,
     blackhole::*, common::*, conditions::*, elasticsearch::*, encoding_transcode::*, heartbeat::*,
-    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, socket::*, stdin::*,
-    syslog::*, tcp::*, template::*, udp::*, unix::*, vector::*,
+    logplex::*, open::*, process::*, pulsar::*, remap::*, sample::*, socket::*, stdin::*, tcp::*,
+    template::*, udp::*, unix::*, vector::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
