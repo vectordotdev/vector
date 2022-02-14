@@ -87,7 +87,7 @@ impl WebSocketConnector {
             .host()
             .ok_or(WsError::Url(UrlError::NoHostName))?
             .to_string();
-        let mode = uri_mode(&request.uri())?;
+        let mode = uri_mode(request.uri())?;
         let port = request.uri().port_u16().unwrap_or_else(|| match mode {
             UriMode::Tls => 443,
             UriMode::Plain => 80,
@@ -96,7 +96,7 @@ impl WebSocketConnector {
         Ok((host, port))
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         ExponentialBackoff::from_millis(2)
             .factor(250)
             .max_delay(Duration::from_secs(60))
@@ -208,7 +208,7 @@ impl WebSocketSink {
         ws_stream.split()
     }
 
-    fn check_received_pong_time(&self, last_pong: &Instant) -> Result<(), WsError> {
+    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), WsError> {
         if let Some(ping_timeout) = self.ping_timeout {
             if last_pong.elapsed() > Duration::from_secs(ping_timeout) {
                 return Err(WsError::Io(io::Error::new(
@@ -245,7 +245,7 @@ impl WebSocketSink {
         loop {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
-                    match self.check_received_pong_time(&last_pong) {
+                    match self.check_received_pong_time(last_pong) {
                         Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
                         Err(e) => Err(e)
                     }
@@ -333,17 +333,18 @@ impl StreamSink<Event> for WebSocketSink {
     }
 }
 
-fn is_closed(error: &WsError) -> bool {
-    match error {
-        WsError::ConnectionClosed | WsError::AlreadyClosed => true,
-        WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
-        _ => false,
-    }
+const fn is_closed(error: &WsError) -> bool {
+    matches!(
+        error,
+        WsError::ConnectionClosed
+            | WsError::AlreadyClosed
+            | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
+    )
 }
 
 fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<Message> {
     let msg = encoding.encode_input_to_string(event).ok();
-    msg.map(|msg| Message::text(msg))
+    msg.map(Message::text)
 }
 
 #[cfg(test)]
@@ -398,7 +399,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr.to_string()),
+            uri: format!("ws://{}", addr),
             tls: None,
             encoding: StandardEncodings::Json.into(),
             ping_interval: None,
@@ -419,7 +420,7 @@ mod tests {
         let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
 
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{}", addr.to_string()),
+            uri: format!("wss://{}", addr),
             tls: Some(TlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
@@ -443,7 +444,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr.to_string()),
+            uri: format!("ws://{}", addr),
             tls: None,
             encoding: StandardEncodings::Json.into(),
             ping_interval: None,
@@ -451,7 +452,7 @@ mod tests {
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        let mut receiver = create_count_receiver(addr.clone(), tls.clone(), true);
+        let mut receiver = create_count_receiver(addr, tls.clone(), true);
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();

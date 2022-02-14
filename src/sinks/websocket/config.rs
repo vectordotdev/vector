@@ -38,7 +38,7 @@ impl GenerateConfig for WebSocketSinkConfig {
 impl SinkConfig for WebSocketSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let ws_sink = WebSocketSink::new(&self, connector.clone(), cx.acker());
+        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker());
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),
@@ -58,7 +58,7 @@ impl SinkConfig for WebSocketSinkConfig {
 impl WebSocketSinkConfig {
     fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false).context(ConnectSnafu)?;
-        Ok(WebSocketConnector::new(self.uri.clone(), tls)?)
+        WebSocketConnector::new(self.uri.clone(), tls)
     }
 }
 
