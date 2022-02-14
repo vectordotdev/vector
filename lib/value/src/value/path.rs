@@ -38,47 +38,59 @@ impl Value {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::value;
-//
-//     #[test]
-//     fn test_object() {
-//         let path = parser::parse_path(".foo.bar.baz").unwrap();
-//         let value = value!(12);
-//
-//         let object = value!({ "foo": { "bar": { "baz": 12 } } });
-//
-//         assert_eq!(value.at_path(&path), object);
-//     }
-//
-//     #[test]
-//     fn test_root() {
-//         let path = parser::parse_path(".").unwrap();
-//         let value = value!(12);
-//
-//         let object = value!(12);
-//
-//         assert_eq!(value.at_path(&path), object);
-//     }
-//
-//     #[test]
-//     fn test_array() {
-//         let path = parser::parse_path(".[2]").unwrap();
-//         let value = value!(12);
-//
-//         let object = value!([null, null, 12]);
-//
-//         assert_eq!(value.at_path(&path), object);
-//     }
-//
-//     #[test]
-//     fn test_complex() {
-//         let path = parser::parse_path(".[2].foo.(bar | baz )[1]").unwrap();
-//         let value = value!({ "bar": [12] });
-//
-//         let object = value!([null, null, { "foo": { "baz": [null, { "bar": [12] }] } } ]);
-//
-//         assert_eq!(value.at_path(&path), object);
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use crate::Value;
+    use lookup::{parser, LookupBuf};
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_object() {
+        let path = parser::parse_lookup(".foo.bar.baz").unwrap();
+        let value = Value::Integer(12);
+
+        let bar_value = Value::Object(BTreeMap::from([("baz".into(), value.clone())]));
+        let foo_value = Value::Object(BTreeMap::from([("bar".into(), bar_value)]));
+
+        let object = Value::Object(BTreeMap::from([("foo".into(), foo_value)]));
+
+        assert_eq!(value.at_path(&path.into_buf()), object);
+    }
+
+    #[test]
+    fn test_root() {
+        let path = LookupBuf::default();
+        let value = Value::Integer(12);
+
+        let object = Value::Integer(12);
+
+        assert_eq!(value.at_path(&path), object);
+    }
+
+    #[test]
+    fn test_array() {
+        let path = parser::parse_lookup("[2]").unwrap();
+        let value = Value::Integer(12);
+
+        let object = Value::Array(vec![Value::Null, Value::Null, Value::Integer(12)]);
+
+        assert_eq!(value.at_path(&path.into_buf()), object);
+    }
+
+    #[test]
+    fn test_complex() {
+        let path = parser::parse_lookup("[2].foo.(bar | baz )[1]").unwrap();
+        let value = Value::Object([("bar".into(), vec![12].into())].into()); //value!({ "bar": [12] });
+
+        let baz_value = Value::Array(vec![Value::Null, value.clone()]);
+        let foo_value = Value::Object(BTreeMap::from([("baz".into(), baz_value)]));
+
+        let object = Value::Array(vec![
+            Value::Null,
+            Value::Null,
+            Value::Object(BTreeMap::from([("foo".into(), foo_value)])),
+        ]);
+
+        assert_eq!(value.at_path(&path.into_buf()), object);
+    }
+}
