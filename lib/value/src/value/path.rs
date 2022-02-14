@@ -16,7 +16,7 @@ impl Value {
                     self = Self::Object(map);
                 }
                 SegmentBuf::Coalesce(fields) => {
-                    let field = fields.last().unwrap();
+                    let field = fields.last().expect("fields should not be empty");
                     let mut map = BTreeMap::default();
                     map.insert(field.as_str().to_owned(), self);
                     self = Self::Object(map);

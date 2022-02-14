@@ -97,8 +97,12 @@ impl Value {
     // This replaces the more implicit "From<f64>", but keeps the same behavior.
     // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
     /// Creates a Value from an f64. If the value is Nan, it is converted to 0.0
-    #[must_use] pub fn from_f64_or_zero(value: f64) -> Self {
-        NotNan::new(value).map_or_else(|_| Self::Float(NotNan::new(0.0).unwrap()), Value::Float)
+    #[must_use]
+    pub fn from_f64_or_zero(value: f64) -> Self {
+        NotNan::new(value).map_or_else(
+            |_| Self::Float(NotNan::new(0.0).expect("0.0 is not NaN")),
+            Value::Float,
+        )
     }
 
     /// Returns true if self is `Value::Bytes`.
@@ -117,6 +121,9 @@ impl Value {
     /// Converts the Value into a byte representation regardless of its original type.
     /// Object and Array are currently not supported, although technically there's no reason why it
     /// couldn't in future should the need arise.
+    ///
+    /// # Errors
+    /// If the type is Object or Array, and string error description will be returned
     pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
         match self {
             Value::Bytes(bytes) => Ok(bytes.clone()),

@@ -116,7 +116,7 @@ impl Value {
     /// ```
     ///
     pub fn insert_by_path(&mut self, path: &LookupBuf, new: Self) {
-        self.insert_by_segments(path.as_segments().iter().peekable(), new)
+        self.insert_by_segments(path.as_segments().iter().peekable(), new);
     }
 
     /// Remove a value, given the provided path.
@@ -131,7 +131,7 @@ impl Value {
     /// that had one of its elements removed and is now empty, is removed as
     /// well.
     pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) {
-        self.remove_by_segments(path.as_segments().iter().peekable(), compact)
+        self.remove_by_segments(path.as_segments().iter().peekable(), compact);
     }
 
     fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Self>
@@ -282,7 +282,7 @@ impl Value {
             Some(value) => {
                 // We have already consumed this element via a peek.
                 let _ = segments.next();
-                value.insert_by_segments(segments, new)
+                value.insert_by_segments(segments, new);
             }
             None => self.update_by_segments(segments, new),
         };
@@ -303,7 +303,7 @@ impl Value {
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
             if !matches!(self, Value::Object(_)) {
-                *self = BTreeMap::default().into()
+                *self = BTreeMap::default().into();
             }
 
             let map = match self {
@@ -345,7 +345,7 @@ impl Value {
                     None => return,
                 };
 
-                handle_field(field.as_str(), new, segments)
+                handle_field(field.as_str(), new, segments);
             }
             SegmentBuf::Index(index) => {
                 let array = match self {
@@ -366,7 +366,7 @@ impl Value {
 
                     // left-padded with null values
                     for _ in 1..abs - array.len() {
-                        array.insert(0, Self::Null)
+                        array.insert(0, Self::Null);
                     }
 
                     match segments.peek() {
