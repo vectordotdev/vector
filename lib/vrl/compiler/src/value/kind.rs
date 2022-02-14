@@ -24,17 +24,6 @@ pub use ::value::{
     Kind,
 };
 
-// TODO: remove this trait
-pub trait VrlValueKind {
-    fn kind(&self) -> Kind;
-}
-
-impl VrlValueKind for Value {
-    fn kind(&self) -> Kind {
-        self.into()
-    }
-}
-
 pub trait DefaultValue {
     /// Returns the default [`Value`] for a given [`Kind`].
     ///

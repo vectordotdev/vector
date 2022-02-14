@@ -1,5 +1,5 @@
 use crate::value::regex::ValueRegex;
-use crate::Value;
+use crate::{Kind, Value};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
@@ -221,6 +221,11 @@ impl Value {
     /// Returns true if self is `Value::Timestamp`.
     pub fn is_timestamp(&self) -> bool {
         matches!(self, Value::Timestamp(_))
+    }
+
+    /// Returns the `Kind` of this `Value`
+    pub fn kind(&self) -> Kind {
+        self.into()
     }
 }
 

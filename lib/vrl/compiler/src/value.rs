@@ -10,7 +10,6 @@ pub use kind::{Collection, Field, Index, Kind};
 
 pub use self::arithmetic::VrlValueArithmetic;
 pub use self::convert::VrlValueConvert;
-pub use self::kind::VrlValueKind;
 
 //TODO: maybe get rid of this?
 pub use value::Value;

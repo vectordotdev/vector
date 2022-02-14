@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use crate::value::{Error, Kind, VrlValueKind};
+use crate::value::{Error, Kind};
 use crate::{expression::Expr, Expression};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
