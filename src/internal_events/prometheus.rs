@@ -50,7 +50,7 @@ impl InternalEvent for PrometheusEventsReceived {
 #[derive(Debug)]
 pub struct PrometheusRequestCompleted {
     pub start: Instant,
-    pub end: Instant,
+    pub(crate) end: Instant,
 }
 
 impl InternalEvent for PrometheusRequestCompleted {
