@@ -23,8 +23,6 @@ mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
 #[cfg(feature = "sources-aws_s3")]
 pub(crate) mod aws_s3;
-#[cfg(feature = "sinks-aws_s3")]
-pub(crate) mod aws_s3_sink;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
@@ -41,8 +39,6 @@ mod conditions;
 mod console;
 #[cfg(feature = "sinks-datadog_events")]
 mod datadog_events;
-#[cfg(feature = "sinks-datadog_logs")]
-mod datadog_logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
@@ -176,8 +172,6 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(feature = "sinks-aws_s3")]
-pub(crate) use self::aws_s3_sink::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "transforms-coercer")]
@@ -188,8 +182,6 @@ pub(crate) use self::concat::*;
 pub(crate) use self::console::*;
 #[cfg(feature = "sinks-datadog_events")]
 pub(crate) use self::datadog_events::*;
-#[cfg(feature = "sinks-datadog_logs")]
-pub(crate) use self::datadog_logs::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
