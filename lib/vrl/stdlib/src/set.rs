@@ -130,7 +130,7 @@ impl Expression for SetFn {
                 insert
             }
             value => {
-                return Err(value::Error::Expected {
+                return Err(value::VrlValueError::Expected {
                     got: value.kind(),
                     expected: Kind::array(Collection::any()) | Kind::bytes(),
                 }

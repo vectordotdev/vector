@@ -154,7 +154,7 @@ impl Expression for RemoveFn {
                 lookup
             }
             value => {
-                return Err(value::Error::Expected {
+                return Err(value::VrlValueError::Expected {
                     got: value.kind(),
                     expected: Kind::array(Collection::any()),
                 }

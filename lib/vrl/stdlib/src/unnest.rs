@@ -102,7 +102,7 @@ impl Expression for UnnestFn {
         let values = root
             .get_by_path(path)
             .cloned()
-            .ok_or(value::Error::Expected {
+            .ok_or(value::VrlValueError::Expected {
                 got: Kind::null(),
                 expected: Kind::array(Collection::any()),
             })?

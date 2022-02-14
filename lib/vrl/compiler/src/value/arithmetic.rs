@@ -1,51 +1,54 @@
 use bytes::Bytes;
 use std::collections::BTreeMap;
 
-use super::{Error, Value};
+use super::{Value, VrlValueError};
 use crate::value::{VrlValueConvert, VrlValueKind};
 use crate::ExpressionError;
 
 pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
-    fn try_mul(self, rhs: Self) -> Result<Self, Error>;
+    fn try_mul(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
-    fn try_div(self, rhs: Self) -> Result<Self, Error>;
+    fn try_div(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
-    fn try_add(self, rhs: Self) -> Result<Self, Error>;
+    fn try_add(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
-    fn try_sub(self, rhs: Self) -> Result<Self, Error>;
+    fn try_sub(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Try to "OR" (`||`) two values types.
     ///
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
     /// returned. The rhs is a closure that can return an error, and thus this
     /// method can return an error as well.
-    fn try_or(self, rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error>;
+    fn try_or(
+        self,
+        rhs: impl FnMut() -> Result<Self, ExpressionError>,
+    ) -> Result<Self, VrlValueError>;
 
     /// Try to "AND" (`&&`) two values types.
     ///
     /// A lhs or rhs value of `Null` returns `false`.
-    fn try_and(self, rhs: Self) -> Result<Self, Error>;
+    fn try_and(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
-    fn try_rem(self, rhs: Self) -> Result<Self, Error>;
+    fn try_rem(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_gt(self, rhs: Self) -> Result<Self, Error>;
+    fn try_gt(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_ge(self, rhs: Self) -> Result<Self, Error>;
+    fn try_ge(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_lt(self, rhs: Self) -> Result<Self, Error>;
+    fn try_lt(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_le(self, rhs: Self) -> Result<Self, Error>;
+    fn try_le(self, rhs: Self) -> Result<Self, VrlValueError>;
 
-    fn try_merge(self, rhs: Self) -> Result<Self, Error>;
+    fn try_merge(self, rhs: Self) -> Result<Self, VrlValueError>;
 
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
@@ -54,8 +57,8 @@ pub trait VrlValueArithmetic: Sized {
 
 impl VrlValueArithmetic for Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
-    fn try_mul(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Mul(self.kind(), rhs.kind());
+    fn try_mul(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Mul(self.kind(), rhs.kind());
 
         // When multiplying a string by an integer, if the number is negative we set it to zero to
         // return an empty string.
@@ -80,13 +83,13 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
-    fn try_div(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Div(self.kind(), rhs.kind());
+    fn try_div(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Div(self.kind(), rhs.kind());
 
         let rhv = rhs.try_into_f64().map_err(|_| err())?;
 
         if rhv == 0.0 {
-            return Err(Error::DivideByZero);
+            return Err(VrlValueError::DivideByZero);
         }
 
         let value = match self {
@@ -99,8 +102,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
-    fn try_add(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Add(self.kind(), rhs.kind());
+    fn try_add(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Add(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -123,8 +126,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
-    fn try_sub(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Sub(self.kind(), rhs.kind());
+    fn try_sub(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Sub(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -143,8 +146,11 @@ impl VrlValueArithmetic for Value {
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
     /// returned. The rhs is a closure that can return an error, and thus this
     /// method can return an error as well.
-    fn try_or(self, mut rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error> {
-        let err = Error::Or;
+    fn try_or(
+        self,
+        mut rhs: impl FnMut() -> Result<Self, ExpressionError>,
+    ) -> Result<Self, VrlValueError> {
+        let err = VrlValueError::Or;
 
         match self {
             Value::Null => rhs().map_err(err),
@@ -156,8 +162,8 @@ impl VrlValueArithmetic for Value {
     /// Try to "AND" (`&&`) two values types.
     ///
     /// A lhs or rhs value of `Null` returns `false`.
-    fn try_and(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::And(self.kind(), rhs.kind());
+    fn try_and(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::And(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Null => false.into(),
@@ -173,8 +179,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
-    fn try_rem(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Rem(self.kind(), rhs.kind());
+    fn try_rem(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Rem(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {
@@ -189,8 +195,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_gt(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Rem(self.kind(), rhs.kind());
+    fn try_gt(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Rem(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 > rhs.try_float()?).into(),
@@ -204,8 +210,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_ge(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+    fn try_ge(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 >= rhs.try_float()?).into(),
@@ -221,8 +227,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_lt(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+    fn try_lt(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => ((lhv as f64) < rhs.try_float()?).into(),
@@ -236,8 +242,8 @@ impl VrlValueArithmetic for Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    fn try_le(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Ge(self.kind(), rhs.kind());
+    fn try_le(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 <= rhs.try_float()?).into(),
@@ -252,8 +258,8 @@ impl VrlValueArithmetic for Value {
         Ok(value)
     }
 
-    fn try_merge(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Merge(self.kind(), rhs.kind());
+    fn try_merge(self, rhs: Self) -> Result<Self, VrlValueError> {
+        let err = || VrlValueError::Merge(self.kind(), rhs.kind());
 
         let value = match (&self, &rhs) {
             (Value::Object(lhv), Value::Object(rhv)) => lhv

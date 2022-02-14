@@ -122,7 +122,7 @@ impl Expression for ReplaceFn {
 
                 Ok(replaced)
             }
-            value => Err(value::Error::Expected {
+            value => Err(value::VrlValueError::Expected {
                 got: value.kind(),
                 expected: Kind::regex() | Kind::bytes(),
             }

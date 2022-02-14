@@ -4,7 +4,7 @@ use super::Kind;
 use crate::ExpressionError;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
-pub enum Error {
+pub enum VrlValueError {
     #[error(
         r#"expected {}, got {got}"#,
         .expected
@@ -57,9 +57,9 @@ pub enum Error {
     Merge(Kind, Kind),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticError for VrlValueError {
     fn code(&self) -> usize {
-        use Error::*;
+        use VrlValueError::*;
 
         match self {
             Expected { .. } => 300,
@@ -82,8 +82,8 @@ impl DiagnosticError for Error {
     }
 }
 
-impl From<Error> for ExpressionError {
-    fn from(err: Error) -> Self {
+impl From<VrlValueError> for ExpressionError {
+    fn from(err: VrlValueError) -> Self {
         Self::Error {
             message: err.message(),
             labels: vec![],

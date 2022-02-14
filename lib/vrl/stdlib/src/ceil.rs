@@ -66,7 +66,7 @@ impl Expression for CeilFn {
                 f64::ceil,
             ))),
             value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
+            value => Err(value::VrlValueError::Expected {
                 got: value.kind(),
                 expected: Kind::float() | Kind::integer(),
             }
