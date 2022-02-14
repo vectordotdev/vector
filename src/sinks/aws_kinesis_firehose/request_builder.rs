@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub struct KinesisRequestBuilder {
-    pub compression: Compression,
+    pub(super) compression: Compression,
     pub(crate) encoder: EncodingConfig<StandardEncodings>,
 }
 
