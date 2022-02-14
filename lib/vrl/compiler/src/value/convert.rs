@@ -1,12 +1,12 @@
-use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::value::{Kind, VrlValueError, VrlValueKind};
 use crate::{expression::Expr, Expression};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use ordered_float::NotNan;
+
 use value::kind::Collection;
-use value::{Value as VectorValue, Value, ValueRegex};
+use value::{Value, ValueRegex};
 
 pub trait VrlValueConvert: Sized {
     /// Convert a given [`Value`] into a [`Expression`] trait object.

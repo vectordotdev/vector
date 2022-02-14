@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
@@ -91,7 +89,7 @@ impl DefaultValue for Kind {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::*;
 

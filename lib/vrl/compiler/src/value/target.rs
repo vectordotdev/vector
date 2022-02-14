@@ -1,6 +1,4 @@
-use std::{collections::BTreeMap, iter::Peekable};
-
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+use lookup::LookupBuf;
 
 use crate::{Target, Value};
 
@@ -28,6 +26,7 @@ mod tests {
 
     use super::*;
     use crate::value;
+    use lookup::{FieldBuf, SegmentBuf};
 
     #[test]
     fn target_get() {
