@@ -32,7 +32,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum BuildError {
+pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
