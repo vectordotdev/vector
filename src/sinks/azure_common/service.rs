@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct AzureBlobService {
+pub(crate) struct AzureBlobService {
     pub(self) client: Arc<ContainerClient>,
 }
 
