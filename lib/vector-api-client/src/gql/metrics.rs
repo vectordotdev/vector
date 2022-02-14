@@ -54,16 +54,6 @@ pub struct ProcessedBytesThroughputSubscription;
 )]
 pub struct ReceivedEventsThroughputSubscription;
 
-/// SentEventsThroughputSubscription contains metrics on the number of events
-/// that have been emitted between `interval` samples.
-#[derive(GraphQLQuery, Debug, Copy, Clone)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/sent_events_throughput.graphql",
-    response_derives = "Debug"
-)]
-pub struct SentEventsThroughputSubscription;
-
 /// ComponentProcessedEventsThroughputsSubscription contains metrics on the number of events
 /// that have been processed between `interval` samples, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -206,12 +196,6 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ReceivedEventsThroughputSubscription>;
 
-    /// Executes a sent events throughput subscription.
-    fn sent_events_throughput_subscription(
-        &self,
-        interval: i64,
-    ) -> crate::BoxedSubscription<SentEventsThroughputSubscription>;
-
     /// Executes a component events processed totals subscription
     fn component_processed_events_totals_subscription(
         &self,
@@ -315,18 +299,6 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         );
 
         self.start::<ReceivedEventsThroughputSubscription>(&request_body)
-    }
-
-    /// Executes a sent events throughput subscription.
-    fn sent_events_throughput_subscription(
-        &self,
-        interval: i64,
-    ) -> crate::BoxedSubscription<SentEventsThroughputSubscription> {
-        let request_body = SentEventsThroughputSubscription::build_query(
-            sent_events_throughput_subscription::Variables { interval },
-        );
-
-        self.start::<SentEventsThroughputSubscription>(&request_body)
     }
 
     /// Executes an all component events processed totals subscription.
