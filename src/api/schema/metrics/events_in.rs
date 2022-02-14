@@ -1,10 +1,7 @@
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
-use crate::{
-    config::ComponentKey,
-    event::{Metric, MetricValue},
-};
+use crate::event::{Metric, MetricValue};
 
 pub struct EventsInTotal(Metric);
 
@@ -41,39 +38,5 @@ impl EventsInTotal {
 impl From<Metric> for EventsInTotal {
     fn from(m: Metric) -> Self {
         Self(m)
-    }
-}
-
-pub struct ComponentEventsInTotal {
-    component_key: ComponentKey,
-    metric: Metric,
-}
-
-impl ComponentEventsInTotal {
-    /// Returns a new `ComponentEventsInTotal` struct, which is a GraphQL type. The
-    /// component id is hoisted for clear field resolution in the resulting payload.
-    pub fn new(metric: Metric) -> Self {
-        let component_key = metric.tag_value("component_id").expect(
-            "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
-        );
-        let component_key = ComponentKey::from(component_key);
-
-        Self {
-            component_key,
-            metric,
-        }
-    }
-}
-
-#[Object]
-impl ComponentEventsInTotal {
-    /// Component id
-    async fn component_id(&self) -> &str {
-        self.component_key.id()
-    }
-
-    /// Total incoming events metric
-    async fn metric(&self) -> EventsInTotal {
-        EventsInTotal::new(self.metric.clone())
     }
 }
