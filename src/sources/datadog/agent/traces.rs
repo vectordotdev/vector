@@ -1,19 +1,23 @@
-use crate::{
-    event::{Event, TraceEvent, Value},
-    internal_events::EventsReceived,
-    sources::datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-    sources::util::ErrorMessage,
-    vector_core::ByteSizeOf,
-    SourceSender,
-};
+use std::{collections::BTreeMap, sync::Arc};
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::future;
 use http::StatusCode;
+use ordered_float::NotNan;
 use prost::Message;
-use std::collections::BTreeMap;
-use std::sync::Arc;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
+
+use crate::{
+    event::{Event, TraceEvent, Value},
+    internal_events::EventsReceived,
+    sources::{
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        util::ErrorMessage,
+    },
+    vector_core::ByteSizeOf,
+    SourceSender,
+};
 
 mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
@@ -192,7 +196,14 @@ fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .iter()
-                .map(|(k, v)| (k.clone(), Value::from(*v)))
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        NotNan::new(*v as f64)
+                            .map(Value::Float)
+                            .unwrap_or(Value::Null),
+                    )
+                })
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );
