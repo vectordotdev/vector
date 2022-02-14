@@ -11,7 +11,6 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
@@ -112,13 +111,7 @@ impl TcpSource for RawTcpSource {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
-        emit!(&SocketEventsReceived {
-            mode: SocketMode::Tcp,
-            byte_size,
-            count: events.len()
-        });
-
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         let now = Utc::now();
 
         for event in events {
