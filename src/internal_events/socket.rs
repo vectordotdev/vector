@@ -1,5 +1,5 @@
-// ## skip check-events ##
-
+#[cfg(feature = "codecs")]
+use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -41,6 +41,7 @@ impl InternalEvent for SocketEventsReceived {
     fn emit_metrics(&self) {
         counter!("component_received_events_total", 1, "mode" => self.mode.as_str());
         counter!("component_received_event_bytes_total", 1, "mode" => self.mode.as_str());
+        // deprecated
         counter!("events_in_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
@@ -73,10 +74,24 @@ pub struct SocketReceiveError<'a> {
 #[cfg(feature = "codecs")]
 impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Error receiving data.", error = ?self.error, mode = %self.mode.as_str());
+        error!(
+            message = "Error receiving data.",
+            error = %self.error,
+            error_type = "connection_failed",
+            stage = error_stage::RECEIVING,
+            mode = %self.mode.as_str(),
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "mode" => self.mode.as_str(),
+            "error" => self.error.to_string(),
+            "error_type" => "connection_failed",
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("connection_errors_total", 1, "mode" => self.mode.as_str());
     }
 }

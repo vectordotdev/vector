@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, TimeZone as _, Utc};
 use chrono_tz::{Australia, Tz};
+use ordered_float::NotNan;
 
 use crate::{
     conversion::{parse_timestamp, tests::StubValue, Conversion, Error},
@@ -56,7 +57,7 @@ fn dateref() -> DateTime<Utc> {
 
 fn convert<T>(fmt: &str, value: &'static str) -> Result<T, Error>
 where
-    T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
+    T: From<Bytes> + From<i64> + From<NotNan<f64>> + From<bool> + From<DateTime<Utc>>,
 {
     std::env::set_var("TZ", TIMEZONE_NAME);
     Conversion::parse(fmt, TimeZone::Local)

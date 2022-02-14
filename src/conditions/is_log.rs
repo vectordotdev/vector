@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::Event,
 };
 
@@ -18,20 +18,17 @@ impl_generate_config_from_default!(IsLogConfig);
 
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        Ok(Box::new(IsLog {}))
+    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+        Ok(Condition::IsLog(IsLog {}))
     }
 }
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct IsLog {}
 
-impl Condition for IsLog {
+impl Conditional for IsLog {
     fn check(&self, e: &Event) -> bool {
         matches!(e, Event::Log(_))
     }

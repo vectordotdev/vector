@@ -25,7 +25,7 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
@@ -151,9 +151,7 @@ impl SourceConfig for SyslogConfig {
                 Ok(build_unix_stream_source(
                     path,
                     decoder,
-                    move |events, host, byte_size| {
-                        handle_events(events, &host_key, host, byte_size)
-                    },
+                    move |events, host| handle_events(events, &host_key, host),
                     cx.shutdown,
                     cx.out,
                 ))
@@ -198,8 +196,8 @@ impl TcpSource for SyslogTcpSource {
         )
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
-        handle_events(events, &self.host_key, Some(host), byte_size);
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+        handle_events(events, &self.host_key, Some(host));
     }
 
     fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
@@ -244,9 +242,9 @@ pub fn udp(
             let host_key = host_key.clone();
             async move {
                 match frame {
-                    Ok(((mut events, byte_size), received_from)) => {
+                    Ok(((mut events, _byte_size), received_from)) => {
                         let received_from = received_from.ip().to_string().into();
-                        handle_events(&mut events, &host_key, Some(received_from), byte_size);
+                        handle_events(&mut events, &host_key, Some(received_from));
                         Some(events.remove(0))
                     }
                     Err(error) => {
@@ -271,23 +269,13 @@ pub fn udp(
     })
 }
 
-fn handle_events(
-    events: &mut [Event],
-    host_key: &str,
-    default_host: Option<Bytes>,
-    byte_size: usize,
-) {
+fn handle_events(events: &mut [Event], host_key: &str, default_host: Option<Bytes>) {
     for event in events {
-        enrich_syslog_event(event, host_key, default_host.clone(), byte_size);
+        enrich_syslog_event(event, host_key, default_host.clone());
     }
 }
 
-fn enrich_syslog_event(
-    event: &mut Event,
-    host_key: &str,
-    default_host: Option<Bytes>,
-    byte_size: usize,
-) {
+fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<Bytes>) {
     let log = event.as_mut_log();
 
     log.insert(log_schema().source_type_key(), Bytes::from("syslog"));
@@ -306,8 +294,6 @@ fn enrich_syslog_event(
         .and_then(|timestamp| timestamp.as_timestamp().cloned())
         .unwrap_or_else(Utc::now);
     log.insert(log_schema().timestamp_key(), timestamp);
-
-    emit!(&SyslogEventReceived { byte_size });
 
     trace!(
         message = "Processing one event.",
@@ -328,10 +314,9 @@ mod test {
         default_host: Option<Bytes>,
         bytes: Bytes,
     ) -> Option<Event> {
-        let byte_size = bytes.len();
         let parser = SyslogDeserializer;
         let mut events = parser.parse(bytes).ok()?;
-        handle_events(&mut events, host_key, default_host, byte_size);
+        handle_events(&mut events, host_key, default_host);
         Some(events.remove(0))
     }
 

@@ -11,12 +11,17 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::field;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
+use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
     codecs,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
+    internal_events::{
+        BytesReceived, ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode,
+        StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
+    },
     shutdown::ShutdownSignal,
     sources::{util::codecs::StreamDecodingError, Source},
     SourceSender,
@@ -29,7 +34,7 @@ use crate::{
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
     decoder: codecs::Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Source {
@@ -67,7 +72,14 @@ pub fn build_unix_stream_source(
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
-            let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
+            let stream = socket
+                .after_read(|byte_size| {
+                    emit!(&BytesReceived {
+                        protocol: "unix",
+                        byte_size,
+                    });
+                })
+                .allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone());
 
             let connection_open = connection_open.clone();
@@ -77,16 +89,23 @@ pub fn build_unix_stream_source(
                     let _open_token =
                         connection_open.open(|count| emit!(&ConnectionOpen { count }));
 
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((mut events, byte_size))) => {
-                                handle_events(&mut events, received_from.clone(), byte_size);
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((mut events, _byte_size)) => {
+                                emit!(&SocketEventsReceived {
+                                    mode: SocketMode::Unix,
+                                    byte_size: events.size_of(),
+                                    count: events.len(),
+                                });
 
+                                handle_events(&mut events, received_from.clone());
+
+                                let count = events.len();
                                 if let Err(error) = out.send_all(stream::iter(events)).await {
-                                    error!(message = "Error sending line.", %error);
+                                    emit!(&StreamClosedError { error, count });
                                 }
                             }
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 emit!(&UnixSocketError {
                                     error: &error,
                                     path: &listen_path
@@ -96,13 +115,12 @@ pub fn build_unix_stream_source(
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
 
                     info!("Finished sending.");
 
-                    let socket: &mut UnixStream = stream.get_mut().get_mut();
+                    let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut_ref();
                     if let Err(error) = socket.shutdown().await {
                         error!(message = "Failed shutting down socket.", %error);
                     }

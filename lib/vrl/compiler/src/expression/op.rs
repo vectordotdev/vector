@@ -5,7 +5,6 @@ use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
-    value,
     vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
@@ -122,58 +121,59 @@ impl Expression for Op {
         use ast::Opcode::*;
         use value::Kind as K;
 
-        let lhs_def = self.lhs.type_def(state);
+        let mut lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);
-
-        let lhs_kind = lhs_def.kind();
-        let rhs_kind = rhs_def.kind();
 
         match self.opcode {
             // ok/err ?? ok
-            Err if rhs_def.is_infallible() => lhs_def.merge(rhs_def).infallible(),
+            Err if rhs_def.is_infallible() => lhs_def.merge_deep(rhs_def).infallible(),
 
             // ... ?? ...
-            Err => lhs_def.merge(rhs_def),
+            Err => lhs_def.merge_deep(rhs_def),
 
             // null || ...
-            Or if lhs_kind.is_null() => rhs_def,
+            Or if lhs_def.is_null() => rhs_def,
 
             // not null || ...
-            Or if !(lhs_kind.contains(K::Null) || lhs_kind.contains(K::Boolean)) => lhs_def,
-
-            // ... || ...
-            Or if !lhs_kind.is_boolean() => {
-                // We can remove Null from the lhs since we know that if the lhs is Null
-                // we will be taking the rhs and only the rhs type_def will then be relevant.
-                (lhs_def - K::Null).merge(rhs_def)
+            Or if !(lhs_def.is_superset(&K::null()) || lhs_def.is_superset(&K::boolean())) => {
+                lhs_def
             }
 
-            Or => lhs_def.merge(rhs_def),
+            // ... || ...
+            Or if !lhs_def.is_boolean() => {
+                // We can remove Null from the lhs since we know that if the lhs is Null
+                // we will be taking the rhs and only the rhs type_def will then be relevant.
+                lhs_def.remove_null().expect("not empty");
+
+                lhs_def.merge_deep(rhs_def)
+            }
+
+            Or => lhs_def.merge_deep(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge(rhs_def),
+            Merge => lhs_def.merge_deep(rhs_def),
 
             // null && ...
-            And if lhs_kind.is_null() => rhs_def
-                .fallible_unless(K::Null | K::Boolean)
-                .scalar(K::Boolean),
+            And if lhs_def.is_null() => rhs_def
+                .fallible_unless(K::null().or_boolean())
+                .with_kind(K::boolean()),
 
             // ... && ...
             And => lhs_def
-                .fallible_unless(K::Null | K::Boolean)
-                .merge(rhs_def.fallible_unless(K::Null | K::Boolean))
-                .scalar(K::Boolean),
+                .fallible_unless(K::null().or_boolean())
+                .merge_deep(rhs_def.fallible_unless(K::null().or_boolean()))
+                .with_kind(K::boolean()),
 
             // ... == ...
             // ... != ...
-            Eq | Ne => lhs_def.merge(rhs_def).boolean(),
+            Eq | Ne => lhs_def.merge_deep(rhs_def).with_kind(K::boolean()),
 
             // "b" >  "a"
             // "a" >= "a"
             // "a" <  "b"
             // "b" <= "b"
             Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
-                lhs_def.merge(rhs_def).boolean()
+                lhs_def.merge_deep(rhs_def).with_kind(K::boolean())
             }
 
             // ... >  ...
@@ -181,13 +181,13 @@ impl Expression for Op {
             // ... <  ...
             // ... <= ...
             Gt | Ge | Lt | Le => lhs_def
-                .fallible_unless(K::Integer | K::Float)
-                .merge(rhs_def.fallible_unless(K::Integer | K::Float))
-                .scalar(K::Boolean),
+                .fallible_unless(K::integer().or_float())
+                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .with_kind(K::boolean()),
 
             // ... / ...
             Div => {
-                let td = TypeDef::new().float();
+                let td = TypeDef::float();
 
                 // Division is infallible if the rhs is a literal normal float or integer.
                 match self.rhs.as_value() {
@@ -202,10 +202,10 @@ impl Expression for Op {
 
             // "bar" + ...
             // ... + "bar"
-            Add if lhs_kind.is_bytes() || rhs_kind.is_bytes() => lhs_def
-                .fallible_unless(K::Bytes | K::Null)
-                .merge(rhs_def.fallible_unless(K::Bytes | K::Null))
-                .scalar(K::Bytes),
+            Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
+                .fallible_unless(K::bytes().or_null())
+                .merge_deep(rhs_def.fallible_unless(K::bytes().or_null()))
+                .with_kind(K::bytes()),
 
             // ... + 1.0
             // ... - 1.0
@@ -215,42 +215,42 @@ impl Expression for Op {
             // 1.0 - ...
             // 1.0 * ...
             // 1.0 % ...
-            Add | Sub | Mul | Rem if lhs_kind.is_float() || rhs_kind.is_float() => lhs_def
-                .fallible_unless(K::Integer | K::Float)
-                .merge(rhs_def.fallible_unless(K::Integer | K::Float))
-                .scalar(K::Float),
+            Add | Sub | Mul | Rem if lhs_def.is_float() || rhs_def.is_float() => lhs_def
+                .fallible_unless(K::integer().or_float())
+                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .with_kind(K::float()),
 
             // 1 + 1
             // 1 - 1
             // 1 * 1
             // 1 % 1
-            Add | Sub | Mul | Rem if lhs_kind.is_integer() && rhs_kind.is_integer() => {
-                lhs_def.merge(rhs_def).scalar(K::Integer)
+            Add | Sub | Mul | Rem if lhs_def.is_integer() && rhs_def.is_integer() => {
+                lhs_def.merge_deep(rhs_def).with_kind(K::integer())
             }
 
             // "bar" * 1
-            Mul if lhs_kind.is_bytes() && rhs_kind.is_integer() => {
-                lhs_def.merge(rhs_def).scalar(K::Bytes)
+            Mul if lhs_def.is_bytes() && rhs_def.is_integer() => {
+                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
             }
 
             // 1 * "bar"
-            Mul if lhs_kind.is_integer() && rhs_kind.is_bytes() => {
-                lhs_def.merge(rhs_def).scalar(K::Bytes)
+            Mul if lhs_def.is_integer() && rhs_def.is_bytes() => {
+                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
             }
 
             // ... + ...
             // ... * ...
             Add | Mul => lhs_def
-                .merge(rhs_def)
+                .merge_deep(rhs_def)
                 .fallible()
-                .scalar(K::Bytes | K::Integer | K::Float),
+                .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
             // ... % ...
             Sub | Rem => lhs_def
-                .merge(rhs_def)
+                .merge_deep(rhs_def)
                 .fallible()
-                .scalar(K::Integer | K::Float),
+                .with_kind(K::integer().or_float()),
         }
     }
 
@@ -448,7 +448,6 @@ mod tests {
     use crate::{
         expression::{Block, IfStatement, Literal, Predicate, Variable},
         test_type_def,
-        value::Kind,
     };
     use ast::Ident;
     use ast::Opcode::*;
@@ -486,157 +485,157 @@ mod tests {
     test_type_def![
         or_exact {
             expr: |_| op(Or, "foo", true),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         or_null {
             expr: |_| op(Or, (), true),
-            want: TypeDef::new().boolean(),
+            want: TypeDef::boolean(),
         }
 
         multiply_string_integer {
             expr: |_| op(Mul, "foo", 1),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         multiply_integer_string {
             expr: |_| op(Mul, 1, "foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         multiply_float_integer {
             expr: |_| op(Mul, f(1.0), 1),
-            want: TypeDef::new().float(),
+            want: TypeDef::float(),
         }
 
         multiply_integer_float {
             expr: |_| op(Mul, 1, f(1.0)),
-            want: TypeDef::new().float(),
+            want: TypeDef::float(),
         }
 
         multiply_integer_integer {
             expr: |_| op(Mul, 1, 1),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
 
         multiply_other {
             expr: |_| op(Mul, (), ()),
-            want: TypeDef::new().fallible().scalar(Kind::Bytes | Kind::Integer | Kind::Float),
+            want: TypeDef::bytes().fallible().add_integer().add_float(),
         }
 
         add_string_string {
             expr: |_| op(Add, "foo", "bar"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         add_string_null {
             expr: |_| op(Add, "foo", ()),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         add_null_string {
             expr: |_| op(Add, (), "foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         add_string_bool {
             expr: |_| op(Add, "foo", true),
-            want: TypeDef::new().fallible().bytes(),
+            want: TypeDef::bytes().fallible(),
         }
 
         add_float_integer {
             expr: |_| op(Add, f(1.0), 1),
-            want: TypeDef::new().float(),
+            want: TypeDef::float(),
         }
 
         add_integer_float {
             expr: |_| op(Add, 1, f(1.0)),
-            want: TypeDef::new().float(),
+            want: TypeDef::float(),
         }
 
         add_float_other {
             expr: |_| op(Add, f(1.0), ()),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         add_other_float {
             expr: |_| op(Add, (), f(1.0)),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         add_integer_integer {
             expr: |_| op(Add, 1, 1),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
 
         add_other {
             expr: |_| op(Add, (), ()),
-            want: TypeDef::new().fallible().bytes().add_integer().add_float(),
+            want: TypeDef::bytes().add_integer().add_float().fallible(),
         }
 
         remainder_integer {
             expr: |_| op(Rem, 5, 5),
-            want: TypeDef::new().infallible().integer(),
+            want: TypeDef::integer().infallible(),
         }
 
         remainder_float {
             expr: |_| op(Rem, 5.0, 5.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         remainder_mixed {
             expr: |_| op(Rem, 5, 5.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         remainder_other {
             expr: |_| op(Rem, 5, ()),
-            want: TypeDef::new().fallible().integer().add_float(),
+            want: TypeDef::integer().add_float().fallible(),
         }
 
         subtract_integer {
             expr: |_| op(Sub, 1, 1),
-            want: TypeDef::new().infallible().integer(),
+            want: TypeDef::integer().infallible(),
         }
 
         subtract_float {
             expr: |_| op(Sub, 1.0, 1.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         subtract_mixed {
             expr: |_| op(Sub, 1, 1.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         subtract_other {
             expr: |_| op(Sub, 1, ()),
-            want: TypeDef::new().fallible().integer().add_float(),
+            want: TypeDef::integer().fallible().add_float(),
         }
 
         divide_integer_literal {
             expr: |_| op(Div, 1, 1),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         divide_float_literal {
             expr: |_| op(Div, 1.0, 1.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         divide_mixed_literal {
             expr: |_| op(Div, 1, 1.0),
-            want: TypeDef::new().infallible().float(),
+            want: TypeDef::float().infallible(),
         }
 
         divide_float_zero_literal {
             expr: |_| op(Div, 1, 0.0),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_integer_zero_literal {
             expr: |_| op(Div, 1, 0),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_lhs_literal_wrong_rhs {
@@ -645,7 +644,7 @@ mod tests {
                 rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
                 opcode: Div,
             },
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_dynamic_rhs {
@@ -654,142 +653,142 @@ mod tests {
                 rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
                 opcode: Div,
             },
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         divide_other {
             expr: |_| op(Div, 1.0, ()),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         and_null {
             expr: |_| op(And, (), ()),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         and_boolean {
             expr: |_| op(And, true, true),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         and_mixed {
             expr: |_| op(And, (), true),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         and_other {
             expr: |_| op(And, (), "bar"),
-            want: TypeDef::new().fallible().boolean(),
+            want: TypeDef::boolean().fallible(),
         }
 
         equal {
             expr: |_| op(Eq, (), ()),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         not_equal {
             expr: |_| op(Ne, (), "foo"),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_integer {
             expr: |_| op(Gt, 1, 1),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_float {
             expr: |_| op(Gt, 1.0, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_mixed {
             expr: |_| op(Gt, 1, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_bytes {
             expr: |_| op(Gt, "c", "b"),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_other {
             expr: |_| op(Gt, 1, "foo"),
-            want: TypeDef::new().fallible().boolean(),
+            want: TypeDef::boolean().fallible(),
         }
 
         greater_or_equal_integer {
             expr: |_| op(Ge, 1, 1),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_or_equal_float {
             expr: |_| op(Ge, 1.0, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_or_equal_mixed {
             expr: |_| op(Ge, 1, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_or_equal_bytes {
             expr: |_| op(Ge, "foo", "foo"),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         greater_or_equal_other {
             expr: |_| op(Ge, 1, "foo"),
-            want: TypeDef::new().fallible().boolean(),
+            want: TypeDef::boolean().fallible(),
         }
 
         less_integer {
             expr: |_| op(Lt, 1, 1),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_float {
             expr: |_| op(Lt, 1.0, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_mixed {
             expr: |_| op(Lt, 1, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_bytes {
             expr: |_| op(Lt, "bar", "foo"),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_other {
             expr: |_| op(Lt, 1, "foo"),
-            want: TypeDef::new().fallible().boolean(),
+            want: TypeDef::boolean().fallible(),
         }
 
         less_or_equal_integer {
             expr: |_| op(Le, 1, 1),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_or_equal_float {
             expr: |_| op(Le, 1.0, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_or_equal_mixed {
             expr: |_| op(Le, 1, 1.0),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_or_equal_bytes {
             expr: |_| op(Le, "bar", "bar"),
-            want: TypeDef::new().infallible().boolean(),
+            want: TypeDef::boolean().infallible(),
         }
 
         less_or_equal_other {
             expr: |_| op(Le, 1, "baz"),
-            want: TypeDef::new().fallible().boolean(),
+            want: TypeDef::boolean().fallible(),
         }
 
         error_or_rhs_infallible {
@@ -802,7 +801,7 @@ mod tests {
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
             },
-            want: TypeDef::new().float().add_boolean(),
+            want: TypeDef::float().add_boolean(),
         }
 
         error_or_fallible {
@@ -819,7 +818,7 @@ mod tests {
                 }.into()),
                 opcode: Err,
             },
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::float().fallible(),
         }
 
         error_or_nested_infallible {
@@ -840,7 +839,7 @@ mod tests {
                 }.into()),
                 opcode: Err,
             },
-            want: TypeDef::new().float().add_bytes(),
+            want: TypeDef::float().add_bytes(),
         }
 
         or_nullable {
@@ -854,7 +853,7 @@ mod tests {
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
             },
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         or_not_nullable {
@@ -868,7 +867,7 @@ mod tests {
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
             },
-            want: TypeDef::new().bytes().add_integer(),
+            want: TypeDef::bytes().add_integer(),
         }
     ];
 }

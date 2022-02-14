@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
+#[cfg(all(test, feature = "vector-unit-test-tests"))]
 mod tests;
 mod unit_test_components;
 
@@ -16,6 +16,7 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+use ordered_float::NotNan;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -342,7 +343,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
     );
-    let test = test.resolve_outputs(&transform_only_graph);
+    let test = test.resolve_outputs(&transform_only_graph)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -454,8 +455,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs: IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
+) -> Result<IndexMap<OutputId, Vec<Vec<Condition>>>, Vec<String>> {
+    let mut outputs: IndexMap<OutputId, Vec<Vec<Condition>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -503,7 +504,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
                         TestInputValue::Boolean(b) => Value::from(*b),
                         TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(*f),
+                        TestInputValue::Float(f) => Value::from(
+                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
+                        ),
                     };
                     event.as_mut_log().insert(path.to_owned(), value);
                 }

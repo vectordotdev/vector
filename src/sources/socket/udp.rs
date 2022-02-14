@@ -7,6 +7,7 @@ use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -16,7 +17,9 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
+    internal_events::{
+        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+    },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::StreamDecodingError, Source},
@@ -98,17 +101,20 @@ pub fn udp(
                         })
                     })?;
 
+                    emit!(&BytesReceived { byte_size, protocol: "udp" });
+
                     let payload = buf.split_to(byte_size);
 
                     let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
 
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((mut events, byte_size))) => {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((mut events, _byte_size)) => {
+                                let count = events.len();
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Udp,
-                                    byte_size,
-                                    count: events.len()
+                                    byte_size: events.size_of(),
+                                    count,
                                 });
 
                                 let now = Utc::now();
@@ -124,21 +130,20 @@ pub fn udp(
                                 tokio::select!{
                                     result = out.send_all(stream::iter(events)) => {
                                         if let Err(error) = result {
-                                            error!(message = "Error sending event.", %error);
+                                            emit!(&StreamClosedError { error, count });
                                             return Ok(())
                                         }
                                     }
                                     _ = &mut shutdown => return Ok(()),
                                 }
                             }
-                            Some(Err(error)) => {
+                            Err(error) => {
                                 // Error is logged by `crate::codecs::Decoder`, no
                                 // further handling is needed here.
                                 if !error.can_continue() {
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
                 }

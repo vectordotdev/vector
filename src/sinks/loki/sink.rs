@@ -1,5 +1,6 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
+use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
 use vector_common::encode_logfmt;
@@ -96,7 +97,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = LokiRequest;
     type Error = RequestBuildError;
 

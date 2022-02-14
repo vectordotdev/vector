@@ -157,7 +157,7 @@ impl Expression for MatchDatadogQueryFn {
 }
 
 fn type_def() -> TypeDef {
-    TypeDef::new().infallible().boolean()
+    TypeDef::boolean().infallible()
 }
 
 #[derive(Default, Clone)]

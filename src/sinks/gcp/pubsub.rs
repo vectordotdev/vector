@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -180,9 +181,9 @@ impl HttpSink for PubsubSink {
         Some(json!({ "data": base64::encode(&json) }))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
-        let body = serde_json::to_vec(&body).unwrap();
+        let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");

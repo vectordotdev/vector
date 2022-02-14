@@ -130,6 +130,66 @@ async fn parse_no_outputs() {
 }
 
 #[tokio::test]
+async fn parse_invalid_output_targets() {
+    let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.bar]
+          inputs = ["foo"]
+          type = "add_fields"
+          [transforms.bar.fields]
+            my_string_field = "string value"
+
+          [[tests]]
+            name = "broken test"
+
+          [tests.input]
+            insert_at = "bar"
+            value = "any value"
+
+          [[tests.outputs]]
+            extract_from = "non-existent"
+            [[tests.outputs.conditions]]
+              type = "vrl"
+              source = ""
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert_eq!(
+        errs,
+        vec![indoc! {r#"
+            Failed to build test 'broken test':
+              Invalid extract_from target in test 'broken test': 'non-existent' does not exist"#}
+        .to_owned(),]
+    );
+
+    let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.bar]
+          inputs = ["foo"]
+          type = "add_fields"
+          [transforms.bar.fields]
+            my_string_field = "string value"
+
+          [[tests]]
+            name = "broken test"
+            no_outputs_from = [ "non-existent" ]
+
+          [[tests.inputs]]
+            insert_at = "bar"
+            value = "any value"
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert_eq!(
+        errs,
+        vec![indoc! {r#"
+            Failed to build test 'broken test':
+              Invalid no_outputs_from target in test 'broken test': 'non-existent' does not exist"#}
+        .to_owned(),]
+    );
+}
+
+#[tokio::test]
 async fn parse_broken_topology() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]

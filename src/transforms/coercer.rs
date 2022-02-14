@@ -6,7 +6,7 @@ use vector_common::TimeZone;
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
-    internal_events::CoercerConversionFailed,
+    internal_events::CoercerConversionError,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -77,11 +77,11 @@ impl FunctionTransform for Coercer {
             let mut new_log = LogEvent::new_with_metadata(log.metadata().clone());
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                    match conv.convert::<Value>(value.as_bytes()) {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
                 }
             }
@@ -90,11 +90,11 @@ impl FunctionTransform for Coercer {
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                    match conv.convert::<Value>(value.as_bytes()) {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
                 }
             }

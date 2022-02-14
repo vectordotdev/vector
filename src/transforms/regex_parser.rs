@@ -10,8 +10,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
-        RegexParserTargetExists,
+        ParserConversionError, ParserMatchError, ParserMissingFieldError, ParserTargetExistsError,
     },
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
@@ -128,7 +127,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(&RegexParserConversionFailed { name, error });
+                                        emit!(&ParserConversionError { name, error });
                                         None
                                     }
                                 }
@@ -137,7 +136,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(&RegexParserFailedMatch { value });
+                emit!(&ParserMatchError { value });
                 None
             }
         }
@@ -254,7 +253,7 @@ impl FunctionTransform for RegexParser {
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(&RegexParserFailedMatch { value });
+                    emit!(&ParserMatchError { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -276,7 +275,7 @@ impl FunctionTransform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            emit!(&RegexParserTargetExists { target_field });
+                            emit!(&ParserTargetExistsError { target_field });
                             output.push(event);
                             return;
                         }
@@ -296,7 +295,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(&RegexParserMissingField { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         }
 
         if !self.drop_failed {
@@ -313,6 +312,7 @@ mod tests {
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -529,7 +529,7 @@ mod tests {
         .expect("Failed to parse log");
         assert_eq!(log["check"], Value::Boolean(false));
         assert_eq!(log["status"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(6789.01));
+        assert_eq!(log["time"], Value::Float(NotNan::new(6789.01).unwrap()));
     }
 
     #[tokio::test]
@@ -582,7 +582,7 @@ mod tests {
 
         assert_eq!(log.get("id1"), None);
         assert_eq!(log["id2"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["time"], Value::Float(NotNan::new(235.42).unwrap()));
         assert_eq!(log["check"], Value::Boolean(true));
         assert!(log.get("message").is_some());
     }

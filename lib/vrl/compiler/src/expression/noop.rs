@@ -15,7 +15,7 @@ impl Expression for Noop {
     }
 
     fn type_def(&self, _: &State) -> TypeDef {
-        TypeDef::new().null().infallible()
+        TypeDef::null().infallible()
     }
 
     fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {

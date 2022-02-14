@@ -282,7 +282,7 @@ impl Function for LogFn {
             QueryValue::Value(value) => value,
             _ => return Err("Can only log Value parameters".to_string()),
         };
-        let msg = msg.into_bytes();
+        let msg = msg.as_bytes();
         let string = String::from_utf8_lossy(&msg);
         let level = self.level.unwrap_or(LogLevel::Info);
 
