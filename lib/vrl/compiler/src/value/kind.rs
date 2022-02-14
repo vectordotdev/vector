@@ -215,7 +215,7 @@ mod tests {
                 },
             ),
         ]) {
-            assert_eq!(value.into(), want, "{}", title);
+            assert_eq!(Kind::from(value), want, "{}", title);
         }
     }
 }
