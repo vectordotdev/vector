@@ -14,7 +14,7 @@ impl Value {
     ///    value:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -29,7 +29,7 @@ impl Value {
     ///    `None`:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
@@ -44,7 +44,7 @@ impl Value {
     ///    exists:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::Value;
+    ///    # use value::Value;
     ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///    # use std::collections::BTreeMap;
@@ -74,7 +74,7 @@ impl Value {
     /// ## Insert At Field
     ///
     /// ```
-    /// # use vrl_compiler::Value;
+    /// # use value::Value;
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
@@ -97,20 +97,21 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use vrl_compiler::{value, Value};
+    /// # use value::Value;
     /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
     ///
-    /// let mut value = value!([false, true]);
+    /// let mut value = Value::Array(vec![Value::Boolean(false), Value::Boolean(true)]);
     /// let path = LookupBuf::from_str("[1].foo").unwrap();
     ///
     /// value.insert_by_path(&path, "bar".into());
     ///
+    /// let expected = Value::Array(vec![Value::Boolean(false), Value::Object([("foo".into(), "bar".into())].into())]);
     /// assert_eq!(
     ///     value.get_by_path(&LookupBuf::root()),
-    ///     Some(&value!([false, {foo: "bar"}])),
+    ///     Some(&expected),
     /// )
     /// ```
     ///
