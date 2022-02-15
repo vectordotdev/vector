@@ -487,6 +487,18 @@ impl RunningTopology {
                 .send(TapResource {
                     outputs: self.outputs.clone(),
                     inputs: watch_inputs,
+                    source_keys: self
+                        .config
+                        .sources
+                        .keys()
+                        .map(|key| key.to_string())
+                        .collect(),
+                    sink_keys: self
+                        .config
+                        .sinks
+                        .keys()
+                        .map(|key| key.to_string())
+                        .collect(),
                 })
                 .expect("Couldn't broadcast config changes.");
         }

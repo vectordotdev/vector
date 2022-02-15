@@ -1041,6 +1041,26 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "invalidMatches",
+              "description": "Any invalid matches for the pattern",
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -1065,6 +1085,18 @@
             {
               "name": "NOT_MATCHED",
               "description": "There isn't currently a component that matches this pattern",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "INVALID_INPUT_PATTERN_MATCH",
+              "description": "The input pattern matched source(s) which cannot be tapped for inputs",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "INVALID_OUTPUT_PATTERN_MATCH",
+              "description": "The output pattern matched sink(s) which cannot be tapped for outputs",
               "isDeprecated": false,
               "deprecationReason": null
             }

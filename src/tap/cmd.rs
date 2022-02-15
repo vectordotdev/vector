@@ -87,7 +87,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
-                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                    for tap_event in d.output_events_by_component_id_patterns {
                         match tap_event {
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
                                 println!("{}", ev.string);
@@ -103,6 +103,8 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                                     match ev.notification {
                                         EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
                                         EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
+                                        EventNotificationType::INVALID_INPUT_PATTERN_MATCH => eprintln!(r#"[tap] Warning: source inputs cannot be tapped. Input pattern "{}" matches sources {:?}"#, ev.pattern, ev.invalid_matches.unwrap_or_default()),
+                                        EventNotificationType::INVALID_OUTPUT_PATTERN_MATCH => eprintln!(r#"[tap] Warning: sink outputs cannot be tapped. Output pattern "{}" matches sinks {:?}"#, ev.pattern, ev.invalid_matches.unwrap_or_default()),
                                         EventNotificationType::Other(_) => {},
                                     }
                                 }
