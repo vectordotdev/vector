@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use futures::{stream, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,6 @@ use vector_core::ByteSizeOf;
 use self::types::Stats;
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
     http::HttpClient,
     internal_events::{
         BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
@@ -121,8 +120,7 @@ fn eventstoredb(
 
                                 emit!(&EventStoreDbMetricsEventsReceived { count, byte_size });
 
-                                let mut metrics = stream::iter(metrics).map(Event::Metric);
-                                if let Err(error) = cx.out.send_all(&mut metrics).await {
+                                if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(&StreamClosedError { count, error });
                                     break;
                                 }

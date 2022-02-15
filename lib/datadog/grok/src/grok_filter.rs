@@ -109,12 +109,11 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
             Value::Bytes(v) => {
-                let v = Ok(String::from_utf8_lossy(v)
-                    .parse::<f64>()
-                    .map_err(|_e| {
+                let v = Ok(Value::from_f64_or_zero(
+                    String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
                         GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                    })?
-                    .into());
+                    })?,
+                ));
                 match v {
                     Ok(Value::Float(v)) if (v.into_inner() as i64) as f64 == v.into_inner() => {
                         Ok(Value::Integer(v.into_inner() as i64))

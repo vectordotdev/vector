@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note};
@@ -291,6 +292,38 @@ impl From<Unary> for Expr {
 impl From<Abort> for Expr {
     fn from(abort: Abort) -> Self {
         Expr::Abort(abort)
+    }
+}
+
+impl From<Value> for Expr {
+    fn from(value: Value) -> Self {
+        use Value::*;
+
+        match value {
+            Bytes(v) => Literal::from(v).into(),
+            Integer(v) => Literal::from(v).into(),
+            Float(v) => Literal::from(v).into(),
+            Boolean(v) => Literal::from(v).into(),
+            Object(v) => {
+                let object = crate::expression::Object::from(
+                    v.into_iter()
+                        .map(|(k, v)| (k, v.into()))
+                        .collect::<BTreeMap<_, _>>(),
+                );
+
+                Container::new(container::Variant::from(object)).into()
+            }
+            Array(v) => {
+                let array = crate::expression::Array::from(
+                    v.into_iter().map(Expr::from).collect::<Vec<_>>(),
+                );
+
+                Container::new(container::Variant::from(array)).into()
+            }
+            Timestamp(v) => Literal::from(v).into(),
+            Regex(v) => Literal::from(v).into(),
+            Null => Literal::from(()).into(),
+        }
     }
 }
 

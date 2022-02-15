@@ -1,9 +1,10 @@
-use std::{collections::BTreeMap, convert::TryFrom, fmt};
+use std::{collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use chrono::SecondsFormat;
+use ordered_float::NotNan;
 use serde::{
-    de::{Error, MapAccess, SeqAccess, Visitor},
+    de::{MapAccess, SeqAccess, Visitor},
     Deserialize, Serialize, Serializer,
 };
 
@@ -67,8 +68,8 @@ impl<'de> Deserialize<'de> for Value {
             where
                 E: serde::de::Error,
             {
-                Value::try_from(value)
-                    .map_err(|_| Error::invalid_value(serde::de::Unexpected::Float(value), &self))
+                // JSON doesn't support NaN values
+                Ok(Value::from(NotNan::new(value).unwrap()))
             }
 
             #[inline]

@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -103,20 +103,20 @@ impl SinkConfig for ClickhouseConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
-        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-        body.push(b'\n');
+        let mut body = crate::serde::json::to_bytes(&log).expect("Events should be valid json!");
+        body.put_u8(b'\n');
 
         Some(body)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -137,7 +137,7 @@ impl HttpSink for ClickhouseConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        let mut request = builder.body(events).unwrap();
+        let mut request = builder.body(events.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);

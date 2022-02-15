@@ -38,9 +38,36 @@ pub fn default_decoding() -> DeserializerConfig {
     BytesDeserializerConfig::new().into()
 }
 
-pub fn to_string(value: impl serde::Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
+/// Utilities for the `serde_json` crate.
+pub mod json {
+    use bytes::{BufMut, BytesMut};
+    use serde::Serialize;
+
+    /// Serialize the given data structure as JSON to `String`.
+    ///
+    /// # Panics
+    ///
+    /// Serialization can panic if `T`'s implementation of `Serialize` decides
+    /// to fail, or if `T` contains a map with non-string keys.
+    pub fn to_string(value: impl Serialize) -> String {
+        let value = serde_json::to_value(value).unwrap();
+        value.as_str().unwrap().into()
+    }
+
+    /// Serialize the given data structure as JSON to `BytesMut`.
+    ///
+    /// # Errors
+    ///
+    /// Serialization can fail if `T`'s implementation of `Serialize` decides to
+    /// fail, or if `T` contains a map with non-string keys.
+    pub fn to_bytes<T>(value: &T) -> serde_json::Result<BytesMut>
+    where
+        T: ?Sized + Serialize,
+    {
+        let mut bytes = BytesMut::new();
+        serde_json::to_writer((&mut bytes).writer(), value)?;
+        Ok(bytes)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
