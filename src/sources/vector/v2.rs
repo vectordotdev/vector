@@ -184,7 +184,7 @@ async fn run(
 
 #[derive(Clone)]
 pub struct MaybeTlsConnectInfo {
-    pub remote_addr: SocketAddr,
+    remote_addr: SocketAddr,
     pub peer_certs: Option<Vec<Certificate>>,
 }
 
