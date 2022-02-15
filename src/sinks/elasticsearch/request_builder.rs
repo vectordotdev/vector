@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub struct ElasticsearchRequestBuilder {
-    pub compression: Compression,
+    pub(super) compression: Compression,
     pub encoder: EncodingConfigFixed<ElasticSearchEncoder>,
 }
 
