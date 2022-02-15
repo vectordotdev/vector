@@ -6,6 +6,7 @@ use lookup::LookupBuf;
 use std::{error::Error, fmt};
 use vector_common::TimeZone;
 
+use crate::prelude::VrlValueKind;
 use crate::{state, Context, Program, Target, Value};
 
 pub type RuntimeResult = Result<Value, Terminate>;

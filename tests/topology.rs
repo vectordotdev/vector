@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use futures::{future, stream, StreamExt};
+use futures::{future, StreamExt};
 use tokio::time::{sleep, Duration};
 use vector::{
     config::{Config, SinkOuter},
@@ -66,7 +66,7 @@ async fn topology_shutdown_while_active() {
 
     let pump_handle = tokio::spawn(async move {
         let mut stream = futures::stream::repeat(Event::from("test"));
-        in1.send_all(&mut stream).await
+        in1.send_stream(&mut stream).await
     });
 
     // Wait until at least 100 events have been seen by the source so we know the pump is running
@@ -441,9 +441,8 @@ async fn topology_swap_transform_is_atomic() {
             None
         }
     };
-    let mut input = stream::iter(iter::from_fn(events));
     let input = async move {
-        in1.send_all(&mut input).await.unwrap();
+        in1.send_batch(iter::from_fn(events)).await.unwrap();
     };
     let output = out1.for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);

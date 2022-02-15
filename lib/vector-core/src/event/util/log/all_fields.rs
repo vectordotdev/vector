@@ -48,7 +48,7 @@ impl<'a> FieldsIter<'a> {
 
     fn push(&mut self, value: &'a Value, component: PathComponent<'a>) -> Option<&'a Value> {
         match value {
-            Value::Map(map) if !map.is_empty() => {
+            Value::Object(map) if !map.is_empty() => {
                 self.stack.push(LeafIter::Map(map.iter()));
                 self.path.push(component);
                 None
@@ -180,7 +180,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Map(BTreeMap::new())),
+            ("d", Value::Object(BTreeMap::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()

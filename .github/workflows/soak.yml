@@ -119,7 +119,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - uses: actions/github-script@v5
+      - uses: actions/github-script@v6
         id: set-matrix
         with:
           script: |

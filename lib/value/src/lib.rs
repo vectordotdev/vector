@@ -24,10 +24,17 @@
 #![allow(
     clippy::cargo_common_metadata,
     clippy::single_match_else,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::module_name_repetitions,
+    clippy::missing_const_for_fn,
+    clippy::multiple_crate_versions,
     unreachable_code,
     unused_variables
 )]
 
 pub mod kind;
+pub mod value;
 
+pub use self::value::Value;
 pub use kind::Kind;

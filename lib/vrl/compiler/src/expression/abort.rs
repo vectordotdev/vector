@@ -3,6 +3,7 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast::Node;
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{ExpressionError, Resolved},
     value::Kind,

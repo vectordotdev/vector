@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
 use lookup::LookupBuf;
 use snafu::Snafu;
+use vrl_core::prelude::VrlValueConvert;
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;
@@ -31,7 +32,7 @@ impl VrlTarget {
         match event {
             Event::Log(event) => {
                 let (fields, metadata) = event.into_parts();
-                VrlTarget::LogEvent(Value::Map(fields), metadata)
+                VrlTarget::LogEvent(Value::Object(fields), metadata)
             }
             Event::Metric(event) => VrlTarget::Metric(event),
         }
@@ -207,7 +208,7 @@ impl vrl_core::Target for VrlTarget {
             VrlTarget::LogEvent(ref mut log, _) => {
                 if path.is_root() {
                     Ok(Some({
-                        let mut map = Value::Map(BTreeMap::new());
+                        let mut map = Value::Object(BTreeMap::new());
                         std::mem::swap(log, &mut map);
                         map.into()
                     }))
@@ -323,11 +324,11 @@ impl From<Event> for VrlTarget {
 // * If `.` is anything else, assign to the `message` key.
 fn value_into_log_events(value: Value, metadata: EventMetadata) -> impl Iterator<Item = Event> {
     match value {
-        Value::Map(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
+        Value::Object(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
             object, metadata,
         )))) as Box<dyn Iterator<Item = Event>>,
         Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Map(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
+            Value::Object(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
             v => {
                 let mut log = LogEvent::new_with_metadata(metadata.clone());
                 log.insert(log_schema().message_key(), v);

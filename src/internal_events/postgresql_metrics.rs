@@ -21,21 +21,39 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 }
 
 #[derive(Debug)]
-pub struct PostgresqlMetricsCollectFailed<'a> {
+pub struct PostgresqlMetricsCollectError<'a> {
     pub error: String,
     pub endpoint: Option<&'a String>,
 }
 
-impl<'a> InternalEvent for PostgresqlMetricsCollectFailed<'a> {
+impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
     fn emit_logs(&self) {
         let message = "PostgreSQL query error.";
         match self.endpoint {
-            Some(endpoint) => error!(message, error = %self.error, %endpoint),
-            None => error!(message, error = %self.error),
+            Some(endpoint) => error!(
+                message,
+                error = %self.error,
+                error_type = "request_error",
+                stage = "receiving",
+                endpoint = %endpoint,
+            ),
+            None => error!(
+                message,
+                error = %self.error,
+                error_type = "request_error",
+                stage = "receiving",
+            ),
         }
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "request_error",
+            "stage" => "receiving",
+        );
+        // deprecated
         counter!("request_errors_total", 1);
     }
 }

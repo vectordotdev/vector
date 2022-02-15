@@ -187,8 +187,9 @@ impl HecAckClient {
         request_body: &HecAckStatusRequest,
     ) -> Result<HecAckStatusResponse, HecAckApiError> {
         self.decrement_retries();
-        let request_body_bytes =
-            serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let request_body_bytes = crate::serde::json::to_bytes(request_body)
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?
+            .freeze();
         let request = self
             .http_request_builder
             .build_request(request_body_bytes, "/services/collector/ack", None)
