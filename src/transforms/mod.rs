@@ -54,7 +54,7 @@ pub mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 pub mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
-pub mod remove_tags;
+mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 pub mod rename_fields;
 #[cfg(feature = "transforms-route")]
