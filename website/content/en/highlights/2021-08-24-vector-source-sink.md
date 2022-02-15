@@ -25,7 +25,7 @@ protocol, which resolves those limitations.
 To allow operators to transition at their leisure, this new release of Vector
 still defaults to `v1`. In `0.20.0` we'll require operators to explicitly state
 which version they want to use, but continue to support `v1`. In `0.22.0` we'll
-drop `v1` completely, and default to `v2`, we also no longer require you to
+drop `v1` completely, and default to `v2`. We will also no longer require you to
 explicitly set the version since there will only be one supported going forward.
 
 If you want to opt in to the new (stable!) `v2` version, you can do so as
