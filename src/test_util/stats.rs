@@ -11,11 +11,11 @@ use vector_core::event::metric::Bucket;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct HistogramStats {
-    pub min: usize,  // The first bucket with a value
-    pub max: usize,  // The last bucket with a value
-    pub mode: usize, // The bucket with the highest value
-    pub total: f64,  // The total over all the weights
-    pub mean: f64,   // The mean of all indices weighted by their value
+    pub min: usize,       // The first bucket with a value
+    pub max: usize,       // The last bucket with a value
+    pub mode: usize,      // The bucket with the highest value
+    pub total: f64,       // The total over all the weights
+    pub(crate) mean: f64, // The mean of all indices weighted by their value
 }
 
 /// A Histogram is a set of accumulator buckets numbered linearly
