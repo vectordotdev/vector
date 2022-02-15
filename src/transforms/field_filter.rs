@@ -6,6 +6,7 @@ use crate::{
         TransformDescription,
     },
     event::Event,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -48,7 +49,7 @@ impl TransformConfig for FieldFilterConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -85,7 +86,7 @@ impl FunctionTransform for FieldFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{event::Event, transforms::test::transform_one};
+    use crate::{event::Event, schema, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

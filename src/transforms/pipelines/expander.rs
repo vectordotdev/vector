@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
+    schema,
     transforms::Transform,
 };
 
@@ -49,7 +50,7 @@ impl TransformConfig for ExpanderConfig {
             .unwrap_or_else(Input::any)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.inner
             .last()
             .map(|(_, item)| item.outputs())

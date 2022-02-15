@@ -8,6 +8,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -58,7 +59,7 @@ impl TransformConfig for SplitConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -145,6 +146,7 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{Event, LogEvent, Value},
+        schema,
     };
     use ordered_float::NotNan;
 

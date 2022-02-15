@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::SampleEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -56,7 +57,7 @@ impl TransformConfig for SampleConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -80,7 +81,7 @@ impl TransformConfig for SampleCompatConfig {
         self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.0.outputs()
     }
 
@@ -151,6 +152,7 @@ mod tests {
         conditions::{ConditionConfig, VrlConfig},
         config::log_schema,
         event::Event,
+        schema,
         test_util::random_lines,
         transforms::test::transform_one,
     };

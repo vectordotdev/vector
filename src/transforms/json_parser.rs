@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -40,7 +41,7 @@ impl TransformConfig for JsonParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -143,7 +144,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
-    use crate::{config::log_schema, event::Event, transforms::test::transform_one};
+    use crate::{config::log_schema, event::Event, schema, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

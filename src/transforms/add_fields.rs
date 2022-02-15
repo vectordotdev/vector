@@ -13,6 +13,7 @@ use crate::{
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
     },
+    schema,
     serde::Fields,
     template::Template,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -76,7 +77,7 @@ impl TransformConfig for AddFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -145,7 +146,7 @@ mod tests {
     use std::iter::FromIterator;
 
     use super::*;
-    use crate::{event::LogEvent, transforms::test::transform_one};
+    use crate::{event::LogEvent, schema, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

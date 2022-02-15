@@ -7,6 +7,7 @@ use crate::{
     },
     event::Event,
     internal_events::RemoveFieldsFieldMissing,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -49,7 +50,7 @@ impl TransformConfig for RemoveFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -84,7 +85,7 @@ impl FunctionTransform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, transforms::test::transform_one};
+    use crate::{event::LogEvent, schema, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

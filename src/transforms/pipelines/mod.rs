@@ -71,6 +71,7 @@ use crate::{
         DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
+    schema,
     transforms::Transform,
 };
 
@@ -246,7 +247,7 @@ impl TransformConfig for PipelinesConfig {
         Input::any()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Any)]
     }
 

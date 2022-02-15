@@ -10,6 +10,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -60,7 +61,7 @@ impl TransformConfig for ConcatConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -213,7 +214,7 @@ impl FunctionTransform for Concat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Event, transforms::test::transform_one};
+    use crate::{event::Event, schema, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

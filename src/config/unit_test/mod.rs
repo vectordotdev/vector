@@ -9,6 +9,7 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
+    schema,
     topology::{
         self,
         builder::{self, Pieces},
@@ -166,7 +167,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs()
+                    .outputs(&schema::Definition::empty())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),

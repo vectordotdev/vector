@@ -20,6 +20,7 @@ use crate::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -103,7 +104,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
         Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -279,6 +280,7 @@ mod tests {
     use super::*;
     use crate::{
         event::{metric, Event, Metric},
+        schema,
         transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
     };
 

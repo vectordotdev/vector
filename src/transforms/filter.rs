@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::FilterEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -50,7 +51,7 @@ impl TransformConfig for FilterConfig {
         Input::any()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Any)]
     }
 
@@ -92,6 +93,7 @@ mod test {
     use crate::{
         conditions::{is_log::IsLogConfig, ConditionConfig},
         event::Event,
+        schema,
         transforms::test::transform_one,
     };
 

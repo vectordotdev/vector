@@ -34,6 +34,7 @@ use vector::{
         metric::{self, MetricData, MetricValue},
         Event, Value,
     },
+    schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     source_sender::{ReceiverStream, SourceSender},
     sources::Source,
@@ -302,7 +303,7 @@ impl TransformConfig for MockTransformConfig {
         Input::any()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Any)]
     }
 

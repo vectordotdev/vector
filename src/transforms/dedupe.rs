@@ -12,6 +12,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -90,7 +91,7 @@ impl TransformConfig for DedupeConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -215,6 +216,7 @@ mod tests {
     use super::*;
     use crate::{
         event::{Event, Value},
+        schema,
         transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
     };
 

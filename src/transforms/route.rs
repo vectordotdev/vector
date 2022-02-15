@@ -10,6 +10,7 @@ use crate::{
     },
     event::Event,
     internal_events::RouteEventDiscarded,
+    schema,
     transforms::Transform,
 };
 
@@ -88,7 +89,7 @@ impl TransformConfig for RouteConfig {
         Input::any()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.route
             .keys()
             .map(|output_name| Output::from((output_name, DataType::Any)))
@@ -115,7 +116,7 @@ impl TransformConfig for RouteCompatConfig {
         self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.0.outputs()
     }
 
@@ -133,6 +134,7 @@ mod test {
 
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
+        schema,
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
 
