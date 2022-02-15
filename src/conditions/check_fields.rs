@@ -57,9 +57,9 @@ impl CheckFieldsPredicate for EqualsPredicate {
         match event {
             Event::Log(l) | Event::Trace(l) => {
                 l.get(&self.target).map_or(false, |v| match &self.arg {
-                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
+                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.coerce_to_bytes(),
                     CheckFieldsPredicateArg::VecString(ss) => {
-                        ss.iter().any(|s| s.as_bytes() == v.as_bytes())
+                        ss.iter().any(|s| s.as_bytes() == v.coerce_to_bytes())
                     }
                     CheckFieldsPredicateArg::Integer(i) => match v {
                         Value::Integer(vi) => *i == *vi,
@@ -236,14 +236,13 @@ impl NotEqualsPredicate {
 impl CheckFieldsPredicate for NotEqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) | Event::Trace(l) => {
-                l.get(&self.target)
-                    .map(|f| f.as_bytes())
-                    .map_or(false, |b| {
-                        //false if any match, else true
-                        !self.arg.iter().any(|s| b == s.as_bytes())
-                    })
-            }
+            Event::Log(l) | Event::Trace(l) => l
+                .get(&self.target)
+                .map(|f| f.coerce_to_bytes())
+                .map_or(false, |b| {
+                    //false if any match, else true
+                    !self.arg.iter().any(|s| b == s.as_bytes())
+                }),
             Event::Metric(m) => m
                 .tags()
                 .and_then(|t| t.get(&self.target))
@@ -427,7 +426,7 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
                 let len = match v {
                     Value::Bytes(value) => value.len(),
                     Value::Array(value) => value.len(),
-                    Value::Map(value) => value.len(),
+                    Value::Object(value) => value.len(),
                     Value::Null => 0,
                     value => value.to_string_lossy().len(),
                 };

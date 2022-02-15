@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashSet},
-    future::ready,
+    iter,
     path::PathBuf,
     time::Instant,
 };
@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
-    stream, FutureExt, StreamExt,
+    FutureExt, StreamExt,
 };
 use openssl::{
     error::ErrorStack,
@@ -28,10 +28,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         BytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
         PostgresqlMetricsCollectError, StreamClosedError,
@@ -166,8 +163,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric);
-                if let Err(error) = cx.out.send_all(&mut stream).await {
+                let metrics = metrics.into_iter().flatten();
+                if let Err(error) = cx.out.send_batch(metrics).await {
                     emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
@@ -465,20 +462,23 @@ impl PostgresqlMetrics {
         })
     }
 
-    async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
-        let (up_value, metrics) = match self.collect_metrics().await {
-            Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
+    async fn collect(&mut self) -> Box<dyn Iterator<Item = Metric> + Send> {
+        match self.collect_metrics().await {
+            Ok(metrics) => Box::new(
+                iter::once(self.create_metric("up", gauge!(1.0), tags!(self.tags))).chain(metrics),
+            ),
             Err(error) => {
                 emit!(&PostgresqlMetricsCollectError {
                     error,
                     endpoint: self.tags.get("endpoint"),
                 });
-                (0.0, stream::empty().boxed())
+                Box::new(iter::once(self.create_metric(
+                    "up",
+                    gauge!(0.0),
+                    tags!(self.tags),
+                )))
             }
-        };
-
-        let up_metric = self.create_metric("up", gauge!(up_value), tags!(self.tags));
-        stream::once(ready(up_metric)).chain(metrics).boxed()
+        }
     }
 
     async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
@@ -919,7 +919,7 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, tls, SourceSender};
+    use crate::{event::Event, test_util::trace_init, tls, SourceSender};
     use std::path::PathBuf;
 
     fn pg_host() -> String {

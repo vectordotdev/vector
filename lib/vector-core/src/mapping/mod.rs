@@ -178,7 +178,7 @@ where
 {
     for (key2, value2) in map2.iter() {
         match (deep, map1.get_mut(key2), value2) {
-            (true, Some(Value::Map(ref mut child1)), Value::Map(ref child2)) => {
+            (true, Some(Value::Object(ref mut child1)), Value::Object(ref child2)) => {
                 // We are doing a deep merge and both fields are maps.
                 merge_maps(child1, child2, deep);
             }
@@ -227,7 +227,7 @@ impl Function for MergeFn {
         ))?;
 
         match (to_value, from_value) {
-            (Value::Map(ref mut map1), QueryValue::Value(Value::Map(ref map2))) => {
+            (Value::Object(ref mut map1), QueryValue::Value(Value::Object(ref map2))) => {
                 merge_maps(map1, map2, deep);
                 Ok(())
             }
@@ -282,7 +282,7 @@ impl Function for LogFn {
             QueryValue::Value(value) => value,
             _ => return Err("Can only log Value parameters".to_string()),
         };
-        let msg = msg.as_bytes();
+        let msg = msg.coerce_to_bytes();
         let string = String::from_utf8_lossy(&msg);
         let level = self.level.unwrap_or(LogLevel::Info);
 
