@@ -1,5 +1,5 @@
 pub mod v1;
-pub mod v2;
+pub(crate) mod v2;
 
 use serde::{Deserialize, Serialize};
 
