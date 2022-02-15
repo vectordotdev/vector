@@ -97,7 +97,7 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         for event in events {
             let log = event.as_mut_log();
 

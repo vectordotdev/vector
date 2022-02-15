@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use http::{header::AUTHORIZATION, HeaderValue, Uri};
@@ -138,7 +139,7 @@ impl HttpSink for HttpEventSink {
     async fn build_request(
         &self,
         mut metrics: Self::Output,
-    ) -> crate::Result<hyper::Request<Vec<u8>>> {
+    ) -> crate::Result<hyper::Request<Bytes>> {
         let metric = metrics.pop().expect("only one metric");
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -199,7 +200,8 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = serde_json::to_vec(&series).unwrap();
+        let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
+
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
             self.config.project_id

@@ -28,7 +28,7 @@ pub(self) mod test {
 
     pub fn fields_from_json(json_value: JsonValue) -> BTreeMap<String, Value> {
         match Value::from(json_value) {
-            Value::Map(map) => map,
+            Value::Object(map) => map,
             something => panic!("Expected a map, got {:?}", something),
         }
     }

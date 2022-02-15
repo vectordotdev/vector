@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{AnyCondition, Condition, ConditionConfig};
+use super::{AnyCondition, Condition, ConditionConfig, Conditional};
 use crate::event::Event;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,18 +14,17 @@ impl From<AnyCondition> for NotConfig {
 
 #[typetag::serde(name = "not")]
 impl ConditionConfig for NotConfig {
-    fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
-        Ok(Box::new(Not(self.0.build(enrichment_tables)?)))
+    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+        Ok(Condition::Not(Not(Box::new(
+            self.0.build(enrichment_tables)?,
+        ))))
     }
 }
 
-#[derive(Clone)]
-struct Not(Box<dyn Condition>);
+#[derive(Debug, Clone)]
+pub struct Not(Box<Condition>);
 
-impl Condition for Not {
+impl Conditional for Not {
     fn check(&self, e: &Event) -> bool {
         !self.0.check(e)
     }

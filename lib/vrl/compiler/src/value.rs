@@ -16,6 +16,10 @@ pub use error::Error;
 pub use kind::{Collection, Field, Index, Kind};
 use ordered_float::NotNan;
 
+pub use self::arithmetic::VrlValueArithmetic;
+pub use self::convert::VrlValueConvert;
+pub use self::kind::VrlValueKind;
+
 pub use self::regex::Regex;
 
 #[derive(Debug, Clone, Hash, PartialEq)]
@@ -77,7 +81,10 @@ impl From<serde_json::Value> for Value {
         match json_value {
             serde_json::Value::Bool(b) => Value::Boolean(b),
             serde_json::Value::Number(n) if n.is_i64() => n.as_i64().unwrap().into(),
-            serde_json::Value::Number(n) if n.is_f64() => n.as_f64().unwrap().into(),
+            serde_json::Value::Number(n) if n.is_f64() => {
+                // JSON doesn't support NaN values
+                NotNan::new(n.as_f64().unwrap()).unwrap().into()
+            }
             serde_json::Value::Number(n) => n.to_string().into(),
             serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
             serde_json::Value::Object(obj) => Value::Object(

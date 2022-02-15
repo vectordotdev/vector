@@ -26,12 +26,12 @@ where
     match (path_iter.next(), path_iter.peek()) {
         (Some(PathComponent::Key(current)), None) => fields.insert(current.into_owned(), value),
         (Some(PathComponent::Key(current)), Some(PathComponent::Key(_))) => {
-            if let Some(Value::Map(map)) = fields.get_mut(current.as_ref()) {
+            if let Some(Value::Object(map)) = fields.get_mut(current.as_ref()) {
                 map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                fields.insert(current.into_owned(), Value::Map(map))
+                fields.insert(current.into_owned(), Value::Object(map))
             }
         }
         (Some(PathComponent::Key(current)), Some(&PathComponent::Index(next))) => {
@@ -63,7 +63,7 @@ where
             Some(std::mem::replace(&mut values[current], value))
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
-            if let Some(Value::Map(map)) = values.get_mut(current) {
+            if let Some(Value::Object(map)) = values.get_mut(current) {
                 map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
@@ -71,7 +71,7 @@ where
                 while values.len() <= current {
                     values.push(Value::Null);
                 }
-                Some(std::mem::replace(&mut values[current], Value::Map(map)))
+                Some(std::mem::replace(&mut values[current], Value::Object(map)))
             }
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {

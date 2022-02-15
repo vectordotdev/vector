@@ -295,7 +295,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.coerce_to_bytes().to_vec())
             .unwrap_or_default(),
         Encoding::Avro => {
             let value = avro_rs::to_value(log)?;

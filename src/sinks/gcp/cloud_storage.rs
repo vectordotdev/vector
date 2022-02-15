@@ -19,7 +19,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         gcs_common::{
             config::{
