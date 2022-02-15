@@ -2,11 +2,7 @@ name: Feature
 about: 🚀 Suggest a new feature.
 labels:
 - 'type: feature'
-
----
-
-<!--
--->
+body:
 - type: markdown
   attributes:
     value: |
