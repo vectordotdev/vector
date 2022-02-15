@@ -40,7 +40,7 @@ impl DriverResponse for DatadogEventsResponse {
 }
 
 #[derive(Clone)]
-pub struct DatadogEventsService {
+pub(super) struct DatadogEventsService {
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
