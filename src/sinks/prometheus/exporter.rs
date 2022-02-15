@@ -60,7 +60,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
-    pub quantiles: Vec<f64>,
+    pub(crate) quantiles: Vec<f64>,
     #[serde(default = "default_distributions_as_summaries")]
     pub distributions_as_summaries: bool,
     #[serde(default = "default_flush_period_secs")]

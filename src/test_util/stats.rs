@@ -116,7 +116,7 @@ impl Display for TimeHistogram {
 /// where the index is treated as a level which may be adjusted up or
 /// down instead of being handled directly.
 #[derive(Clone, Debug, Default)]
-pub struct LevelTimeHistogram {
+pub(crate) struct LevelTimeHistogram {
     level: usize,
     histogram: TimeHistogram,
 }

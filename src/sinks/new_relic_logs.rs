@@ -52,7 +52,7 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
-    pub region: Option<NewRelicLogsRegion>,
+    pub(super) region: Option<NewRelicLogsRegion>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
