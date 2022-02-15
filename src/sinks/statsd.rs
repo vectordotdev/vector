@@ -37,7 +37,7 @@ struct StatsdSvc {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
 // #[serde(deny_unknown_fields)]
-pub struct StatsdSinkConfig {
+pub(self) struct StatsdSinkConfig {
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     #[serde(flatten)]
