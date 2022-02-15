@@ -3,7 +3,7 @@ use std::task::Poll;
 use bytes::Bytes;
 use chrono::Utc;
 use fakedata::logs::*;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -141,11 +141,7 @@ async fn demo_logs_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = if interval != 0.0 {
-        Some(interval)
-    } else {
-        None
-    };
+    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
@@ -175,7 +171,7 @@ async fn demo_logs_source(
                     });
                     let now = Utc::now();
 
-                    let mut events = stream::iter(events).map(|mut event| {
+                    let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
 
                         log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
@@ -183,7 +179,7 @@ async fn demo_logs_source(
 
                         event
                     });
-                    out.send_all(&mut events).await.map_err(|error| {
+                    out.send_batch(events).await.map_err(|error| {
                         emit!(&StreamClosedError { error, count });
                     })?;
                 }

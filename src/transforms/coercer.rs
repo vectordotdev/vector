@@ -77,7 +77,7 @@ impl FunctionTransform for Coercer {
             let mut new_log = LogEvent::new_with_metadata(log.metadata().clone());
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.as_bytes()) {
+                    match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
@@ -90,7 +90,7 @@ impl FunctionTransform for Coercer {
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.as_bytes()) {
+                    match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }

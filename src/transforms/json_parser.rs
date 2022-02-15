@@ -85,7 +85,7 @@ impl FunctionTransform for JsonParser {
 
         let parsed = value
             .and_then(|value| {
-                let to_parse = value.as_bytes();
+                let to_parse = value.coerce_to_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(&JsonParserError {
@@ -548,7 +548,7 @@ mod test {
         let event = event.as_log();
 
         match event.get("message") {
-            Some(crate::event::Value::Map(_)) => (),
+            Some(crate::event::Value::Object(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
         assert_eq!(event["message.greeting"], "hello".into());

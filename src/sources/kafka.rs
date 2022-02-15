@@ -278,7 +278,7 @@ async fn kafka_source(
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                        match out.send_all(&mut stream).await {
+                        match out.send_stream(&mut stream).await {
                             Err(error) => {
                                 emit!(&StreamClosedError { error, count });
                             }
@@ -290,7 +290,7 @@ async fn kafka_source(
                             }
                         }
                     }
-                    None => match out.send_all(&mut stream).await {
+                    None => match out.send_stream(&mut stream).await {
                         Err(error) => {
                             emit!(&StreamClosedError { error, count });
                         }

@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt};
+use futures::FutureExt;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -33,7 +33,7 @@ use crate::{
         SplunkHecRequestReceived,
     },
     serde::bool_or_struct,
-    source_sender::StreamSendError,
+    source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsConfig},
     SourceSender,
 };
@@ -267,21 +267,42 @@ impl SplunkSource {
                             }
                             _ => None,
                         };
-                        let mut events = stream::iter(EventIterator::new(
+
+                        let mut error = None;
+                        let mut events = Vec::new();
+                        let iter = EventIterator::new(
                             Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
                             xff,
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
-                        ));
-
-                        match out.send_result_stream(&mut events).await {
-                            Ok(()) => Ok(maybe_ack_id),
-                            Err(StreamSendError::Stream(error)) => Err(error),
-                            Err(StreamSendError::Closed(_)) => {
-                                Err(Rejection::from(ApiError::ServerShutdown))
+                        );
+                        for result in iter {
+                            match result {
+                                Ok(event) => events.push(event),
+                                Err(err) => {
+                                    error = Some(err);
+                                    break;
+                                }
                             }
+                        }
+
+                        if !events.is_empty() {
+                            emit!(&EventsReceived {
+                                count: events.len(),
+                                byte_size: events.size_of(),
+                            });
+
+                            if let Err(ClosedError) = out.send_batch(events).await {
+                                return Err(Rejection::from(ApiError::ServerShutdown));
+                            }
+                        }
+
+                        if let Some(error) = error {
+                            Err(error)
+                        } else {
+                            Ok(maybe_ack_id)
                         }
                     }
                 },
@@ -628,10 +649,6 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             event.add_batch_notifier(batch);
         }
 
-        emit!(&EventsReceived {
-            count: 1,
-            byte_size: event.size_of(),
-        });
         self.events += 1;
 
         Ok(event)

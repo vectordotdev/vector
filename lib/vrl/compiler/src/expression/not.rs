@@ -2,6 +2,7 @@ use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{Expr, Noop, Resolved},
     parser::Node,

@@ -17,10 +17,7 @@ use crate::{
     config::{
         self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
     },
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
@@ -225,41 +222,35 @@ fn apache_metrics(
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
-                                Some(stream::iter(metrics).map(Event::Metric))
+                                Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
                                 emit!(&ApacheMetricsResponseError {
                                     code: header.status,
                                     endpoint: &sanitized_url,
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 1.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 1.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
                                 emit!(&ApacheMetricsHttpError {
                                     error,
                                     endpoint: &sanitized_url
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 0.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 0.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                         })
                     })
@@ -268,7 +259,7 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

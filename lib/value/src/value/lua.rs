@@ -15,7 +15,7 @@ impl<'a> ToLua<'a> for Value {
             Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
-            Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
+            Value::Object(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
             Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Value::Null => lua.create_string("").map(LuaValue::String),
         }
@@ -42,7 +42,7 @@ impl<'a> FromLua<'a> for Value {
                 } else if table_is_timestamp(&t)? {
                     table_to_timestamp(t).map(Self::Timestamp)
                 } else {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Self::Map)
+                    <_>::from_lua(LuaValue::Table(t), lua).map(Self::Object)
                 }
             }
             other => Err(mlua::Error::FromLuaConversionError {
@@ -127,13 +127,15 @@ mod test {
             ("true", Value::Boolean(true)),
             (
                 "{ x = 1, y = '2', nested = { other = 5.678 } }",
-                Value::Map(
+                Value::Object(
                     vec![
                         ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
-                            Value::Map(vec![("other".into(), 5.678.into())].into_iter().collect()),
+                            Value::Object(
+                                vec![("other".into(), 5.678.into())].into_iter().collect(),
+                            ),
                         ),
                     ]
                     .into_iter()
@@ -203,13 +205,15 @@ mod test {
                 "#,
             ),
             (
-                Value::Map(
+                Value::Object(
                     vec![
                         ("x".into(), 1_i64.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
-                            Value::Map(vec![("other".into(), 5.111.into())].into_iter().collect()),
+                            Value::Object(
+                                vec![("other".into(), 5.111.into())].into_iter().collect(),
+                            ),
                         ),
                     ]
                     .into_iter()

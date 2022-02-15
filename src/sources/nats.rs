@@ -149,15 +149,15 @@ async fn nats_source(
 
                     let now = Utc::now();
 
-                    let events = stream::iter(events.into_iter().map(|mut event| {
+                    let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
                         event
-                    }));
+                    });
 
-                    out.send_all(events).await.map_err(|error| {
+                    out.send_batch(events).await.map_err(|error| {
                         emit!(&StreamClosedError { error, count });
                     })?;
                 }

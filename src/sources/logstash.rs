@@ -102,7 +102,7 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         let now = Value::from(chrono::Utc::now());
         for event in events {
             let log = event.as_mut_log();
@@ -113,7 +113,7 @@ impl TcpSource for LogstashSource {
                     .get_flat("@timestamp")
                     .and_then(|timestamp| {
                         self.timestamp_converter
-                            .convert::<Value>(timestamp.as_bytes())
+                            .convert::<Value>(timestamp.coerce_to_bytes())
                             .ok()
                     })
                     .unwrap_or_else(|| now.clone());
