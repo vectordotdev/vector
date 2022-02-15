@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 pub use field::Field;
 pub use index::Index;
-use unknown::Unknown;
+pub use unknown::Unknown;
 
 use super::{merge, Kind};
 

@@ -27,6 +27,7 @@ use std::fmt::Debug;
 use crate::{
     event::Event,
     internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
+    schema,
     sources::util::StreamDecodingError,
 };
 
@@ -250,6 +251,16 @@ impl DeserializerConfig {
             DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
+        }
+    }
+
+    /// The schema produced by the deserializer.
+    pub fn schema_definition(&self) -> schema::Definition {
+        match self {
+            DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(),
+            DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(),
+            #[cfg(feature = "sources-syslog")]
+            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(),
         }
     }
 }

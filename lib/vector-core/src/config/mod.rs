@@ -74,7 +74,7 @@ impl Output {
         Self {
             port: None,
             ty,
-            schema_definition: schema::Definition,
+            schema_definition: schema::Definition::empty(),
         }
     }
 }
@@ -84,7 +84,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
-            schema_definition: schema::Definition,
+            schema_definition: schema::Definition::empty(),
         }
     }
 }

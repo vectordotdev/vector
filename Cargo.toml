@@ -108,6 +108,7 @@ file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
+value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
