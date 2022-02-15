@@ -21,7 +21,7 @@ pub struct Options {
     #[serde(default)]
     pub api_key: Option<String>,
 
-    pub configuration_key: String,
+    pub(super) configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: u64,
