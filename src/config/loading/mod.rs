@@ -1,4 +1,5 @@
 mod config_builder;
+mod internal;
 mod loader;
 mod recursive;
 mod source;
@@ -10,9 +11,12 @@ use std::{
     sync::Mutex,
 };
 
+use config_builder::ConfigBuilderLoader;
+use internal::process::{ComponentHint, Process};
+
 use super::{
-    builder::ConfigBuilder, format, loading::ConfigBuilderLoader, validation, vars, ComponentKey,
-    Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
+    FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -211,7 +215,7 @@ fn loader_from_paths<T, L>(
 ) -> Result<(T, Vec<String>), Vec<String>>
 where
     T: serde::de::DeserializeOwned,
-    L: Loader<T> + private::Process<T>,
+    L: Loader<T> + Process,
 {
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
@@ -255,7 +259,7 @@ pub fn load_builder_from_paths(
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<(SourceMap, Vec<String>), Vec<String>> {
+) -> Result<(toml::value::Table, Vec<String>), Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 

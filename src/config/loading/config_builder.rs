@@ -1,4 +1,5 @@
 use super::{loader, prepare_input};
+use super::{ComponentHint, Process};
 use crate::config::{
     format, ConfigBuilder, EnrichmentTableOuter, Format, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
@@ -18,41 +19,55 @@ impl ConfigBuilderLoader {
     }
 }
 
-impl loader::private::Process<ConfigBuilder> for ConfigBuilderLoader {
+impl Process for ConfigBuilderLoader {
     fn load<R: std::io::Read>(
-        &self,
+        &mut self,
+        name: String,
         input: R,
         format: Format,
-    ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+        hint: Option<ComponentHint>,
+    ) -> Result<Vec<String>, Vec<String>> {
         let (with_vars, warnings) = prepare_input(input)?;
 
-        format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
-    }
+        match hint {
+            Some(ComponentHint::Source) => {
+                self.builder.sources.insert(
+                    ComponentKey::from(name),
+                    format::deserialize(&with_vars, format)?,
+                );
+            }
+            Some(ComponentHint::Sink) => {
+                self.builder.sinks.insert(
+                    ComponentKey::from(name),
+                    format::deserialize(&with_vars, format)?,
+                );
+            }
+            Some(ComponentHint::Transform) => {
+                self.builder.transforms.insert(
+                    ComponentKey::from(name),
+                    format::deserialize(&with_vars, format)?,
+                );
+            }
+            Some(ComponentHint::EnrichmentTable) => {
+                self.builder.enrichment_tables.insert(
+                    ComponentKey::from(name),
+                    format::deserialize(&with_vars, format)?,
+                );
+            }
+            Some(ComponentHint::Test) => {
+                self.builder
+                    .tests
+                    .extend(format::deserialize::<Vec<TestDefinition<String>>>(
+                        &with_vars, format,
+                    )?);
+            }
+            None => {
+                self.builder
+                    .append(format::deserialize(&with_vars, format)?)?;
+            }
+        }
 
-    fn add_value(&mut self, value: ConfigBuilder) -> Result<(), Vec<String>> {
-        self.builder.append(value)
-    }
-
-    fn add_sources(&mut self, sources: IndexMap<ComponentKey, SourceOuter>) {
-        self.builder.sources.extend(sources)
-    }
-
-    fn add_transforms(&mut self, component: IndexMap<ComponentKey, TransformOuter<String>>) {
-        self.builder.transforms.extend(component);
-    }
-
-    fn add_sink(&mut self, component: IndexMap<ComponentKey, SinkOuter<String>>) {
-        self.builder.sinks.extend(component);
-    }
-
-    fn add_enrichment_tables(&mut self, component: IndexMap<ComponentKey, EnrichmentTableOuter>) {
-        self.builder.enrichment_tables.extend(component);
-    }
-
-    fn add_tests(&mut self, tests: IndexMap<ComponentKey, TestDefinition<String>>) {
-        self.builder
-            .tests
-            .extend(tests.into_iter().map(|(_, value)| value));
+        Ok(warnings)
     }
 }
 
