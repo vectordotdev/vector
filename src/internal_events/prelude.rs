@@ -1,4 +1,3 @@
-
 pub(super) mod error_stage {
     pub const RECEIVING: &str = "receiving";
     pub const PROCESSING: &str = "processing";

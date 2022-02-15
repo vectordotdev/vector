@@ -9,7 +9,7 @@ use snafu::ResultExt;
 use tokio::task::spawn_blocking;
 use tower::Service;
 
-pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
+pub(crate) struct LookupIp(std::vec::IntoIter<SocketAddr>);
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Resolver;
