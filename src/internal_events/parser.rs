@@ -1,6 +1,20 @@
 use super::prelude::error_stage;
 use metrics::counter;
+use std::borrow::Cow;
 use vector_core::internal_event::InternalEvent;
+
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+    let ellipsis: &str = "[...]";
+    if s.len() >= maxlen {
+        let mut len = maxlen - ellipsis.len();
+        while !s.is_char_boundary(len) {
+            len -= 1;
+        }
+        format!("{}{}", &s[..len], ellipsis).into()
+    } else {
+        s.into()
+    }
+}
 
 #[derive(Debug)]
 pub struct ParserMatchError<'a> {
@@ -14,7 +28,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error = "No match found in specified field",
             error_type = "condition_failed",
             stage = error_stage::PROCESSING,
-            field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
+            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
         );
     }
@@ -119,5 +133,14 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn truncate_utf8() {
+        let message = "Hello 😁 this is test.";
+        assert_eq!("Hello [...]", super::truncate_string_at(message, 13));
     }
 }

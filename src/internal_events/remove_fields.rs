@@ -1,7 +1,7 @@
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RemoveFieldsFieldMissing<'a> {
+pub(crate) struct RemoveFieldsFieldMissing<'a> {
     pub field: &'a str,
 }
 

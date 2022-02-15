@@ -149,7 +149,7 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-pub fn expand_globs(config: &mut ConfigBuilder) {
+pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .iter()

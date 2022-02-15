@@ -225,7 +225,7 @@ mod test_sink {
     }
 
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct TestBackpressureSinkConfig {
+    pub(super) struct TestBackpressureSinkConfig {
         pub num_to_consume: usize,
     }
 

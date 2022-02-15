@@ -61,7 +61,7 @@ pub(crate) enum ApiError {
 impl warp::reject::Reject for ApiError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct DatadogAgentConfig {
+struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]

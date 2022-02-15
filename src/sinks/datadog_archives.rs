@@ -93,7 +93,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }

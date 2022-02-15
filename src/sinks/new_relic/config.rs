@@ -85,7 +85,7 @@ impl NewRelicConfig {
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
     ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck(client, credentials).boxed())
+        Ok(healthcheck::healthcheck(client, credentials).boxed())
     }
 }
 

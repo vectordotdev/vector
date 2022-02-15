@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CompoundConfig {
+struct CompoundConfig {
     steps: Vec<TransformStep>,
 }
 

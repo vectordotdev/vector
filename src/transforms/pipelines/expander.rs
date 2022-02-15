@@ -11,7 +11,7 @@ use crate::{
 /// expands in serial.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ExpanderConfig {
+pub(crate) struct ExpanderConfig {
     mode: ExpandType,
     inner: IndexMap<String, Box<dyn TransformConfig>>,
 }

@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct PulsarEncodeEventFailed<'a> {
+pub(crate) struct PulsarEncodeEventFailed<'a> {
     pub error: &'a str,
 }
 
