@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   mock-ec2-metadata:
     image: timberiodev/mock-ec2-metadata:latest
@@ -72,4 +74,3 @@ volumes:
 
 networks:
   backend: {}
-

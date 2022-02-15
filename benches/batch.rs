@@ -1,6 +1,6 @@
 use std::{convert::Infallible, time::Duration};
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
 use vector::{
@@ -30,7 +30,11 @@ fn benchmark_batch(c: &mut Criterion) {
 
     let input: Vec<_> = random_lines(event_len)
         .take(num_events)
-        .map(|s| s.into_bytes())
+        .map(|s| {
+            let mut bytes = BytesMut::new();
+            bytes.put_slice(s.as_bytes());
+            bytes
+        })
         .collect();
 
     for (compression, batch_size) in cases.iter() {
@@ -114,7 +118,7 @@ pub struct PartitionedBuffer {
 
 #[derive(Clone)]
 pub struct InnerBuffer {
-    pub(self) inner: Vec<u8>,
+    pub(self) inner: BytesMut,
     key: Bytes,
 }
 

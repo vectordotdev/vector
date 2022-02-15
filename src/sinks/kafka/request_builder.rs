@@ -43,7 +43,7 @@ impl KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes()),
+        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))
@@ -67,7 +67,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
         if let Event::Log(log) = event {
             if let Some(headers) = log.get(headers_key) {
                 match headers {
-                    Value::Map(headers_map) => {
+                    Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
                         for (key, value) in headers_map {
                             if let Value::Bytes(value_bytes) = value {

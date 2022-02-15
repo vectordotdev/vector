@@ -34,3 +34,6 @@ vector_common = { path = "../../vector-common", default-features = false, featur
 name = "kind"
 harness = false
 test = true
+
+[features]
+test = []

@@ -32,7 +32,7 @@ mod prelude {
 // function as expected. This is a bug in the implementation.
 macro_rules! unexpected_type {
     ($value:expr) => {
-        unreachable!("unexpected value type: '{}'", $value.kind())
+        unreachable!("unexpected value type: '{}'", $value.kind_str())
     };
 }
 
@@ -239,7 +239,7 @@ impl Function for Argument {
         if !(self.parameter.accepts)(&value) {
             return Err(format!(
                 "invalid argument type '{}' for parameter '{}'",
-                value.kind(),
+                value.kind_str(),
                 self.parameter.keyword
             ));
         }

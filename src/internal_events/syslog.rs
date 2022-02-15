@@ -3,23 +3,6 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct SyslogEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for SyslogEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received line.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
 #[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
