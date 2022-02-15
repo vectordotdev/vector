@@ -17,7 +17,7 @@ For example, let's partition data on AWS S3 by application_id and date. We can a
   key_prefix = "application_id={{ application_id }}/date=%F/"
 ```
 
-Notice that Vector allows direct field references as well as strftime specifiers. If we were to run the following log event though Vector:
+Notice that Vector allows direct field references as well as strftime specifiers. If we were to run the following log event through Vector:
 
 ```json
 {

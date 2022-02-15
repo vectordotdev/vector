@@ -195,7 +195,7 @@ impl Encoder<Event> for StandardTextEncoding {
             Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
-                    .map(|v| v.as_bytes())
+                    .map(|v| v.coerce_to_bytes())
                     .unwrap_or_default();
                 writer.write_all(&message[..]).map(|()| message.len())
             }

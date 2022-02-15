@@ -259,7 +259,7 @@ where
     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
 {
     any_match(field, move |value| {
-        let bytes = value.as_bytes();
+        let bytes = value.coerce_to_bytes();
         func(String::from_utf8_lossy(&bytes))
     })
 }

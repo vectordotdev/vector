@@ -13,8 +13,8 @@ use crate::{
         Event, Value,
     },
     internal_events::{
-        LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
-        LogToMetricTemplateParseError,
+        LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        ParserMissingFieldError,
     },
     schema,
     template::{Template, TemplateParseError, TemplateRenderingError},
@@ -389,10 +389,10 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNullError {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(&ParserMissingFieldError {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {

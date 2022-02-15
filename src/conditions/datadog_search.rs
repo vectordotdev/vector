@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use vector_datadog_filter::EventFilter;
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::{Event, LogEvent},
 };
 
@@ -21,12 +21,12 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 
 /// Runner that contains the boxed `Matcher` function to check whether an `Event` matches
 /// a Datadog Search Syntax query.
-#[derive(Clone)]
-struct DatadogSearchRunner {
+#[derive(Debug, Clone)]
+pub struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
 }
 
-impl Condition for DatadogSearchRunner {
+impl Conditional for DatadogSearchRunner {
     fn check(&self, e: &Event) -> bool {
         self.matcher.run(e)
     }
@@ -34,14 +34,11 @@ impl Condition for DatadogSearchRunner {
 
 #[typetag::serde(name = "datadog_search")]
 impl ConditionConfig for DatadogSearchConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
         let matcher = as_log(build_matcher(&node, &EventFilter::default()));
 
-        Ok(Box::new(DatadogSearchRunner { matcher }))
+        Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
 }
 
