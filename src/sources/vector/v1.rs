@@ -130,7 +130,7 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use tokio::{
         io::AsyncWriteExt,
@@ -256,6 +256,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();
@@ -293,6 +294,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();

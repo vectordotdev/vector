@@ -206,6 +206,7 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use std::{
+        collections::HashMap,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -615,6 +616,7 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();
