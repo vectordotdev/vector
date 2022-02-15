@@ -1,4 +1,5 @@
-pub mod logs;
+
+pub(crate) mod logs;
 pub mod metrics;
 
 use serde::{Deserialize, Serialize};
