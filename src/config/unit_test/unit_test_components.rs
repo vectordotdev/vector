@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use futures_util::{
-    future,
-    stream::{self, BoxStream},
-    FutureExt, StreamExt,
-};
+use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
@@ -37,9 +33,7 @@ impl SourceConfig for UnitTestSourceConfig {
             // To appropriately shut down the topology after the source is done
             // sending events, we need to hold on to this shutdown trigger.
             let _shutdown = cx.shutdown;
-            out.send_all(&mut stream::iter(events))
-                .await
-                .map_err(|_| ())?;
+            out.send_batch(events).await.map_err(|_| ())?;
             Ok(())
         }))
     }
