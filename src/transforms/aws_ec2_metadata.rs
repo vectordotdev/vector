@@ -93,7 +93,7 @@ pub struct Ec2Metadata {
 }
 
 #[derive(Clone, Debug)]
-pub struct Ec2MetadataTransform {
+pub(self) struct Ec2MetadataTransform {
     state: Arc<ArcSwap<HashMap<Cow<'static, str>, Bytes>>>,
 }
 

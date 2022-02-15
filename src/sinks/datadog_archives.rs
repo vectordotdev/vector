@@ -84,7 +84,7 @@ impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
 pub struct DatadogArchivesSinkConfig {
     pub service: String,
     pub bucket: String,
-    pub key_prefix: Option<String>,
+    pub(super) key_prefix: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
