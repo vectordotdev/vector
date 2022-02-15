@@ -307,7 +307,11 @@ pub(crate) use self::throttle::*;
     any(
         feature = "sinks-socket",
         feature = "sinks-statsd",
-        feature = "sources-dnstap"
+        feature = "sources-dnstap",
+        feature = "sources-metrics",
+        feature = "sources-statsd",
+        feature = "sources-syslog",
+        feature = "sources-socket"
     ),
     unix
 ))]
