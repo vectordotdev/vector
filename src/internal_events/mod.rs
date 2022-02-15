@@ -63,7 +63,7 @@ mod fluent;
 mod geoip;
 mod heartbeat;
 mod http;
-pub mod http_client;
+pub(crate) mod http_client;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]

@@ -1,7 +1,7 @@
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AddFieldsFieldOverwritten<'a> {
+pub(crate) struct AddFieldsFieldOverwritten<'a> {
     pub(crate) field: &'a str,
 }
 
