@@ -174,7 +174,7 @@ pub mod invocation {
     }
 }
 
-pub mod stream {
+mod stream {
     //! Stream error.
     use super::*;
 
