@@ -65,7 +65,7 @@ impl<'a> InternalEvent for DockerLogsContainerEventReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerLogsContainerWatch<'a> {
+pub(crate) struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
 }
 
