@@ -1,5 +1,5 @@
 name: Feature
-about: 🚀 Suggest a new feature.
+description: 🚀 Suggest a new feature.
 labels:
 - 'type: feature'
 body:
@@ -87,5 +87,3 @@ body:
 
       This will record which version was current at the time of your feature request,
       to help manage the request backlog.
-
-    render: text
