@@ -178,7 +178,7 @@ where
 }
 
 #[derive(Debug, Snafu)]
-pub enum ConfigError {
+pub(super) enum ConfigError {
     #[snafu(display("`threshold`, and `window_secs` must be non-zero"))]
     NonZero,
 }
