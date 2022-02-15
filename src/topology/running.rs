@@ -487,16 +487,14 @@ impl RunningTopology {
                 .send(TapResource {
                     outputs: self.outputs.clone(),
                     inputs: watch_inputs,
-                    source_keys: self
-                        .config
+                    source_keys: diff
                         .sources
-                        .keys()
+                        .changed_and_added()
                         .map(|key| key.to_string())
                         .collect(),
-                    sink_keys: self
-                        .config
+                    sink_keys: diff
                         .sinks
-                        .keys()
+                        .changed_and_added()
                         .map(|key| key.to_string())
                         .collect(),
                 })
