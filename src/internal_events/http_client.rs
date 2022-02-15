@@ -49,7 +49,7 @@ impl<'a, T: HttpBody> InternalEvent for AboutToSendHttpRequest<'a, T> {
 
 #[derive(Debug)]
 pub struct GotHttpResponse<'a, T> {
-    pub response: &'a Response<T>,
+    pub(crate) response: &'a Response<T>,
     pub roundtrip: Duration,
 }
 
