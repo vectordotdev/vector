@@ -22,12 +22,14 @@ where
     loop {
         match (path_iter.next(), value) {
             (None, value) => return Some(value),
-            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get_mut(key.as_ref()) {
-                None => return None,
-                Some(nested_value) => {
-                    value = nested_value;
+            (Some(PathComponent::Key(key)), Value::Object(map)) => {
+                match map.get_mut(key.as_ref()) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
                 }
-            },
+            }
             (Some(PathComponent::Index(index)), Value::Array(array)) => {
                 match array.get_mut(index) {
                     None => return None,

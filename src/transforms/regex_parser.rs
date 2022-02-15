@@ -10,8 +10,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
-        RegexParserTargetExists,
+        ParserConversionError, ParserMatchError, ParserMissingFieldError, ParserTargetExistsError,
     },
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -129,7 +128,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(&RegexParserConversionFailed { name, error });
+                                        emit!(&ParserConversionError { name, error });
                                         None
                                     }
                                 }
@@ -138,7 +137,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(&RegexParserFailedMatch { value });
+                emit!(&ParserMatchError { value });
                 None
             }
         }
@@ -248,14 +247,14 @@ impl RegexParser {
 impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(&self.field).map(|s| s.coerce_to_bytes());
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(&RegexParserFailedMatch { value });
+                    emit!(&ParserMatchError { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -277,7 +276,7 @@ impl FunctionTransform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            emit!(&RegexParserTargetExists { target_field });
+                            emit!(&ParserTargetExistsError { target_field });
                             output.push(event);
                             return;
                         }
@@ -297,7 +296,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(&RegexParserMissingField { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         }
 
         if !self.drop_failed {

@@ -49,7 +49,12 @@ async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Cli
 
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
-        .credentials_provider(AwsAuthentication::test_auth().credentials_provider().await)
+        .credentials_provider(
+            AwsAuthentication::test_auth()
+                .credentials_provider()
+                .await
+                .unwrap(),
+        )
         .endpoint_resolver(Endpoint::immutable(
             Uri::from_str(sqs_address().as_str()).unwrap(),
         ))

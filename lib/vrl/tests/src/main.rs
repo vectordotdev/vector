@@ -11,6 +11,7 @@ use chrono_tz::Tz;
 use glob::glob;
 use structopt::StructOpt;
 use vector_common::TimeZone;
+use vrl::prelude::VrlValueConvert;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 use vrl_tests::{docs, Test};
 

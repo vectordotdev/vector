@@ -94,7 +94,7 @@ impl Function for Arithmetic {
             query => {
                 return Err(format!(
                     "arithmetic can not be performed with {}",
-                    query.kind()
+                    query.kind_str()
                 ))
             }
         };
@@ -103,7 +103,7 @@ impl Function for Arithmetic {
             query => {
                 return Err(format!(
                     "arithmetic can not be performed with {}",
-                    query.kind()
+                    query.kind_str()
                 ))
             }
         };

@@ -192,7 +192,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                 match encoder.finish() {
                     Ok((payload, mut metrics)) => {
                         let finalizers = metrics.take_finalizers();
-                        results.push(Ok(((endpoint, n, finalizers), payload.into())));
+                        results.push(Ok(((endpoint, n, finalizers), payload)));
                     }
                     Err(err) => match err {
                         // The encoder informed us that the resulting payload was too big, so we're
@@ -283,7 +283,7 @@ fn encode_now_or_never(
         .finish()
         .map(|(payload, mut processed)| {
             let finalizers = processed.take_finalizers();
-            ((endpoint, n, finalizers), payload.into())
+            ((endpoint, n, finalizers), payload)
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
             dropped_events: metrics_len,

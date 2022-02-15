@@ -1,5 +1,4 @@
-// ## skip check-events ##
-
+use super::prelude::error_stage;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -21,10 +20,29 @@ pub struct LuaScriptError {
 
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
+        error!(
+            message = "Error in lua script; discarding event.",
+            error = ?self.error,
+            error_type = "script_failed",
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }
@@ -36,10 +54,29 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
+        error!(
+            message = "Error in lua script; discarding event.",
+            error = ?self.error,
+            error_type = "script_failed",
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "script_failed",
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }

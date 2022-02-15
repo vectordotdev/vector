@@ -1,5 +1,6 @@
 use std::task::{Context, Poll};
 
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
@@ -49,7 +50,7 @@ pub struct LokiRequest {
     pub compression: Compression,
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
     pub tenant_id: Option<String>,
     pub events_byte_size: usize,
 }

@@ -32,4 +32,7 @@ pub use compiler::{
 pub use diagnostic::DiagnosticError;
 pub use indoc::indoc;
 pub use ordered_float::NotNan;
+
+pub use compiler::value::{VrlValueArithmetic, VrlValueConvert, VrlValueKind};
+
 // pub use crate::{array, bench_function, func_args, lit, map, test_function, test_type_def};
