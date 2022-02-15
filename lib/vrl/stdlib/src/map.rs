@@ -24,27 +24,49 @@ impl Function for Map {
                 result: Ok("[2,3,4]"),
             },
             Example {
+                title: "array returning array",
+                source: r#"map([1,2,3]) -> |index, value| {  [value]  }"#,
+                result: Ok(r#"[[1],[2],[3]]"#),
+            },
+            Example {
+                title: "index type checks as integer",
+                source: r#"map([1,2,3]) -> |index, value| {  5 - index }"#,
+                result: Ok(r#"[5,4,3]"#),
+            },
+            Example {
                 title: "enumerating object",
                 source: r#"map({"a" : 1, "b" : 2, "c" : 3}) -> |key, value| { [key, value + 1] }"#,
                 result: Ok(r#"{"a" :2, "b" : 3, "c" :4}"#),
             },
             Example {
                 title: "string array value",
-                source: r#"map(["foo", "bar"]) ->   |index, value| { value + "_" + to_string(index) }"#,
+                source: r#"map(["foo", "bar"]) -> |index, value| { value + "_" + to_string(index) }"#,
                 result: Ok(r#"["foo_0", "bar_1"]"#),
             },
             Example {
                 title: "map to array of objects",
-                source: r#"map([1]) ->   |index, value| { { "a": 1} }"#,
+                source: r#"map([1, 2]) -> |index, value| { { "a": value} }"#,
+
+                result: Ok(r#"[{"a": 1}, {"a": 2}]"#),
+            },
+            Example {
+                title: "map to array of objects",
+                source: r#"map([1]) -> |index, value| { { "a": 1} }"#,
 
                 result: Ok(r#"[{"a": 1}]"#),
             },
             Example {
-                title: "object iteration requires array return value",
-                source: r#"map({"b": 2}) ->   |index, value| { { "a": 1} }"#,
+                title: "accrue value outside map",
+                source: r#"result = {};  map(["a", "b", "c"]) -> |index, value| { result = set!(value: result, path: [value], data: index) }; result"#,
+
+                result: Ok(r#"{"a": 0, "b": 1, "c": 2}"#),
+            },
+            Example {
+                title: "non array return value for object iteration does not compile",
+                source: r#"map({"b": 2}) -> |index, value| { { "a": 1} }"#,
 
                 result: Err(
-                    r#"function call error for "map" at (0:47): object iteration requires returning a key/value array return value"#,
+                    r#"function call error for "map" at (0:45): object iteration requires returning a key/value array return value"#,
                 ),
             },
             Example {
