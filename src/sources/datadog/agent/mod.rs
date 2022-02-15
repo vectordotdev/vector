@@ -732,5 +732,5 @@ struct LogMsg {
     pub hostname: Bytes,
     pub service: Bytes,
     pub ddsource: Bytes,
-    pub ddtags: Bytes,
+    pub(crate) ddtags: Bytes,
 }
