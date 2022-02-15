@@ -212,7 +212,7 @@ async fn statsd_udp(
         match frame {
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
-                if let Err(error) = out.send_all(stream::iter(events)).await {
+                if let Err(error) = out.send_batch(events).await {
                     emit!(&StreamClosedError { error, count });
                 }
             }
