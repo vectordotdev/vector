@@ -1,3 +1,4 @@
+use vrl::diagnostic::Label;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -149,22 +150,42 @@ impl Expression for MapFn {
         //   different closure variables, and it takes an `Fn` to apply to the data.
 
         let value = self.value.resolve(ctx)?;
+        let result = match &value {
+            Value::Array(array) => Value::Array(Vec::with_capacity(array.len())),
+            Value::Object(_) => Value::Object(BTreeMap::default()),
+            _ => unreachable!("Should be type checked by the compiler"),
+        };
+        let mut map = |_: &Context, output: Value, result: Value| -> Result<Value> {
+            match result {
+                Value::Object(mut map) => match output {
+                    Value::Array(mut array) => {
+                        let value = match array.pop() {
+                            Some(value) => Ok(value),
+                            None => Err(Error::ObjectArrayRequired.to_string()),
+                        }?;
 
-        let mut map = |_: &Context, output: Output, result: &mut Value| -> Result<()> {
-            match (output, result) {
-                (Output::Object { key, value }, Value::Object(ref mut map)) => {
-                    map.insert(key, value);
-                }
-                (Output::Array { element }, Value::Array(ref mut array)) => {
-                    array.push(element);
+                        let key = match array.pop() {
+                            Some(Value::Bytes(bytes)) => {
+                                Ok(String::from_utf8_lossy(&bytes).into_owned())
+                            }
+                            None => Err(Error::ObjectArrayRequired.to_string()),
+                            _ => Err(Error::ObjectInvalidKey.to_string()),
+                        }?;
+
+                        map.insert(key, value);
+                        Ok(Value::Object(map))
+                    }
+                    _ => Err(Error::ObjectNonArray.to_string().into()),
+                },
+                Value::Array(mut array) => {
+                    array.push(output);
+                    Ok(Value::Array(array))
                 }
                 _ => unreachable!(),
-            };
-
-            Ok(())
+            }
         };
 
-        self.closure.resolve(ctx, value, &mut map)
+        self.closure.resolve(ctx, value, &mut map, result)
 
         // let result = match self.value.resolve(ctx)? {
         //     Value::Object(object) => {
@@ -206,5 +227,27 @@ impl Expression for MapFn {
             .type_def(state)
             .fallible_unless(Kind::object(Collection::any()) | Kind::array(Collection::any()))
             .restrict_array()
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("object iteration requires a two-element array return value")]
+    ObjectArrayRequired,
+
+    #[error("object iteration requires returning a key/value array return value")]
+    ObjectNonArray,
+
+    #[error("object iteration requires the first element to be a string type")]
+    ObjectInvalidKey,
+}
+
+impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        0
+    }
+
+    fn labels(&self) -> Vec<Label> {
+        vec![]
     }
 }
