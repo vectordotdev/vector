@@ -175,20 +175,20 @@ fn execute(
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {
-    use serde_json::Value;
+    use serde_json::Value as JsonValue;
 
     match value {
-        Value::Null => vrl::Value::Null,
-        Value::Object(v) => v
+        JsonValue::Null => vrl::Value::Null,
+        JsonValue::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))
             .collect::<BTreeMap<_, _>>()
             .into(),
-        Value::Bool(v) => v.into(),
-        Value::Number(v) if v.is_f64() => v.as_f64().unwrap().into(),
-        Value::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
-        Value::String(v) => v.into(),
-        Value::Array(v) => v.into_iter().map(serde_to_vrl).collect::<Vec<_>>().into(),
+        JsonValue::Bool(v) => v.into(),
+        JsonValue::Number(v) if v.is_f64() => Value::from_f64_or_zero(v.as_f64().unwrap()),
+        JsonValue::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
+        JsonValue::String(v) => v.into(),
+        JsonValue::Array(v) => v.into_iter().map(serde_to_vrl).collect::<Vec<_>>().into(),
     }
 }
 

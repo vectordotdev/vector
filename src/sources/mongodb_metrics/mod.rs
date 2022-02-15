@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, time::Instant};
 use chrono::Utc;
 use futures::{
     future::{join_all, try_join_all},
-    stream, StreamExt,
+    StreamExt,
 };
 use mongodb::{
     bson::{self, doc, from_document, Bson, Document},
@@ -19,10 +19,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
@@ -133,12 +130,9 @@ impl SourceConfig for MongoDbMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics)
-                    .map(stream::iter)
-                    .flatten()
-                    .map(Event::Metric);
+                let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_all(&mut stream).await {
+                if let Err(error) = cx.out.send_batch(metrics).await {
                     emit!(&StreamClosedError { error, count });
                     return Err(());
                 }

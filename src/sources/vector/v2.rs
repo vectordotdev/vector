@@ -52,7 +52,7 @@ impl proto::Service for Service {
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events))
+            .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
                 emit!(&StreamClosedError { error, count });

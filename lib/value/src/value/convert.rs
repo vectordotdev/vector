@@ -8,7 +8,7 @@ impl Value {
     /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Map`.
     pub fn as_map(&self) -> Option<&BTreeMap<String, Self>> {
         match &self {
-            Value::Map(map) => Some(map),
+            Value::Object(map) => Some(map),
             _ => None,
         }
     }
@@ -24,7 +24,7 @@ impl Value {
     /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`.
     pub fn into_map(self) -> Option<BTreeMap<String, Self>> {
         match self {
-            Value::Map(map) => Some(map),
+            Value::Object(map) => Some(map),
             _ => None,
         }
     }
@@ -44,7 +44,7 @@ impl Value {
     /// This function will panic if self is anything other than `Value::Map`.
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Self> {
         match self {
-            Value::Map(ref mut m) => m,
+            Value::Object(ref mut m) => m,
             _ => panic!("Tried to call `Value::as_map` on a non-map value."),
         }
     }
@@ -137,7 +137,7 @@ impl From<f64> for Value {
 
 impl From<BTreeMap<String, Self>> for Value {
     fn from(value: BTreeMap<String, Self>) -> Self {
-        Self::Map(value)
+        Self::Object(value)
     }
 }
 
@@ -149,7 +149,7 @@ impl FromIterator<Self> for Value {
 
 impl FromIterator<(String, Self)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Self)>>(iter: I) -> Self {
-        Self::Map(iter.into_iter().collect::<BTreeMap<String, Self>>())
+        Self::Object(iter.into_iter().collect::<BTreeMap<String, Self>>())
     }
 }
 

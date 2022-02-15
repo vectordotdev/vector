@@ -23,7 +23,7 @@ use crate::{
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
+    event::{BatchNotifier, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },
@@ -396,7 +396,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
+        tokio::spawn(async move { out.send_stream(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
@@ -461,7 +461,7 @@ fn create_event(
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
-) -> Event {
+) -> LogEvent {
     emit!(&FileEventsReceived {
         count: 1,
         file: &file,
@@ -481,7 +481,7 @@ fn create_event(
         event.insert(host_key, hostname.clone());
     }
 
-    event.into()
+    event
 }
 
 #[cfg(test)]
@@ -501,7 +501,7 @@ mod tests {
     use super::*;
     use crate::{
         config::Config,
-        event::{EventStatus, Value},
+        event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
         test_util::components::{self, SOURCE_TESTS},
@@ -639,8 +639,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
 
-        let event = create_event(line, file, &host_key, &hostname, &file_key);
-        let log = event.into_log();
+        let log = create_event(line, file, &host_key, &hostname, &file_key);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());

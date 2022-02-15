@@ -170,7 +170,7 @@ tower-layer = { version = "0.3.1", default-features = false }
 # Serde
 serde = { version = "1.0.136", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.78", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.79", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.12.0", default-features = false, features = ["macros"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
@@ -249,7 +249,7 @@ http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.17", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-infer = { version = "0.6.0", default-features = false, optional = true}
+infer = { version = "0.7.0", default-features = false, optional = true}
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
