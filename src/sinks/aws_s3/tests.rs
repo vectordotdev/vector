@@ -328,6 +328,7 @@ mod integration_tests {
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),
+            tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
         }
