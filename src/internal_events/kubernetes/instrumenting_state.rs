@@ -19,7 +19,7 @@ pub struct StateResynced;
 pub struct StateMaintenanceRequested;
 
 #[derive(Debug)]
-pub struct StateMaintenancePerformed;
+pub(crate) struct StateMaintenancePerformed;
 
 impl InternalEvent for StateItemAdded {
     fn emit_metrics(&self) {
