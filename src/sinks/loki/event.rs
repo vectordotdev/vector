@@ -52,7 +52,7 @@ impl From<Vec<LokiRecord>> for LokiBatch {
 #[derive(Clone, Debug)]
 pub struct LokiEvent {
     pub timestamp: i64,
-    pub event: String,
+    pub(crate) event: String,
 }
 
 impl ByteSizeOf for LokiEvent {
