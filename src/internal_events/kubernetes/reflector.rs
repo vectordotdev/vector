@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct InvocationDesyncReceived<E> {
     /// The underlying error.
-    pub error: E,
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationDesyncReceived<E> {
