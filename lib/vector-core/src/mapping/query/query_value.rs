@@ -10,9 +10,9 @@ pub(in crate::mapping) enum QueryValue {
 }
 
 impl QueryValue {
-    pub fn kind(&self) -> &str {
+    pub fn kind_str(&self) -> &str {
         match self {
-            QueryValue::Value(value) => value.kind(),
+            QueryValue::Value(value) => value.kind_str(),
             QueryValue::Regex(_) => "regex",
         }
     }

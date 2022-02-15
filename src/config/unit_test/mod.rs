@@ -402,6 +402,11 @@ async fn build_unit_test(
             .collect::<Vec<_>>();
     }
 
+    if let Some(sink) = get_loose_end_outputs_sink(&config_builder) {
+        config_builder
+            .sinks
+            .insert(ComponentKey::from(Uuid::new_v4().to_string()), sink);
+    }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
@@ -412,6 +417,58 @@ async fn build_unit_test(
         pieces,
         test_result_rxs,
     })
+}
+
+/// Near the end of building a unit test, it's possible that we've included a
+/// transform(s) with multiple outputs where at least one of its output is
+/// consumed but its other outputs are left unconsumed.
+///
+/// To avoid warning logs that occur when building such topologies, we construct
+/// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
+fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
+    let mut config = config.clone();
+    let _ = expand_macros(&mut config);
+    let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
+        transform
+            .inner
+            .outputs()
+            .iter()
+            .map(|output| {
+                if let Some(port) = &output.port {
+                    OutputId::from((key, port.clone())).to_string()
+                } else {
+                    key.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let mut loose_end_outputs = Vec::new();
+    for id in transform_ids {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&id))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&id))
+        {
+            loose_end_outputs.push(id);
+        }
+    }
+
+    if loose_end_outputs.is_empty() {
+        None
+    } else {
+        let noop_sink = UnitTestSinkConfig {
+            test_name: "".to_string(),
+            transform_id: "".to_string(),
+            result_tx: Arc::new(Mutex::new(None)),
+            check: UnitTestSinkCheck::NoOp,
+        };
+        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+    }
 }
 
 fn build_and_validate_inputs(

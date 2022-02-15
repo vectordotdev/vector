@@ -244,7 +244,7 @@ fn encode_event(
         Encoding::Text => event
             .as_log()
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.coerce_to_bytes().to_vec())
             .unwrap_or_default(),
     };
 

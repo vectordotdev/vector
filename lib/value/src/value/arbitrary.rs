@@ -41,7 +41,7 @@ impl Arbitrary for Value {
             4 => Self::Timestamp(datetime(g)),
             5 => {
                 let mut gen = Gen::new(MAX_MAP_SIZE);
-                Self::Map(BTreeMap::arbitrary(&mut gen))
+                Self::Object(BTreeMap::arbitrary(&mut gen))
             }
             6 => {
                 let mut gen = Gen::new(MAX_ARRAY_SIZE);

@@ -154,9 +154,17 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("elb", take_anything);
     field!("client_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
     field!("target_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
-    field_parse!("request_processing_time", '0'..='9' | '.' | '-', f64);
-    field_parse!("target_processing_time", '0'..='9' | '.' | '-', f64);
-    field_parse!("response_processing_time", '0'..='9' | '.' | '-', f64);
+    field_parse!(
+        "request_processing_time",
+        '0'..='9' | '.' | '-',
+        NotNan<f64>
+    );
+    field_parse!("target_processing_time", '0'..='9' | '.' | '-', NotNan<f64>);
+    field_parse!(
+        "response_processing_time",
+        '0'..='9' | '.' | '-',
+        NotNan<f64>
+    );
     field!("elb_status_code", '0'..='9' | '-');
     field!("target_status_code", '0'..='9' | '-');
     field_parse!("received_bytes", '0'..='9' | '-', i64);

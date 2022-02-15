@@ -256,7 +256,7 @@ pub fn udp(
         })
         .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
@@ -284,7 +284,9 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
         log.insert("source_ip", default_host.clone());
     }
 
-    let parsed_hostname = log.get("hostname").map(|hostname| hostname.as_bytes());
+    let parsed_hostname = log
+        .get("hostname")
+        .map(|hostname| hostname.coerce_to_bytes());
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         log.insert(host_key, parsed_host);
     }

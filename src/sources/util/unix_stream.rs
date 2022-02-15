@@ -1,7 +1,7 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
-use futures::{stream, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -101,7 +101,7 @@ pub fn build_unix_stream_source(
                                 handle_events(&mut events, received_from.clone());
 
                                 let count = events.len();
-                                if let Err(error) = out.send_all(stream::iter(events)).await {
+                                if let Err(error) = out.send_batch(events).await {
                                     emit!(&StreamClosedError { error, count });
                                 }
                             }

@@ -98,7 +98,7 @@ impl MetricToLog {
                         .remove(&self.timestamp_key)
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
-                                .convert(value.as_bytes())
+                                .convert(value.coerce_to_bytes())
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
