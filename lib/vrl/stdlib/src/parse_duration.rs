@@ -115,7 +115,7 @@ impl Expression for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(number.into())
+        Ok(Value::from_f64_or_zero(number))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

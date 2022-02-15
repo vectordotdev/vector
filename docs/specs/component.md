@@ -219,7 +219,13 @@ This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
 
 * Properties
-  * `error` - The specifics of the error condition, such as system error code, etc.
+  * `message` - A human readable error message.
+  * `error` - An error code. The values for `error` for a given error event MUST
+    be a bounded set with relatively low cardinality because it will be used as
+    a metric tag. Examples would be syscall error code. Examples of values that
+    should not be used are raw error messages from `serde` as these are highly
+    variable depending on the input. Instead, these errors should be converted
+    to an error code like `invalid_json`.
   * `error_type` - The type of error condition. This MUST be one of the types
     listed in the `error_type` enum list in the cue docs.
   * `stage` - The stage at which the error occurred. This MUST be one of
@@ -229,8 +235,8 @@ implement since errors are specific to the component.
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
 * Metrics
-  * MUST increment the `component_errors_total` counter by 1 with the defined properties
-    as metric tags.
+  * MUST increment the `component_errors_total` counter by 1 with the defined
+    properties, except `message` as metric tags.
   * MUST increment the `component_discarded_events_total` counter by the number
     of Vector events discarded if the error resulted in discarding (dropping)
     acknowledged events. For sources, only increment this metric if incoming

@@ -348,7 +348,7 @@ fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
             None => return None,
         }
     }
-    Some(event::Value::Map(accum))
+    Some(event::Value::Object(accum))
 }
 
 fn decode_array(items: Vec<Value>) -> Option<event::Value> {
@@ -366,6 +366,7 @@ fn encode_value(value: event::Value) -> Value {
     Value {
         kind: match value {
             event::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            event::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
             event::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,
@@ -373,7 +374,7 @@ fn encode_value(value: event::Value) -> Value {
             event::Value::Integer(value) => Some(value::Kind::Integer(value)),
             event::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
             event::Value::Boolean(value) => Some(value::Kind::Boolean(value)),
-            event::Value::Map(fields) => Some(value::Kind::Map(encode_map(fields))),
+            event::Value::Object(fields) => Some(value::Kind::Map(encode_map(fields))),
             event::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),
             event::Value::Null => Some(value::Kind::Null(ValueNull::NullValue as i32)),
         },

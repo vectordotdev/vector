@@ -141,7 +141,7 @@ impl FunctionTransform for Concat {
 
         for substring in self.items.iter() {
             if let Some(value) = event.as_log().get(&substring.source) {
-                let b = value.as_bytes();
+                let b = value.coerce_to_bytes();
                 let start = match substring.start {
                     None => 0,
                     Some(s) => {
