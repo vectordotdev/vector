@@ -24,7 +24,7 @@ pub struct KinesisMetadata {
     pub partition_key: String,
 }
 
-pub struct KinesisSink {
+pub(crate) struct KinesisSink {
     pub batch_settings: BatcherSettings,
     pub acker: Acker,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
