@@ -60,6 +60,10 @@ impl SourceConfig for MockSourceConfig {
     fn source_type(&self) -> &'static str {
         "mock"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[tokio::test]
