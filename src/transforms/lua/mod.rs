@@ -40,7 +40,7 @@ pub struct LuaConfigV2 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum LuaConfig {
+pub(crate) enum LuaConfig {
     V1(LuaConfigV1),
     V2(LuaConfigV2),
 }
