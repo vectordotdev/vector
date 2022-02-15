@@ -7,6 +7,10 @@ pub enum EventNotificationType {
     Matched,
     /// There isn't currently a component that matches this pattern
     NotMatched,
+    /// The input pattern matched source(s) which cannot be tapped for inputs
+    InvalidInputPatternMatch,
+    /// The output pattern matched sink(s) which cannot be tapped for outputs
+    InvalidOutputPatternMatch,
 }
 
 #[derive(Debug, SimpleObject, Clone, PartialEq)]
@@ -17,6 +21,9 @@ pub struct EventNotification {
 
     /// Event notification type
     notification: EventNotificationType,
+
+    /// Any invalid matches for the pattern
+    invalid_matches: Option<Vec<String>>,
 }
 
 impl EventNotification {
@@ -24,6 +31,19 @@ impl EventNotification {
         Self {
             pattern,
             notification,
+            invalid_matches: None,
+        }
+    }
+
+    pub const fn new_with_invalid_matches(
+        pattern: String,
+        notification: EventNotificationType,
+        invalid_matches: Vec<String>,
+    ) -> Self {
+        Self {
+            pattern,
+            notification,
+            invalid_matches: Some(invalid_matches),
         }
     }
 }

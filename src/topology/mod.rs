@@ -53,6 +53,10 @@ pub struct TapResource {
     pub outputs: HashMap<OutputId, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Source component keys used to warn against invalid pattern matches
+    pub source_keys: Vec<String>,
+    // Sink component keys used to warn against invalid pattern amtches
+    pub sink_keys: Vec<String>,
 }
 
 // Watcher types for topology changes.

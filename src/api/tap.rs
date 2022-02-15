@@ -71,6 +71,10 @@ impl GlobMatcher<&str> for Pattern {
 pub enum TapNotification {
     Matched,
     NotMatched,
+    /// An invalid match may occur for an input pattern that matches source(s)
+    /// or an output pattern that matches sink(s)
+    InvalidInputPatternMatch(Vec<String>),
+    InvalidOutputPatternMatch(Vec<String>),
 }
 
 /// A tap payload can either contain a log/metric event or a notification that's intended
@@ -91,6 +95,28 @@ impl TapPayload {
     /// Raise a `not_matched` event against the provided pattern.
     pub fn not_matched<T: Into<String>>(pattern: T) -> Self {
         Self::Notification(pattern.into(), TapNotification::NotMatched)
+    }
+
+    /// Raise an `invalid_input_patter_match `event against the provided input pattern.
+    pub fn invalid_input_pattern_match<T: Into<String>>(
+        pattern: T,
+        invalid_matches: Vec<String>,
+    ) -> Self {
+        Self::Notification(
+            pattern.into(),
+            TapNotification::InvalidInputPatternMatch(invalid_matches),
+        )
+    }
+
+    /// Raise an `invalid_output_patter_match `event against the provided output pattern.
+    pub fn invalid_output_pattern_match<T: Into<String>>(
+        pattern: T,
+        invalid_matches: Vec<String>,
+    ) -> Self {
+        Self::Notification(
+            pattern.into(),
+            TapNotification::InvalidOutputPatternMatch(invalid_matches),
+        )
     }
 }
 
@@ -195,6 +221,34 @@ async fn send_not_matched(tx: TapSender, pattern: String) -> Result<(), SendErro
     tx.send(TapPayload::not_matched(pattern)).await
 }
 
+/// Sends an 'invalid input pattern match' tap payload.
+async fn send_invalid_input_pattern_match(
+    tx: TapSender,
+    pattern: String,
+    invalid_matches: Vec<String>,
+) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending invalid input pattern match notification.", pattern = ?pattern, invalid_matches = ?invalid_matches);
+    tx.send(TapPayload::invalid_input_pattern_match(
+        pattern,
+        invalid_matches,
+    ))
+    .await
+}
+
+/// Sends an 'invalid output pattern match' tap payload.
+async fn send_invalid_output_pattern_match(
+    tx: TapSender,
+    pattern: String,
+    invalid_matches: Vec<String>,
+) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending invalid output pattern match notification.", pattern = ?pattern, invalid_matches = ?invalid_matches);
+    tx.send(TapPayload::invalid_output_pattern_match(
+        pattern,
+        invalid_matches,
+    ))
+    .await
+}
+
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
@@ -229,6 +283,8 @@ async fn tap_handler(
                 let TapResource {
                     outputs,
                     inputs,
+                    source_keys,
+                    sink_keys,
                 } = watch_rx.borrow().clone();
 
                 let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(Pattern::OutputPattern).collect::<HashSet<_>>();
@@ -314,9 +370,8 @@ async fn tap_handler(
                     }
                 });
 
-                // Send notifications to the client. The # of notifications will always be
-                // exactly equal to the number of patterns, so we can pre-allocate capacity.
-                let mut notifications = Vec::with_capacity(component_id_patterns.len());
+                // Notifications to send to the client.
+                let mut notifications = Vec::new();
 
                 // Matched notifications.
                 for pattern in matched.difference(&last_matches) {
@@ -326,6 +381,20 @@ async fn tap_handler(
                 // Not matched notifications.
                 for pattern in user_provided_patterns.difference(&matched) {
                     notifications.push(send_not_matched(tx.clone(), pattern.clone()).boxed());
+                }
+
+                // Warnings on invalid matches.
+                for pattern in patterns.for_inputs.iter() {
+                    let invalid_matches = source_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    if !invalid_matches.is_empty() {
+                        notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    }
+                }
+                for pattern in patterns.for_outputs.iter() {
+                    let invalid_matches = sink_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    if !invalid_matches.is_empty() {
+                        notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    }
                 }
 
                 last_matches = matched;
@@ -391,6 +460,8 @@ mod tests {
         let tap_resource = TapResource {
             outputs,
             inputs: HashMap::new(),
+            source_keys: Vec::new(),
+            sink_keys: Vec::new(),
         };
 
         let (watch_tx, watch_rx) = watch::channel(TapResource::default());
@@ -662,11 +733,12 @@ mod tests {
             100,
         );
 
-        let tap_events: Vec<_> = tap_stream.take(3).collect().await;
+        let tap_events: Vec<_> = tap_stream.take(4).collect().await;
 
         let notifications = [
             assert_notification(tap_events[0][0].clone()),
             assert_notification(tap_events[1][0].clone()),
+            assert_notification(tap_events[2][0].clone()),
         ];
         assert!(notifications.iter().any(|n| *n
             == EventNotification::new("transform".to_string(), EventNotificationType::Matched)));
@@ -675,9 +747,17 @@ mod tests {
             .iter()
             .any(|n| *n
                 == EventNotification::new("in".to_string(), EventNotificationType::NotMatched)));
+        // "in" results in an invalid matches notification to warn against an
+        // attempt to tap the input of a source
+        assert!(notifications.iter().any(|n| *n
+            == EventNotification::new_with_invalid_matches(
+                "in".to_string(),
+                EventNotificationType::InvalidInputPatternMatch,
+                vec!["in".to_string()]
+            )));
 
         assert_eq!(
-            assert_log(tap_events[2][0].clone())
+            assert_log(tap_events[3][0].clone())
                 .get_message()
                 .unwrap_or_default(),
             "test"
