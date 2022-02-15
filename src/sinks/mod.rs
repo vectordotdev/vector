@@ -4,7 +4,7 @@ use snafu::Snafu;
 pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-pub mod aws_cloudwatch_logs;
+pub(super) mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
 pub mod aws_cloudwatch_metrics;
 #[cfg(feature = "sinks-aws_kinesis_firehose")]
