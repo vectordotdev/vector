@@ -30,7 +30,7 @@ use crate::{
     },
 };
 
-pub struct StatsdSvc {
+struct StatsdSvc {
     inner: UdpService,
 }
 
