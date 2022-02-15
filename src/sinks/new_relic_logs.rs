@@ -64,7 +64,7 @@ pub struct NewRelicLogsConfig {
     pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(self) request: TowerRequestConfig,
 }
 
 inventory::submit! {

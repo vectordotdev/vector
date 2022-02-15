@@ -67,7 +67,7 @@ pub struct CloudWatchMetricsSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AwsAuthentication,
+    auth: AwsAuthentication,
 }
 
 inventory::submit! {

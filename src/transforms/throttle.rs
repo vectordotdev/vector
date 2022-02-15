@@ -51,7 +51,7 @@ impl TransformConfig for ThrottleConfig {
 }
 
 #[derive(Clone)]
-pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
+pub(self) struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
