@@ -166,7 +166,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct LogsApiModel(pub Vec<DataStore>);
+pub struct LogsApiModel(pub(crate) Vec<DataStore>);
 
 impl LogsApiModel {
     pub fn new(logs_array: Vec<KeyValData>) -> Self {
