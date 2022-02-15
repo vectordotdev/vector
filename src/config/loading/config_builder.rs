@@ -1,10 +1,12 @@
 use super::{loader, prepare_input};
-use super::{ComponentHint, Process};
+use super::{ComponentHint, Process, ProcessedFile};
 use crate::config::{
     format, ConfigBuilder, EnrichmentTableOuter, Format, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
 };
 use indexmap::IndexMap;
+use serde::de::DeserializeOwned;
+use std::{io::Read, path::Path};
 use vector_core::config::ComponentKey;
 
 pub struct ConfigBuilderLoader {
@@ -20,54 +22,54 @@ impl ConfigBuilderLoader {
 }
 
 impl Process for ConfigBuilderLoader {
-    fn load<R: std::io::Read>(
+    fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
+        prepare_input(input)
+    }
+
+    fn merge(
         &mut self,
-        name: String,
-        input: R,
+        file: &ProcessedFile,
         format: Format,
         hint: Option<ComponentHint>,
-    ) -> Result<Vec<String>, Vec<String>> {
-        let (with_vars, warnings) = prepare_input(input)?;
+    ) -> Result<(), Vec<String>> {
+        let component_key = ComponentKey::from(file.name.as_str());
 
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder.sources.insert(
-                    ComponentKey::from(name),
-                    format::deserialize(&with_vars, format)?,
-                );
+                self.builder
+                    .sources
+                    .insert(component_key, format::deserialize(&file.input, format)?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder.sinks.insert(
-                    ComponentKey::from(name),
-                    format::deserialize(&with_vars, format)?,
-                );
+                self.builder
+                    .sinks
+                    .insert(component_key, format::deserialize(&file.input, format)?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder.transforms.insert(
-                    ComponentKey::from(name),
-                    format::deserialize(&with_vars, format)?,
-                );
+                self.builder
+                    .transforms
+                    .insert(component_key, format::deserialize(&file.input, format)?);
             }
             Some(ComponentHint::EnrichmentTable) => {
-                self.builder.enrichment_tables.insert(
-                    ComponentKey::from(name),
-                    format::deserialize(&with_vars, format)?,
-                );
+                self.builder
+                    .enrichment_tables
+                    .insert(component_key, format::deserialize(&file.input, format)?);
             }
             Some(ComponentHint::Test) => {
                 self.builder
                     .tests
                     .extend(format::deserialize::<Vec<TestDefinition<String>>>(
-                        &with_vars, format,
+                        &file.input,
+                        format,
                     )?);
             }
             None => {
                 self.builder
-                    .append(format::deserialize(&with_vars, format)?)?;
+                    .append(format::deserialize(&file.input, format)?)?;
             }
-        }
+        };
 
-        Ok(warnings)
+        Ok(())
     }
 }
 

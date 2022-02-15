@@ -1,5 +1,4 @@
 mod config_builder;
-mod internal;
 mod loader;
 mod recursive;
 mod source;
@@ -12,7 +11,7 @@ use std::{
 };
 
 use config_builder::ConfigBuilderLoader;
-use internal::process::{ComponentHint, Process};
+use loader::process::{ComponentHint, Process, ProcessedFile};
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
