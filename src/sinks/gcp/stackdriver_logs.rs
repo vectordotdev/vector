@@ -97,7 +97,7 @@ pub struct StackdriverResource {
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(flatten)]
-    pub labels: HashMap<String, Template>,
+    pub(self) labels: HashMap<String, Template>,
 }
 
 inventory::submit! {
