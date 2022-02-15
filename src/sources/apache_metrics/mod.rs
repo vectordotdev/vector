@@ -40,7 +40,7 @@ struct ApacheMetricsConfig {
     namespace: String,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(super) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
