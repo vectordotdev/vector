@@ -185,6 +185,7 @@ print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
+results = results.drop(labels=["p-value"], axis=1) # only used for detecting changes
 results['Δ mean'] = results['Δ mean'].apply(common.human_bytes)
 results['baseline mean'] = results['baseline mean'].apply(common.human_bytes)
 results['baseline stdev'] = results['baseline stdev'].apply(common.human_bytes)
