@@ -123,7 +123,7 @@ impl SourceConfig for LogplexConfig {
 
 // Add a compatibility alias to avoid breaking existing configs
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexCompatConfig(LogplexConfig);
+pub(crate) struct LogplexCompatConfig(LogplexConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
