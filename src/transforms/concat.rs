@@ -18,7 +18,7 @@ use crate::{
 pub struct ConcatConfig {
     pub(crate) target: String,
     pub joiner: Option<String>,
-    pub items: Vec<String>,
+    pub(super) items: Vec<String>,
 }
 
 inventory::submit! {
