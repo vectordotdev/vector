@@ -332,7 +332,7 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
         .await
 }
 
-pub fn encode_event(encoding: &EncodingConfig<Encoding>, mut event: Event) -> Vec<u8> {
+pub(crate) fn encode_event(encoding: &EncodingConfig<Encoding>, mut event: Event) -> Vec<u8> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     match encoding.codec() {
