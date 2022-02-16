@@ -23,7 +23,7 @@ use crate::{
 
 const MAX_CHUNK_SIZE: usize = 1024;
 
-pub struct BlackholeSink {
+pub(crate) struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
