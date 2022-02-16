@@ -103,7 +103,7 @@ impl<'a> InternalEvent for DockerLogsContainerUnwatch<'a> {
 #[derive(Debug)]
 pub struct DockerLogsCommunicationError<'a> {
     pub error: Error,
-    pub container_id: Option<&'a str>,
+    pub(crate) container_id: Option<&'a str>,
 }
 
 impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {

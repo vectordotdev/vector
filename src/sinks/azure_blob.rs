@@ -43,7 +43,7 @@ pub struct AzureBlobSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig,
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
