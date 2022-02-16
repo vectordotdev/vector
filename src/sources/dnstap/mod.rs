@@ -22,7 +22,7 @@ pub use schema::DnstapEventSchema;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
     #[serde(default = "default_max_frame_length")]
-    pub max_frame_length: usize,
+    pub(super) max_frame_length: usize,
     pub(self) host_key: Option<String>,
     pub socket_path: PathBuf,
     raw_data_only: Option<bool>,
