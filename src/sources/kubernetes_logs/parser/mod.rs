@@ -9,6 +9,6 @@ mod test_util;
 pub(super) type Parser = picker::Picker;
 
 /// Build a parser for any log format supported by `kubelet`.
-pub const fn build(timezone: TimeZone) -> Parser {
+pub(super) const fn build(timezone: TimeZone) -> Parser {
     picker::Picker::new(timezone)
 }
