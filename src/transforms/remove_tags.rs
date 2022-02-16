@@ -16,7 +16,7 @@ pub struct RemoveTagsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct RemoveTags {
+pub(super) struct RemoveTags {
     tags: Vec<String>,
 }
 
