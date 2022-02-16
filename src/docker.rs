@@ -16,7 +16,7 @@ use snafu::Snafu;
 const DEFAULT_TIMEOUT: u64 = 120;
 
 #[derive(Debug, Snafu)]
-pub enum Error {
+pub(crate) enum Error {
     #[snafu(display("URL has no host."))]
     NoHost,
 }

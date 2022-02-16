@@ -106,7 +106,7 @@ pub struct AuthInfo {
     #[serde(rename = "auth-provider")]
     pub auth_provider: Option<AuthProviderConfig>,
 
-    pub exec: Option<ExecConfig>,
+    pub(crate) exec: Option<ExecConfig>,
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
