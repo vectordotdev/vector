@@ -121,7 +121,7 @@ impl Params {
 
 /// Creates a new Relay-compliant connection. Iterator must implement `ExactSizeIterator` to
 /// determine page position in the total result set.
-pub async fn query<T, I: ExactSizeIterator<Item = T>>(
+pub(crate) async fn query<T, I: ExactSizeIterator<Item = T>>(
     iter: I,
     p: Params,
     default_page_size: usize,
