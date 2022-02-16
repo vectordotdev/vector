@@ -22,7 +22,7 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectError<'a> {
-    pub error: String,
+    pub(crate) error: String,
     pub(crate) endpoint: Option<&'a String>,
 }
 
