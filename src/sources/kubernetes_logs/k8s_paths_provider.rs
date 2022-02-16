@@ -13,7 +13,7 @@ use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_confi
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
-pub struct K8sPathsProvider {
+pub(crate) struct K8sPathsProvider {
     pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
     namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
     exclude_paths: Vec<glob::Pattern>,
