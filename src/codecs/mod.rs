@@ -16,7 +16,7 @@ pub use decoding::{
 };
 #[cfg(feature = "sources-syslog")]
 pub(super) use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
-pub use encoding::{
+pub(super) use encoding::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
     RawMessageSerializer, RawMessageSerializerConfig,
