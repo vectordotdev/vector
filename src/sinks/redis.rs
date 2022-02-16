@@ -57,7 +57,7 @@ pub struct ListOption {
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum DataType {
+pub(super) enum DataType {
     #[derivative(Default)]
     List(Method),
     Channel,
