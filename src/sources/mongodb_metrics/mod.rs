@@ -90,7 +90,7 @@ struct MongoDbMetrics {
     tags: BTreeMap<String, String>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
