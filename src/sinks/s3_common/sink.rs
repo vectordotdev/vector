@@ -17,7 +17,7 @@ use crate::{
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
-pub struct S3Sink<Svc, RB> {
+pub(crate) struct S3Sink<Svc, RB> {
     acker: Acker,
     service: Svc,
     request_builder: RB,
