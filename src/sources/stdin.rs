@@ -29,7 +29,7 @@ pub struct StdinConfig {
     #[serde(default = "default_framing_stream_based")]
     pub framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    pub decoding: DeserializerConfig,
+    decoding: DeserializerConfig,
 }
 
 impl Default for StdinConfig {

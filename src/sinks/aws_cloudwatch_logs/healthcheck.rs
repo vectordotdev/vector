@@ -18,7 +18,7 @@ enum HealthcheckError {
     GroupNameMismatch { expected: String, name: String },
 }
 
-pub async fn healthcheck(
+pub(crate) async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
     client: CloudWatchLogsClient,
 ) -> crate::Result<()> {
