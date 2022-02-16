@@ -23,7 +23,7 @@ impl InternalEvent for LokiEventsProcessed {
 }
 
 #[derive(Debug)]
-pub struct LokiUniqueStream;
+pub(super) struct LokiUniqueStream;
 
 impl InternalEvent for LokiUniqueStream {
     fn emit_metrics(&self) {
