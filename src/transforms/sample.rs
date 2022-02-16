@@ -16,7 +16,7 @@ use crate::{
 pub struct SampleConfig {
     pub rate: u64,
     pub key_field: Option<String>,
-    pub exclude: Option<AnyCondition>,
+    exclude: Option<AnyCondition>,
 }
 
 inventory::submit! {
