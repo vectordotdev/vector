@@ -12,7 +12,7 @@ use tokio::task::spawn_blocking;
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
-pub async fn run_file_server<PP, E, C, S>(
+pub(crate) async fn run_file_server<PP, E, C, S>(
     file_server: FileServer<PP, E>,
     chans: C,
     shutdown: S,
