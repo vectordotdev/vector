@@ -20,7 +20,7 @@ pub struct RenameFieldsConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct RenameFields {
+pub(super) struct RenameFields {
     fields: IndexMap<String, String>,
     drop_empty: bool,
 }
