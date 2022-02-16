@@ -28,7 +28,7 @@ pub struct KeyValueConfig {
     pub target_field: Option<String>,
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
-    pub types: HashMap<String, String>,
+    pub(crate) types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
 }
 
