@@ -138,7 +138,6 @@ mod tests {
             metric::{MetricKind, MetricValue, StatisticKind},
             Metric, Value,
         },
-        schema,
         transforms::test::transform_one,
     };
 

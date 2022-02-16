@@ -224,7 +224,6 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        schema,
         transforms::{
             json_parser::{JsonParser, JsonParserConfig},
             test::transform_one,

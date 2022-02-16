@@ -221,7 +221,6 @@ mod tests {
     use super::*;
     use crate::{
         event::{Event, Value},
-        schema,
         transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
     };
 

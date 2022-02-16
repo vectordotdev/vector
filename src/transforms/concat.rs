@@ -214,7 +214,7 @@ impl FunctionTransform for Concat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Event, schema, transforms::test::transform_one};
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

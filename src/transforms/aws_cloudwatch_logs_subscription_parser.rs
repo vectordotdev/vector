@@ -136,7 +136,7 @@ mod test {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::{event::Event, log_event, schema};
+    use crate::{event::Event, log_event};
 
     #[test]
     fn generate_config() {

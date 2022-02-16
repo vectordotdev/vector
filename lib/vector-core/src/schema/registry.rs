@@ -47,7 +47,7 @@ pub struct Registry {
 
     /// Keep track of the next available schema identifier.
     ///
-    /// The 0th identifier is reserved for the default "open" schema.
+    /// The 0th identifier is reserved for the default "empty" schema.
     next_id: NonZeroU16,
 }
 

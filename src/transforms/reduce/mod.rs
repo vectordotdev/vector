@@ -313,7 +313,6 @@ mod test {
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Value},
-        schema,
     };
 
     #[test]

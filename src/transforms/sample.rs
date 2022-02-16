@@ -152,7 +152,6 @@ mod tests {
         conditions::{ConditionConfig, VrlConfig},
         config::log_schema,
         event::Event,
-        schema,
         test_util::random_lines,
         transforms::test::transform_one,
     };

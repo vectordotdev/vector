@@ -93,7 +93,6 @@ mod test {
     use crate::{
         conditions::{is_log::IsLogConfig, ConditionConfig},
         event::Event,
-        schema,
         transforms::test::transform_one,
     };
 

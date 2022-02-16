@@ -280,7 +280,6 @@ mod tests {
     use super::*;
     use crate::{
         event::{metric, Event, Metric},
-        schema,
         transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
     };
 
