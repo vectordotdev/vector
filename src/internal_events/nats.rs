@@ -34,7 +34,7 @@ impl InternalEvent for NatsEventsReceived {
 
 #[derive(Debug)]
 pub struct NatsEventSendSuccess {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
 }
 
 impl InternalEvent for NatsEventSendSuccess {

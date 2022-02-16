@@ -15,7 +15,7 @@ impl Heartbeat {
 }
 
 #[derive(Default)]
-pub struct HealthQuery;
+pub(super) struct HealthQuery;
 
 #[Object]
 impl HealthQuery {

@@ -235,7 +235,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct FileWatchError<'a> {
+    struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
     }

@@ -40,7 +40,7 @@ impl EventType {
 /// and then propagate them to the series of pipeline.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventRouterConfig {
+pub(super) struct EventRouterConfig {
     filter: EventType,
     // This inner field contains a list of pipelines that will be expanded.
     inner: Option<Box<dyn TransformConfig>>,
@@ -88,7 +88,7 @@ impl TransformConfig for EventRouterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -115,7 +115,7 @@ impl TransformConfig for EventFilterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {

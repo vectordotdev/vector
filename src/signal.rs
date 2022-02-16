@@ -137,7 +137,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {

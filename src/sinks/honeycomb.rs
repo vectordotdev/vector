@@ -21,7 +21,7 @@ use crate::{
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     api_key: String,
 
     // TODO: we probably want to make this a template

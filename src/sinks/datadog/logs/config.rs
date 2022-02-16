@@ -48,7 +48,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogLogsConfig {
+pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
     region: Option<Region>,
