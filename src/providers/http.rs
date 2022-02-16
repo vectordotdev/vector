@@ -22,7 +22,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(super) struct RequestConfig {
     #[serde(default)]
-    pub headers: IndexMap<String, String>,
+    pub(self) headers: IndexMap<String, String>,
 }
 
 impl Default for RequestConfig {
