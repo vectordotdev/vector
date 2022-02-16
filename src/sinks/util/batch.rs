@@ -343,7 +343,7 @@ pub struct EncodedBatch<I> {
 
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.
 #[derive(Clone, Debug)]
-pub struct FinalizersBatch<B> {
+pub(super) struct FinalizersBatch<B> {
     inner: B,
     finalizers: EventFinalizers,
     // The count of items inserted into this batch is distinct from the
