@@ -1,4 +1,5 @@
-pub mod source {
+
+pub(crate) mod source {
     use metrics::counter;
     use rusoto_core::RusotoError;
     use rusoto_sqs::{
