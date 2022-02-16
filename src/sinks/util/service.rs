@@ -75,7 +75,7 @@ pub struct TowerRequestConfig {
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
     pub retry_attempts: Option<usize>,         // isize::MAX
-    pub retry_max_duration_secs: Option<u64>,
+    pub(crate) retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
