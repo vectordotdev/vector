@@ -44,7 +44,7 @@ pub mod sized_bytes_codec;
 #[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
     pub mode: Mode,
-    pub scheduled: Option<ScheduledConfig>,
+    pub(crate) scheduled: Option<ScheduledConfig>,
     pub streaming: Option<StreamingConfig>,
     pub command: Vec<String>,
     pub working_directory: Option<PathBuf>,
