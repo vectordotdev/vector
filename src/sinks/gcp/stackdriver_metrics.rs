@@ -36,7 +36,7 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 pub struct StackdriverConfig {
     pub project_id: String,
     pub resource: gcp::GcpTypedResource,
-    pub credentials_path: Option<String>,
+    pub(crate) credentials_path: Option<String>,
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
     #[serde(default)]
