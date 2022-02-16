@@ -50,7 +50,7 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
 #[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
-    pub license_key: Option<String>,
+    pub(self) license_key: Option<String>,
     pub(self) insert_key: Option<String>,
     pub(super) region: Option<NewRelicLogsRegion>,
     #[serde(

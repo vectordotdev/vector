@@ -15,7 +15,7 @@ use crate::{
 pub struct KafkaRequestBuilder {
     pub(super) key_field: Option<String>,
     pub(super) headers_key: Option<String>,
-    pub topic_template: Template,
+    pub(crate) topic_template: Template,
     pub(crate) encoder: EncodingConfig<StandardEncodings>,
     pub log_schema: &'static LogSchema,
 }
