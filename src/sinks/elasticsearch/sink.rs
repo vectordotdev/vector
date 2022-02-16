@@ -39,7 +39,7 @@ impl ByteSizeOf for BatchedEvents {
 
 pub struct ElasticSearchSink {
     pub batch_settings: BatcherSettings,
-    pub request_builder: ElasticsearchRequestBuilder,
+    pub(super) request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
     pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
     pub acker: Acker,
