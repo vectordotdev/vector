@@ -10,7 +10,7 @@ use crate::sources::apache_metrics;
 pub struct ApacheMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub endpoint: &'a str,
+    pub(crate) endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
