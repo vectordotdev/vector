@@ -14,6 +14,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Decoder;
+use value::Kind;
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
     internal_event::EventsReceived,
@@ -39,6 +40,7 @@ use crate::{
         Event,
     },
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
+    schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
@@ -158,13 +160,39 @@ impl SourceConfig for DatadogAgentConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
+        let definition = match self.decoding {
+            // See: `LogMsg` struct.
+            DeserializerConfig::Bytes => schema::Definition::empty()
+                .required_field("message", Kind::bytes(), Some("message"))
+                .required_field("status", Kind::bytes(), Some("severity"))
+                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                .required_field("hostname", Kind::bytes(), Some("host"))
+                .required_field("service", Kind::bytes(), None)
+                .required_field("ddsource", Kind::bytes(), None)
+                .required_field("ddtags", Kind::bytes(), None)
+                .merge(self.decoding.schema_definition()),
+
+            // JSON deserializer can overwrite existing fields at runtime, so we have to treat
+            // those events as if there is no known type details we can provide, other than the
+            // details provided by the generic JSON schema definition.
+            DeserializerConfig::Json => self.decoding.schema_definition(),
+
+            // Syslog deserializer allows for arbritrary "structured data" that can overwrite
+            // existing fields, similar to the JSON deserializer.
+            //
+            // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
+            #[cfg(feature = "sources-syslog")]
+            DeserializerConfig::Syslog => self.decoding.schema_definition(),
+        };
+
         if self.multiple_outputs {
             vec![
                 Output::from((METRICS, DataType::Metric)),
-                Output::from((LOGS, DataType::Log)),
+                Output::from((LOGS, DataType::Log)).with_schema_definition(definition),
             ]
         } else {
-            vec![Output::default(DataType::Log | DataType::Metric)]
+            vec![Output::default(DataType::Log | DataType::Metric)
+                .with_schema_definition(definition)]
         }
     }
 

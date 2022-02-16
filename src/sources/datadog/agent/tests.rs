@@ -2,7 +2,7 @@ use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg
 use crate::{
     codecs::{
         self,
-        decoding::{Deserializer, Framer},
+        decoding::{Deserializer, DeserializerConfig, Framer},
         BytesDecoder, BytesDeserializer,
     },
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -11,7 +11,9 @@ use crate::{
         metric::{MetricKind, MetricSketch, MetricValue},
         Event, EventStatus,
     },
+    schema,
     serde::{default_decoding, default_framing_message_based},
+    sources::datadog::agent::{LOGS, METRICS},
     test_util::{
         components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         next_addr, spawn_collect_n, trace_init, wait_for_tcp,
@@ -25,8 +27,10 @@ use http::HeaderMap;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str;
+use value::Kind;
 
 mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
@@ -901,4 +905,185 @@ async fn split_outputs() {
     }
 
     COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn test_config_outputs() {
+    struct TestCase {
+        decoding: DeserializerConfig,
+        multiple_outputs: bool,
+        want: HashMap<Option<&'static str>, schema::Definition>,
+    }
+
+    for (
+        title,
+        TestCase {
+            decoding,
+            multiple_outputs,
+            want,
+        },
+    ) in HashMap::from([
+        (
+            "default decoding",
+            TestCase {
+                decoding: default_decoding(),
+                multiple_outputs: false,
+                want: HashMap::from([(
+                    None,
+                    schema::Definition::empty()
+                        .required_field("message", Kind::bytes(), Some("message"))
+                        .required_field("status", Kind::bytes(), Some("severity"))
+                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                        .required_field("hostname", Kind::bytes(), Some("host"))
+                        .required_field("service", Kind::bytes(), None)
+                        .required_field("ddsource", Kind::bytes(), None)
+                        .required_field("ddtags", Kind::bytes(), None),
+                )]),
+            },
+        ),
+        (
+            "bytes / single output",
+            TestCase {
+                decoding: DeserializerConfig::Bytes,
+                multiple_outputs: false,
+                want: HashMap::from([(
+                    None,
+                    schema::Definition::empty()
+                        .required_field("message", Kind::bytes(), Some("message"))
+                        .required_field("status", Kind::bytes(), Some("severity"))
+                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                        .required_field("hostname", Kind::bytes(), Some("host"))
+                        .required_field("service", Kind::bytes(), None)
+                        .required_field("ddsource", Kind::bytes(), None)
+                        .required_field("ddtags", Kind::bytes(), None),
+                )]),
+            },
+        ),
+        (
+            "bytes / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Bytes,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), None)
+                            .required_field("ddsource", Kind::bytes(), None)
+                            .required_field("ddtags", Kind::bytes(), None),
+                    ),
+                    (Some(METRICS), schema::Definition::empty()),
+                ]),
+            },
+        ),
+        (
+            "json / single output",
+            TestCase {
+                decoding: DeserializerConfig::Json,
+                multiple_outputs: false,
+                want: HashMap::from([(
+                    None,
+                    schema::Definition::empty()
+                        .required_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
+                        .unknown_fields(Kind::json()),
+                )]),
+            },
+        ),
+        (
+            "json / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Json,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        schema::Definition::empty()
+                            .required_field(
+                                "timestamp",
+                                Kind::json().or_timestamp(),
+                                Some("timestamp"),
+                            )
+                            .unknown_fields(Kind::json()),
+                    ),
+                    (Some(METRICS), schema::Definition::empty()),
+                ]),
+            },
+        ),
+        #[cfg(feature = "sources-syslog")]
+        (
+            "syslog / single output",
+            TestCase {
+                decoding: DeserializerConfig::Syslog,
+                multiple_outputs: false,
+                want: HashMap::from([(
+                    None,
+                    schema::Definition::empty()
+                        .required_field("message", Kind::bytes(), Some("message"))
+                        .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                        .optional_field("hostname", Kind::bytes(), None)
+                        .optional_field("severity", Kind::bytes(), Some("severity"))
+                        .optional_field("facility", Kind::bytes(), None)
+                        .optional_field("version", Kind::integer(), None)
+                        .optional_field("appname", Kind::bytes(), None)
+                        .optional_field("msgid", Kind::bytes(), None)
+                        .optional_field("procid", Kind::integer().or_bytes(), None)
+                        .unknown_fields(Kind::bytes()),
+                )]),
+            },
+        ),
+        #[cfg(feature = "sources-syslog")]
+        (
+            "syslog / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Syslog,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .optional_field("hostname", Kind::bytes(), None)
+                            .optional_field("severity", Kind::bytes(), Some("severity"))
+                            .optional_field("facility", Kind::bytes(), None)
+                            .optional_field("version", Kind::integer(), None)
+                            .optional_field("appname", Kind::bytes(), None)
+                            .optional_field("msgid", Kind::bytes(), None)
+                            .optional_field("procid", Kind::integer().or_bytes(), None)
+                            .unknown_fields(Kind::bytes()),
+                    ),
+                    (Some(METRICS), schema::Definition::empty()),
+                ]),
+            },
+        ),
+    ]) {
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            tls: None,
+            store_api_key: true,
+            framing: default_framing_message_based(),
+            decoding,
+            acknowledgements: Default::default(),
+            multiple_outputs,
+        };
+
+        let mut outputs = config
+            .outputs()
+            .into_iter()
+            .map(|output| (output.port, output.log_schema_definition))
+            .collect::<HashMap<_, _>>();
+
+        for (name, want) in want {
+            let got = outputs
+                .remove(&name.map(ToOwned::to_owned))
+                .expect("output exists");
+
+            assert_eq!(got, want, "{}", title);
+        }
+    }
 }

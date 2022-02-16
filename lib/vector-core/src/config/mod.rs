@@ -38,7 +38,7 @@ impl fmt::Display for DataType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Input {
     ty: DataType,
-    schema_requirement: schema::Requirement,
+    log_schema_requirement: schema::Requirement,
 }
 
 impl Input {
@@ -47,41 +47,41 @@ impl Input {
     }
 
     pub fn schema_requirement(&self) -> &schema::Requirement {
-        &self.schema_requirement
+        &self.log_schema_requirement
     }
 
     pub fn new(ty: DataType) -> Self {
         Self {
             ty,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
     pub fn trace() -> Self {
         Self {
             ty: DataType::Trace,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
     pub fn all() -> Self {
         Self {
             ty: DataType::all(),
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 }
@@ -90,7 +90,10 @@ impl Input {
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
-    pub schema_definition: schema::Definition,
+    // NOTE: schema definitions are only implemented/supported for log-type events. There is no
+    // inherent blocker to support other types as well, but it'll require additional work to add
+    // the relevant schemas, and store them separately in this type.
+    pub log_schema_definition: schema::Definition,
 }
 
 impl Output {
@@ -102,8 +105,14 @@ impl Output {
         Self {
             port: None,
             ty,
-            schema_definition: schema::Definition::empty(),
+            log_schema_definition: schema::Definition::empty(),
         }
+    }
+
+    /// Set the schema definition for this output.
+    pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
+        self.log_schema_definition = schema_definition;
+        self
     }
 }
 
@@ -112,7 +121,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
-            schema_definition: schema::Definition::empty(),
+            log_schema_definition: schema::Definition::empty(),
         }
     }
 }
