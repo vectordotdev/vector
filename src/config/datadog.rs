@@ -24,7 +24,7 @@ pub struct Options {
     pub(super) configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
-    pub reporting_interval_secs: u64,
+    pub(super) reporting_interval_secs: u64,
 }
 
 impl Default for Options {
