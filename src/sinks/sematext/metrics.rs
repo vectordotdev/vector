@@ -49,7 +49,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 struct SematextMetricsConfig {
     pub default_namespace: String,
     region: Option<Region>,
-    pub endpoint: Option<String>,
+    pub(super) endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,

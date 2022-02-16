@@ -30,7 +30,7 @@ pub(crate) enum ShutdownCheck {
 /// - Count event size on each `start_send`.
 /// - Ack all sent events on successful `poll_flush` and `poll_close` or on `Drop`.
 #[pin_project(PinnedDrop)]
-pub struct BytesSink<T>
+pub(crate) struct BytesSink<T>
 where
     T: AsyncWrite + Unpin,
 {
