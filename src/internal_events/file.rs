@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::prelude::error_stage;
+use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -33,6 +35,60 @@ impl InternalEvent for FileBytesSent<'_> {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "file",
             "file" => self.file.clone().into_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct FileIoError<'a> {
+    pub error: std::io::Error,
+    pub code: &'static str,
+    pub message: &'static str,
+    pub path: Option<&'a Bytes>,
+}
+
+impl<'a> InternalEvent for FileIoError<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_code = %self.code,
+            error_type = "io_failed",
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.code.to_string(),
+            "error_type" => "io_failed",
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct FileExpiringError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed expiring a file.",
+            error = %self.error,
+            error_type = "writer_failed",
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => "writer_failed",
+            "stage" => error_stage::SENDING,
         );
     }
 }
