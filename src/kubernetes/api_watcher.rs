@@ -137,7 +137,7 @@ where
     }
 }
 
-pub mod invocation {
+mod invocation {
     //! Invocation error.
     use super::*;
 
