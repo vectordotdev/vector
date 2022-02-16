@@ -8,7 +8,7 @@ pub struct Matched {
     #[graphql(skip)]
     message: String,
     /// Pattern that raised the notification
-    pattern: String,
+    pub pattern: String,
 }
 
 impl Matched {
@@ -26,7 +26,7 @@ pub struct NotMatched {
     #[graphql(skip)]
     message: String,
     /// Pattern that raised the notification
-    pattern: String,
+    pub pattern: String,
 }
 
 impl NotMatched {
