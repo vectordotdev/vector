@@ -4,7 +4,7 @@ use http::Uri;
 
 use crate::tls::TlsOptions;
 
-pub mod in_cluster;
+mod in_cluster;
 pub(super) mod kubeconfig;
 mod kubeconfig_types;
 
