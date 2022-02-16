@@ -74,7 +74,7 @@ impl RequestLimiterData {
 }
 
 #[derive(Clone)]
-pub struct RequestLimiter {
+pub(crate) struct RequestLimiter {
     semaphore: Arc<Semaphore>,
     data: Arc<Mutex<RequestLimiterData>>,
 }
