@@ -70,7 +70,7 @@ impl TransformConfig for ConcatConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Substring {
+pub(self) struct Substring {
     source: String,
     start: Option<i32>,
     end: Option<i32>,
