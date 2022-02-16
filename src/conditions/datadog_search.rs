@@ -14,7 +14,7 @@ use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Condit
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct DatadogSearchConfig {
-    pub source: String,
+    source: String,
 }
 
 inventory::submit! {
