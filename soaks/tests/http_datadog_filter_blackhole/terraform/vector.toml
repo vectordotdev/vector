@@ -18,13 +18,9 @@ encoding = "ndjson"
 ## Transforms
 ##
 
-.custom.message = .message
-.tags = []
-'''
-
 [transforms.processing]
 type = "pipelines"
-inputs = ["preprocessing"]
+inputs = ["logs"]
 
 [transforms.processing.logs]
 order = [
