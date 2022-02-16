@@ -9,7 +9,7 @@ use crate::{
 /// Partial event merger.
 pub type PartialEventsMerger = Optional<Merge>;
 
-pub fn build(enabled: bool) -> PartialEventsMerger {
+pub(crate) fn build(enabled: bool) -> PartialEventsMerger {
     Optional(if enabled {
         Some(
             MergeConfig {
