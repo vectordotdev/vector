@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 pub struct Kubeconfig {
     pub kind: Option<String>,
     #[serde(rename = "apiVersion")]
-    pub api_version: Option<String>,
+    api_version: Option<String>,
     pub preferences: Option<Preferences>,
     pub clusters: Vec<NamedCluster>,
     #[serde(rename = "users")]

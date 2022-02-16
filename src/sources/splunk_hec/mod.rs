@@ -44,7 +44,7 @@ mod acknowledgements;
 pub(super) const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
-pub const SOURCETYPE: &str = "splunk_sourcetype";
+const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
