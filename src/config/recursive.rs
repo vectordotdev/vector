@@ -124,7 +124,7 @@ pub(super) fn load_dir_into(
     }
 }
 
-pub fn load_dir(path: &Path) -> Result<(Map<String, Value>, Vec<String>), Vec<String>> {
+pub(crate) fn load_dir(path: &Path) -> Result<(Map<String, Value>, Vec<String>), Vec<String>> {
     let mut result = Map::new();
     let warnings = load_dir_into(path, &mut result)?;
     Ok((result, warnings))
