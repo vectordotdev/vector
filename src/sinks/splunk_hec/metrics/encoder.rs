@@ -23,7 +23,7 @@ struct HecData<'a> {
     fields: HecFieldMap<'a>,
     time: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub host: Option<String>,
+    pub(super) host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
