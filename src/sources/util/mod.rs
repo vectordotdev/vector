@@ -22,7 +22,7 @@ pub mod framestream;
     feature = "sources-utils-http-query"
 ))]
 mod http;
-pub mod multiline_config;
+pub(super) mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
 #[cfg(all(unix, feature = "sources-socket"))]
