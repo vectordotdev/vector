@@ -31,7 +31,7 @@ use crate::{
 pub struct HecLogsSinkConfig {
     // Deprecated name
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub(crate) default_token: String,
     pub endpoint: String,
     #[serde(default = "host_key")]
     pub host_key: String,
