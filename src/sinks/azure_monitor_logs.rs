@@ -47,7 +47,7 @@ pub struct AzureMonitorLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
