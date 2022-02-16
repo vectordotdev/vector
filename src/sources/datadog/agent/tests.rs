@@ -27,6 +27,7 @@ use http::HeaderMap;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str;
 use std::{collections::HashMap, num::NonZeroU16};
