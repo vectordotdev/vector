@@ -12,7 +12,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {
-    pub request: &'a Request<T>,
+    pub(crate) request: &'a Request<T>,
 }
 
 fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
