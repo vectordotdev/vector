@@ -1,4 +1,5 @@
-pub mod http;
+
+mod http;
 
 use super::config::ConfigBuilder;
 
