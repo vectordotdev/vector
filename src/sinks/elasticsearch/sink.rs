@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
-    pub index: String,
+    pub(super) index: String,
     pub bulk_action: BulkAction,
 }
 

@@ -15,7 +15,7 @@ use crate::{
 #[serde(default, deny_unknown_fields)]
 pub(self) struct LogfmtConfig {
     field: Option<String>,
-    pub drop_field: bool,
+    pub(super) drop_field: bool,
     types: HashMap<String, String>,
     pub(crate) timezone: Option<TimeZone>,
 }
