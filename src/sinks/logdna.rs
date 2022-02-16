@@ -25,7 +25,7 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 const PATH: &str = "/logs/ingest";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LogdnaConfig {
+pub(super) struct LogdnaConfig {
     api_key: String,
     // Deprecated name
     #[serde(alias = "host")]

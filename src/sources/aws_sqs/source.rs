@@ -33,7 +33,7 @@ pub struct SqsSource {
     pub decoder: Decoder,
     pub poll_secs: u32,
     pub concurrency: u32,
-    pub acknowledgements: bool,
+    pub(super) acknowledgements: bool,
 }
 
 impl SqsSource {
@@ -106,9 +106,9 @@ impl SqsSource {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         batch_receiver = Some(receiver);
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     } else {
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     };
 
                     match send_result {

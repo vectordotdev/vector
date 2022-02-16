@@ -52,7 +52,7 @@ impl proto::Service for Service {
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events))
+            .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
                 emit!(&StreamClosedError { error, count });
@@ -131,7 +131,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {

@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use futures_util::{
-    future,
-    stream::{self, BoxStream},
-    FutureExt, StreamExt,
-};
+use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
@@ -37,15 +33,13 @@ impl SourceConfig for UnitTestSourceConfig {
             // To appropriately shut down the topology after the source is done
             // sending events, we need to hold on to this shutdown trigger.
             let _shutdown = cx.shutdown;
-            out.send_all(&mut stream::iter(events))
-                .await
-                .map_err(|_| ())?;
+            out.send_batch(events).await.map_err(|_| ())?;
             Ok(())
         }))
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -112,7 +106,7 @@ impl SinkConfig for UnitTestSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 }
 
@@ -213,6 +207,9 @@ fn events_to_string(events: &[Event]) -> String {
             Event::Log(log) => serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string()),
             Event::Metric(metric) => {
                 serde_json::to_string(metric).unwrap_or_else(|_| "{}".to_string())
+            }
+            Event::Trace(trace) => {
+                serde_json::to_string(trace).unwrap_or_else(|_| "{}".to_string())
             }
         })
         .collect::<Vec<_>>()

@@ -12,7 +12,7 @@ pub mod remove;
 
 use crate::Value;
 pub use builder::EmptyKindError;
-pub use collection::{Collection, Field, Index};
+pub use collection::{Collection, Field, Index, Unknown};
 use std::collections::BTreeMap;
 
 /// The type (kind) of a given value.

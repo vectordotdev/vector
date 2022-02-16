@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
@@ -128,7 +128,7 @@ pub fn udp(
                                 }
 
                                 tokio::select!{
-                                    result = out.send_all(stream::iter(events)) => {
+                                    result = out.send_batch(events) => {
                                         if let Err(error) = result {
                                             emit!(&StreamClosedError { error, count });
                                             return Ok(())

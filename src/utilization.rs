@@ -81,7 +81,7 @@ pub fn wrap<S>(inner: S) -> Utilization<S> {
     }
 }
 
-pub struct Timer {
+pub(super) struct Timer {
     overall_start: Instant,
     span_start: Instant,
     waiting: bool,

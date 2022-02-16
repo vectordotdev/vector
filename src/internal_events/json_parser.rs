@@ -32,7 +32,6 @@ impl<'a> InternalEvent for JsonParserError<'a> {
             "error_type" => "parser_failed",
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-            "value" => self.value.to_string(),
         );
         if self.drop_invalid {
             counter!(
@@ -41,7 +40,6 @@ impl<'a> InternalEvent for JsonParserError<'a> {
                 "error_type" => "parser_failed",
                 "stage" => error_stage::PROCESSING,
                 "field" => self.field.to_string(),
-                "value" => self.value.to_string(),
             );
         }
         // deprecated

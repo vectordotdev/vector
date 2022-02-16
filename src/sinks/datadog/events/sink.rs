@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub struct DatadogEventsSink {
-    pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
+    pub(super) service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
     pub acker: Acker,
 }
 

@@ -55,7 +55,7 @@ struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -368,7 +368,7 @@ fn prometheus(
             .flatten()
             .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

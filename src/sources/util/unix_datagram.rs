@@ -1,7 +1,7 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
@@ -100,9 +100,8 @@ async fn listen(
                             handle_events(&mut events, received_from.clone());
 
                             let count = events.len();
-                            if let Err(error) = out.send_all(stream::iter(events)).await {
+                            if let Err(error) = out.send_batch(events).await {
                                 emit!(&StreamClosedError { error, count });
-                                return Err(());
                             }
                         },
                         Some(Err(error)) => {
