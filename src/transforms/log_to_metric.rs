@@ -41,7 +41,7 @@ pub struct CounterConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GaugeConfig {
     pub field: String,
-    pub name: Option<String>,
+    pub(crate) name: Option<String>,
     pub namespace: Option<String>,
     pub tags: Option<IndexMap<String, String>>,
 }
