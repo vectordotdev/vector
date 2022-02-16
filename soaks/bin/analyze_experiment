@@ -91,10 +91,6 @@ for exp in bytes_written.experiment.unique():
                     })
 
 results = pd.DataFrame.from_records(results)
-results = (results
-  .assign(delta_mean_abs=results['Δ mean %'].abs())
-  .sort_values(['p-value', 'delta_mean_abs'], ascending=(True, False))
-   .drop(columns=['delta_mean_abs']))
 
 print(f'''
 # Soak Test Results
@@ -138,6 +134,7 @@ changes = changes.drop(labels=['p-value', 'baseline mean',
                                'comparison outlier %', 'comparison CoV', 'erratic',
                                'comparison stdev', 'declared erratic', 'baseline stderr',
                                'comparison stderr'], axis=1)
+changes = changes.sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
 
 no_longer_erratic = results[~erratic_violation & declared_erratic].copy(deep=True)
@@ -185,6 +182,7 @@ print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
+results = results.sort_values('Δ mean %', ascending=False)
 results = results.drop(labels=["p-value"], axis=1) # only used for detecting changes
 results['Δ mean'] = results['Δ mean'].apply(common.human_bytes)
 results['baseline mean'] = results['baseline mean'].apply(common.human_bytes)
