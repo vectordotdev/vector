@@ -39,7 +39,7 @@ struct StatsdSvc {
 // #[serde(deny_unknown_fields)]
 pub(self) struct StatsdSinkConfig {
     #[serde(alias = "namespace")]
-    pub default_namespace: Option<String>,
+    pub(self) default_namespace: Option<String>,
     #[serde(flatten)]
     pub mode: Mode,
 }
