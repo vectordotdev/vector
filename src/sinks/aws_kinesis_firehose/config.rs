@@ -45,7 +45,7 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct KinesisFirehoseSinkConfig {
+pub(crate) struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,

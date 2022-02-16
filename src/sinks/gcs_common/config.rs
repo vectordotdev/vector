@@ -21,7 +21,7 @@ pub const BASE_URL: &str = "https://storage.googleapis.com/";
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "kebab-case")]
-pub enum GcsPredefinedAcl {
+pub(crate) enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
     BucketOwnerRead,
