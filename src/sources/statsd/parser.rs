@@ -13,7 +13,7 @@ use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
 
-pub fn parse(packet: &str) -> Result<Metric, ParseError> {
+pub(crate) fn parse(packet: &str) -> Result<Metric, ParseError> {
     // https://docs.datadoghq.com/developers/dogstatsd/datagram_shell/#datagram-format
     let key_and_body = packet.splitn(2, ':').collect::<Vec<_>>();
     if key_and_body.len() != 2 {
