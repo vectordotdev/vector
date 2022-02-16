@@ -80,7 +80,7 @@ pub(self) struct LokiRequestBuilder {
 }
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuildError {
+pub(super) enum RequestBuildError {
     #[snafu(display("Encoded payload is greater than the max limit."))]
     PayloadTooBig,
     #[snafu(display("Failed to build payload with error: {}", error))]
