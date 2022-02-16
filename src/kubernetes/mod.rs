@@ -40,6 +40,6 @@ pub mod watcher;
 pub use debounce::Debounce;
 pub use hash_value::HashValue;
 pub use multi_response_decoder::MultiResponseDecoder;
-pub use reflector::Reflector;
+pub(super) use reflector::Reflector;
 pub use response::Response;
 pub use watch_request_builder::WatchRequestBuilder;
