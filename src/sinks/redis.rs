@@ -280,7 +280,7 @@ impl RetryLogic for RedisRetryLogic {
 }
 
 #[derive(Clone)]
-pub struct RedisSink {
+pub(super) struct RedisSink {
     conn: ConnectionManager,
     data_type: DataType,
 }
