@@ -29,8 +29,8 @@ use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::num::NonZeroU16;
 use std::str;
-use std::{collections::HashMap, num::NonZeroU16};
 use value::Kind;
 
 mod dd_proto {
