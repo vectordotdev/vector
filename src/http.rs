@@ -124,7 +124,7 @@ where
     }
 }
 
-pub fn build_proxy_connector(
+pub(crate) fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {

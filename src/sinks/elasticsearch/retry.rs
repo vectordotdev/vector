@@ -45,7 +45,7 @@ struct EsErrorDetails {
 }
 
 #[derive(Clone)]
-pub struct ElasticSearchRetryLogic;
+pub(crate) struct ElasticSearchRetryLogic;
 
 impl RetryLogic for ElasticSearchRetryLogic {
     type Error = HttpError;
