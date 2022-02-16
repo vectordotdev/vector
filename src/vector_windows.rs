@@ -17,7 +17,7 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 const NO_ERROR: u32 = 0;
 
-pub mod service_control {
+pub(crate) mod service_control {
     use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
 
     use snafu::ResultExt;
