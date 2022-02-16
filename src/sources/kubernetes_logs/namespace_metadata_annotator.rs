@@ -26,7 +26,7 @@ impl Default for FieldsSpec {
 }
 
 /// Annotate the event with namespace metadata.
-pub struct NamespaceMetadataAnnotator {
+pub(crate) struct NamespaceMetadataAnnotator {
     namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
     fields_spec: FieldsSpec,
 }
