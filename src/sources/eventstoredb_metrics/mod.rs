@@ -33,7 +33,7 @@ const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-pub fn default_endpoint() -> String {
+fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
 

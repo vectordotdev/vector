@@ -74,7 +74,7 @@ impl Partitioner for RecordPartitioner {
 }
 
 #[derive(Clone)]
-pub struct LokiRequestBuilder {
+pub(self) struct LokiRequestBuilder {
     compression: Compression,
     encoder: LokiBatchEncoder,
 }
