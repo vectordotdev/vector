@@ -14,7 +14,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
-    pub field: Option<String>,
+    field: Option<String>,
     pub drop_field: bool,
     types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
