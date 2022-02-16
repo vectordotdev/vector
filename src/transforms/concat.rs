@@ -119,7 +119,7 @@ impl Substring {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Concat {
+pub(self) struct Concat {
     target: String,
     joiner: String,
     items: Vec<Substring>,
