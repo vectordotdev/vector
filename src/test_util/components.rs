@@ -200,7 +200,7 @@ where
 }
 
 /// Convenience wrapper for running sinks with a stream of events
-pub async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
+pub(crate) async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
