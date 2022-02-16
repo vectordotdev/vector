@@ -142,22 +142,25 @@ mod source {
             error!(
                 message = "Failed reading file for fingerprinting.",
                 file = %self.file.display(),
-                error_type = error_type::READER_FAILED,
                 error = %self.error,
+                error_code = "failed_reading_fingerprint",
+                error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "fingerprint_read_errors_total", 1,
+                "component_errors_total", 1,
+                "error_code" => "failed_reading_fingerprint",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
+            // deprecated
             counter!(
-                "component_errors_total", 1,
-                "error_type" => error_type::READER_FAILED,
+                "fingerprint_read_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => error_stage::RECEIVING,
             );
         }
     }
@@ -173,9 +176,10 @@ mod source {
     impl<'a> InternalEvent for FileDeleteError<'a> {
         fn emit_logs(&self) {
             warn!(
-                message = %format!("Failed in deleting file: {:?}", self.error),
+                message = "Failed in deleting file.",
                 file = %self.file.display(),
-                error = DELETION_FAILED,
+                error = %self.error,
+                error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 1
@@ -184,15 +188,16 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "file_delete_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
-            counter!(
                 "component_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
-                "error" => DELETION_FAILED,
+                "error_code" => DELETION_FAILED,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
+            );
+            // deprecated
+            counter!(
+                "file_delete_errors_total", 1,
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -250,25 +255,27 @@ mod source {
     impl<'a> InternalEvent for FileWatchError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = %format!("Failed to watch file: {:?}", self.error),
-                file = %self.file.display(),
-                error = WATCH_FAILED,
+                message = "Failed to watch file.",
+                error = %self.error,
+                error_code = WATCH_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
+                file = %self.file.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "file_watch_errors_total", 1,
+                "component_errors_total", 1,
+                "error_code" => WATCH_FAILED,
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
+            // deprecated
             counter!(
-                "component_errors_total", 1,
+                "file_watch_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
-                "error" => WATCH_FAILED,
-                "error_type" => error_type::COMMAND_FAILED,
-                "stage" => error_stage::RECEIVING
             );
         }
     }
@@ -345,8 +352,9 @@ mod source {
     impl InternalEvent for FileCheckpointWriteError {
         fn emit_logs(&self) {
             error!(
-                message = %format!("Failed writing checkpoints: {:?}", self.error),
-                error = "failed_writing_checkpoints",
+                message = "Failed writing checkpoints.",
+                error = %self.error,
+                error_code = "failed_writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING
             );
@@ -356,9 +364,9 @@ mod source {
             counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
-                "error" => "failed_writing_checkpoints",
+                "error_code" => "failed_writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
-                "stage" => error_stage::RECEIVING
+                "stage" => error_stage::RECEIVING,
             );
         }
     }
@@ -372,25 +380,27 @@ mod source {
     impl<'a> InternalEvent for PathGlobbingError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = %format!("Failed to glob path: {:?}", self.error),
-                path = %self.path.display(),
-                error = "failed_globbing",
+                message = "Failed to glob path.",
+                error = %self.error,
+                error_code = "failed_globbing",
                 error_type = error_type::READER_FAILED,
-                stage = error_stage::RECEIVING
+                stage = error_stage::RECEIVING,
+                path = %self.path.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "glob_errors_total", 1,
+                "component_errors_total", 1,
+                "error_code" => "failed_globbing",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
                 "path" => self.path.to_string_lossy().into_owned(),
             );
+            // deprecated
             counter!(
-                "component_errors_total", 1,
+                "glob_errors_total", 1,
                 "path" => self.path.to_string_lossy().into_owned(),
-                "error" => "failed_globbing",
-                "error_type" => error_type::READER_FAILED,
-                "stage" => error_stage::RECEIVING
             );
         }
     }
