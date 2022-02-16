@@ -22,7 +22,7 @@ use crate::{
 pub(crate) struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub(super) http_status: http::StatusCode,
-    pub event_byte_size: usize,
+    pub(crate) event_byte_size: usize,
 }
 
 impl DriverResponse for DatadogEventsResponse {
