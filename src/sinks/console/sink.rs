@@ -19,7 +19,7 @@ use crate::{
 pub struct WriterSink<T> {
     pub acker: Acker,
     pub output: T,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(super) encoding: EncodingConfig<StandardEncodings>,
 }
 
 #[async_trait]
