@@ -64,7 +64,7 @@ pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-pub fn default_namespace() -> String {
+pub(super) fn default_namespace() -> String {
     "awsecs".to_string()
 }
 
