@@ -21,7 +21,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
-    pub fields: Fields<TomlValue>,
+    pub(self) fields: Fields<TomlValue>,
     #[serde(default = "crate::serde::default_true")]
     pub overwrite: bool,
 }
