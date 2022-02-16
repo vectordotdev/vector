@@ -50,7 +50,7 @@ struct SematextMetricsConfig {
     pub default_namespace: String,
     region: Option<Region>,
     pub(super) endpoint: Option<String>,
-    pub token: String,
+    pub(super) token: String,
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
