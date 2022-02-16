@@ -39,7 +39,7 @@ choice for transforming data in Vector:
   and no type mismatches.
 
 In cases where VRL doesn't fit your use case, Vector also offers a [Lua runtime
-transform](#runtime-transform) that offer a bit more flexibility than VRL but
+transform](#lua-runtime-transform) that offer a bit more flexibility than VRL but
 also come with downsides (listed below) that should always be borne in mind.
 
 ## Transforming data using VRL
