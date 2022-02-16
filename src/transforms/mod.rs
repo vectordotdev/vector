@@ -23,7 +23,7 @@ pub mod dedupe;
 #[cfg(feature = "transforms-field_filter")]
 pub mod field_filter;
 #[cfg(feature = "transforms-filter")]
-pub mod filter;
+mod filter;
 #[cfg(feature = "transforms-geoip")]
 pub mod geoip;
 #[cfg(feature = "transforms-grok_parser")]

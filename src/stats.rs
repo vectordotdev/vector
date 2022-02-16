@@ -54,7 +54,7 @@ impl EwmaDefault {
 
 /// Exponentially Weighted Moving Average with variance calculation
 #[derive(Clone, Copy, Debug)]
-pub struct EwmaVar {
+pub(crate) struct EwmaVar {
     state: Option<MeanVariance>,
     alpha: f64,
 }
