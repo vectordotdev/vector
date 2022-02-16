@@ -78,7 +78,7 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
-pub struct Ec2Metadata {
+struct Ec2Metadata {
     // Deprecated name
     #[serde(alias = "host")]
     endpoint: Option<String>,
