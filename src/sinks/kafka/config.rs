@@ -28,7 +28,7 @@ pub(crate) struct KafkaSinkConfig {
     pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
-    pub batch: BatchConfig<NoDefaultsBatchSettings>,
+    pub(super) batch: BatchConfig<NoDefaultsBatchSettings>,
     #[serde(default)]
     pub compression: KafkaCompression,
     #[serde(flatten)]
