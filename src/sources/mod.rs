@@ -51,7 +51,7 @@ pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
 #[cfg(feature = "sources-postgresql_metrics")]
-pub mod postgresql_metrics;
+pub(crate) mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]
