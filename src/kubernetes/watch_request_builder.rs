@@ -67,7 +67,7 @@ where
 /// Specify the namespace and an API request building function.
 ///
 /// See module documentation for an example.
-pub struct Namespaced<N, F>(pub N, pub(crate) F);
+pub struct Namespaced<N, F>(pub(crate) N, pub(crate) F);
 
 impl<N, F, T> WatchRequestBuilder for Namespaced<N, F>
 where
