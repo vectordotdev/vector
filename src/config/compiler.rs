@@ -279,7 +279,7 @@ mod test {
         }
 
         fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-            vec![Output::default(DataType::all)]
+            vec![Output::default(DataType::all())]
         }
     }
 
