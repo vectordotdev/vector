@@ -1,7 +1,7 @@
 mod handler;
 mod schema;
 mod server;
-pub mod tap;
+pub(super) mod tap;
 
 pub use schema::build_schema;
 pub use server::Server;
