@@ -188,7 +188,7 @@ impl SinkConfig for TestConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {

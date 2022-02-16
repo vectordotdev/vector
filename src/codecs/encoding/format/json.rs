@@ -39,6 +39,7 @@ impl Encoder<Event> for JsonSerializer {
         match event {
             Event::Log(log) => serde_json::to_writer(writer, &log),
             Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+            Event::Trace(trace) => serde_json::to_writer(writer, &trace),
         }
         .map_err(Into::into)
     }

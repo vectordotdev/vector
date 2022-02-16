@@ -241,7 +241,7 @@ mod test_sink {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
 
         fn sink_type(&self) -> &'static str {
@@ -283,7 +283,7 @@ mod test_source {
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
 
         fn source_type(&self) -> &'static str {

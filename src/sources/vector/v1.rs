@@ -75,7 +75,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {

@@ -526,7 +526,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "strum",
+ "strum 0.18.0",
  "strum_macros 0.18.0",
  "thiserror",
  "typed-builder 0.5.1",
@@ -979,6 +979,16 @@ name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
+
+[[package]]
+name = "bitmask-enum"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb8ac9438bbed34c8697e95c79ca2e9359d724b83f07208020e6c8ccd2b86a1e"
+dependencies = [
+ "quote 1.0.10",
+ "syn 1.0.84",
+]
 
 [[package]]
 name = "blake2b_simd"
@@ -7000,6 +7010,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
 
 [[package]]
+name = "strum"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
+
+[[package]]
 name = "strum_macros"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8170,6 +8186,7 @@ dependencies = [
  "azure_storage",
  "azure_storage_blobs",
  "base64 0.13.0",
+ "bitmask-enum",
  "bloom",
  "bollard",
  "bytes 1.1.0",
@@ -8296,6 +8313,8 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt",
+ "strum 0.23.0",
+ "strum_macros 0.23.1",
  "syslog",
  "syslog_loose",
  "tempfile",
@@ -8453,6 +8472,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "atomig",
+ "bitmask-enum",
  "bytes 1.1.0",
  "chrono",
  "criterion",

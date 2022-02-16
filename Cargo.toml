@@ -219,6 +219,7 @@ arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
+bitmask-enum = { version = "1.1.2", default-features = false }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
@@ -291,6 +292,8 @@ socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.26", default-features = false }
+strum = { version = "0.23", default-features = false }
+strum_macros = { version = "0.23", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }

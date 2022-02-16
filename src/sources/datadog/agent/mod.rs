@@ -126,7 +126,6 @@ impl SourceConfig for DatadogAgentConfig {
             self.multiple_outputs,
         );
         let series_v2_service = source.series_v2_service();
-
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
@@ -165,7 +164,7 @@ impl SourceConfig for DatadogAgentConfig {
                 Output::from((LOGS, DataType::Log)),
             ]
         } else {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::Log | DataType::Metric)]
         }
     }
 
