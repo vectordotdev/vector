@@ -55,7 +55,7 @@ fn load_file_recursive(
     }
 }
 
-pub fn load_dir_into(
+pub(super) fn load_dir_into(
     path: &Path,
     result: &mut Map<String, Value>,
 ) -> Result<Vec<String>, Vec<String>> {
