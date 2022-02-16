@@ -47,7 +47,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 struct SematextMetricsConfig {
-    pub default_namespace: String,
+    pub(crate) default_namespace: String,
     region: Option<Region>,
     pub(super) endpoint: Option<String>,
     pub(super) token: String,
