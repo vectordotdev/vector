@@ -52,7 +52,7 @@ impl MaybeTlsSettings {
     }
 }
 
-pub struct MaybeTlsListener {
+pub(crate) struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<SslAcceptor>,
 }
