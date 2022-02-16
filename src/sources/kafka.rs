@@ -51,7 +51,7 @@ enum BuildError {
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct KafkaSourceConfig {
+struct KafkaSourceConfig {
     bootstrap_servers: String,
     topics: Vec<String>,
     group_id: String,
