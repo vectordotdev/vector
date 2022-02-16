@@ -63,7 +63,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub(crate) tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
