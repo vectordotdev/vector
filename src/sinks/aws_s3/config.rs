@@ -38,7 +38,7 @@ pub struct S3SinkConfig {
     pub key_prefix: Option<String>,
     pub filename_time_format: Option<String>,
     pub filename_append_uuid: Option<bool>,
-    pub filename_extension: Option<String>,
+    pub(super) filename_extension: Option<String>,
     #[serde(flatten)]
     pub options: S3Options,
     #[serde(flatten)]
