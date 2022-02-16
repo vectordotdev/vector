@@ -1,6 +1,7 @@
 use crate::Value;
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use ordered_float::NotNan;
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;
 
@@ -30,7 +31,11 @@ impl Arbitrary for Value {
                 Self::Bytes(Bytes::from(bytes))
             }
             1 => Self::Integer(i64::arbitrary(g)),
-            2 => Self::from(f64::arbitrary(g) % MAX_F64_SIZE),
+            2 => {
+                let f = f64::arbitrary(g) % MAX_F64_SIZE;
+                let not_nan = NotNan::new(f).unwrap_or(NotNan::new(0.0).unwrap());
+                Self::from(not_nan)
+            }
             3 => Self::Boolean(bool::arbitrary(g)),
             4 => Self::Timestamp(datetime(g)),
             5 => {

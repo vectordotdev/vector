@@ -29,7 +29,7 @@ lua = ["mlua"]
 api = ["async-graphql"]
 json = ["serde", "serde_json"]
 test = []
-arbitrary = ["quickcheck", "test"]
+arbitrary = ["quickcheck"]
 
 [dev-dependencies]
 quickcheck = "1.0.3"
