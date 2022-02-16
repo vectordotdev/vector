@@ -22,7 +22,7 @@ use crate::{
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
-pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
+pub(crate) static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
