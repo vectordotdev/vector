@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct FilterConfig {
+pub(crate) struct FilterConfig {
     condition: AnyCondition,
 }
 
