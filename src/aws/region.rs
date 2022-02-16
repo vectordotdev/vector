@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
-    pub region: Option<String>,
+    pub(super) region: Option<String>,
     pub endpoint: Option<String>,
 }
 
