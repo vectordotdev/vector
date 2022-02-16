@@ -14,7 +14,13 @@ use tokio::sync::{
 use uuid::Uuid;
 use vector_core::event::Metric;
 
-use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
+use super::{
+    schema::events::{
+        notification::{InvalidMatch, Matched, NotMatched, Notification},
+        TapPatterns,
+    },
+    ShutdownRx, ShutdownTx,
+};
 use crate::{
     config::{ComponentKey, OutputId},
     event::{Event, LogEvent, TraceEvent},
@@ -66,58 +72,56 @@ impl GlobMatcher<&str> for Pattern {
     }
 }
 
-/// A tap notification signals whether a pattern matches a component.
-#[derive(Debug)]
-pub enum TapNotification {
-    Matched,
-    NotMatched,
-    /// An invalid match may occur for an input pattern that matches source(s)
-    /// or an output pattern that matches sink(s)
-    InvalidInputPatternMatch(Vec<String>),
-    InvalidOutputPatternMatch(Vec<String>),
-}
-
 /// A tap payload can either contain a log/metric event or a notification that's intended
 /// to be communicated back to the client to alert them about the status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
     Log(OutputId, LogEvent),
     Metric(OutputId, Metric),
-    Notification(String, TapNotification),
     Trace(OutputId, TraceEvent),
+    Notification(Notification),
 }
 
 impl TapPayload {
     /// Raise a `matched` event against the provided pattern.
     pub fn matched<T: Into<String>>(pattern: T) -> Self {
-        Self::Notification(pattern.into(), TapNotification::Matched)
+        Self::Notification(Notification::Matched(Matched::new(pattern.into())))
     }
 
     /// Raise a `not_matched` event against the provided pattern.
     pub fn not_matched<T: Into<String>>(pattern: T) -> Self {
-        Self::Notification(pattern.into(), TapNotification::NotMatched)
+        Self::Notification(Notification::NotMatched(NotMatched::new(pattern.into())))
     }
 
-    /// Raise an `invalid_input_patter_match `event against the provided input pattern.
+    /// Raise an `invalid_match` event against the provided input pattern.
     pub fn invalid_input_pattern_match<T: Into<String>>(
         pattern: T,
         invalid_matches: Vec<String>,
     ) -> Self {
-        Self::Notification(
-            pattern.into(),
-            TapNotification::InvalidInputPatternMatch(invalid_matches),
-        )
+        let pattern = pattern.into();
+        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{}' matches sources {:?}", pattern, invalid_matches);
+        Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
+            message,
+            pattern,
+            invalid_matches,
+        )))
     }
 
-    /// Raise an `invalid_output_patter_match `event against the provided output pattern.
+    /// Raise an `invalid_match`event against the provided output pattern.
     pub fn invalid_output_pattern_match<T: Into<String>>(
         pattern: T,
         invalid_matches: Vec<String>,
     ) -> Self {
-        Self::Notification(
-            pattern.into(),
-            TapNotification::InvalidOutputPatternMatch(invalid_matches),
-        )
+        let pattern = pattern.into();
+        let message = format!(
+            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{}' matches sinks {:?}",
+            pattern, invalid_matches
+        );
+        Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
+            message,
+            pattern,
+            invalid_matches,
+        )))
     }
 }
 
