@@ -34,7 +34,7 @@ pub(crate) struct KafkaSinkConfig {
     #[serde(flatten)]
     pub auth: KafkaAuthConfig,
     #[serde(default = "default_socket_timeout_ms")]
-    pub socket_timeout_ms: u64,
+    pub(super) socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     pub message_timeout_ms: u64,
     #[serde(default)]
