@@ -62,7 +62,7 @@ impl TransformConfig for LogfmtConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct Logfmt {
+pub(crate) struct Logfmt {
     field: String,
     drop_field: bool,
     conversions: HashMap<String, Conversion>,
