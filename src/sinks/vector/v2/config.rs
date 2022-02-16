@@ -31,7 +31,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(self) request: TowerRequestConfig,
     #[serde(default)]
     tls: Option<TlsConfig>,
 }
