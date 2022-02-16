@@ -427,7 +427,6 @@ mod tests {
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event,
         },
-        schema,
         transforms::test::transform_one,
     };
 

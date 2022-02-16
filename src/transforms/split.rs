@@ -146,7 +146,6 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{Event, LogEvent, Value},
-        schema,
     };
     use ordered_float::NotNan;
 

@@ -144,7 +144,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
-    use crate::{config::log_schema, event::Event, schema, transforms::test::transform_one};
+    use crate::{config::log_schema, event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {

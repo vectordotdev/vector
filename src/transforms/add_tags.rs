@@ -104,7 +104,6 @@ mod tests {
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
-        schema,
         transforms::test::transform_one,
     };
 

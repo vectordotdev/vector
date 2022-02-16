@@ -134,7 +134,6 @@ mod test {
 
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
-        schema,
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
 

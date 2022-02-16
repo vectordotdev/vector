@@ -112,7 +112,6 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
-        schema,
         transforms::OutputBuffer,
     };
 

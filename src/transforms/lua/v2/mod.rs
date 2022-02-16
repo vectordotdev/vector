@@ -352,7 +352,6 @@ mod tests {
             metric::{Metric, MetricKind, MetricValue},
             Event, Value,
         },
-        schema,
         test_util::trace_init,
         transforms::TaskTransform,
     };

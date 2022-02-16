@@ -146,7 +146,7 @@ mod tests {
     use std::iter::FromIterator;
 
     use super::*;
-    use crate::{event::LogEvent, schema, transforms::test::transform_one};
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
