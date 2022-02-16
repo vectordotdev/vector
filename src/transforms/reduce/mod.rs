@@ -40,7 +40,7 @@ pub struct ReduceConfig {
 
     /// An optional condition that determines when an event is the end of a
     /// reduce.
-    pub ends_when: Option<AnyCondition>,
+    ends_when: Option<AnyCondition>,
     pub starts_when: Option<AnyCondition>,
 }
 
