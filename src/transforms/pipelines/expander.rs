@@ -35,11 +35,7 @@ impl TransformConfig for ExpanderConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        if self.inner.is_empty() {
-            Err("must specify at least one transform".into())
-        } else {
-            Ok(Some((self.inner.clone(), self.mode.clone())))
-        }
+        Ok(Some((self.inner.clone(), self.mode.clone())))
     }
 
     fn input(&self) -> Input {
