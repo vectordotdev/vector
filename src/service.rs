@@ -149,7 +149,7 @@ enum SubCommand {
 struct ServiceInfo {
     pub name: OsString,
     pub display_name: OsString,
-    pub description: OsString,
+    pub(super) description: OsString,
 
     pub executable_path: std::path::PathBuf,
     pub launch_arguments: Vec<OsString>,

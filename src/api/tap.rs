@@ -70,7 +70,7 @@ impl TapPayload {
 
 /// A `TapSink` is used as an output channel for a topology component, and receives
 /// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
-pub struct TapSink {
+pub(self) struct TapSink {
     tap_tx: TapSender,
     output_id: OutputId,
 }
