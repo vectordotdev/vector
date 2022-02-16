@@ -1,4 +1,3 @@
-
 mod http;
 
 use super::config::ConfigBuilder;
