@@ -88,7 +88,7 @@ pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub query_params: HashMap<String, String>,
     pub region: Region,
-    pub compression: Compression,
+    pub(super) compression: Compression,
     pub http_request_config: RequestConfig,
     pub http_auth: Option<Auth>,
     pub credentials_provider: Option<AwsCredentialsProvider>,
