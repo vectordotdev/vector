@@ -65,7 +65,7 @@ impl Finalizable for KafkaRequest {
     }
 }
 
-pub struct KafkaService {
+pub(crate) struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
 }
 
