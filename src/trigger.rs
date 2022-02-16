@@ -1,6 +1,6 @@
 use stream_cancel::Trigger;
 
-pub struct DisabledTrigger {
+pub(crate) struct DisabledTrigger {
     trigger: Option<Trigger>,
 }
 
