@@ -49,7 +49,7 @@ impl DriverResponse for VectorResponse {
 
 #[derive(Clone, Default)]
 pub struct VectorRequest {
-    pub events: Vec<EventWrapper>,
+    pub(crate) events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
 }

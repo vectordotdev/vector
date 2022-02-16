@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct RegionOrEndpoint {
     pub(super) region: Option<String>,
-    pub endpoint: Option<String>,
+    pub(crate) endpoint: Option<String>,
 }
 
 impl RegionOrEndpoint {
