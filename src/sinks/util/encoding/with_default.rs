@@ -147,7 +147,7 @@ where
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
-pub struct InnerWithDefault<E: Default> {
+pub(crate) struct InnerWithDefault<E: Default> {
     #[serde(default)]
     codec: E,
     #[serde(default)]

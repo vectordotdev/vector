@@ -1,4 +1,3 @@
-
 mod config;
 pub(super) mod request_builder;
 pub mod service;
