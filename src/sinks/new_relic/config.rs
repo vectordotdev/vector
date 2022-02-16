@@ -139,7 +139,7 @@ impl SinkConfig for NewRelicConfig {
 #[derive(Debug, Clone)]
 pub struct NewRelicCredentials {
     pub license_key: String,
-    pub account_id: String,
+    pub(super) account_id: String,
     pub api: NewRelicApi,
     pub region: NewRelicRegion,
 }
