@@ -30,7 +30,7 @@ pub struct HecData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sourcetype: Option<String>,
+    pub(crate) sourcetype: Option<String>,
 }
 
 impl HecData {
