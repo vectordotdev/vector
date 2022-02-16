@@ -286,7 +286,7 @@ impl<'a> Widgets<'a> {
 }
 
 /// Determine if the terminal is a TTY
-pub fn is_tty() -> bool {
+pub(crate) fn is_tty() -> bool {
     stdout().is_tty()
 }
 
