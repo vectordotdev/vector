@@ -182,7 +182,7 @@ pub async fn build_pieces(
             // with the given ID. This ID can then be used by subsequent components to get the
             // schema of an event at runtime.
             let schema_id = schema_registry
-                .register_definition(output.schema_definition)
+                .register_definition(output.log_schema_definition)
                 .map_err(|err| vec![err.to_string()])?;
 
             schema_ids.insert(output.port, schema_id);
