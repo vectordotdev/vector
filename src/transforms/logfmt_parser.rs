@@ -17,7 +17,7 @@ pub struct LogfmtConfig {
     field: Option<String>,
     pub drop_field: bool,
     types: HashMap<String, String>,
-    pub timezone: Option<TimeZone>,
+    pub(crate) timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
