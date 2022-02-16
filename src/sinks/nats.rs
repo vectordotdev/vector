@@ -115,7 +115,7 @@ struct NatsOptions {
     connection_name: String,
 }
 
-pub struct NatsSink {
+pub(super) struct NatsSink {
     encoding: EncodingConfig<Encoding>,
     options: NatsOptions,
     subject: Template,

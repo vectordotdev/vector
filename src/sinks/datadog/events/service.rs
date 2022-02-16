@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-pub struct DatadogEventsResponse {
+pub(crate) struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
     pub event_byte_size: usize,
