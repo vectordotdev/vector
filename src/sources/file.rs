@@ -85,7 +85,7 @@ pub struct FileConfig {
     #[serde(alias = "fingerprinting")]
     fingerprint: FingerprintConfig,
     pub ignore_not_found: bool,
-    pub message_start_indicator: Option<String>,
+    pub(self) message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
     pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,

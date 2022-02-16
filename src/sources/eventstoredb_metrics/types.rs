@@ -156,7 +156,7 @@ pub struct Proc {
     pub cpu: f64,
     pub threads_count: i64,
     pub thrown_exceptions_rate: f64,
-    pub disk_io: DiskIo,
+    disk_io: DiskIo,
 }
 
 #[derive(Deserialize, Debug)]
