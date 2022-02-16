@@ -60,6 +60,7 @@ impl ElasticSearchSink {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
+                    _ => None,
                 }))
             })
             .filter_map(|x| async move { x })

@@ -2,7 +2,7 @@ use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    config::{DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
         encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
@@ -128,7 +128,7 @@ impl SinkConfig for NewRelicConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::new(DataType::Log | DataType::Metric)
     }
 
     fn sink_type(&self) -> &'static str {

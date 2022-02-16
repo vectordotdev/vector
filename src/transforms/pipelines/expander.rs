@@ -35,25 +35,21 @@ impl TransformConfig for ExpanderConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        if self.inner.is_empty() {
-            Err("must specify at least one transform".into())
-        } else {
-            Ok(Some((self.inner.clone(), self.mode.clone())))
-        }
+        Ok(Some((self.inner.clone(), self.mode.clone())))
     }
 
     fn input(&self) -> Input {
         self.inner
             .first()
             .map(|(_, item)| item.input())
-            .unwrap_or_else(Input::any)
+            .unwrap_or_else(Input::all)
     }
 
     fn outputs(&self) -> Vec<Output> {
         self.inner
             .last()
             .map(|(_, item)| item.outputs())
-            .unwrap_or_else(|| vec![Output::default(DataType::Any)])
+            .unwrap_or_else(|| vec![Output::default(DataType::all())])
     }
 
     fn transform_type(&self) -> &'static str {

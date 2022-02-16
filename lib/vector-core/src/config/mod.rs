@@ -1,4 +1,6 @@
+use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 mod global_options;
 mod id;
@@ -14,17 +16,29 @@ use crate::schema;
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
     vector_buffers::config::memory_buffer_default_max_events();
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+// This enum should be kept alphabetically sorted as the bitmask value is used when
+// sorting sources by data type in the GraphQL API.
+#[bitmask(u8)]
 pub enum DataType {
-    Any,
     Log,
     Metric,
+    Trace,
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut t = Vec::new();
+        self.contains(DataType::Log).then(|| t.push("Log"));
+        self.contains(DataType::Metric).then(|| t.push("Metric"));
+        self.contains(DataType::Trace).then(|| t.push("Trace"));
+        f.write_str(&t.join(","))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Input {
     ty: DataType,
-    schema_requirement: schema::Requirement,
+    log_schema_requirement: schema::Requirement,
 }
 
 impl Input {
@@ -33,27 +47,41 @@ impl Input {
     }
 
     pub fn schema_requirement(&self) -> &schema::Requirement {
-        &self.schema_requirement
+        &self.log_schema_requirement
+    }
+
+    pub fn new(ty: DataType) -> Self {
+        Self {
+            ty,
+            log_schema_requirement: schema::Requirement,
+        }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement,
         }
     }
 
-    pub fn any() -> Self {
+    pub fn trace() -> Self {
         Self {
-            ty: DataType::Any,
-            schema_requirement: schema::Requirement,
+            ty: DataType::Trace,
+            log_schema_requirement: schema::Requirement,
+        }
+    }
+
+    pub fn all() -> Self {
+        Self {
+            ty: DataType::all(),
+            log_schema_requirement: schema::Requirement,
         }
     }
 }
@@ -62,7 +90,10 @@ impl Input {
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
-    pub schema_definition: schema::Definition,
+    // NOTE: schema definitions are only implemented/supported for log-type events. There is no
+    // inherent blocker to support other types as well, but it'll require additional work to add
+    // the relevant schemas, and store them separately in this type.
+    pub log_schema_definition: schema::Definition,
 }
 
 impl Output {
@@ -74,8 +105,14 @@ impl Output {
         Self {
             port: None,
             ty,
-            schema_definition: schema::Definition::empty(),
+            log_schema_definition: schema::Definition::empty(),
         }
+    }
+
+    /// Set the schema definition for this output.
+    pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
+        self.log_schema_definition = schema_definition;
+        self
     }
 }
 
@@ -84,7 +121,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
-            schema_definition: schema::Definition::empty(),
+            log_schema_definition: schema::Definition::empty(),
         }
     }
 }

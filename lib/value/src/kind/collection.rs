@@ -3,10 +3,11 @@ mod field;
 mod index;
 mod unknown;
 
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub use field::Field;
 pub use index::Index;
+use lookup::{Lookup, Segment};
 pub use unknown::Unknown;
 
 use super::{merge, Kind};
@@ -233,6 +234,36 @@ impl<T: Ord> Collection<T> {
             (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
             _ => {}
         };
+    }
+}
+
+impl Collection<Field> {
+    /// Find the `Kind` within the known set of fields.
+    ///
+    /// This currently has limited support for the first segment of the path. That is:
+    ///
+    /// - The path must not be root (`.`).
+    /// - The path must not start with an index segment (`.[2]`)
+    /// - The path must not start with a coalesced segment (`.(foo | bar)`).
+    ///
+    /// In all of the above cases, this method returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// See `Kind::find_at_path`.
+    pub fn find_known_at_path<'a>(
+        &'a self,
+        path: &'a mut Lookup<'a>,
+    ) -> Result<Option<Cow<'a, Kind>>, super::find::Error> {
+        if let Some(Segment::Field(field)) = path.pop_front() {
+            let field = Field::from(field);
+
+            if let Some(kind) = self.known.get(&(field)) {
+                return kind.find_at_path(path);
+            }
+        }
+
+        Ok(None)
     }
 }
 

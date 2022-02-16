@@ -1,4 +1,5 @@
 use async_graphql::{InputObject, InputType};
+use std::collections::BTreeSet;
 
 use super::components::{source, ComponentKind};
 
@@ -46,8 +47,38 @@ impl StringFilter {
 }
 
 #[derive(InputObject)]
-#[graphql(concrete(name = "ComponentKindFilter", params(ComponentKind)))]
 #[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
+// Filter for GraphQL lists
+pub struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
+    pub equals: Option<Vec<T>>,
+    pub not_equals: Option<Vec<T>>,
+    pub contains: Option<T>,
+    pub not_contains: Option<T>,
+}
+
+impl<T: InputType + PartialEq + Eq + Ord> ListFilter<T> {
+    pub fn filter_value(&self, value: Vec<T>) -> bool {
+        let val = BTreeSet::from_iter(value.iter());
+        filter_check!(
+            // Equals
+            self.equals
+                .as_ref()
+                .map(|s| BTreeSet::from_iter(s.iter()).eq(&val)),
+            // Not Equals
+            self.not_equals
+                .as_ref()
+                .map(|s| !BTreeSet::from_iter(s.iter()).eq(&val)),
+            // Contains
+            self.contains.as_ref().map(|s| val.contains(s)),
+            // Not Contains
+            self.not_contains.as_ref().map(|s| !val.contains(s))
+        );
+        true
+    }
+}
+
+#[derive(InputObject)]
+#[graphql(concrete(name = "ComponentKindFilter", params(ComponentKind)))]
 pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
     pub equals: Option<T>,
     pub not_equals: Option<T>,
