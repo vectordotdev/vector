@@ -53,7 +53,7 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
 }
 
 #[derive(Debug)]
-pub struct LokiOutOfOrderEventRewritten;
+pub(crate) struct LokiOutOfOrderEventRewritten;
 
 impl InternalEvent for LokiOutOfOrderEventRewritten {
     fn emit_logs(&self) {
