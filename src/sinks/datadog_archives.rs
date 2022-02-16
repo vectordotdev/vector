@@ -104,7 +104,7 @@ pub struct S3Config {
     #[serde(flatten)]
     pub options: S3Options,
     #[serde(flatten)]
-    pub region: RegionOrEndpoint,
+    pub(self) region: RegionOrEndpoint,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
