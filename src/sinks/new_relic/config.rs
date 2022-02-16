@@ -65,7 +65,7 @@ pub struct NewRelicConfig {
     pub region: Option<NewRelicRegion>,
     pub api: NewRelicApi,
     #[serde(default = "Compression::gzip_default")]
-    pub compression: Compression,
+    pub(self) compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
