@@ -85,7 +85,7 @@ pub fn spawn_thread<'a>(
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn spawn_thread<'a>(
+pub(super) fn spawn_thread<'a>(
     _config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
     _delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {

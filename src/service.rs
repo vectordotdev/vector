@@ -52,7 +52,7 @@ struct InstallOpts {
         env = "VECTOR_CONFIG_DIR",
         use_delimiter(true)
     )]
-    pub config_dirs: Vec<PathBuf>,
+    config_dirs: Vec<PathBuf>,
 }
 
 impl InstallOpts {
