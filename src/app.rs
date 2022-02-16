@@ -42,7 +42,7 @@ pub struct ApplicationConfig {
 pub struct Application {
     opts: RootOpts,
     pub config: ApplicationConfig,
-    pub runtime: Runtime,
+    runtime: Runtime,
 }
 
 impl Application {
