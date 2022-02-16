@@ -184,7 +184,7 @@ pub async fn build_pieces(
             let schema_id = schema_registry
                 .register_definition(
                     output
-                        .schema_definition
+                        .log_schema_definition
                         .unwrap_or_else(schema::Definition::empty),
                 )
                 .map_err(|err| vec![err.to_string()])?;
@@ -262,7 +262,7 @@ pub async fn build_pieces(
     {
         let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
         for output in transform.inner.outputs() {
-            let definition = match output.schema_definition {
+            let definition = match output.log_schema_definition {
                 Some(definition) => definition,
                 None => schema::merged_definition(&transform.inputs, config),
             };

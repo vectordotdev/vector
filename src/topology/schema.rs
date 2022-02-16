@@ -43,7 +43,7 @@ pub(super) fn merged_definition(inputs: &[OutputId], config: &topology::Config) 
                     // For sources, a `None` schema definition is equal to an "empty" definition.
                     Some(
                         output
-                            .schema_definition
+                            .log_schema_definition
                             .clone()
                             .unwrap_or_else(Definition::empty),
                     )
@@ -73,7 +73,7 @@ pub(super) fn merged_definition(inputs: &[OutputId], config: &topology::Config) 
                 if output.port == input.port {
                     // For transforms, a `None` schema definition is equal to "pass-through merged
                     // input schemas".
-                    output.schema_definition.clone()
+                    output.log_schema_definition.clone()
                 } else {
                     None
                 }
