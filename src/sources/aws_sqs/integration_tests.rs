@@ -65,7 +65,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 }
 
 #[tokio::test]
-pub async fn test() {
+pub(crate) async fn test() {
     let sqs_client = get_sqs_client().await;
     let queue_name = gen_queue_name();
     let queue_url = ensure_queue(&queue_name, &sqs_client)

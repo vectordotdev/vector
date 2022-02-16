@@ -1126,7 +1126,7 @@ fn test_config_outputs() {
         let mut outputs = config
             .outputs()
             .into_iter()
-            .map(|output| (output.port, output.schema_definition))
+            .map(|output| (output.port, output.log_schema_definition))
             .collect::<HashMap<_, _>>();
 
         for (name, want) in want {
