@@ -5,7 +5,7 @@ use http::Uri;
 use crate::tls::TlsOptions;
 
 pub mod in_cluster;
-pub mod kubeconfig;
+pub(super) mod kubeconfig;
 mod kubeconfig_types;
 
 /// A k8s client configuration.
