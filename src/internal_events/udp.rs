@@ -36,7 +36,7 @@ where
 
 #[derive(Debug)]
 pub struct UdpSocketError {
-    pub error: std::io::Error,
+    pub(crate) error: std::io::Error,
 }
 
 impl InternalEvent for UdpSocketError {
