@@ -18,9 +18,7 @@ subscription OutputEventsByComponentIdPatternsSubscription(
             string(encoding: $encoding)
         }
         ... on EventNotification {
-            pattern
-            notification
-            invalidMatches
+            message
         }
     }
 }

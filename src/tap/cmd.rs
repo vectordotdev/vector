@@ -3,10 +3,7 @@ use url::Url;
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::{
-            EventNotificationType,
-            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
-        },
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         TapSubscriptionExt,
     },
     Client,
@@ -100,13 +97,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if !opts.quiet {
-                                    match ev.notification {
-                                        EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
-                                        EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
-                                        EventNotificationType::INVALID_INPUT_PATTERN_MATCH => eprintln!(r#"[tap] Warning: source inputs cannot be tapped. Input pattern "{}" matches sources {:?}"#, ev.pattern, ev.invalid_matches.unwrap_or_default()),
-                                        EventNotificationType::INVALID_OUTPUT_PATTERN_MATCH => eprintln!(r#"[tap] Warning: sink outputs cannot be tapped. Output pattern "{}" matches sinks {:?}"#, ev.pattern, ev.invalid_matches.unwrap_or_default()),
-                                        EventNotificationType::Other(_) => {},
-                                    }
+                                    eprintln!("{}", ev.message);
                                 }
                             },
                         }

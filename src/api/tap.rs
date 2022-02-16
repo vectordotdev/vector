@@ -433,7 +433,7 @@ mod tests {
     use tokio::sync::watch;
 
     use super::*;
-    use crate::api::schema::events::notification::{EventNotification, EventNotificationType};
+    use crate::api::schema::events::notification::EventNotification;
     use crate::api::schema::events::output::OutputEventsPayload;
     use crate::event::{Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
