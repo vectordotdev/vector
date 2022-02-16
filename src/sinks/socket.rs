@@ -15,7 +15,7 @@ use crate::{
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     mode: Mode,
-    pub encoding: EncodingConfig<Encoding>,
+    pub(self) encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
