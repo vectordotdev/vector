@@ -182,7 +182,7 @@ impl KinesisFirehoseSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct KinesisRetryLogic;
+struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = RusotoError<PutRecordBatchError>;
