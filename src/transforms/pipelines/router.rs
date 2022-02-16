@@ -40,7 +40,7 @@ impl EventType {
 /// and then propagate them to the series of pipeline.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventRouterConfig {
+pub(super) struct EventRouterConfig {
     filter: EventType,
     // This inner field contains a list of pipelines that will be expanded.
     inner: Option<Box<dyn TransformConfig>>,

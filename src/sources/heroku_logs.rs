@@ -31,7 +31,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexConfig {
+pub(crate) struct LogplexConfig {
     address: SocketAddr,
     #[serde(default)]
     query_parameters: Vec<String>,

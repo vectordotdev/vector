@@ -25,7 +25,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,

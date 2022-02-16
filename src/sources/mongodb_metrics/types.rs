@@ -280,7 +280,7 @@ pub struct CommandServerStatusOpLatenciesStat {
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusOpLatenciesStatHistBucket {
-    pub micros: i64,
+    pub(crate) micros: i64,
     pub count: i64,
 }
 

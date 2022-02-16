@@ -34,18 +34,3 @@ dyn_clone::clone_trait_object!(Deserializer);
 
 /// A `Box` containing a `Deserializer`.
 pub type BoxedDeserializer = Box<dyn Deserializer>;
-
-/// Define options for a deserializer and build it from the config object.
-///
-/// Implementors must annotate the struct with `#[typetag::serde(name = "...")]`
-/// to define which value should be read from the `codec` key to select their
-/// implementation.
-#[typetag::serde(tag = "codec")]
-pub trait DeserializerConfig: Debug + DynClone + Send + Sync {
-    /// Builds a deserializer from this configuration.
-    ///
-    /// Fails if the configuration is invalid.
-    fn build(&self) -> crate::Result<BoxedDeserializer>;
-}
-
-dyn_clone::clone_trait_object!(DeserializerConfig);

@@ -133,7 +133,7 @@ impl Source {
 }
 
 #[derive(Default, InputObject)]
-pub struct SourcesFilter {
+pub(super) struct SourcesFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_type: Option<Vec<filter::StringFilter>>,
     output_type: Option<Vec<filter::EqualityFilter<SourceOutputType>>>,

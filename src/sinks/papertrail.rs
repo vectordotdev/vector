@@ -18,7 +18,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct PapertrailConfig {
+pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig<Encoding>,
     keepalive: Option<TcpKeepaliveConfig>,
