@@ -26,7 +26,7 @@ pub struct S3RequestOptions {
     pub filename_append_uuid: bool,
     pub filename_extension: Option<String>,
     pub api_options: S3Options,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(super) encoding: EncodingConfig<StandardEncodings>,
     pub compression: Compression,
 }
 

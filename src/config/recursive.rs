@@ -38,7 +38,7 @@ pub(self) fn load_file(
     }
 }
 
-pub fn load_file_recursive(
+fn load_file_recursive(
     path: &Path,
 ) -> Result<Option<(String, toml::Value, Vec<String>)>, Vec<String>> {
     if let Some((name, mut value, mut warnings)) = load_file(path)? {

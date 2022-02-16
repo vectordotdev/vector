@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct DatadogMetricsEncodingError {
     pub error: &'static str,
-    pub dropped_events: u64,
+    pub(crate) dropped_events: u64,
 }
 
 impl InternalEvent for DatadogMetricsEncodingError {
