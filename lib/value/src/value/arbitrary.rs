@@ -33,7 +33,7 @@ impl Arbitrary for Value {
             1 => Self::Integer(i64::arbitrary(g)),
             2 => {
                 let f = f64::arbitrary(g) % MAX_F64_SIZE;
-                let not_nan = NotNan::new(f).unwrap_or(NotNan::new(0.0).unwrap());
+                let not_nan = NotNan::new(f).unwrap_or_else(|_| NotNan::new(0.0).unwrap());
                 Self::from(not_nan)
             }
             3 => Self::Boolean(bool::arbitrary(g)),
