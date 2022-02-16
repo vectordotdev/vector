@@ -16,7 +16,7 @@ static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 #[serde(deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]
-    pub enabled: bool,
+    pub(crate) enabled: bool,
 
     #[serde(default)]
     pub api_key: Option<String>,
