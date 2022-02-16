@@ -76,7 +76,7 @@ pub struct TransformOuter {
 }
 
 #[derive(Serialize, Default)]
-pub struct Config {
+pub(self) struct Config {
     pub sources: Option<IndexMap<String, Value>>,
     pub transforms: Option<IndexMap<String, TransformOuter>>,
     pub sinks: Option<IndexMap<String, SinkOuter>>,

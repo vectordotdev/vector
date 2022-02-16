@@ -19,7 +19,7 @@ async fn fetch_status(
     Ok(client.send(req).await?.status())
 }
 
-pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
+pub(crate) async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
     let endpoint = config.endpoint.append_path("ready")?;
 
     let mut req = http::Request::get(endpoint.uri)
