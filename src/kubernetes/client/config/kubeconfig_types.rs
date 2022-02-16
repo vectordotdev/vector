@@ -112,7 +112,7 @@ pub struct AuthInfo {
 /// AuthProviderConfig stores auth for specified cloud provider.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthProviderConfig {
-    pub name: String,
+    pub(crate) name: String,
     pub config: HashMap<String, String>,
 }
 

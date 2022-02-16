@@ -167,7 +167,7 @@ impl HostMetricsConfig {
     }
 }
 
-pub struct HostMetrics {
+pub(crate) struct HostMetrics {
     config: HostMetricsConfig,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroup>,
