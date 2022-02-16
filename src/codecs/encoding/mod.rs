@@ -4,7 +4,7 @@
 mod format;
 pub mod framing;
 
-pub use format::{
+pub(crate) use format::{
     BoxedSerializer, JsonSerializer, JsonSerializerConfig, RawMessageSerializer,
     RawMessageSerializerConfig,
 };
