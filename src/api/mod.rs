@@ -3,7 +3,7 @@ mod schema;
 mod server;
 pub(super) mod tap;
 
-pub use schema::build_schema;
+use schema::build_schema;
 pub use server::Server;
 use tokio::sync::oneshot;
 
