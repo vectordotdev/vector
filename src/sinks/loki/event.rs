@@ -77,7 +77,7 @@ impl Serialize for LokiEvent {
 pub struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
-    pub event: LokiEvent,
+    pub(crate) event: LokiEvent,
     pub finalizers: EventFinalizers,
 }
 
