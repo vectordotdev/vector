@@ -47,7 +47,7 @@ impl ElementCount for DatadogEventsRequest {
 pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub api_key: Option<Arc<str>>,
-    pub event_byte_size: usize,
+    pub(crate) event_byte_size: usize,
 }
 
 #[derive(Default)]
