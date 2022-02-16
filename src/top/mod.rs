@@ -4,7 +4,7 @@ mod events;
 mod metrics;
 mod state;
 
-pub use cmd::cmd;
+pub(super) use cmd::cmd;
 use structopt::StructOpt;
 use url::Url;
 
