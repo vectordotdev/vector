@@ -1,4 +1,5 @@
-pub mod config;
+
+mod config;
 pub(super) mod request_builder;
 pub mod service;
 pub mod sink;
