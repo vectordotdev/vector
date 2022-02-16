@@ -47,7 +47,7 @@ impl Partitioner for DatadogMetricsTypePartitioner {
     }
 }
 
-pub struct DatadogMetricsSink<S> {
+pub(crate) struct DatadogMetricsSink<S> {
     service: S,
     acker: Acker,
     request_builder: DatadogMetricsRequestBuilder,

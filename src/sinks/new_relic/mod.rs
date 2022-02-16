@@ -9,7 +9,6 @@ mod sink;
 
 pub use config::*;
 pub use encoding::*;
-pub use healthcheck::*;
 pub use model::*;
 pub use service::*;
 pub use sink::*;

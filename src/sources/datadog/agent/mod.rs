@@ -63,7 +63,7 @@ pub(crate) enum ApiError {
 impl warp::reject::Reject for ApiError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct DatadogAgentConfig {
+struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]
@@ -128,7 +128,6 @@ impl SourceConfig for DatadogAgentConfig {
             self.multiple_outputs,
         );
         let series_v2_service = source.series_v2_service();
-
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
@@ -192,7 +191,8 @@ impl SourceConfig for DatadogAgentConfig {
                 Output::from((LOGS, DataType::Log)).with_schema_definition(definition),
             ]
         } else {
-            vec![Output::default(DataType::Any).with_schema_definition(definition)]
+            vec![Output::default(DataType::Log | DataType::Metric)
+                .with_schema_definition(definition)]
         }
     }
 

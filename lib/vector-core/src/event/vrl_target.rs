@@ -25,6 +25,7 @@ pub enum VrlTarget {
     // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
     Metric(Metric),
+    Trace(Value, EventMetadata),
 }
 
 impl VrlTarget {
@@ -35,6 +36,10 @@ impl VrlTarget {
                 VrlTarget::LogEvent(Value::Object(fields), metadata)
             }
             Event::Metric(event) => VrlTarget::Metric(event),
+            Event::Trace(event) => {
+                let (fields, metadata) = event.into_parts();
+                VrlTarget::Trace(Value::Object(fields), metadata)
+            }
         }
     }
 
@@ -45,10 +50,15 @@ impl VrlTarget {
     pub fn into_events(self) -> impl Iterator<Item = Event> {
         match self {
             VrlTarget::LogEvent(value, metadata) => {
-                Box::new(value_into_log_events(value, metadata)) as Box<dyn Iterator<Item = Event>>
+                Box::new(value_into_logevents(value, metadata).map(Event::Log))
+                    as Box<dyn Iterator<Item = Event>>
             }
             VrlTarget::Metric(metric) => {
                 Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
+            }
+            VrlTarget::Trace(value, metadata) => {
+                Box::new(value_into_logevents(value, metadata).map(Event::Trace))
+                    as Box<dyn Iterator<Item = Event>>
             }
         }
     }
@@ -57,7 +67,7 @@ impl VrlTarget {
 impl vrl_core::Target for VrlTarget {
     fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) => log
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => log
                 .insert(path.clone(), value)
                 .map(|_| ())
                 .map_err(|err| err.to_string()),
@@ -130,7 +140,7 @@ impl vrl_core::Target for VrlTarget {
 
     fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) => log
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log
                 .get(path)
                 .map(|val| val.map(|val| val.clone().into()))
                 .map_err(|err| err.to_string()),
@@ -205,7 +215,7 @@ impl vrl_core::Target for VrlTarget {
         compact: bool,
     ) -> Result<Option<vrl_core::Value>, String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) => {
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
                 if path.is_root() {
                     Ok(Some({
                         let mut map = Value::Object(BTreeMap::new());
@@ -254,7 +264,7 @@ impl vrl_core::Target for VrlTarget {
 
     fn get_metadata(&self, key: &str) -> Result<Option<vrl_core::Value>, String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric(metric) => metric.metadata(),
         };
 
@@ -273,7 +283,7 @@ impl vrl_core::Target for VrlTarget {
 
     fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric(metric) => metric.metadata_mut(),
         };
 
@@ -292,7 +302,7 @@ impl vrl_core::Target for VrlTarget {
 
     fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric(metric) => metric.metadata_mut(),
         };
 
@@ -322,23 +332,22 @@ impl From<Event> for VrlTarget {
 //   * If an element is an object, create an event using that as fields.
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
-fn value_into_log_events(value: Value, metadata: EventMetadata) -> impl Iterator<Item = Event> {
+fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
     match value {
-        Value::Object(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
-            object, metadata,
-        )))) as Box<dyn Iterator<Item = Event>>,
+        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
+            as Box<dyn Iterator<Item = LogEvent>>,
         Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Object(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
+            Value::Object(object) => LogEvent::from_parts(object, metadata.clone()),
             v => {
                 let mut log = LogEvent::new_with_metadata(metadata.clone());
                 log.insert(log_schema().message_key(), v);
-                Event::from(log)
+                log
             }
-        })) as Box<dyn Iterator<Item = Event>>,
+        })) as Box<dyn Iterator<Item = LogEvent>>,
         v => {
             let mut log = LogEvent::new_with_metadata(metadata);
             log.insert(log_schema().message_key(), v);
-            Box::new(std::iter::once(Event::from(log))) as Box<dyn Iterator<Item = Event>>
+            Box::new(std::iter::once(log)) as Box<dyn Iterator<Item = LogEvent>>
         }
     }
 }

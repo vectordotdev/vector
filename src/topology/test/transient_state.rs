@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSourceConfig {
+struct MockSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
 }

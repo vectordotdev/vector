@@ -34,7 +34,7 @@ enum BuildError {
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct NatsSourceConfig {
+struct NatsSourceConfig {
     url: String,
     #[serde(alias = "name")]
     connection_name: String,
