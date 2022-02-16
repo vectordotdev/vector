@@ -60,7 +60,7 @@ pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
 #[cfg(windows)]
-pub mod service;
+mod service;
 pub mod shutdown;
 pub mod signal;
 pub mod sink;

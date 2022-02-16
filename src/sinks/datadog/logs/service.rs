@@ -48,7 +48,7 @@ pub struct LogApiRequest {
     pub(crate) api_key: Arc<str>,
     pub compression: Compression,
     pub body: Bytes,
-    pub finalizers: EventFinalizers,
+    pub(super) finalizers: EventFinalizers,
     pub events_byte_size: usize,
 }
 
