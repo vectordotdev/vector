@@ -64,7 +64,7 @@ impl<'a> InternalEvent for WindowsServiceRestart<'a> {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceInstall<'a> {
+pub(crate) struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }
 
