@@ -20,7 +20,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct AwsCloudwatchLogsSubscriptionParserConfig {
-    pub field: Option<String>,
+    pub(self) field: Option<String>,
 }
 
 inventory::submit! {
