@@ -16,7 +16,7 @@ use crate::{
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
     pub field_names: Vec<String>,
-    pub field: Option<String>,
+    pub(self) field: Option<String>,
     drop_field: bool,
     pub types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
