@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct ThrottleEventDiscarded {
-    pub key: String,
+    pub(crate) key: String,
 }
 
 impl InternalEvent for ThrottleEventDiscarded {
