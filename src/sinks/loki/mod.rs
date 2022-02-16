@@ -24,7 +24,7 @@ mod tests;
 #[cfg(feature = "loki-benches")]
 pub use config::valid_label_name;
 use config::LokiConfig;
-pub use config::OutOfOrderAction;
+pub(crate) use config::OutOfOrderAction;
 
 use crate::config::SinkDescription;
 
