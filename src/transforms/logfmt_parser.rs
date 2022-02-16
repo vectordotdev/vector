@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
-pub struct LogfmtConfig {
+pub(self) struct LogfmtConfig {
     field: Option<String>,
     pub drop_field: bool,
     types: HashMap<String, String>,
