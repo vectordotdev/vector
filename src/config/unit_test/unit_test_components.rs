@@ -115,7 +115,7 @@ pub struct UnitTestSink {
     pub(super) transform_id: String,
     // None for NoOp test sinks
     pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
-    pub check: UnitTestSinkCheck,
+    pub(self) check: UnitTestSinkCheck,
 }
 
 #[async_trait::async_trait]
