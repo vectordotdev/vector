@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct ConcatConfig {
+pub(super) struct ConcatConfig {
     pub(crate) target: String,
     pub joiner: Option<String>,
     pub(super) items: Vec<String>,
