@@ -60,7 +60,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 pub struct InfluxDbConfig {
     #[serde(alias = "namespace")]
     pub(super) default_namespace: Option<String>,
-    pub endpoint: String,
+    pub(crate) endpoint: String,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
     #[serde(flatten)]

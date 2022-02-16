@@ -23,7 +23,7 @@ struct KinesisFirehoseRetryLogic;
 pub struct KinesisSink {
     pub batch_settings: BatcherSettings,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
-    pub acker: Acker,
+    pub(crate) acker: Acker,
     pub request_builder: KinesisRequestBuilder,
 }
 

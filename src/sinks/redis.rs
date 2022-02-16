@@ -80,7 +80,7 @@ pub enum Encoding {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RedisDefaultBatchSettings;
+pub(self) struct RedisDefaultBatchSettings;
 
 impl SinkBatchSettings for RedisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
