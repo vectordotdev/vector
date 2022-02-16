@@ -29,7 +29,7 @@ pub struct KeyValueConfig {
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
     pub(crate) types: HashMap<String, String>,
-    pub timezone: Option<TimeZone>,
+    pub(self) timezone: Option<TimeZone>,
 }
 
 inventory::submit! {

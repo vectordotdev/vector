@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct LargeEventDropped {
+pub(crate) struct LargeEventDropped {
     pub(crate) length: usize,
     pub(crate) max_length: usize,
 }
