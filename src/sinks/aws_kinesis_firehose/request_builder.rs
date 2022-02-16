@@ -18,7 +18,7 @@ pub struct KinesisRequestBuilder {
 }
 
 pub struct Metadata {
-    pub finalizers: EventFinalizers,
+    pub(self) finalizers: EventFinalizers,
     pub event_byte_size: usize,
 }
 
