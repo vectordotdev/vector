@@ -11,7 +11,7 @@ use crate::internal_events::kubernetes::stream as internal_events;
 
 /// Converts the HTTP response [`Body`] to a stream of parsed Kubernetes
 /// [`Response`]s.
-pub fn body<B, T>(body: B) -> impl Stream<Item = Result<T, Error<<B as Body>::Error>>>
+pub(crate) fn body<B, T>(body: B) -> impl Stream<Item = Result<T, Error<<B as Body>::Error>>>
 where
     T: Response + Unpin + 'static,
     B: Body,
