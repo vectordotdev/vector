@@ -25,7 +25,7 @@ use crate::{
 pub struct VectorService {
     pub client: proto_vector::Client<HyperSvc>,
     pub protocol: String,
-    pub endpoint: String,
+    pub(self) endpoint: String,
 }
 
 pub struct VectorResponse {
