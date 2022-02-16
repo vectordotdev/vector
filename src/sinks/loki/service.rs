@@ -52,7 +52,7 @@ pub struct LokiRequest {
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
-    pub events_byte_size: usize,
+    pub(super) events_byte_size: usize,
 }
 
 impl Ackable for LokiRequest {
