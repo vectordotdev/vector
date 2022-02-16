@@ -12,7 +12,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveTagsConfig {
-    pub tags: Vec<String>,
+    tags: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
