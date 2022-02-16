@@ -102,7 +102,7 @@ impl TransformConfig for RemapConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
@@ -137,12 +137,12 @@ impl TransformConfig for RemapConfig {
         );
 
         let default_output =
-            Output::default(DataType::Any).with_schema_definition(default_definition);
+            Output::default(DataType::all()).with_schema_definition(default_definition);
 
         if self.reroute_dropped {
             vec![
                 default_output,
-                Output::from((DROPPED, DataType::Any)).with_schema_definition(dropped_definition),
+                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
             ]
         } else {
             vec![default_output]
@@ -219,7 +219,7 @@ impl Remap {
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
+            Event::Log(ref mut log) | Event::Trace(ref mut log) => {
                 let message = error
                     .notes()
                     .iter()
@@ -1062,7 +1062,7 @@ mod tests {
             );
 
         assert_eq!(
-            vec![Output::default(DataType::Any).with_schema_definition(schema_definition)],
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
             conf.outputs(&schema::Definition::empty()),
         );
 
@@ -1128,8 +1128,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );
@@ -1155,8 +1155,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );

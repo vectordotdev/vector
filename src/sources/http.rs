@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct SimpleHttpConfig {
+pub(super) struct SimpleHttpConfig {
     address: SocketAddr,
     #[serde(default)]
     encoding: Option<Encoding>,

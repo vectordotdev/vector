@@ -21,7 +21,7 @@ impl InternalEvent for SyslogUdpReadError {
 }
 #[derive(Debug)]
 pub(crate) struct SyslogConvertUtf8Error {
-    pub error: std::str::Utf8Error,
+    pub(crate) error: std::str::Utf8Error,
 }
 
 impl InternalEvent for SyslogConvertUtf8Error {

@@ -13,8 +13,8 @@ use crate::{
 };
 
 pub struct KinesisRequestBuilder {
-    pub compression: Compression,
-    pub encoder: EncodingConfig<StandardEncodings>,
+    pub(super) compression: Compression,
+    pub(crate) encoder: EncodingConfig<StandardEncodings>,
 }
 
 pub struct Metadata {

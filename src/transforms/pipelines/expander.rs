@@ -12,7 +12,7 @@ use crate::{
 /// expands in serial.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ExpanderConfig {
+pub(crate) struct ExpanderConfig {
     mode: ExpandType,
     inner: IndexMap<String, Box<dyn TransformConfig>>,
 }
@@ -47,14 +47,14 @@ impl TransformConfig for ExpanderConfig {
         self.inner
             .first()
             .map(|(_, item)| item.input())
-            .unwrap_or_else(Input::any)
+            .unwrap_or_else(Input::all)
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.inner
             .last()
             .map(|(_, item)| item.outputs())
-            .unwrap_or_else(|| vec![Output::default(DataType::Any)])
+            .unwrap_or_else(|| vec![Output::default(DataType::all())])
     }
 
     fn transform_type(&self) -> &'static str {

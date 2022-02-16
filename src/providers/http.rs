@@ -35,7 +35,7 @@ impl Default for RequestConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct HttpConfig {
+pub(crate) struct HttpConfig {
     url: Option<Url>,
     request: RequestConfig,
     poll_interval_secs: u64,
