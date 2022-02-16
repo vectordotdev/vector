@@ -7,7 +7,7 @@ use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub mod compression;
 pub mod json;
-pub mod metrics;
+pub(crate) mod metrics;
 pub mod partition;
 pub mod vec;
 
