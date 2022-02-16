@@ -730,7 +730,7 @@ struct LogMsg {
     pub status: Bytes,
     pub timestamp: i64,
     pub hostname: Bytes,
-    pub service: Bytes,
+    pub(self) service: Bytes,
     pub ddsource: Bytes,
     pub(crate) ddtags: Bytes,
 }
