@@ -26,7 +26,7 @@ pub struct KeyValueConfig {
     pub overwrite_target: bool,
     pub separator: Option<String>,
     pub target_field: Option<String>,
-    pub trim_key: Option<String>,
+    pub(self) trim_key: Option<String>,
     pub trim_value: Option<String>,
     pub(crate) types: HashMap<String, String>,
     pub(self) timezone: Option<TimeZone>,
