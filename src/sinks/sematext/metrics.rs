@@ -37,7 +37,7 @@ struct SematextMetricsService {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SematextMetricsDefaultBatchSettings;
+pub(crate) struct SematextMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
@@ -52,7 +52,7 @@ struct SematextMetricsConfig {
     pub endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
-    pub batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
+    pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

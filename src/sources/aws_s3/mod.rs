@@ -111,7 +111,7 @@ impl AwsS3Config {
 
         let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
+        let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())

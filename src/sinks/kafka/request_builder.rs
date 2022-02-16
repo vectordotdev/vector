@@ -48,6 +48,7 @@ fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
             .tags()
             .and_then(|tags| tags.get(key_field))
             .map(|value| value.clone().into()),
+        _ => None,
     })
 }
 
@@ -58,6 +59,7 @@ fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option
             .and_then(|v| v.as_timestamp())
             .copied(),
         Event::Metric(metric) => metric.timestamp(),
+        _ => None,
     }
     .map(|ts| ts.timestamp_millis())
 }

@@ -17,7 +17,7 @@ use crate::{
 pub struct SplitConfig {
     pub field_names: Vec<String>,
     pub separator: Option<String>,
-    pub field: Option<String>,
+    pub(self) field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,

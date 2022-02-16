@@ -33,7 +33,7 @@ pub struct SqsSource {
     pub decoder: Decoder,
     pub poll_secs: u32,
     pub concurrency: u32,
-    pub acknowledgements: bool,
+    pub(super) acknowledgements: bool,
 }
 
 impl SqsSource {

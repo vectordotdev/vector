@@ -37,14 +37,14 @@ pub struct PulsarSinkConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AuthConfig {
+struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum Encoding {
+pub(self) enum Encoding {
     Text,
     Json,
     Avro,

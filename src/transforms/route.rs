@@ -85,13 +85,13 @@ impl TransformConfig for RouteConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
         self.route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .map(|output_name| Output::from((output_name, DataType::all())))
             .collect()
     }
 
@@ -215,7 +215,7 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );
@@ -250,7 +250,7 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );

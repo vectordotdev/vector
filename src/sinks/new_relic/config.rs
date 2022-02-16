@@ -2,7 +2,7 @@ use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    config::{DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
         encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
@@ -85,7 +85,7 @@ impl NewRelicConfig {
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
     ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck(client, credentials).boxed())
+        Ok(healthcheck::healthcheck(client, credentials).boxed())
     }
 }
 
@@ -128,7 +128,7 @@ impl SinkConfig for NewRelicConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::new(DataType::Log | DataType::Metric)
     }
 
     fn sink_type(&self) -> &'static str {
