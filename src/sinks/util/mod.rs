@@ -128,7 +128,7 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
         Encoding::Text => {
             let bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.coerce_to_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
         }

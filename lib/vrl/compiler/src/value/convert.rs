@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -7,48 +7,148 @@ use value::kind::Collection;
 use value::Value as VectorValue;
 
 use super::{Error, Kind, Regex, Value};
-use crate::{
-    expression::{container, Container, Expr, Literal},
-    Expression,
-};
+use crate::value::VrlValueKind;
+use crate::{expression::Expr, Expression};
 
-impl Value {
+pub trait VrlValueConvert: Sized {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
-    pub fn into_expression(self) -> Box<dyn Expression> {
-        Box::new(self.into_expr())
+    fn into_expression(self) -> Box<dyn Expression>;
+
+    fn try_integer(self) -> Result<i64, Error>;
+    fn try_float(self) -> Result<f64, Error>;
+    fn try_bytes(self) -> Result<Bytes, Error>;
+    fn try_boolean(self) -> Result<bool, Error>;
+    fn try_regex(self) -> Result<Regex, Error>;
+    fn try_null(self) -> Result<(), Error>;
+    fn try_array(self) -> Result<Vec<Value>, Error>;
+    fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
+    fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
+
+    fn try_into_i64(&self) -> Result<i64, Error>;
+    fn try_into_f64(&self) -> Result<f64, Error>;
+
+    fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error>;
+}
+
+impl VrlValueConvert for Value {
+    /// Convert a given [`Value`] into a [`Expression`] trait object.
+    fn into_expression(self) -> Box<dyn Expression> {
+        Box::new(Expr::from(self))
     }
 
-    /// Convert a given [`Value`] into an [`Expr`] enum variant.
-    ///
-    /// This is a non-public function because we want to avoid exposing internal
-    /// details about the expression variants.
-    pub(crate) fn into_expr(self) -> Expr {
-        use Value::*;
-
+    fn try_integer(self) -> Result<i64, Error> {
         match self {
-            Bytes(v) => Literal::from(v).into(),
-            Integer(v) => Literal::from(v).into(),
-            Float(v) => Literal::from(v).into(),
-            Boolean(v) => Literal::from(v).into(),
-            Object(v) => {
-                let object = crate::expression::Object::from(
-                    v.into_iter()
-                        .map(|(k, v)| (k, v.into_expr()))
-                        .collect::<BTreeMap<_, _>>(),
-                );
+            Value::Integer(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::integer(),
+            }),
+        }
+    }
 
-                Container::new(container::Variant::from(object)).into()
-            }
-            Array(v) => {
-                let array = crate::expression::Array::from(
-                    v.into_iter().map(|v| v.into_expr()).collect::<Vec<_>>(),
-                );
+    fn try_into_i64(self: &Value) -> Result<i64, Error> {
+        match self {
+            Value::Integer(v) => Ok(*v),
+            Value::Float(v) => Ok(v.into_inner() as i64),
+            _ => Err(Error::Coerce(self.kind(), Kind::integer())),
+        }
+    }
 
-                Container::new(container::Variant::from(array)).into()
-            }
-            Timestamp(v) => Literal::from(v).into(),
-            Regex(v) => Literal::from(v).into(),
-            Null => Literal::from(()).into(),
+    fn try_float(self) -> Result<f64, Error> {
+        match self {
+            Value::Float(v) => Ok(v.into_inner()),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::float(),
+            }),
+        }
+    }
+
+    fn try_into_f64(&self) -> Result<f64, Error> {
+        match self {
+            Value::Integer(v) => Ok(*v as f64),
+            Value::Float(v) => Ok(v.into_inner()),
+            _ => Err(Error::Coerce(self.kind(), Kind::float())),
+        }
+    }
+
+    fn try_bytes(self) -> Result<Bytes, Error> {
+        match self {
+            Value::Bytes(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::bytes(),
+            }),
+        }
+    }
+
+    fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
+        match self.as_bytes() {
+            Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
+            None => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::bytes(),
+            }),
+        }
+    }
+
+    fn try_boolean(self) -> Result<bool, Error> {
+        match self {
+            Value::Boolean(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::boolean(),
+            }),
+        }
+    }
+
+    fn try_regex(self) -> Result<Regex, Error> {
+        match self {
+            Value::Regex(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::regex(),
+            }),
+        }
+    }
+
+    fn try_null(self) -> Result<(), Error> {
+        match self {
+            Value::Null => Ok(()),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::null(),
+            }),
+        }
+    }
+
+    fn try_array(self) -> Result<Vec<Value>, Error> {
+        match self {
+            Value::Array(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::array(Collection::any()),
+            }),
+        }
+    }
+
+    fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+        match self {
+            Value::Object(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::object(Collection::any()),
+            }),
+        }
+    }
+
+    fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
+        match self {
+            Value::Timestamp(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::timestamp(),
+            }),
         }
     }
 }
@@ -64,16 +164,6 @@ impl Value {
         match self {
             Value::Integer(v) => Some(*v),
             _ => None,
-        }
-    }
-
-    pub fn try_integer(self) -> Result<i64, Error> {
-        match self {
-            Value::Integer(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::integer(),
-            }),
         }
     }
 }
@@ -126,18 +216,6 @@ impl From<usize> for Value {
     }
 }
 
-impl TryFrom<&Value> for i64 {
-    type Error = Error;
-
-    fn try_from(v: &Value) -> Result<Self, Self::Error> {
-        match v {
-            Value::Integer(v) => Ok(*v),
-            Value::Float(v) => Ok(v.into_inner() as i64),
-            _ => Err(Error::Coerce(v.kind(), Kind::integer())),
-        }
-    }
-}
-
 // Value::Float ----------------------------------------------------------------
 
 impl Value {
@@ -145,21 +223,19 @@ impl Value {
         matches!(self, Value::Float(_))
     }
 
-    pub fn as_float(&self) -> Option<f64> {
-        match self {
-            Value::Float(v) => Some(v.into_inner()),
-            _ => None,
-        }
+    // This replaces the more implicit "From<f64>", but keeps the same behavior.
+    // Ideally https://github.com/vectordotdev/vector/issues/11177 will remove this entirely
+    pub fn from_f64_or_zero(value: f64) -> Value {
+        NotNan::new(value)
+            .map(Value::Float)
+            .unwrap_or_else(|_| Value::Float(NotNan::new(0.0).unwrap()))
     }
+}
 
-    pub fn try_float(self) -> Result<f64, Error> {
-        match self {
-            Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::float(),
-            }),
-        }
+#[cfg(any(test, feature = "test"))]
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        NotNan::new(f).unwrap().into()
     }
 }
 
@@ -168,37 +244,6 @@ impl From<NotNan<f64>> for Value {
         Value::Float(v)
     }
 }
-
-impl TryFrom<&Value> for f64 {
-    type Error = Error;
-
-    fn try_from(v: &Value) -> Result<Self, Self::Error> {
-        match v {
-            Value::Integer(v) => Ok(*v as f64),
-            Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Coerce(v.kind(), Kind::float())),
-        }
-    }
-}
-
-// TODO: this exists to satisfy the `vector_common::Convert` utility.
-//
-// We'll have to fix that so that we can remove this impl.
-impl From<f64> for Value {
-    fn from(v: f64) -> Self {
-        let v = if v.is_nan() { 0.0 } else { v };
-
-        Value::Float(NotNan::new(v).unwrap())
-    }
-}
-
-// impl TryFrom<f64> for Value {
-//     type Error = Error;
-
-//     fn try_from(v: f64) -> Result<Self, Self::Error> {
-//         Ok(Value::Float(NotNan::new(v).map_err(|_| Error::NanFloat)?))
-//     }
-// }
 
 // Value::Bytes ----------------------------------------------------------------
 
@@ -211,26 +256,6 @@ impl Value {
         match self {
             Value::Bytes(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn try_bytes(self) -> Result<Bytes, Error> {
-        match self {
-            Value::Bytes(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::bytes(),
-            }),
-        }
-    }
-
-    pub fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
-        match self.as_bytes() {
-            Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
-            None => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::bytes(),
-            }),
         }
     }
 
@@ -268,15 +293,9 @@ impl From<Cow<'_, str>> for Value {
     }
 }
 
-impl From<Vec<u8>> for Value {
-    fn from(v: Vec<u8>) -> Self {
-        v.as_slice().into()
-    }
-}
-
-impl From<&[u8]> for Value {
-    fn from(v: &[u8]) -> Self {
-        Value::Bytes(Bytes::copy_from_slice(v))
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Self::Null
     }
 }
 
@@ -305,16 +324,6 @@ impl Value {
             _ => None,
         }
     }
-
-    pub fn try_boolean(self) -> Result<bool, Error> {
-        match self {
-            Value::Boolean(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::boolean(),
-            }),
-        }
-    }
 }
 
 impl From<bool> for Value {
@@ -334,16 +343,6 @@ impl Value {
         match self {
             Value::Regex(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn try_regex(self) -> Result<Regex, Error> {
-        match self {
-            Value::Regex(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::regex(),
-            }),
         }
     }
 }
@@ -372,22 +371,6 @@ impl Value {
             Value::Null => Some(()),
             _ => None,
         }
-    }
-
-    pub fn try_null(self) -> Result<(), Error> {
-        match self {
-            Value::Null => Ok(()),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::null(),
-            }),
-        }
-    }
-}
-
-impl From<()> for Value {
-    fn from(_: ()) -> Self {
-        Value::Null
     }
 }
 
@@ -418,16 +401,6 @@ impl Value {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn try_array(self) -> Result<Vec<Value>, Error> {
-        match self {
-            Value::Array(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::array(Collection::any()),
-            }),
         }
     }
 }
@@ -464,16 +437,6 @@ impl Value {
             _ => None,
         }
     }
-
-    pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
-        match self {
-            Value::Object(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::object(Collection::any()),
-            }),
-        }
-    }
 }
 
 impl From<BTreeMap<String, Value>> for Value {
@@ -501,16 +464,6 @@ impl Value {
             _ => None,
         }
     }
-
-    pub fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
-        match self {
-            Value::Timestamp(v) => Ok(v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::timestamp(),
-            }),
-        }
-    }
 }
 
 impl From<DateTime<Utc>> for Value {
@@ -527,7 +480,7 @@ impl From<Value> for VectorValue {
             Value::Float(v) => VectorValue::Float(v),
             Value::Boolean(v) => VectorValue::Boolean(v),
             Value::Object(v) => {
-                VectorValue::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect())
+                VectorValue::Object(v.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
             Value::Array(v) => VectorValue::Array(v.into_iter().map(Into::into).collect()),
             Value::Timestamp(v) => VectorValue::Timestamp(v),
@@ -547,7 +500,7 @@ impl From<VectorValue> for Value {
             VectorValue::Integer(v) => v.into(),
             VectorValue::Float(v) => v.into(),
             VectorValue::Boolean(v) => v.into(),
-            VectorValue::Map(v) => {
+            VectorValue::Object(v) => {
                 Value::Object(v.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
             VectorValue::Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),

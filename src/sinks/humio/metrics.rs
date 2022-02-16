@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HumioMetricsConfig {
+struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
     token: String,

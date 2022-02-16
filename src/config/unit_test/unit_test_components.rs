@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use futures_util::{
-    future,
-    stream::{self, BoxStream},
-    FutureExt, StreamExt,
-};
+use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_core::{
@@ -37,15 +33,13 @@ impl SourceConfig for UnitTestSourceConfig {
             // To appropriately shut down the topology after the source is done
             // sending events, we need to hold on to this shutdown trigger.
             let _shutdown = cx.shutdown;
-            out.send_all(&mut stream::iter(events))
-                .await
-                .map_err(|_| ())?;
+            out.send_batch(events).await.map_err(|_| ())?;
             Ok(())
         }))
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -95,7 +89,7 @@ pub struct UnitTestSinkConfig {
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tx = self.result_tx.lock().await.take().unwrap();
+        let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
             test_name: self.test_name.clone(),
             transform_id: self.transform_id.clone(),
@@ -112,14 +106,15 @@ impl SinkConfig for UnitTestSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 }
 
 pub struct UnitTestSink {
     pub test_name: String,
     pub transform_id: String,
-    pub result_tx: oneshot::Sender<UnitTestSinkResult>,
+    // None for NoOp test sinks
+    pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
     pub check: UnitTestSinkCheck,
 }
 
@@ -196,8 +191,10 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOp => {}
         }
 
-        if self.result_tx.send(result).is_err() {
-            error!(message = "Sending unit test results failed in unit test sink.");
+        if let Some(tx) = self.result_tx {
+            if tx.send(result).is_err() {
+                error!(message = "Sending unit test results failed in unit test sink.");
+            }
         }
         Ok(())
     }
@@ -210,6 +207,9 @@ fn events_to_string(events: &[Event]) -> String {
             Event::Log(log) => serde_json::to_string(log).unwrap_or_else(|_| "{}".to_string()),
             Event::Metric(metric) => {
                 serde_json::to_string(metric).unwrap_or_else(|_| "{}".to_string())
+            }
+            Event::Trace(trace) => {
+                serde_json::to_string(trace).unwrap_or_else(|_| "{}".to_string())
             }
         })
         .collect::<Vec<_>>()

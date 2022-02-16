@@ -33,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     pub connection_string: String,
-    pub container_name: String,
+    pub(super) container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
     pub blob_append_uuid: Option<bool>,

@@ -210,7 +210,7 @@ mod tests {
         );
         expected.insert(
             "table",
-            Value::Map(vec![("key".into(), "value".into())].into_iter().collect()),
+            Value::Object(vec![("key".into(), "value".into())].into_iter().collect()),
         );
 
         let mut fields = IndexMap::new();

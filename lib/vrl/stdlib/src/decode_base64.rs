@@ -76,7 +76,7 @@ impl Expression for DecodeBase64Fn {
         };
 
         match base64::decode_config(value, config) {
-            Ok(s) => Ok(Value::from(s)),
+            Ok(s) => Ok(Value::from(Bytes::from(s))),
             Err(_) => Err("unable to decode value to base64".into()),
         }
     }

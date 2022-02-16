@@ -9,6 +9,13 @@ impl<'a> ToLua<'a> for Event {
         match self {
             Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
             Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+            Event::Trace(_) => {
+                return Err(LuaError::ToLuaConversionError {
+                    from: "Event",
+                    to: "table",
+                    message: Some("Trace are not supported".to_string()),
+                })
+            }
         }
         Ok(LuaValue::Table(table))
     }

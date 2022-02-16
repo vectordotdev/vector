@@ -445,18 +445,18 @@ pub async fn build_pieces(
 }
 
 const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(event, Event::Log(_)),
-        DataType::Metric => matches!(event, Event::Metric(_)),
+    match event {
+        Event::Log(_) => data_type.contains(DataType::Log),
+        Event::Metric(_) => data_type.contains(DataType::Metric),
+        Event::Trace(_) => data_type.contains(DataType::Trace),
     }
 }
 
 const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(events, EventArray::Logs(_)),
-        DataType::Metric => matches!(events, EventArray::Metrics(_)),
+    match events {
+        EventArray::Logs(_) => data_type.contains(DataType::Log),
+        EventArray::Metrics(_) => data_type.contains(DataType::Metric),
+        EventArray::Traces(_) => data_type.contains(DataType::Trace),
     }
 }
 

@@ -168,6 +168,7 @@ impl Encoder<Event> for StandardJsonEncoding {
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
+            Event::Trace(trace) => self.encode_input(trace, writer),
         }
     }
 }
@@ -195,7 +196,7 @@ impl Encoder<Event> for StandardTextEncoding {
             Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
-                    .map(|v| v.as_bytes())
+                    .map(|v| v.coerce_to_bytes())
                     .unwrap_or_default();
                 writer.write_all(&message[..]).map(|()| message.len())
             }
@@ -203,6 +204,7 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
+            Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
         }
     }
 }

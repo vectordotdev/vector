@@ -17,7 +17,7 @@ use vector_core::event::Metric;
 use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
 use crate::{
     config::{ComponentKey, OutputId},
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, TraceEvent},
     topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
 };
 
@@ -80,6 +80,7 @@ pub enum TapPayload {
     Log(OutputId, LogEvent),
     Metric(OutputId, Metric),
     Notification(String, TapNotification),
+    Trace(OutputId, TraceEvent),
 }
 
 impl TapPayload {
@@ -121,6 +122,7 @@ impl Sink<Event> for TapSink {
         let payload = match event {
             Event::Log(log) => TapPayload::Log(self.output_id.clone(), log),
             Event::Metric(metric) => TapPayload::Metric(self.output_id.clone(), metric),
+            Event::Trace(trace) => TapPayload::Trace(self.output_id.clone(), trace),
         };
 
         if let Err(TrySendError::Closed(payload)) = self.tap_tx.try_send(payload) {

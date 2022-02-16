@@ -15,7 +15,7 @@ pub fn remove(fields: &mut BTreeMap<String, Value>, path: &str, prune: bool) -> 
 /// type of `Value`.
 fn remove_rec(value: &mut Value, path: Peekable<PathIter>, prune: bool) -> Option<(Value, bool)> {
     match value {
-        Value::Map(map) => remove_map(map, path, prune),
+        Value::Object(map) => remove_map(map, path, prune),
         Value::Array(map) => remove_array(map, path, prune),
         _ => None,
     }

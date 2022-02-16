@@ -243,7 +243,7 @@ struct FlatUniqueMerger {
 #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
 fn insert_value(h: &mut HashSet<Value>, v: Value) {
     match v {
-        Value::Map(m) => {
+        Value::Object(m) => {
             for (_, v) in m {
                 h.insert(v);
             }
@@ -519,7 +519,7 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
             Value::Integer(i) => Box::new(AddNumbersMerger::new(i.into())),
             Value::Float(f) => Box::new(AddNumbersMerger::new(f.into())),
             Value::Timestamp(ts) => Box::new(TimestampWindowMerger::new(ts)),
-            Value::Map(_) => Box::new(DiscardMerger::new(v)),
+            Value::Object(_) => Box::new(DiscardMerger::new(v)),
             Value::Null => Box::new(DiscardMerger::new(v)),
             Value::Boolean(_) => Box::new(DiscardMerger::new(v)),
             Value::Bytes(_) => Box::new(DiscardMerger::new(v)),
@@ -529,7 +529,10 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
     }
 }
 
-pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceValueMerger>, String> {
+pub(crate) fn get_value_merger(
+    v: Value,
+    m: &MergeStrategy,
+) -> Result<Box<dyn ReduceValueMerger>, String> {
     match m {
         MergeStrategy::Sum => match v {
             Value::Integer(i) => Ok(Box::new(AddNumbersMerger::new(i.into()))),

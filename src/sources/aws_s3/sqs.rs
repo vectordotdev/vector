@@ -20,7 +20,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::aws_s3::source::{
         SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
         SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
@@ -478,16 +478,14 @@ impl IngestorProcess {
                         }
                     }
 
-                    let event: Event = log.into();
-
                     emit!(&SqsS3EventsReceived {
-                        byte_size: event.size_of()
+                        byte_size: log.size_of()
                     });
 
-                    ready(Some(event))
+                    ready(Some(log))
                 });
 
-                let send_error = match self.out.send_all(&mut stream).await {
+                let send_error = match self.out.send_stream(&mut stream).await {
                     Ok(_) => None,
                     Err(error) => {
                         // count is set to 0 to have no discarded events considering

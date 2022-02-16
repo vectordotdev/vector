@@ -5,7 +5,7 @@ use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -25,7 +25,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -180,7 +180,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

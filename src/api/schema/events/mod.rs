@@ -3,6 +3,7 @@ pub mod log;
 pub mod metric;
 pub mod notification;
 pub mod output;
+pub mod trace;
 
 use std::collections::HashSet;
 
