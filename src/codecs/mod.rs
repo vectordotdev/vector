@@ -15,7 +15,7 @@ pub use decoding::{
     OctetCountingDecoderConfig,
 };
 #[cfg(feature = "sources-syslog")]
-pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
+pub(super) use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,

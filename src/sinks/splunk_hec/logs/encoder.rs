@@ -28,7 +28,7 @@ pub struct HecData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
+    pub(self) source: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) sourcetype: Option<String>,
 }
