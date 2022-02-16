@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Deserialize, Default, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct ThrottleConfig {
+pub(super) struct ThrottleConfig {
     threshold: u32,
     window_secs: f64,
     key_field: Option<Template>,
