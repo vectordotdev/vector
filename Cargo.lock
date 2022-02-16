@@ -2884,6 +2884,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c21d40587b92fa6a6c6e3c1bdbf87d75511db5672f9c93175574b3a00df1758"
+dependencies = [
+ "ahash",
+]
+
+[[package]]
 name = "hdrhistogram"
 version = "7.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3296,7 +3305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282a6247722caba404c065016bbfa522806e51714c34f5dfc3e4a3a46fcb4223"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.11.2",
  "serde",
 ]
 
@@ -3978,7 +3987,7 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "dashmap 4.0.2",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "metrics",
  "num_cpus",
@@ -5851,12 +5860,12 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.31"
+version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439655b8d657bcb28264da8e5380d55549e34ffc4149bea9e3521890a122a7bd"
+checksum = "8e3791595bf1ee951356964271bea7dafd1e1730e8be812f44a31afc38fa7bba"
 dependencies = [
  "bytecheck",
- "hashbrown",
+ "hashbrown 0.12.0",
  "ptr_meta",
  "rend",
  "rkyv_derive",
@@ -5865,9 +5874,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.31"
+version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cded413ad606a80291ca84bedba137093807cf4f5b36be8c60f57a7e790d48f6"
+checksum = "ca655472e721430bfb5c995a5602278e089c329cde96a0a53e1f711e3ba39c55"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
