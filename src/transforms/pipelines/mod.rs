@@ -184,7 +184,7 @@ impl EventTypeConfig {
 
 /// The configuration of the pipelines transform itself.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct PipelinesConfig {
+pub(crate) struct PipelinesConfig {
     #[serde(default)]
     logs: EventTypeConfig,
     #[serde(default)]
