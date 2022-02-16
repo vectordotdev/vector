@@ -17,7 +17,7 @@ use crate::{
 pub struct TokenizerConfig {
     pub field_names: Vec<String>,
     pub field: Option<String>,
-    pub drop_field: bool,
+    drop_field: bool,
     pub types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
 }

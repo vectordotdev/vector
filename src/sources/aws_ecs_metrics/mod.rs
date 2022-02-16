@@ -44,7 +44,7 @@ struct AwsEcsMetricsSourceConfig {
 const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
 const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
 
-pub fn default_endpoint() -> String {
+pub(super) fn default_endpoint() -> String {
     env::var(METADATA_URI_V4)
         .or_else(|_| env::var(METADATA_URI_V3))
         .unwrap_or_else(|_| "http://169.254.170.2/v2".into())
