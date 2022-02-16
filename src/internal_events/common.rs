@@ -93,7 +93,7 @@ impl InternalEvent for AwsBytesSent {
 }
 
 #[derive(Debug)]
-pub struct StreamClosedError {
+pub(crate) struct StreamClosedError {
     pub error: crate::source_sender::ClosedError,
     pub count: usize,
 }
