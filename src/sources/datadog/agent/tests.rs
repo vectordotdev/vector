@@ -33,7 +33,7 @@ use crate::{
     sources::datadog::agent::{
         logs::{decode_log_body, LogMsg},
         metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS,
+        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
@@ -1104,6 +1104,7 @@ fn test_config_outputs() {
                             .required_field("ddtags", Kind::bytes(), None),
                     ),
                     (Some(METRICS), schema::Definition::empty()),
+                    (Some(TRACES), schema::Definition::empty()),
                 ]),
             },
         ),
@@ -1137,6 +1138,7 @@ fn test_config_outputs() {
                             .unknown_fields(Kind::json()),
                     ),
                     (Some(METRICS), schema::Definition::empty()),
+                    (Some(TRACES), schema::Definition::empty()),
                 ]),
             },
         ),
@@ -1184,6 +1186,7 @@ fn test_config_outputs() {
                             .unknown_fields(Kind::bytes()),
                     ),
                     (Some(METRICS), schema::Definition::empty()),
+                    (Some(TRACES), schema::Definition::empty()),
                 ]),
             },
         ),
@@ -1196,6 +1199,9 @@ fn test_config_outputs() {
             decoding,
             acknowledgements: Default::default(),
             multiple_outputs,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
         };
 
         let mut outputs = config

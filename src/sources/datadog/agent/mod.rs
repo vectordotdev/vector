@@ -7,6 +7,8 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
+use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
+
 use bytes::{Buf, Bytes};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
@@ -14,7 +16,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
+use value::Kind;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -29,6 +31,7 @@ use crate::{
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
+    schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self, util::ErrorMessage},
     tls::{MaybeTlsSettings, TlsConfig},
@@ -149,13 +152,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::from((METRICS, DataType::Metric)).with_schema_definition(definition),
+                Output::from((METRICS, DataType::Metric)),
                 Output::from((LOGS, DataType::Log)).with_schema_definition(definition),
-                Output::from((TRACE, DataType::Trace)).with_schema_definition(definition),
+                Output::from((TRACES, DataType::Trace)),
             ]
         } else {
-            vec![Output::default(DataType::all())
-                .with_schema_definition(definition)]
+            vec![Output::default(DataType::all()).with_schema_definition(definition)]
         }
     }
 

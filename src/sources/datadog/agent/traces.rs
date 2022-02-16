@@ -109,25 +109,28 @@ fn handle_dd_trace_payload(
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = dd_proto::TracePayload::decode(frame)?;
+
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
-    let trace_events: Vec<Event> =
+
+    let trace_events: Vec<TraceEvent> =
     // Each traces is mapped to one event...
     decoded_payload
         .traces
         .iter()
-        .map(|dd_trace| convert_dd_trace(dd_trace, env.clone(), hostname.clone(), source))
+        .map(convert_dd_trace)
         //... and each APM event is also mapped into its own event
         .chain(decoded_payload.transactions.iter().map(|s| {
-            let mut trace_event = TraceEvent::from(convert_span(s));
-            trace_event.insert(
-                source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
-            );
-            trace_event.insert(source.log_schema_host_key, hostname.clone());
-            trace_event.insert("env", env.clone());
-            trace_event
-        }))
+            TraceEvent::from(convert_span(s))
+        })).collect();
+
+    emit!(&EventsReceived {
+        byte_size: trace_events.size_of(),
+        count: trace_events.len(),
+    });
+
+    let enriched_events = trace_events
+        .into_iter()
         .map(|mut trace_event| {
             if let Some(k) = &api_key {
                 trace_event
@@ -137,30 +140,22 @@ fn handle_dd_trace_payload(
             if let Some(lang) = lang {
                 trace_event.insert("language", lang.clone());
             }
+            trace_event.insert(
+                source.log_schema_source_type_key,
+                Bytes::from("datadog_agent"),
+            );
             trace_event.insert("payload_version", "v1".to_string());
+            trace_event.insert(source.log_schema_host_key, hostname.clone());
+            trace_event.insert("env", env.clone());
             Event::Trace(trace_event)
         })
         .collect();
-    emit!(&EventsReceived {
-        byte_size: trace_events.size_of(),
-        count: trace_events.len(),
-    });
-    Ok(trace_events)
+
+    Ok(enriched_events)
 }
 
-fn convert_dd_trace(
-    dd_trace: &dd_proto::ApiTrace,
-    env: String,
-    hostname: String,
-    source: &DatadogAgentSource,
-) -> TraceEvent {
+fn convert_dd_trace(dd_trace: &dd_proto::ApiTrace) -> TraceEvent {
     let mut trace_event = TraceEvent::default();
-    trace_event.insert(
-        source.log_schema_source_type_key,
-        Bytes::from("datadog_agent"),
-    );
-    trace_event.insert(source.log_schema_host_key, hostname);
-    trace_event.insert("env", env);
     trace_event.insert("trace_id", dd_trace.trace_id as i64);
     trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
     trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));

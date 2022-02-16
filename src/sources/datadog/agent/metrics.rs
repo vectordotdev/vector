@@ -1,22 +1,29 @@
-use crate::{
-    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
-    config::log_schema,
-    event::{metric::Metric, metric::MetricValue, Event, MetricKind},
-    internal_events::EventsReceived,
-    sources::datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-    sources::util::ErrorMessage,
-    vector_core::ByteSizeOf,
-    SourceSender,
-};
+use std::{collections::BTreeMap, sync::Arc};
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::future;
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, sync::Arc};
 use vector_core::metrics::AgentDDSketch;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection};
+
+use crate::{
+    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
+    config::log_schema,
+    event::{
+        metric::{Metric, MetricValue},
+        Event, MetricKind,
+    },
+    internal_events::EventsReceived,
+    sources::{
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        util::ErrorMessage,
+    },
+    vector_core::ByteSizeOf,
+    SourceSender,
+};
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {

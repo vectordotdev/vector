@@ -1,18 +1,22 @@
-use crate::{
-    event::Event,
-    internal_events::EventsReceived,
-    sources::datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-    sources::util::{ErrorMessage, StreamDecodingError},
-    vector_core::ByteSizeOf,
-    SourceSender,
-};
+use std::sync::Arc;
+
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tokio_util::codec::Decoder;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
+
+use crate::{
+    event::Event,
+    internal_events::EventsReceived,
+    sources::{
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        util::{ErrorMessage, StreamDecodingError},
+    },
+    vector_core::ByteSizeOf,
+    SourceSender,
+};
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
