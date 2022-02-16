@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{stream, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
