@@ -85,8 +85,8 @@ impl Display for Notification {
 /// This wrapper struct hoists `message` up from [`Notification`] for a more
 /// natural querying experience. While ideally [`Notification`] would be a
 /// GraphQL interface with a common `message` field, an interface cannot be
-/// directly nested into the union of [`super::OutputEventsPayload`]. 
-/// 
+/// directly nested into the union of [`super::OutputEventsPayload`].
+///
 /// The GraphQL specification forbids such a nesting:
 /// http://spec.graphql.org/October2021/#sel-HAHdfFDABABkG3_I
 #[derive(Debug, Clone)]
