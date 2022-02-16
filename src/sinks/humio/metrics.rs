@@ -116,7 +116,7 @@ impl SinkConfig for HumioMetricsConfig {
     }
 }
 
-pub struct HumioMetricsSink {
+pub(super) struct HumioMetricsSink {
     inner: VectorSink,
     transform: Transform,
 }
