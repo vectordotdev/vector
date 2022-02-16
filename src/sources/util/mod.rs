@@ -49,7 +49,7 @@ pub use unix_stream::build_unix_stream_source;
 pub use wrappers::AfterReadExt;
 
 #[cfg(any(feature = "sources-http"))]
-pub use self::body_decoding::Encoding;
+pub(super) use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
