@@ -36,7 +36,7 @@ pub use sink::{IntoSinkMetrics, SinkMetrics};
 pub use source::{IntoSourceMetrics, SourceMetrics};
 use tokio_stream::{Stream, StreamExt};
 pub use transform::{IntoTransformMetrics, TransformMetrics};
-pub use uptime::Uptime;
+pub(super) use uptime::Uptime;
 
 use crate::config::ComponentKey;
 
