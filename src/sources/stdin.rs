@@ -24,7 +24,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
     #[serde(default = "crate::serde::default_max_length")]
-    pub max_length: usize,
+    pub(super) max_length: usize,
     pub host_key: Option<String>,
     #[serde(default = "default_framing_stream_based")]
     pub framing: FramingConfig,
