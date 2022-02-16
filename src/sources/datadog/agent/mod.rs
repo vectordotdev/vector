@@ -728,7 +728,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    pub timestamp: i64,
+    pub(super) timestamp: i64,
     pub hostname: Bytes,
     pub(self) service: Bytes,
     pub ddsource: Bytes,

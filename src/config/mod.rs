@@ -639,7 +639,7 @@ pub struct TestDefinition<T = OutputId> {
     #[serde(default)]
     pub outputs: Vec<TestOutput<T>>,
     #[serde(default)]
-    pub no_outputs_from: Vec<T>,
+    no_outputs_from: Vec<T>,
 }
 
 impl TestDefinition<String> {
