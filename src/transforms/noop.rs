@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Noop;
+pub(crate) struct Noop;
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "noop")]
