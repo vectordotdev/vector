@@ -59,7 +59,7 @@ pub struct NewRelicLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub compression: Compression,
+    pub(super) compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 

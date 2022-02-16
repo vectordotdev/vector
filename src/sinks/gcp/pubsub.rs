@@ -46,7 +46,7 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PubsubConfig {
-    pub project: String,
+    pub(crate) project: String,
     pub topic: String,
     pub(crate) endpoint: Option<String>,
     #[serde(default = "default_skip_authentication")]
