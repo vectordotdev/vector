@@ -12,7 +12,7 @@ parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline ex
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
 parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
-parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--mean-drift-percentage', type=float, default=5, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 5')
 parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
 parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
@@ -159,12 +159,12 @@ detected_not_erratic = len(no_longer_erratic) > 0
 detected_actually_erratic = len(actually_erratic) > 0
 
 if detected_changes:
-    print(f"Changes in throughput with confidence ≥ {common.confidence(args.p_value)}:")
+    print(f"Changes in throughput with confidence ≥ {common.confidence(args.p_value)} and absolute Δ mean >= ±{args.mean_drift_percentage}%:")
     print()
     print(changes.to_markdown(index=False, tablefmt='github'))
     print()
 else:
-    print(f"No interesting changes with confidence ≥ {common.confidence(args.p_value)}:")
+    print(f"No interesting changes in throughput with confidence ≥ {common.confidence(args.p_value)} and absolute Δ mean >= ±{args.mean_drift_percentage}%:")
     print()
 
 if args.report_erratic and detected_not_erratic:
