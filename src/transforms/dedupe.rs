@@ -60,7 +60,7 @@ impl DedupeConfig {
     }
 }
 
-pub struct Dedupe {
+pub(self) struct Dedupe {
     fields: FieldMatchConfig,
     cache: LruCache<CacheEntry, bool>,
 }
