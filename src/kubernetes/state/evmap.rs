@@ -15,7 +15,7 @@ use crate::kubernetes::{
 /// A [`WriteHandle`] wrapper that implements [`super::Write`].
 /// For use as a state writer implementation for
 /// [`crate::kubernetes::Reflector`].
-pub struct Writer<T>
+pub(crate) struct Writer<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
