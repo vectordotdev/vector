@@ -62,7 +62,7 @@ pub(crate) struct PubsubConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
 }
