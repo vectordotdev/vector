@@ -37,7 +37,7 @@ pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DatadogLogsDefaultBatchSettings;
+pub(super) struct DatadogLogsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
