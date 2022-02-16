@@ -14,7 +14,7 @@ use crate::transforms::TaskTransform;
 /// as-is.
 /// Useful to avoid boxing the transforms.
 #[derive(Clone, Debug)]
-pub struct Optional<T>(pub Option<T>);
+pub(crate) struct Optional<T>(pub Option<T>);
 
 impl<T: TaskTransform<E>, E: EventContainer + 'static> TaskTransform<E> for Optional<T> {
     fn transform(
