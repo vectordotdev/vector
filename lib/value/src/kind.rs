@@ -24,7 +24,7 @@ pub use collection::{Collection, Field, Index, Unknown};
 /// A state without any type information (e.g. all fields are `None`) indicates no type information
 /// can be inferred from the value. This is usually a programming error, but it's a valid state for
 /// this library to expose.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
     // usage of the API easier to work with. There is no impact on the memory size of the type.

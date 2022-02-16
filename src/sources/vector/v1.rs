@@ -256,7 +256,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
-                schema_ids: HashMap::default(),
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -294,7 +294,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
-                schema_ids: HashMap::default(),
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();

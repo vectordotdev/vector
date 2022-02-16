@@ -616,7 +616,7 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
-                schema_ids: HashMap::default(),
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
