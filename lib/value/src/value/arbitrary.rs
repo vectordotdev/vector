@@ -30,13 +30,7 @@ impl Arbitrary for Value {
                 Self::Bytes(Bytes::from(bytes))
             }
             1 => Self::Integer(i64::arbitrary(g)),
-            2 => {
-                let mut f = f64::arbitrary(g) % MAX_F64_SIZE;
-                if f.is_nan() {
-                    f = 0.0;
-                }
-                Self::from(f)
-            }
+            2 => Self::from(f64::arbitrary(g) % MAX_F64_SIZE),
             3 => Self::Boolean(bool::arbitrary(g)),
             4 => Self::Timestamp(datetime(g)),
             5 => {
