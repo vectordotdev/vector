@@ -60,7 +60,7 @@ pub struct Opts {
 }
 
 #[derive(Serialize)]
-pub struct SinkOuter {
+struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
