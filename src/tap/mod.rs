@@ -1,6 +1,6 @@
 mod cmd;
 
-pub use cmd::cmd;
+pub(crate) use cmd::cmd;
 use structopt::StructOpt;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
