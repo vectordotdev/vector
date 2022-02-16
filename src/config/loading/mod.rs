@@ -1,10 +1,10 @@
 mod config_builder;
 mod loader;
-mod recursive;
 mod source;
 
 use std::{
     collections::HashMap,
+    fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
     sync::Mutex,
@@ -19,7 +19,6 @@ use super::{
 };
 use crate::signal;
 use glob::glob;
-use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 pub use config_builder::*;
@@ -28,20 +27,22 @@ pub use source::*;
 
 pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
 
-pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
-    path.read_dir()
+pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
+    path.as_ref()
+        .read_dir()
         .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
 }
 
-pub(super) fn component_name(path: &Path) -> Result<String, Vec<String>> {
-    path.file_stem()
+pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, Vec<String>> {
+    path.as_ref()
+        .file_stem()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-pub(super) fn open_file(path: &Path) -> Option<File> {
-    match File::open(path) {
+pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {
+    match File::open(&path) {
         Ok(f) => Some(f),
         Err(error) => {
             if let std::io::ErrorKind::NotFound = error.kind() {
@@ -52,60 +53,6 @@ pub(super) fn open_file(path: &Path) -> Option<File> {
                 None
             }
         }
-    }
-}
-
-fn load_from_file<T: serde::de::DeserializeOwned>(
-    path: &Path,
-    format: Format,
-) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
-    let name = component_name(path)?;
-    if let Some(file) = open_file(path) {
-        let (component, warnings): (T, Vec<String>) = load(file, format)?;
-        Ok(Some((name, component, warnings)))
-    } else {
-        Ok(None)
-    }
-}
-
-fn load_files_from_dir<T: serde::de::DeserializeOwned>(
-    path: &Path,
-) -> Result<(IndexMap<ComponentKey, T>, Vec<String>), Vec<String>> {
-    let readdir = read_dir(path)?;
-    let mut result = IndexMap::new();
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-    for res in readdir {
-        match res {
-            Ok(direntry) => {
-                let entry_path = direntry.path();
-                if entry_path.is_file() {
-                    // skip any unknown file formats
-                    if let Ok(format) = Format::from_path(direntry.path()) {
-                        match load_from_file::<T>(&entry_path, format) {
-                            Ok(Some((name, file, warns))) => {
-                                result.insert(ComponentKey::from(name), file);
-                                warnings.extend(warns);
-                            }
-                            Ok(None) => {}
-                            Err(errs) => errors.extend(errs),
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                errors.push(format!(
-                    "Could not read file in config dir: {:?}, {}.",
-                    path, err
-                ));
-            }
-        }
-    }
-
-    if errors.is_empty() {
-        Ok((result, warnings))
-    } else {
-        Err(errors)
     }
 }
 
@@ -221,13 +168,8 @@ where
 
     for config_path in config_paths {
         match config_path {
-            ConfigPath::File(path, format_hint) => {
-                match loader.load_from_file(
-                    path,
-                    format_hint
-                        .or_else(move || Format::from_path(&path).ok())
-                        .unwrap_or_default(),
-                ) {
+            ConfigPath::File(path, _) => {
+                match loader.load_from_file(path) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };

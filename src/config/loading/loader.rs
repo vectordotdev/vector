@@ -1,9 +1,7 @@
-use super::{
-    component_name, load_files_from_dir, open_file, read_dir, ComponentKey, Format, Process,
-};
-use crate::config::{EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition, TransformOuter};
-use indexmap::IndexMap;
+use super::{component_name, open_file, read_dir, Format};
+use crate::config::format;
 use std::path::Path;
+use toml::value::{Table, Value};
 
 // The loader traits are split into two parts -- an internal `process` mod, that contains
 // functionality for deserializing a type `T`, and a `Loader` trait, that provides a public interface
@@ -11,6 +9,7 @@ use std::path::Path;
 // the loading mod, but does not form part of the public interface.
 pub(super) mod process {
     use super::*;
+    use std::fmt::Debug;
     use std::io::Read;
 
     #[derive(Debug, Copy, Clone)]
@@ -36,6 +35,7 @@ pub(super) mod process {
         }
     }
 
+    #[derive(Debug)]
     pub struct ProcessedFile {
         pub name: String,
         pub input: String,
@@ -47,26 +47,133 @@ pub(super) mod process {
     pub trait Process {
         fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
 
-        fn merge(
-            &mut self,
-            processed_file: &ProcessedFile,
+        fn load<R: std::io::Read, T>(
+            &self,
+            input: R,
             format: Format,
-            hint: Option<ComponentHint>,
-        ) -> Result<(), Vec<String>>;
+        ) -> Result<(T, Vec<String>), Vec<String>>
+        where
+            T: serde::de::DeserializeOwned,
+        {
+            let (value, warnings) = self.prepare(input)?;
 
-        fn process_file(&mut self, path: &Path) -> Result<Option<ProcessedFile>, Vec<String>> {
-            let name = component_name(path)?;
-            if let Some(file) = open_file(path) {
-                let (input, warnings) = self.prepare(file)?;
-                Ok(Some(ProcessedFile {
-                    name,
-                    input,
-                    warnings,
-                }))
+            format::deserialize(&value, format).map(|builder| (builder, warnings))
+        }
+
+        fn load_dir_into(
+            &self,
+            path: &Path,
+            result: &mut Table,
+        ) -> Result<Vec<String>, Vec<String>> {
+            let mut errors = Vec::new();
+            let mut warnings = Vec::new();
+            let readdir = read_dir(path)?;
+
+            let mut files = Vec::new();
+            let mut folders = Vec::new();
+
+            for direntry in readdir {
+                match direntry {
+                    Ok(item) => {
+                        let entry = item.path();
+                        if entry.is_file() {
+                            files.push(entry);
+                        } else if entry.is_dir() {
+                            folders.push(entry);
+                        }
+                    }
+                    Err(err) => {
+                        errors.push(format!(
+                            "Could not read entry in config dir: {:?}, {}.",
+                            path, err
+                        ));
+                    }
+                };
+            }
+
+            for entry in files {
+                match self.load_file_recursive(&entry) {
+                    Ok(Some((name, inner, warns))) => {
+                        if let Err(errs) = merge_with_value(result, name, Value::Table(inner)) {
+                            errors.extend(errs);
+                        } else {
+                            warnings.extend(warns);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(errs) => {
+                        errors.extend(errs);
+                    }
+                }
+            }
+
+            for entry in folders {
+                if let Ok(name) = component_name(&entry) {
+                    if !result.contains_key(&name) {
+                        match self.load_dir(&entry) {
+                            Ok((table, warns)) => {
+                                result.insert(name, Value::Table(table));
+                                warnings.extend(warns);
+                            }
+                            Err(errs) => {
+                                errors.extend(errs);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if errors.is_empty() {
+                Ok(warnings)
+            } else {
+                Err(errors)
+            }
+        }
+
+        fn load_file(
+            &self,
+            path: &Path,
+        ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
+            if let (Ok(name), Some(file), Ok(format)) = (
+                component_name(path),
+                open_file(path),
+                Format::from_path(path),
+            ) {
+                self.load(file, format)
+                    .map(|(value, warnings)| Some((name, value, warnings)))
             } else {
                 Ok(None)
             }
         }
+
+        fn load_file_recursive(
+            &self,
+            path: &Path,
+        ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
+            if let Some((name, mut table, mut warnings)) = self.load_file(path)? {
+                if let Some(subdir) = path.parent().map(|p| p.join(&name)) {
+                    if subdir.is_dir() && subdir.exists() {
+                        warnings.extend(self.load_dir_into(&subdir, &mut table)?);
+                    }
+                }
+                Ok(Some((name, table, warnings)))
+            } else {
+                Ok(None)
+            }
+        }
+
+        fn load_dir(&self, path: &Path) -> Result<(Table, Vec<String>), Vec<String>> {
+            let mut result = Table::new();
+            let warnings = self.load_dir_into(path, &mut result)?;
+            Ok((result, warnings))
+        }
+
+        fn merge(
+            &mut self,
+            name: String,
+            value: Value,
+            hint: Option<ComponentHint>,
+        ) -> Result<(), Vec<String>>;
     }
 }
 
@@ -81,10 +188,10 @@ where
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
-    fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
-        if let Ok(Some(file)) = self.process_file(path) {
-            self.merge(&file, format, None);
-            Ok(file.warnings)
+    fn load_from_file(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        if let Ok(Some((name, value, warnings))) = self.load_file(path) {
+            self.merge(name, Value::Table(value), None)?;
+            Ok(warnings)
         } else {
             Ok(vec![])
         }
@@ -129,30 +236,40 @@ where
             // Sanity check for paths, to ensure we're dealing with a folder. This is necessary
             // because a sub-folder won't generally exist unless the config is namespaced.
             if path.exists() && path.is_dir() {
-                let readdir = read_dir(&path)?;
-                for res in readdir {
-                    match res {
-                        Ok(dir_entry) => {
-                            let entry_path = dir_entry.path();
-                            if entry_path.is_file() {
-                                // Silently ignore any unknown file formats.
-                                if let Ok(format) = Format::from_path(dir_entry.path()) {
-                                    match self.process_file(&entry_path) {
-                                        Ok(None) => continue,
-                                        Ok(Some(file)) => {
-                                            self.merge(&file, format, hint);
-                                            warnings.extend(file.warnings);
+                match hint {
+                    Some(ComponentHint::Transform) => {
+                        let (table, warns) = self.load_dir(&path)?;
+                        println!("transform: {:?}", table);
+
+                        warnings.extend(warns);
+                    }
+                    _ => {
+                        let readdir = read_dir(&path)?;
+                        for res in readdir {
+                            match res {
+                                Ok(entry) => {
+                                    let path = entry.path();
+                                    if path.is_file() {
+                                        match self.load_file(path.as_path()) {
+                                            Ok(None) => continue,
+                                            Ok(Some((name, value, warns))) => {
+                                                println!("other ({}): {:?}", name, value);
+                                                self.merge(name, Value::Table(value), hint)?;
+                                                warnings.extend(warns);
+                                            }
+                                            Err(errs) => {
+                                                errors.extend(errs);
+                                            }
                                         }
-                                        Err(errs) => errors.extend(errs),
                                     }
                                 }
+                                Err(err) => {
+                                    errors.push(format!(
+                                        "Could not read file in config dir: {:?}, {}.",
+                                        path, err
+                                    ));
+                                }
                             }
-                        }
-                        Err(err) => {
-                            errors.push(format!(
-                                "Could not read file in config dir: {:?}, {}.",
-                                path, err
-                            ));
                         }
                     }
                 }
@@ -164,25 +281,24 @@ where
         } else {
             Err(errors)
         }
-
-        /*
-        let sub_folder = path.join("transforms");
-        if sub_folder.exists() && sub_folder.is_dir() {
-            let (value, warns) = super::recursive::load_dir(&sub_folder)?;
-            warnings.extend(warns);
-            match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TransformOuter<_>>>()
-            {
-                Ok(inner) => self.add_transforms(inner),
-                Err(err) => errors.push(format!("Unable to decode transform folder: {:?}", err)),
-            }
-        }
-
-        if errors.is_empty() {
-            Ok(warnings)
-        } else {
-            Err(errors)
-        }
-
-         */
     }
+}
+
+fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
+    serde_toml_merge::merge(value, other).map_err(|err| vec![format!("{}", err)])
+}
+
+fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result<(), Vec<String>> {
+    if let Some(existing) = res.remove(&name) {
+        res.insert(name, merge_values(existing, value)?);
+    } else {
+        res.insert(name, value);
+    }
+    Ok(())
+}
+
+pub(super) fn deserialize_value<T: serde::de::DeserializeOwned>(
+    value: Value,
+) -> Result<T, Vec<String>> {
+    value.try_into().map_err(|e| vec![e.to_string()])
 }
