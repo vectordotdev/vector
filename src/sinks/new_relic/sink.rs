@@ -119,7 +119,7 @@ pub struct NewRelicSink<S> {
     pub(crate) service: S,
     pub(crate) acker: Acker,
     pub encoding: EncodingConfigFixed<Encoding>,
-    pub credentials: Arc<NewRelicCredentials>,
+    pub(crate) credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
     pub batcher_settings: BatcherSettings,
 }
