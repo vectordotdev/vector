@@ -65,8 +65,8 @@ impl TransformConfig for PipelineFilterConfig {
         self.inner.input()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        self.inner.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.inner.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
