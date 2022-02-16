@@ -34,4 +34,4 @@ See [the documentation for end-to-end
 acknowledgements][acknowledgements] for more details on the
 acknowledgement process.
 
-[acknowledgements]: https://vector.dev/docs/about/under-the-hood/end-to-end-acknowledgements
+[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
