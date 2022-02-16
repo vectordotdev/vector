@@ -38,7 +38,7 @@ enum HealthcheckError {
 pub struct StackdriverConfig {
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
-    pub log_id: Template,
+    pub(self) log_id: Template,
 
     pub resource: StackdriverResource,
     pub severity_key: Option<String>,
