@@ -60,7 +60,7 @@ pub mod rename_fields;
 #[cfg(feature = "transforms-route")]
 pub mod route;
 #[cfg(feature = "transforms-sample")]
-pub mod sample;
+mod sample;
 #[cfg(feature = "transforms-split")]
 pub mod split;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
