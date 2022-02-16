@@ -19,7 +19,7 @@ pub mod tcp;
 pub mod test;
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
-pub mod unix;
+pub(crate) mod unix;
 pub mod uri;
 
 use std::borrow::Cow;
