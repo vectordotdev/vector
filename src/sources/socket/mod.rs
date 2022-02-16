@@ -1,4 +1,5 @@
-pub mod tcp;
+
+pub(super) mod tcp;
 mod udp;
 #[cfg(unix)]
 mod unix;
