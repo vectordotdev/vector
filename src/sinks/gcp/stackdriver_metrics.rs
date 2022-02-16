@@ -38,7 +38,7 @@ pub struct StackdriverConfig {
     pub resource: gcp::GcpTypedResource,
     pub(crate) credentials_path: Option<String>,
     #[serde(default = "default_metric_namespace_value")]
-    pub default_namespace: String,
+    pub(crate) default_namespace: String,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]

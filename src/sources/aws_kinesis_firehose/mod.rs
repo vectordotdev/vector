@@ -20,7 +20,7 @@ mod handlers;
 mod models;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct AwsKinesisFirehoseConfig {
+pub(self) struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
     tls: Option<TlsConfig>,
