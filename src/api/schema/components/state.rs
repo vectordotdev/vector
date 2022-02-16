@@ -14,7 +14,9 @@ pub static COMPONENTS: Lazy<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Filter components with the provided `map_func`
-pub fn filter_components<T>(map_func: impl Fn((&ComponentKey, &Component)) -> Option<T>) -> Vec<T> {
+pub(crate) fn filter_components<T>(
+    map_func: impl Fn((&ComponentKey, &Component)) -> Option<T>,
+) -> Vec<T> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
