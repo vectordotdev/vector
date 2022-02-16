@@ -31,7 +31,7 @@ pub mod grok_parser;
 #[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
 #[cfg(feature = "transforms-key_value_parser")]
-pub mod key_value_parser;
+mod key_value_parser;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]
