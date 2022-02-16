@@ -160,7 +160,7 @@ impl IndexerAcknowledgement {
     }
 }
 
-pub struct Channel {
+struct Channel {
     last_used_timestamp: RwLock<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
