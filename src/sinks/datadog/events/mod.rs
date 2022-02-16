@@ -1,7 +1,7 @@
 mod config;
 pub(super) mod request_builder;
 pub mod service;
-pub mod sink;
+pub(crate) mod sink;
 
 #[cfg(test)]
 mod tests;
