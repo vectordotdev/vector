@@ -969,7 +969,7 @@ mod integration_tests {
                 exclude_databases,
                 ..Default::default()
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

@@ -130,7 +130,7 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use tokio::{
         io::AsyncWriteExt,
@@ -169,7 +169,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -253,6 +256,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();
@@ -290,6 +294,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();

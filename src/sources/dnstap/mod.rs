@@ -278,7 +278,7 @@ mod integration_tests {
                 socket_receive_buffer_size: Some(10485760),
                 socket_send_buffer_size: Some(10485760),
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

@@ -107,9 +107,26 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let logs_schema_id = *cx
+            .schema_ids
+            .get(&Some(LOGS.to_owned()))
+            .or_else(|| cx.schema_ids.get(&None))
+            .expect("registered log schema required");
+        let metrics_schema_id = *cx
+            .schema_ids
+            .get(&Some(METRICS.to_owned()))
+            .or_else(|| cx.schema_ids.get(&None))
+            .expect("registered metrics schema required");
+
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
+        let source = DatadogAgentSource::new(
+            self.store_api_key,
+            decoder,
+            tls.http_protocol_name(),
+            logs_schema_id,
+            metrics_schema_id,
+        );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
         let log_service = source.clone().event_service(
@@ -213,6 +230,8 @@ struct DatadogAgentSource {
     log_schema_source_type_key: &'static str,
     decoder: codecs::Decoder,
     protocol: &'static str,
+    logs_schema_id: schema::Id,
+    metrics_schema_id: schema::Id,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -221,7 +240,13 @@ struct DatadogSeriesRequest {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool, decoder: codecs::Decoder, protocol: &'static str) -> Self {
+    fn new(
+        store_api_key: bool,
+        decoder: codecs::Decoder,
+        protocol: &'static str,
+        logs_schema_id: schema::Id,
+        metrics_schema_id: schema::Id,
+    ) -> Self {
         Self {
             store_api_key,
             api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
@@ -230,6 +255,8 @@ impl DatadogAgentSource {
             log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
+            logs_schema_id,
+            metrics_schema_id,
         }
     }
 
@@ -443,7 +470,7 @@ impl DatadogAgentSource {
             return Ok(Vec::new());
         }
 
-        let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
+        let metrics = decode_ddsketch(body, &api_key, self.metrics_schema_id).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!("Error decoding Datadog sketch: {:?}", error),
@@ -482,7 +509,7 @@ impl DatadogAgentSource {
         let decoded_metrics: Vec<Event> = metrics
             .series
             .into_iter()
-            .flat_map(|m| into_vector_metric(m, api_key.clone()))
+            .flat_map(|m| into_vector_metric(m, api_key.clone(), self.metrics_schema_id))
             .collect();
 
         emit!(&EventsReceived {
@@ -540,6 +567,8 @@ impl DatadogAgentSource {
                                 if let Some(k) = &api_key {
                                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                                 }
+
+                                log.metadata_mut().set_schema_id(self.logs_schema_id);
                             }
 
                             decoded.push(event);
@@ -596,7 +625,11 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
     Ok(body)
 }
 
-fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>) -> Vec<Event> {
+fn into_vector_metric(
+    dd_metric: DatadogSeriesMetric,
+    api_key: Option<Arc<str>>,
+    schema_id: schema::Id,
+) -> Vec<Event> {
     let mut tags: BTreeMap<String, String> = dd_metric
         .tags
         .unwrap_or_default()
@@ -670,6 +703,9 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
                 .metadata_mut()
                 .set_datadog_api_key(Some(Arc::clone(k)));
         }
+
+        metric.metadata_mut().set_schema_id(schema_id);
+
         metric.into()
     })
     .collect()
