@@ -103,7 +103,7 @@ impl TransformConfig for EventRouterConfig {
 /// This transform only filter the events depending on their type.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventFilterConfig {
+pub(self) struct EventFilterConfig {
     inner: EventType,
 }
 
