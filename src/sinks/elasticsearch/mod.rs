@@ -15,7 +15,7 @@ mod integration_tests;
 
 use std::convert::TryFrom;
 
-pub use common::*;
+pub(crate) use common::*;
 pub use config::*;
 pub use encoder::ElasticSearchEncoder;
 use http::{
