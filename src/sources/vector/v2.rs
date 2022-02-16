@@ -95,7 +95,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 pub struct VectorConfig {
     pub(super) address: SocketAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
+    shutdown_timeout_secs: u64,
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
