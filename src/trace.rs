@@ -10,7 +10,7 @@ use tracing::{
     Id, Metadata, Subscriber,
 };
 use tracing_core::span;
-pub use tracing_futures::Instrument;
+pub(super) use tracing_futures::Instrument;
 use tracing_limit::RateLimitedLayer;
 use tracing_log::LogTracer;
 use tracing_subscriber::layer::SubscriberExt;
