@@ -189,7 +189,7 @@ mod tests {
                 "single input, source with empty schema",
                 TestCase {
                     inputs: vec![("foo", None)],
-                    sources: IndexMap::from([("foo", vec![Output::default(DataType::Any)])]),
+                    sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
                     transforms: IndexMap::default(),
                     want: Definition::empty(),
                 },
@@ -200,7 +200,7 @@ mod tests {
                     inputs: vec![("source-foo", None)],
                     sources: IndexMap::from([(
                         "source-foo",
-                        vec![Output::default(DataType::Any).with_schema_definition(
+                        vec![Output::default(DataType::all()).with_schema_definition(
                             Definition::empty().required_field(
                                 "foo",
                                 Kind::integer().or_bytes(),
@@ -223,7 +223,7 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![Output::default(DataType::Any).with_schema_definition(
+                            vec![Output::default(DataType::all()).with_schema_definition(
                                 Definition::empty().required_field(
                                     "foo",
                                     Kind::integer().or_bytes(),
@@ -233,7 +233,7 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![Output::default(DataType::Any).with_schema_definition(
+                            vec![Output::default(DataType::all()).with_schema_definition(
                                 Definition::empty().required_field(
                                     "foo",
                                     Kind::timestamp(),
