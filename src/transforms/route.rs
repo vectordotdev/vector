@@ -16,7 +16,7 @@ use crate::{
 //------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct Route {
+pub(super) struct Route {
     conditions: IndexMap<String, Condition>,
 }
 
