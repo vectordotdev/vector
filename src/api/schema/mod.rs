@@ -1,4 +1,5 @@
-pub mod components;
+
+pub(super) mod components;
 pub mod events;
 pub mod filter;
 mod health;
