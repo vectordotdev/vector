@@ -16,7 +16,7 @@ use crate::{
 #[derive(Clone)]
 pub struct KinesisService {
     pub client: KinesisClient,
-    pub stream_name: String,
+    pub(crate) stream_name: String,
     pub region: Region,
 }
 
