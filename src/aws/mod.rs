@@ -2,7 +2,7 @@ pub mod auth;
 pub mod region;
 
 pub use auth::AwsAuthentication;
-pub use region::RegionOrEndpoint;
+pub(crate) use region::RegionOrEndpoint;
 
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
