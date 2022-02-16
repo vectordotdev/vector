@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.19.1-distroless-libc"
+    app.kubernetes.io/version: "0.20.0-distroless-libc"
 rules:
   - apiGroups:
       - ""
@@ -29,7 +29,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.19.1-distroless-libc"
+    app.kubernetes.io/version: "0.20.0-distroless-libc"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
