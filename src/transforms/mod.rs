@@ -33,7 +33,7 @@ pub mod json_parser;
 #[cfg(feature = "transforms-key_value_parser")]
 mod key_value_parser;
 #[cfg(feature = "transforms-log_to_metric")]
-pub mod log_to_metric;
+pub(crate) mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]
 pub mod logfmt_parser;
 #[cfg(feature = "transforms-lua")]

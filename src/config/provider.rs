@@ -17,7 +17,7 @@ dyn_clone::clone_trait_object!(ProviderConfig);
 
 /// Describes a provider plugin storing its type name and an optional example config.
 pub struct ProviderDescription {
-    pub type_str: &'static str,
+    pub(crate) type_str: &'static str,
     example_value: fn() -> Option<Value>,
 }
 
