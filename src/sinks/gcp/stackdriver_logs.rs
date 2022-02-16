@@ -44,7 +44,7 @@ pub struct StackdriverConfig {
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
-    pub auth: GcpAuthConfig,
+    auth: GcpAuthConfig,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
