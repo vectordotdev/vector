@@ -2,7 +2,7 @@ use crate::config::SinkDescription;
 
 pub(crate) mod common;
 pub mod logs;
-pub mod metrics;
+pub(super) mod metrics;
 
 use self::{logs::config::HecLogsSinkConfig, metrics::config::HecMetricsSinkConfig};
 
