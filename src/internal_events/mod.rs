@@ -21,10 +21,10 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(feature = "sources-aws_s3")]
-pub(crate) mod aws_s3;
 #[cfg(feature = "sinks-aws_s3")]
 pub(crate) mod aws_s3_sink;
+#[cfg(feature = "sources-aws_sqs")]
+pub(crate) mod aws_s3_source;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
@@ -178,6 +178,8 @@ pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
 #[cfg(feature = "sinks-aws_s3")]
 pub use self::aws_s3_sink::*;
+#[cfg(feature = "sources-aws_sqs")]
+pub use self::aws_s3_source::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub use self::aws_sqs::*;
 #[cfg(feature = "transforms-coercer")]
