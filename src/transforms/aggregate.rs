@@ -58,7 +58,7 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Aggregate {
+pub(super) struct Aggregate {
     interval: Duration,
     map: HashMap<metric::MetricSeries, MetricEntry>,
 }

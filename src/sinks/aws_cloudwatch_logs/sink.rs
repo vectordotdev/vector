@@ -64,7 +64,7 @@ impl CloudwatchSink {
 #[derive(Clone)]
 pub struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
-    pub events: Vec<CloudwatchRequest>,
+    pub(super) events: Vec<CloudwatchRequest>,
 }
 
 impl Ackable for BatchCloudwatchRequest {
