@@ -41,7 +41,7 @@ pub struct ReduceConfig {
     /// An optional condition that determines when an event is the end of a
     /// reduce.
     ends_when: Option<AnyCondition>,
-    pub starts_when: Option<AnyCondition>,
+    pub(crate) starts_when: Option<AnyCondition>,
 }
 
 inventory::submit! {

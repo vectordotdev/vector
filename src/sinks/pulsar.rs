@@ -27,7 +27,7 @@ enum BuildError {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PulsarSinkConfig {
+pub(crate) struct PulsarSinkConfig {
     // Deprecated name
     #[serde(alias = "address")]
     endpoint: String,
