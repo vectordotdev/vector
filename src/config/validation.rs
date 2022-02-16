@@ -114,7 +114,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
