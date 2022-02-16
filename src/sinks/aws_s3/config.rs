@@ -47,7 +47,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
-    pub(self) batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,

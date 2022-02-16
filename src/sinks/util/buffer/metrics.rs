@@ -27,6 +27,7 @@ pub struct MetricsBuffer {
 }
 
 impl MetricsBuffer {
+    #[allow(unused)] // dinged by cargo-hack, not in use for all feature combinations
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
@@ -94,6 +95,7 @@ pub(crate) struct MetricNormalizer<N> {
     normalizer: N,
 }
 
+#[allow(unused)] // dinged by cargo-hack, not in use for all feature combinations
 impl<N> MetricNormalizer<N> {
     /// Gets a mutable reference to the current metric state for this normalizer.
     pub fn get_state_mut(&mut self) -> &mut MetricSet {
@@ -113,6 +115,7 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     }
 }
 
+#[allow(unused)] // dinged by cargo-hack, not in use for all feature combinations
 impl<N: Default> MetricNormalizer<N> {
     pub fn default() -> Self {
         Self {
