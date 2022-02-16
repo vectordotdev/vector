@@ -8327,7 +8327,6 @@ dependencies = [
  "uuid",
  "value",
  "vector-api-client",
- "vector-datadog-filter",
  "vector-vrl-functions",
  "vector_buffers",
  "vector_common",
@@ -8362,17 +8361,6 @@ dependencies = [
  "url",
  "uuid",
  "weak-table",
-]
-
-[[package]]
-name = "vector-datadog-filter"
-version = "0.1.0"
-dependencies = [
- "bytes 1.1.0",
- "datadog-filter",
- "datadog-filter-test",
- "datadog-search-syntax",
- "vector_core",
 ]
 
 [[package]]
