@@ -24,7 +24,7 @@ pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
-    pub key_field: Option<String>,
+    pub(super) key_field: Option<String>,
     pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
