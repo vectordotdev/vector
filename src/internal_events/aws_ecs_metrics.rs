@@ -87,7 +87,7 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
 }
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsResponseError<'a> {
+pub(crate) struct AwsEcsMetricsResponseError<'a> {
     pub code: hyper::StatusCode,
     pub endpoint: &'a str,
 }
