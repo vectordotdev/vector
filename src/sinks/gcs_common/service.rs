@@ -72,7 +72,7 @@ pub struct GcsRequestSettings {
     pub acl: Option<HeaderValue>,
     pub content_type: HeaderValue,
     pub content_encoding: Option<HeaderValue>,
-    pub storage_class: HeaderValue,
+    pub(crate) storage_class: HeaderValue,
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
