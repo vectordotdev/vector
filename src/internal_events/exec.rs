@@ -6,7 +6,7 @@ use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ExecEventsReceived<'a> {
+pub(crate) struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
     pub byte_size: usize,
