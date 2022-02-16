@@ -46,7 +46,7 @@ pub(self) struct StatsdSinkConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-pub enum Mode {
+pub(self) enum Mode {
     Tcp(TcpSinkConfig),
     Udp(StatsdUdpConfig),
     #[cfg(unix)]
