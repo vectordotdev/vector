@@ -460,10 +460,6 @@ impl tracing::field::Visit for MakeLogEvent {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use serde_json::json;
-
     use super::*;
     use crate::test_util::open_fixture;
 
