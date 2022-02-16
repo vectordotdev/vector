@@ -61,7 +61,7 @@ pub struct Config {
     /// The maximum time to wait for the continuation. Once this timeout is
     /// reached, the buffered message is guaranteed to be flushed, even if
     /// incomplete.
-    pub timeout: Duration,
+    pub(super) timeout: Duration,
 }
 
 impl Config {
