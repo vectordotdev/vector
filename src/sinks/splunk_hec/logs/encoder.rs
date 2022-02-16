@@ -21,7 +21,7 @@ pub enum HecEvent {
 pub struct HecData {
     #[serde(flatten)]
     pub event: HecEvent,
-    pub fields: LogEvent,
+    pub(super) fields: LogEvent,
     pub time: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,

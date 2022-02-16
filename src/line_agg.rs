@@ -53,7 +53,7 @@ pub enum Mode {
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Start pattern to look for as a beginning of the message.
-    pub start_pattern: Regex,
+    pub(crate) start_pattern: Regex,
     /// Condition pattern to look for. Exact behavior is configured via `mode`.
     pub condition_pattern: Regex,
     /// Mode of operation, specifies how the condition pattern is interpreted.
