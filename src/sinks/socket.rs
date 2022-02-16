@@ -14,7 +14,7 @@ use crate::{
 // #[serde(deny_unknown_fields)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
-    pub mode: Mode,
+    mode: Mode,
     pub encoding: EncodingConfig<Encoding>,
 }
 
