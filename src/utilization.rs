@@ -73,7 +73,7 @@ where
 /// and the rest of the time it is doing useful work. This is more true for
 /// sinks than transforms, which can be blocked by downstream components, but
 /// with knowledge of the config the data is still useful.
-pub fn wrap<S>(inner: S) -> Utilization<S> {
+pub(crate) fn wrap<S>(inner: S) -> Utilization<S> {
     Utilization {
         timer: Timer::new(),
         intervals: IntervalStream::new(interval(Duration::from_secs(5))),
