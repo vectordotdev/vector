@@ -24,7 +24,7 @@ struct NewRelicStatusComponent {
     status: String,
 }
 
-pub async fn healthcheck(
+pub(crate) async fn healthcheck(
     client: HttpClient,
     credentials: Arc<NewRelicCredentials>,
 ) -> crate::Result<()> {

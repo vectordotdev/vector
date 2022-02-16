@@ -15,7 +15,7 @@ use crate::http::Auth;
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,
-    pub auth: Option<Auth>,
+    pub(crate) auth: Option<Auth>,
 }
 
 impl UriSerde {

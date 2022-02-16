@@ -40,7 +40,7 @@ pub struct AzureMonitorLogsConfig {
     pub log_type: String,
     pub azure_resource_id: Option<String>,
     #[serde(default = "default_host")]
-    pub host: String,
+    pub(super) host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default

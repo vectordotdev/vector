@@ -40,6 +40,7 @@ impl Encoder<Event> for RawMessageSerializer {
                 .get(log_schema().message_key())
                 .map(|value| value.coerce_to_bytes()),
             Event::Metric(_) => None,
+            Event::Trace(_) => None,
         };
 
         if let Some(bytes) = bytes {

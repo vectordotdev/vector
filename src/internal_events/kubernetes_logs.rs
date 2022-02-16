@@ -70,7 +70,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventNamespaceAnnotationError<'a> {
+pub(crate) struct KubernetesLogsEventNamespaceAnnotationError<'a> {
     pub event: &'a Event,
 }
 

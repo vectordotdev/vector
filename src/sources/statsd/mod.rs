@@ -147,7 +147,7 @@ impl SourceConfig for StatsdConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsdDeserializer;
+pub(crate) struct StatsdDeserializer;
 
 impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {

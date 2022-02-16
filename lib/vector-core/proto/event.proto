@@ -7,10 +7,15 @@ message EventWrapper {
   oneof event {
     Log log = 1;
     Metric metric = 2;
+    Trace trace = 3;
   }
 }
 
 message Log {
+  map<string, Value> fields = 1;
+}
+
+message Trace {
   map<string, Value> fields = 1;
 }
 
