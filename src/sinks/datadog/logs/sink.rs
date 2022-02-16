@@ -41,7 +41,7 @@ impl Partitioner for EventPartitioner {
 }
 
 #[derive(Debug)]
-pub struct LogSinkBuilder<S> {
+pub(super) struct LogSinkBuilder<S> {
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     service: S,
     context: SinkContext,
