@@ -18,7 +18,7 @@ pub struct TokenizerConfig {
     pub field_names: Vec<String>,
     pub(self) field: Option<String>,
     drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub(super) types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
 }
 
