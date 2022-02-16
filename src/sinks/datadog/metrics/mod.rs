@@ -8,7 +8,7 @@ mod sink;
 #[cfg(all(test, feature = "datadog-metrics-integration-tests"))]
 mod integration_tests;
 
-pub use self::config::DatadogMetricsConfig;
+pub(crate) use self::config::DatadogMetricsConfig;
 use crate::config::SinkDescription;
 
 inventory::submit! {
