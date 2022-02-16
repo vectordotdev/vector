@@ -61,7 +61,7 @@ pub struct Opts {
 
 #[derive(Serialize)]
 struct SinkOuter {
-    pub inputs: Vec<String>,
+    inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
