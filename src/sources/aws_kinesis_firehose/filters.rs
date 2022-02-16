@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
-pub fn firehose(
+pub(crate) fn firehose(
     access_key: Option<String>,
     record_compression: Compression,
     decoder: codecs::Decoder,
