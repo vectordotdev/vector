@@ -51,7 +51,7 @@ pub fn build_test_server_status(
     })
 }
 
-pub fn build_test_server_generic<B>(
+pub(crate) fn build_test_server_generic<B>(
     addr: SocketAddr,
     responder: impl Fn() -> Response<B> + Clone + Send + Sync + 'static,
 ) -> (
