@@ -25,7 +25,7 @@ struct Edge {
 }
 
 #[derive(Default)]
-pub struct Graph {
+pub(super) struct Graph {
     nodes: HashMap<ComponentKey, Node>,
     edges: Vec<Edge>,
 }
