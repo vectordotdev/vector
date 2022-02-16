@@ -32,7 +32,7 @@ pub struct KafkaAuthConfig {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct KafkaSaslConfig {
-    pub enabled: Option<bool>,
+    pub(super) enabled: Option<bool>,
     pub username: Option<String>,
     pub password: Option<String>,
     pub mechanism: Option<String>,
