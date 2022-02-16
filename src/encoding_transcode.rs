@@ -98,7 +98,7 @@ impl Decoder {
 }
 
 /// Helps transcoding to the specified encoding from utf8
-pub struct Encoder {
+pub(super) struct Encoder {
     buffer: [u8; BUFFER_SIZE],
     output: BytesMut,
     inner: encoding_rs::Encoder,
