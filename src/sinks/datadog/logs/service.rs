@@ -26,7 +26,7 @@ use crate::{
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct LogApiRetry;
+pub(super) struct LogApiRetry;
 
 impl RetryLogic for LogApiRetry {
     type Error = LogApiError;
