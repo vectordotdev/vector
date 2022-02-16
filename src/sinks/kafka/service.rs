@@ -27,7 +27,7 @@ pub struct KafkaRequest {
 }
 
 pub struct KafkaRequestMetadata {
-    pub finalizers: EventFinalizers,
+    pub(crate) finalizers: EventFinalizers,
     pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
