@@ -338,7 +338,7 @@ pub struct EncodedBatch<I> {
     pub items: I,
     pub finalizers: EventFinalizers,
     pub count: usize,
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
 }
 
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.

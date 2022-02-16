@@ -31,7 +31,7 @@ use crate::internal_events::{
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
-    pub topology: RunningTopology,
+    pub(super) topology: RunningTopology,
     graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
