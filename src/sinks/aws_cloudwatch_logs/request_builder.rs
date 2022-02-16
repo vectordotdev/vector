@@ -38,7 +38,7 @@ impl Finalizable for CloudwatchRequest {
 
 pub struct CloudwatchRequestBuilder {
     pub group_template: Template,
-    pub stream_template: Template,
+    pub(super) stream_template: Template,
     pub log_schema: LogSchema,
     pub encoding: EncodingConfig<StandardEncodings>,
 }

@@ -21,7 +21,7 @@ pub struct KeyValueConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub field: Option<String>,
-    pub field_split: Option<String>,
+    field_split: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub separator: Option<String>,
