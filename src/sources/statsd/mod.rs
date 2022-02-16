@@ -44,7 +44,7 @@ enum StatsdConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct UdpConfig {
+pub(self) struct UdpConfig {
     address: SocketAddr,
     receive_buffer_bytes: Option<usize>,
 }
