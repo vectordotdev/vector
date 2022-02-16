@@ -16,7 +16,7 @@ use crate::{
 pub struct LogfmtConfig {
     pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
 }
 
