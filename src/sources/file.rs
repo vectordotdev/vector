@@ -68,7 +68,7 @@ enum BuildError {
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
-    pub file_key: Option<String>,
+    pub(crate) file_key: Option<String>,
     pub start_at_beginning: Option<bool>,
     pub ignore_checkpoints: Option<bool>,
     pub read_from: Option<ReadFromConfig>,

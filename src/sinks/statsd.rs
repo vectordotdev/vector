@@ -68,7 +68,7 @@ pub struct StatsdUdpConfig {
     pub udp: UdpSinkConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig<StatsdDefaultBatchSettings>,
+    pub(super) batch: BatchConfig<StatsdDefaultBatchSettings>,
 }
 
 inventory::submit! {
