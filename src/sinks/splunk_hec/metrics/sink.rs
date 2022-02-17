@@ -106,7 +106,7 @@ impl Partitioner for EventPartitioner {
 
 pub struct HecMetricsProcessedEventMetadata {
     pub event_byte_size: usize,
-    pub sourcetype: Option<String>,
+    pub(crate) sourcetype: Option<String>,
     pub source: Option<String>,
     pub index: Option<String>,
     pub host: Option<String>,
