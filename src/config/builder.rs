@@ -30,7 +30,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub(crate) enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
