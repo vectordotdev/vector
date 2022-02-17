@@ -168,7 +168,7 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
 }
 
 #[derive(Default)]
-pub struct PrometheusMetricNormalize;
+pub(self) struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
     fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
