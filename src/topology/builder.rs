@@ -114,7 +114,7 @@ pub(self) async fn load_enrichment_tables<'a>(
 pub struct Pieces {
     pub inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
     pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
-    pub tasks: HashMap<ComponentKey, Task>,
+    pub(super) tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
     pub healthchecks: HashMap<ComponentKey, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
