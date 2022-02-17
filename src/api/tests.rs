@@ -63,14 +63,14 @@ async fn sink_events() {
         match notification {
             Some(TapPayload::Notification(returned_id, TapNotification::Matched))
                 if returned_id == pattern_matched =>
-                {
-                    continue
-                }
+            {
+                continue
+            }
             Some(TapPayload::Notification(returned_id, TapNotification::NotMatched))
                 if returned_id == pattern_not_matched =>
-                {
-                    continue
-                }
+            {
+                continue
+            }
             _ => panic!("unexpected payload"),
         }
     }
@@ -79,9 +79,9 @@ async fn sink_events() {
     // to ensure the event handler has been initialized.
     let log_event = Event::new_empty_log();
     let metric_event = Event::from(Metric::new(
-            id.to_string(),
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
+        id.to_string(),
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
     ));
 
     let _ = fanout.send(metric_event).await.unwrap();
@@ -295,8 +295,7 @@ async fn integration_test_tap_non_default_output() {
         100,
     );
 
-    let transform_tap_events: Vec<_> =
-        transform_tap_remap_dropped_stream.take(2).collect().await;
+    let transform_tap_events: Vec<_> = transform_tap_remap_dropped_stream.take(2).collect().await;
 
     assert_eq!(
         assert_notification(transform_tap_events[0][0].clone()),
@@ -307,8 +306,8 @@ async fn integration_test_tap_non_default_output() {
     );
     assert_eq!(
         assert_log(transform_tap_events[1][0].clone())
-        .get_message()
-        .unwrap_or_default(),
+            .get_message()
+            .unwrap_or_default(),
         "test2"
     );
 }
