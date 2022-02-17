@@ -41,7 +41,7 @@ pub struct UnitTest {
 }
 
 pub struct UnitTestResult {
-    pub errors: Vec<String>,
+    pub(crate) errors: Vec<String>,
 }
 
 impl UnitTest {
