@@ -11,7 +11,7 @@ pub enum EventNotificationType {
 
 #[derive(Debug, SimpleObject, Clone, PartialEq)]
 /// A notification regarding events observation
-pub struct EventNotification {
+pub(crate) struct EventNotification {
     /// Pattern that raised the event
     pattern: String,
 
