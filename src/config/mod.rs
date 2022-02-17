@@ -513,7 +513,7 @@ inventory::collect!(SinkDescription);
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter<T> {
     #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
+    pub(super) inputs: Vec<T>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
 }
