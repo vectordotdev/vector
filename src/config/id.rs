@@ -8,7 +8,7 @@ pub use vector_core::config::ComponentKey;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OutputId {
     pub component: ComponentKey,
-    pub port: Option<String>,
+    pub(crate) port: Option<String>,
 }
 
 impl fmt::Display for OutputId {
