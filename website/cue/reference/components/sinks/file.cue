@@ -14,7 +14,6 @@ components: sinks: file: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			compression: {

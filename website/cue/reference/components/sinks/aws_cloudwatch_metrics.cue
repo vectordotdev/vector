@@ -13,7 +13,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			batch: {
