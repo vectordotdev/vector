@@ -31,7 +31,7 @@ pub struct SqsSource {
     pub client: SqsClient,
     pub(super) queue_url: String,
     pub decoder: Decoder,
-    pub poll_secs: u32,
+    pub(super) poll_secs: u32,
     pub concurrency: u32,
     pub(super) acknowledgements: bool,
 }
