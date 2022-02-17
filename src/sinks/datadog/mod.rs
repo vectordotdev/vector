@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{http::HttpClient, sinks::HealthcheckError};
 
 #[cfg(feature = "sinks-datadog_events")]
-pub mod events;
+pub(super) mod events;
 #[cfg(feature = "sinks-datadog_logs")]
 mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
