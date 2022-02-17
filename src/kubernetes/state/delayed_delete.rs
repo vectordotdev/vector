@@ -9,7 +9,7 @@ use tokio::time::{sleep_until, timeout_at, Instant};
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// delays the delete calls.
 /// Implements the logic for delaying the deletion of items from the storage.
-pub struct Writer<T>
+pub(crate) struct Writer<T>
 where
     T: super::Write + Send,
     <T as super::Write>::Item: Send + Sync,
