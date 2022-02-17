@@ -46,7 +46,7 @@ impl From<Metric> for SentEventsTotal {
     }
 }
 
-pub struct ComponentSentEventsTotal {
+pub(super) struct ComponentSentEventsTotal {
     component_key: ComponentKey,
     outputs: Vec<Output>,
     metric: Metric,
