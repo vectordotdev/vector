@@ -18,7 +18,7 @@ pub(crate) struct Query(
 );
 
 #[derive(MergedSubscription, Default)]
-pub struct Subscription(
+pub(crate) struct Subscription(
     health::HealthSubscription,
     metrics::MetricsSubscription,
     components::ComponentsSubscription,
