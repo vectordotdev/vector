@@ -14,7 +14,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
-pub mod errors;
+pub(crate) mod errors;
 mod filters;
 mod handlers;
 mod models;
