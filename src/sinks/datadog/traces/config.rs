@@ -31,10 +31,12 @@ use crate::{
 
 // The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
 // Above this limit the payload will be ignored.
-
 pub const BATCH_GOAL_BYTES: usize = 3_200_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
@@ -122,7 +124,7 @@ impl DatadogTracesConfig {
 impl DatadogTracesConfig {
     pub fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoints = self.generate_traces_endpoint_configuration()?;
         let batcher_settings = self
             .batch
