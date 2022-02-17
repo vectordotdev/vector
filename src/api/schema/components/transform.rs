@@ -18,7 +18,7 @@ pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
     pub inputs: Vec<OutputId>,
-    pub outputs: Vec<String>,
+    pub(crate) outputs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
