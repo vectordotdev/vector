@@ -10,7 +10,7 @@ pub(super) mod sort;
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 
 #[derive(MergedObject, Default)]
-pub struct Query(
+pub(crate) struct Query(
     health::HealthQuery,
     components::ComponentsQuery,
     metrics::MetricsQuery,
