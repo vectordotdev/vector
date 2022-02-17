@@ -5,7 +5,7 @@ pub mod tap;
 #[cfg(all(test, feature = "vector-api-tests"))]
 mod tests;
 
-pub use schema::build_schema;
+pub(self) use schema::build_schema;
 pub use server::Server;
 use tokio::sync::oneshot;
 
