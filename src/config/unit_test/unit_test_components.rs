@@ -82,7 +82,7 @@ pub(super) struct UnitTestSinkConfig {
     pub(super) transform_id: String,
     #[serde(skip)]
     // Sender used to transmit the test result
-    pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
+    pub(crate) result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     // Check applied to incoming events
