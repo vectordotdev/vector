@@ -11,7 +11,7 @@ use std::{
 };
 
 use config_builder::ConfigBuilderLoader;
-use loader::process::{ComponentHint, Process};
+use loader::process::Process;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,

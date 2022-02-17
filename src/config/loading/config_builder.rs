@@ -21,10 +21,12 @@ impl ConfigBuilderLoader {
 }
 
 impl Process for ConfigBuilderLoader {
+    /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
     fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
         prepare_input(input)
     }
 
+    /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
@@ -48,8 +50,10 @@ impl Process for ConfigBuilderLoader {
                 >(table)?);
             }
             Some(ComponentHint::Test) => {
+                // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
+                // it to an ordered map, and then pull out the value, ignoring the keys.
                 self.builder.tests.extend(
-                    deserialize_table::<IndexMap<ComponentKey, TestDefinition<String>>>(table)?
+                    deserialize_table::<IndexMap<String, TestDefinition<String>>>(table)?
                         .into_iter()
                         .map(|(_, test)| test),
                 );
@@ -64,6 +68,7 @@ impl Process for ConfigBuilderLoader {
 }
 
 impl loader::Loader<ConfigBuilder> for ConfigBuilderLoader {
+    /// Returns the resulting `ConfigBuilder`.
     fn take(self) -> ConfigBuilder {
         self.builder
     }

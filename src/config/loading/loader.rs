@@ -1,46 +1,60 @@
 use super::{component_name, open_file, read_dir, Format};
 use crate::config::format;
 use serde_toml_merge::merge_into_table;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use toml::value::{Table, Value};
 
-// The loader traits are split into two parts -- an internal `process` mod, that contains
-// functionality for deserializing a type `T`, and a `Loader` trait, that provides a public interface
-// getting a `T` from a file/directory. The private mod is available to implementors within
-// the loading mod, but does not form part of the public interface.
-pub(super) mod process {
-    use super::*;
-    use std::fmt::Debug;
-    use std::io::Read;
+/// Provides a hint to the loading system of the type of components that should be found
+/// when traversing an explicitly named directory.
+#[derive(Debug, Copy, Clone, EnumIter)]
+pub enum ComponentHint {
+    Source,
+    Transform,
+    Sink,
+    Test,
+    EnrichmentTable,
+}
 
-    #[derive(Debug, Copy, Clone)]
-    pub enum ComponentHint {
-        Source,
-        Transform,
-        Sink,
-        Test,
-        EnrichmentTable,
-    }
-
-    impl ComponentHint {
-        /// Returns the component string field that should host a component -- e.g. sources,
-        /// transforms, etc.
-        pub fn as_component_field(&self) -> &str {
-            match self {
-                ComponentHint::Source => "sources",
-                ComponentHint::Transform => "transforms",
-                ComponentHint::Sink => "sinks",
-                ComponentHint::Test => "tests",
-                ComponentHint::EnrichmentTable => "enrichment_tables",
-            }
+impl ComponentHint {
+    /// Returns the component string field that should host a component -- e.g. sources,
+    /// transforms, etc.
+    fn as_component_field(&self) -> &str {
+        match self {
+            ComponentHint::Source => "sources",
+            ComponentHint::Transform => "transforms",
+            ComponentHint::Sink => "sinks",
+            ComponentHint::Test => "tests",
+            ComponentHint::EnrichmentTable => "enrichment_tables",
         }
     }
 
-    /// This trait contains methods that facilitate deserialization of a loader. This includes
-    /// loading a type based on a provided `Format`, and processing files.
+    /// Joins a component sub-folder to a provided path, for traversal.
+    pub fn join_path(&self, path: &Path) -> PathBuf {
+        path.join(self.as_component_field())
+    }
+}
+
+// The loader traits are split into two parts -- an internal `process` mod, that contains
+// functionality for processing files/folders, and a `Loader<T>` trait, that provides a public
+// interface getting a `T` from a file/folder. The private mod is available to implementors
+// within the loading mod, but does not form part of the public interface. This is useful
+// because there are numerous internal functions for dealing with (non)recursive loading that
+// rely on `&self` but don't need overriding and would be confusingly named in a public API.
+pub(super) mod process {
+    use super::*;
+    use std::io::Read;
+
+    /// This trait contains methods that deserialize files/folders. There are a few methods
+    /// in here with subtly different names that can be hidden from public view, hence why
+    /// this is nested in a private mod.
     pub trait Process {
+        /// Prepares input for serialization. This can be a useful step to interpolate
+        /// environment variables or perform some other pre-processing on the input.
         fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
 
+        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
         fn load<R: std::io::Read, T>(
             &self,
             input: R,
@@ -54,6 +68,8 @@ pub(super) mod process {
             format::deserialize(&value, format).map(|builder| (builder, warnings))
         }
 
+        /// Helper method used by other methods to recursively handle file/dir loading, merging
+        /// values against a provided TOML `Table`.
         fn load_dir_into(
             &self,
             path: &Path,
@@ -67,8 +83,8 @@ pub(super) mod process {
             let mut files = Vec::new();
             let mut folders = Vec::new();
 
-            for direntry in readdir {
-                match direntry {
+            for entry in readdir {
+                match entry {
                     Ok(item) => {
                         let entry = item.path();
                         if entry.is_file() {
@@ -108,6 +124,7 @@ pub(super) mod process {
                 }
             }
 
+            // Only descend into folders if `recurse: true`.
             if recurse {
                 for entry in folders {
                     if let Ok(name) = component_name(&entry) {
@@ -133,6 +150,7 @@ pub(super) mod process {
             }
         }
 
+        /// Loads and deserializes a file into a TOML `Table`.
         fn load_file(
             &self,
             path: &Path,
@@ -149,6 +167,8 @@ pub(super) mod process {
             }
         }
 
+        /// Loads a file, and if the path provided contains a sub-folder by the same name as the
+        /// component, descend into it recursively, returning a TOML `Table`.
         fn load_file_recursive(
             &self,
             path: &Path,
@@ -165,6 +185,8 @@ pub(super) mod process {
             }
         }
 
+        /// Loads a directory (optionally, recursively), returning a TOML `Table`. This will
+        /// create an initial `Table` and pass it into `load_dir_into` for recursion handling.
         fn load_dir(
             &self,
             path: &Path,
@@ -175,12 +197,15 @@ pub(super) mod process {
             Ok((result, warnings))
         }
 
+        /// Merge a provided TOML `Table` in an implementation-specific way. Contains an
+        /// optional component hint, which may affect how components are merged. Takes a `&mut self`
+        /// with the intention of merging an inner value that can be `take`n by a `Loader`.
         fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>>;
     }
 }
 
 /// `Loader` represents the public part of the loading interface. Includes methods for loading
-/// from files/folders, and accessing the final deserialized `T` value via the `take` method.
+/// from a file or folder, and accessing the final deserialized `T` value via the `take` method.
 pub trait Loader<T>: process::Process
 where
     T: serde::de::DeserializeOwned,
@@ -202,33 +227,8 @@ where
     /// Deserializes a dir with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_dir(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
-        use process::ComponentHint;
-
-        // Paths to process, starting with the current folder, and looking for sub-folders
-        // to process namespaced components if applicable. An optional `ComponentHint` is
-        // provided, which is passed along to the `load` method to determine how to deserialize.
-        let paths = [
-            (
-                path.join(ComponentHint::Source.as_component_field()),
-                ComponentHint::Source,
-            ),
-            (
-                path.join(ComponentHint::Transform.as_component_field()),
-                ComponentHint::Transform,
-            ),
-            (
-                path.join(ComponentHint::Sink.as_component_field()),
-                ComponentHint::Sink,
-            ),
-            (
-                path.join(ComponentHint::EnrichmentTable.as_component_field()),
-                ComponentHint::EnrichmentTable,
-            ),
-            (
-                path.join(ComponentHint::Test.as_component_field()),
-                ComponentHint::Test,
-            ),
-        ];
+        // Iterator containing component-specific sub-folders to attempt traversing into.
+        let paths = ComponentHint::iter().map(|hint| (hint.join_path(path), hint));
 
         // Get files from the root of the folder. These represent top-level config settings,
         // and need to merged down first to represent a more 'complete' config.
@@ -237,28 +237,27 @@ where
 
         // Discard the named part of the path, since these don't form any component names.
         for (_, value) in table {
+            // All files should contain key/value pairs.
             if let Value::Table(table) = value {
-                println!("inner: {:?}", table);
                 merge_into_table(&mut root, table).map_err(|e| vec![e.to_string()])?;
             }
         }
 
-        println!("root: {:?}", root);
-
-        // Merge the 'root' value.
+        // Merge the 'root' config value first.
         self.merge(root, None)?;
 
+        // Loop over each component path. If it exists, load files and merge.
         for (path, hint) in paths {
             // Sanity check for paths, to ensure we're dealing with a folder. This is necessary
             // because a sub-folder won't generally exist unless the config is namespaced.
             if path.exists() && path.is_dir() {
+                // Transforms are treated differently from other component types; they can be
+                // arbitrarily nested.
                 let (table, warns) = if matches!(hint, ComponentHint::Transform) {
                     self.load_dir(&path, true)?
                 } else {
                     self.load_dir(&path, false)?
                 };
-
-                println!("component: {:?}", table);
 
                 self.merge(table, Some(hint))?;
 
@@ -270,10 +269,12 @@ where
     }
 }
 
+/// Merge two TOML `Value`s, returning a new `Value`.
 fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
-    serde_toml_merge::merge(value, other).map_err(|err| vec![format!("{}", err)])
+    serde_toml_merge::merge(value, other).map_err(|e| vec![e.to_string()])
 }
 
+/// Updates a TOML `Table` with the merged values of a named key. Inserts if it doesn't exist.
 fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result<(), Vec<String>> {
     if let Some(existing) = res.remove(&name) {
         res.insert(name, merge_values(existing, value)?);
@@ -283,6 +284,7 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
     Ok(())
 }
 
+/// Deserialize a TOML `Table` into a `T`.
 pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     table: Table,
 ) -> Result<T, Vec<String>> {
