@@ -75,7 +75,7 @@ pub struct InfluxDbConfig {
     pub quantiles: Vec<f64>,
 }
 
-pub fn default_summary_quantiles() -> Vec<f64> {
+fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
