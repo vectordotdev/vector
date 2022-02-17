@@ -8658,6 +8658,7 @@ dependencies = [
  "uuid",
  "vector_common",
  "vrl",
+ "vrl-compiler",
  "woothee",
 ]
 

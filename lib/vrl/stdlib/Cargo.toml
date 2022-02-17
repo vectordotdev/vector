@@ -48,6 +48,7 @@ vector_common = { path = "../../vector-common", default-features = false, option
 anyhow = "1"
 criterion = "0.3"
 chrono-tz = "0.6"
+compiler = { package = "vrl-compiler", path = "../compiler", features = ["test"] }
 
 [features]
 default = [
@@ -302,3 +303,4 @@ bench = false
 name = "benches"
 harness = false
 test = true
+required-features = ["default"]
