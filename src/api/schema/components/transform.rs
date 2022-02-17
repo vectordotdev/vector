@@ -114,7 +114,7 @@ impl Transform {
 }
 
 #[derive(Default, InputObject)]
-pub struct TransformsFilter {
+pub(crate) struct TransformsFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_type: Option<Vec<filter::StringFilter>>,
     or: Option<Vec<Self>>,
