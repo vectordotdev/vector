@@ -36,7 +36,7 @@ fn default_host() -> String {
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
     pub customer_id: String,
-    pub shared_key: String,
+    pub(self) shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
     #[serde(default = "default_host")]
