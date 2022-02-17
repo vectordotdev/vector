@@ -28,7 +28,7 @@ pub(crate) use processed_bytes::{
 pub use processed_events::{
     ComponentProcessedEventsThroughput, ComponentProcessedEventsTotal, ProcessedEventsTotal,
 };
-pub use received_events::{
+pub(super) use received_events::{
     ComponentReceivedEventsThroughput, ComponentReceivedEventsTotal, ReceivedEventsTotal,
 };
 pub use sent_events::{ComponentSentEventsThroughput, ComponentSentEventsTotal, SentEventsTotal};
