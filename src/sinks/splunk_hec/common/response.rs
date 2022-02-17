@@ -1,7 +1,7 @@
 use vector_core::{event::EventStatus, internal_event::EventsSent, stream::DriverResponse};
 
 pub struct HecResponse {
-    pub event_status: EventStatus,
+    pub(crate) event_status: EventStatus,
     pub(crate) events_count: usize,
     pub events_byte_size: usize,
 }
