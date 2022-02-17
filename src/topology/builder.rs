@@ -113,7 +113,7 @@ pub(self) async fn load_enrichment_tables<'a>(
 
 pub struct Pieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
-    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
+    pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
