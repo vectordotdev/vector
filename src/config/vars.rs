@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::{Captures, Regex};
 
 /// (result, warnings)
-pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {
+pub(crate) fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {
     let mut warnings = Vec::new();
     // Environment variable names can have any characters from the Portable Character Set other
     // than NUL.  However, for Vector's intepolation, we are closer to what a shell supports which
