@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use super::{ComponentKey, Config};
 
 pub struct ConfigDiff {
-    pub sources: Difference,
+    pub(crate) sources: Difference,
     pub(crate) transforms: Difference,
     pub(crate) sinks: Difference,
     pub(crate) enrichment_tables: Difference,
