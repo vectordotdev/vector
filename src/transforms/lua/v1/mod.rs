@@ -262,17 +262,19 @@ impl mlua::UserData for LuaEvent {
     }
 }
 
-fn format_error(error: &mlua::Error) -> String {
-    match error {
-        mlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
-        err => err.to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::event::{Event, Value};
+
+    fn format_error(error: &mlua::Error) -> String {
+        match error {
+            mlua::Error::CallbackError { traceback, cause } => {
+                format_error(cause) + "\n" + traceback
+            }
+            err => err.to_string(),
+        }
+    }
 
     #[test]
     fn lua_add_field() {

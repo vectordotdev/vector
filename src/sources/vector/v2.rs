@@ -4,7 +4,7 @@ use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
-    transport::{server::Connected, Certificate, Server},
+    transport::{server::Connected, Server},
     Request, Response, Status,
 };
 use tracing_futures::Instrument;
@@ -185,7 +185,6 @@ async fn run(
 #[derive(Clone)]
 pub struct MaybeTlsConnectInfo {
     remote_addr: SocketAddr,
-    pub(super) peer_certs: Option<Vec<Certificate>>,
 }
 
 impl Connected for MaybeTlsIncomingStream<TcpStream> {
@@ -194,15 +193,6 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
     fn connect_info(&self) -> Self::ConnectInfo {
         MaybeTlsConnectInfo {
             remote_addr: self.peer_addr(),
-            peer_certs: self
-                .ssl_stream()
-                .and_then(|s| s.ssl().peer_cert_chain())
-                .map(|s| {
-                    s.into_iter()
-                        .filter_map(|c| c.to_pem().ok())
-                        .map(Certificate::from_pem)
-                        .collect()
-                }),
         }
     }
 }

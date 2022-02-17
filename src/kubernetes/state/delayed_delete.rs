@@ -40,17 +40,6 @@ where
     T: super::Write + Send,
     <T as super::Write>::Item: Send + Sync,
 {
-    /// Schedules the delayed deletion of the item at the future.
-    pub fn schedule_delete(&mut self, item: <T as super::Write>::Item) {
-        let deadline = Instant::now() + self.sleep;
-        self.queue.push_back((item, deadline));
-    }
-
-    /// Clear the delayed deletion requests.
-    pub fn clear(&mut self) {
-        self.queue.clear();
-    }
-
     /// Perform the queued deletions.
     pub async fn perform(&mut self) {
         let now = Instant::now();

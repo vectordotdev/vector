@@ -294,13 +294,6 @@ impl GenerateConfig for PipelinesConfig {
 }
 
 #[cfg(test)]
-impl PipelinesConfig {
-    pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 

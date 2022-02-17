@@ -214,12 +214,6 @@ pub struct RusotoBody {
     inner: Option<SignedRequestPayload>,
 }
 
-impl<T> HttpClient<T> {
-    pub const fn new(client: T) -> Self {
-        HttpClient { client }
-    }
-}
-
 impl<T> DispatchSignedRequest for HttpClient<T>
 where
     T: Service<Request<RusotoBody>, Response = Response<Body>, Error = HttpError>

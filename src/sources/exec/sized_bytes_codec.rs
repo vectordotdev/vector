@@ -8,6 +8,7 @@ pub(super) struct SizedBytesCodec {
     max_length: usize,
 }
 
+#[cfg(test)]
 impl SizedBytesCodec {
     pub const fn new_with_max_length(max_length: usize) -> Self {
         SizedBytesCodec { max_length }
