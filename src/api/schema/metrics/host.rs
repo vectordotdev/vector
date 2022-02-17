@@ -89,7 +89,7 @@ impl MemoryMetrics {
     }
 }
 
-pub struct SwapMetrics(Vec<Metric>);
+pub(super) struct SwapMetrics(Vec<Metric>);
 
 #[Object]
 impl SwapMetrics {
