@@ -839,7 +839,7 @@ pub enum TestInputValue {
 pub struct TestInput {
     pub insert_at: ComponentKey,
     #[serde(default = "default_test_input_type", rename = "type")]
-    pub type_str: String,
+    pub(super) type_str: String,
     pub value: Option<String>,
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
     pub metric: Option<Metric>,
