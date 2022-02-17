@@ -26,7 +26,7 @@ pub enum SourceOutputType {
 pub struct Data {
     pub(crate) component_key: ComponentKey,
     pub(super) component_type: String,
-    pub output_type: DataType,
+    pub(crate) output_type: DataType,
     pub outputs: Vec<String>,
 }
 
