@@ -95,7 +95,7 @@ pub struct ConnectionFields {
 pub type ConnectionResult<T> = Result<Connection<Base64Cursor, T, ConnectionFields, EmptyFields>>;
 
 /// Relay-compliant connection parameters to page results by cursor/page size
-pub struct Params {
+pub(crate) struct Params {
     after: Option<String>,
     before: Option<String>,
     first: Option<i32>,
