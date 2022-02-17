@@ -1,4 +1,3 @@
-// ## skip check-events ##
 use super::prelude::error_stage;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -13,8 +12,9 @@ impl InternalEvent for DatadogMetricsEncodingError {
     fn emit_logs(&self) {
         error!(
             message = "Failed to encode Datadog metrics.",
-            error_type = "encode_failed",
             error = %self.error,
+            error_code = "failed_encoding_datadog_metrics",
+            error_type = "encode_failed",
             stage = error_stage::PROCESSING,
         );
     }
@@ -22,8 +22,8 @@ impl InternalEvent for DatadogMetricsEncodingError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
+            "error_code" => "failed_encoding_datadog_metrics",
             "error_type" => "encode_failed",
-            "error" => self.error,
             "stage" => error_stage::PROCESSING,
         );
 
