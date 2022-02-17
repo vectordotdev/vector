@@ -19,7 +19,7 @@ use async_graphql::{Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::EventsInTotal;
-pub use events_out::EventsOutTotal;
+pub(self) use events_out::EventsOutTotal;
 pub use filter::*;
 pub use output::*;
 pub use processed_bytes::{
