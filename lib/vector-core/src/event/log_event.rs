@@ -82,7 +82,7 @@ impl LogEvent {
         (
             Arc::try_unwrap(self.fields)
                 .expect("already cloned")
-                .into_map()
+                .into_object()
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )

@@ -17,7 +17,7 @@ impl Value {
     }
 
     /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`.
-    pub fn into_map(self) -> Option<BTreeMap<String, Self>> {
+    pub fn into_object(self) -> Option<BTreeMap<String, Self>> {
         match self {
             Value::Object(map) => Some(map),
             _ => None,
