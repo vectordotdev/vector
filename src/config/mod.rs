@@ -28,7 +28,7 @@ use crate::{
     SourceSender,
 };
 
-pub mod api;
+pub(crate) mod api;
 mod builder;
 mod compiler;
 pub(crate) mod component;
