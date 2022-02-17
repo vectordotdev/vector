@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{TimeZone, Utc};
+use ordered_float::NotNan;
 use regex::Regex;
 
 use super::Value;
@@ -25,8 +26,12 @@ pub use ::value::{
     Kind,
 };
 
-impl Value {
-    pub fn kind(&self) -> Kind {
+pub trait VrlValueKind {
+    fn kind(&self) -> Kind;
+}
+
+impl VrlValueKind for Value {
+    fn kind(&self) -> Kind {
         self.into()
     }
 }
@@ -51,11 +56,11 @@ impl DefaultValue for Kind {
         }
 
         if self.is_integer() {
-            return value!(0);
+            return value!(0_i64);
         }
 
         if self.is_float() {
-            return value!(0.0);
+            return value!(NotNan::new(0.0).unwrap());
         }
 
         if self.is_boolean() {
@@ -142,14 +147,14 @@ mod tests {
             (
                 "integer",
                 TestCase {
-                    value: value!(3),
+                    value: value!(3_i64),
                     want: Kind::integer(),
                 },
             ),
             (
                 "float",
                 TestCase {
-                    value: value!(3.3),
+                    value: value!(NotNan::new(3.3).unwrap()),
                     want: Kind::float(),
                 },
             ),
@@ -184,7 +189,7 @@ mod tests {
             (
                 "object",
                 TestCase {
-                    value: value!({ "foo": { "bar": 12 }, "baz": true }),
+                    value: value!({ "foo": { "bar": 12_i64 }, "baz": true }),
                     want: Kind::object(BTreeMap::from([
                         (
                             "foo".into(),
@@ -197,7 +202,7 @@ mod tests {
             (
                 "array",
                 TestCase {
-                    value: value!([12, true, "foo", { "bar": null }]),
+                    value: value!([12_i64, true, "foo", { "bar": null }]),
                     want: Kind::array(BTreeMap::from([
                         (0.into(), Kind::integer()),
                         (1.into(), Kind::boolean()),

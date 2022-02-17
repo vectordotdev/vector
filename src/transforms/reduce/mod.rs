@@ -28,7 +28,7 @@ use merge_strategy::*;
 pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,
 
-    pub flush_period_ms: Option<u64>,
+    pub(self) flush_period_ms: Option<u64>,
 
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
@@ -152,8 +152,8 @@ pub struct Reduce {
     group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
-    ends_when: Option<Box<dyn Condition>>,
-    starts_when: Option<Box<dyn Condition>>,
+    ends_when: Option<Condition>,
+    starts_when: Option<Condition>,
 }
 
 impl Reduce {

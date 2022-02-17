@@ -4,7 +4,10 @@ releases: "0.20.0": {
 	date:     "2022-02-08"
 	codename: ""
 
-	known_issues: []
+	known_issues: [
+		"When unit testing targets that have multiple outputs, Vector logs a warning for untested outputs. Will be fixed in `0.20.1`.",
+		"If non-existent extract_from/no_outputs_from targets are included in unit testing configurations, `vector test` will panic. Will be fixed in `0.20.1`.",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.20.0!

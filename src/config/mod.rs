@@ -19,6 +19,7 @@ pub use vector_core::{
 use crate::{
     conditions,
     event::Metric,
+    schema,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
@@ -197,6 +198,12 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
+
+    /// Tracks the schema IDs assigned to schemas exposed by the source.
+    ///
+    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
+    /// that `Output`.
+    pub schema_ids: HashMap<Option<String>, schema::Id>,
 }
 
 impl SourceContext {
@@ -214,19 +221,24 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
+                schema_ids: HashMap::default(),
             },
             shutdown,
         )
     }
 
     #[cfg(test)]
-    pub fn new_test(out: SourceSender) -> Self {
+    pub fn new_test(
+        out: SourceSender,
+        schema_ids: Option<HashMap<Option<String>, schema::Id>>,
+    ) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
+            schema_ids: schema_ids.unwrap_or_default(),
         }
     }
 }
@@ -632,7 +644,10 @@ pub struct TestDefinition<T = OutputId> {
 }
 
 impl TestDefinition<String> {
-    fn resolve_outputs(self, graph: &graph::Graph) -> TestDefinition<OutputId> {
+    fn resolve_outputs(
+        self,
+        graph: &graph::Graph,
+    ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
             input,
@@ -640,28 +655,53 @@ impl TestDefinition<String> {
             outputs,
             no_outputs_from,
         } = self;
+        let mut errors = Vec::new();
 
         let output_map = graph.input_map().expect("ambiguous outputs");
 
         let outputs = outputs
             .into_iter()
-            .map(|old| TestOutput {
-                extract_from: output_map.get(&old.extract_from).unwrap().clone(),
-                conditions: old.conditions,
+            .filter_map(|old| {
+                if let Some(output_id) = output_map.get(&old.extract_from) {
+                    Some(TestOutput {
+                        extract_from: output_id.clone(),
+                        conditions: old.conditions,
+                    })
+                } else {
+                    errors.push(format!(
+                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                        name, old.extract_from
+                    ));
+                    None
+                }
             })
             .collect();
 
         let no_outputs_from = no_outputs_from
             .into_iter()
-            .map(|o| output_map.get(&o).unwrap().clone())
+            .filter_map(|o| {
+                if let Some(output_id) = output_map.get(&o) {
+                    Some(output_id.clone())
+                } else {
+                    errors.push(format!(
+                        r#"Invalid no_outputs_from target in test '{}': '{}' does not exist"#,
+                        name, o
+                    ));
+                    None
+                }
+            })
             .collect();
 
-        TestDefinition {
-            name,
-            input,
-            inputs,
-            outputs,
-            no_outputs_from,
+        if errors.is_empty() {
+            Ok(TestDefinition {
+                name,
+                input,
+                inputs,
+                outputs,
+                no_outputs_from,
+            })
+        } else {
+            Err(errors)
         }
     }
 }

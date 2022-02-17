@@ -47,11 +47,11 @@ impl TransformConfig for FilterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -67,11 +67,11 @@ impl TransformConfig for FilterConfig {
 #[derivative(Debug)]
 pub struct Filter {
     #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
+    condition: Condition,
 }
 
 impl Filter {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
+    pub const fn new(condition: Condition) -> Self {
         Self { condition }
     }
 }

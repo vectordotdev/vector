@@ -24,11 +24,5 @@ pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: SourceSend
         Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
 
-    build_unix_stream_source(
-        config.path,
-        decoder,
-        |_events, _host, _byte_size| {},
-        shutdown,
-        out,
-    )
+    build_unix_stream_source(config.path, decoder, |_events, _host| {}, shutdown, out)
 }

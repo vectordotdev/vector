@@ -341,7 +341,7 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
 
             // Then a float.
             if let Ok(v) = text.parse::<f64>() {
-                return v.into();
+                return Value::from_f64_or_zero(v);
             }
 
             // Fall back to string.

@@ -180,7 +180,7 @@ mod tests {
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,

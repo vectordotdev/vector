@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, stream, StreamExt, TryFutureExt};
+use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
@@ -13,10 +13,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
         BytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
@@ -68,7 +65,7 @@ struct NginxMetricsConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(super) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -113,12 +110,9 @@ impl SourceConfig for NginxMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics)
-                    .map(stream::iter)
-                    .flatten()
-                    .map(Event::Metric);
+                let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_all(&mut stream).await {
+                if let Err(error) = cx.out.send_batch(metrics).await {
                     emit!(&StreamClosedError { error, count });
                     return Err(());
                 }
@@ -278,7 +272,7 @@ mod integration_tests {
 
         let (sender, mut recv) = SourceSender::new_test();
 
-        let mut ctx = SourceContext::new_test(sender);
+        let mut ctx = SourceContext::new_test(sender, None);
         ctx.proxy = proxy;
 
         tokio::spawn(async move {

@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     event::{Event, Value},
 };
 
@@ -55,26 +55,28 @@ impl EqualsPredicate {
 impl CheckFieldsPredicate for EqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
-                CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
-                CheckFieldsPredicateArg::VecString(ss) => {
-                    ss.iter().any(|s| s.as_bytes() == v.as_bytes())
-                }
-                CheckFieldsPredicateArg::Integer(i) => match v {
-                    Value::Integer(vi) => *i == *vi,
-                    Value::Float(vf) => *i == vf.into_inner() as i64,
-                    _ => false,
-                },
-                CheckFieldsPredicateArg::Float(f) => match v {
-                    Value::Float(vf) => *f == vf.into_inner(),
-                    Value::Integer(vi) => *f == *vi as f64,
-                    _ => false,
-                },
-                CheckFieldsPredicateArg::Boolean(b) => match v {
-                    Value::Boolean(vb) => *b == *vb,
-                    _ => false,
-                },
-            }),
+            Event::Log(l) | Event::Trace(l) => {
+                l.get(&self.target).map_or(false, |v| match &self.arg {
+                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.coerce_to_bytes(),
+                    CheckFieldsPredicateArg::VecString(ss) => {
+                        ss.iter().any(|s| s.as_bytes() == v.coerce_to_bytes())
+                    }
+                    CheckFieldsPredicateArg::Integer(i) => match v {
+                        Value::Integer(vi) => *i == *vi,
+                        Value::Float(vf) => *i == vf.into_inner() as i64,
+                        _ => false,
+                    },
+                    CheckFieldsPredicateArg::Float(f) => match v {
+                        Value::Float(vf) => *f == vf.into_inner(),
+                        Value::Integer(vi) => *f == *vi as f64,
+                        _ => false,
+                    },
+                    CheckFieldsPredicateArg::Boolean(b) => match v {
+                        Value::Boolean(vb) => *b == *vb,
+                        _ => false,
+                    },
+                })
+            }
             Event::Metric(m) => m
                 .tags()
                 .and_then(|t| t.get(&self.target))
@@ -234,9 +236,9 @@ impl NotEqualsPredicate {
 impl CheckFieldsPredicate for NotEqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l
+            Event::Log(l) | Event::Trace(l) => l
                 .get(&self.target)
-                .map(|f| f.as_bytes())
+                .map(|f| f.coerce_to_bytes())
                 .map_or(false, |b| {
                     //false if any match, else true
                     !self.arg.iter().any(|s| b == s.as_bytes())
@@ -285,6 +287,10 @@ impl CheckFieldsPredicate for RegexPredicate {
                 .tags()
                 .and_then(|tags| tags.get(&self.target))
                 .map_or(false, |field| self.regex.is_match(field)),
+            Event::Trace(trace) => trace
+                .get(&self.target)
+                .map(|field| field.to_string_lossy())
+                .map_or(false, |field| self.regex.is_match(&field)),
         }
     }
 }
@@ -312,7 +318,7 @@ impl ExistsPredicate {
 impl CheckFieldsPredicate for ExistsPredicate {
     fn check(&self, event: &Event) -> bool {
         (match event {
-            Event::Log(l) => l.get(&self.target).is_some(),
+            Event::Log(l) | Event::Trace(l) => l.get(&self.target).is_some(),
             Event::Metric(m) => m.tags().map_or(false, |t| t.contains_key(&self.target)),
         }) == self.arg
     }
@@ -420,7 +426,7 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
                 let len = match v {
                     Value::Bytes(value) => value.len(),
                     Value::Array(value) => value.len(),
-                    Value::Map(value) => value.len(),
+                    Value::Object(value) => value.len(),
                     Value::Null => 0,
                     value => value.to_string_lossy().len(),
                 };
@@ -525,13 +531,10 @@ impl CheckFieldsConfig {
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
-    fn build(
-        &self,
-        _enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
-            .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
+            .map(|preds| -> Condition { Condition::CheckFields(CheckFields { predicates: preds }) })
             .map_err(|errs| {
                 if errs.len() > 1 {
                     let mut err_fmt = errs.join("\n");
@@ -547,12 +550,12 @@ impl ConditionConfig for CheckFieldsConfig {
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
-impl Condition for CheckFields {
+impl Conditional for CheckFields {
     fn check(&self, e: &Event) -> bool {
         self.predicates.iter().all(|(_, p)| p.check(e))
     }

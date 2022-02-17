@@ -176,9 +176,9 @@ impl Graph {
             let from_ty = self.get_output_type(&edge.from);
             let to_ty = self.get_input_type(&edge.to);
 
-            if from_ty != to_ty && from_ty != DataType::Any && to_ty != DataType::Any {
+            if !from_ty.intersects(to_ty) {
                 errors.push(format!(
-                    "Data type mismatch between {} ({:?}) and {} ({:?})",
+                    "Data type mismatch between {} ({}) and {} ({})",
                     edge.from, from_ty, edge.to, to_ty
                 ));
             }
@@ -488,7 +488,7 @@ mod test {
         graph.add_source("metric_source", DataType::Metric);
         graph.add_sink(
             "any_sink",
-            DataType::Any,
+            DataType::all(),
             vec!["log_source", "metric_source"],
         );
 
@@ -498,16 +498,16 @@ mod test {
     #[test]
     fn allows_any_into_log_or_metric() {
         let mut graph = Graph::default();
-        graph.add_source("any_source", DataType::Any);
+        graph.add_source("any_source", DataType::all());
         graph.add_transform(
             "log_to_any",
             DataType::Log,
-            DataType::Any,
+            DataType::all(),
             vec!["any_source"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::Any,
+            DataType::all(),
             DataType::Log,
             vec!["any_source"],
         );
@@ -544,19 +544,19 @@ mod test {
         );
         graph.add_transform(
             "any_to_any",
-            DataType::Any,
-            DataType::Any,
+            DataType::all(),
+            DataType::all(),
             vec!["log_to_log", "metric_to_metric"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::Any,
+            DataType::all(),
             DataType::Log,
             vec!["any_to_any"],
         );
         graph.add_transform(
             "any_to_metric",
-            DataType::Any,
+            DataType::all(),
             DataType::Metric,
             vec!["any_to_any"],
         );
@@ -604,22 +604,22 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
             Node::Transform {
-                in_ty: DataType::Any,
+                in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::Any),
-                    Output::from(("bar", DataType::Any)),
+                    Output::default(DataType::all()),
+                    Output::from(("bar", DataType::all())),
                 ],
             },
         );
@@ -628,16 +628,16 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
             Node::Transform {
-                in_ty: DataType::Any,
+                in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::Any),
-                    Output::from(("errors", DataType::Any)),
+                    Output::default(DataType::all()),
+                    Output::from(("errors", DataType::all())),
                 ],
             },
         );

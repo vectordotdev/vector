@@ -11,7 +11,7 @@ pub mod nest;
 pub mod remove;
 
 pub use builder::EmptyKindError;
-pub use collection::{Collection, Field, Index};
+pub use collection::{Collection, Field, Index, Unknown};
 
 /// The type (kind) of a given value.
 ///

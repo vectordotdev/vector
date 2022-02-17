@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{
     header,
@@ -39,7 +40,7 @@ pub struct AzureMonitorLogsConfig {
     pub log_type: String,
     pub azure_resource_id: Option<String>,
     #[serde(default = "default_host")]
-    pub host: String,
+    pub(super) host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -166,7 +167,7 @@ impl HttpSink for AzureMonitorLogsSink {
         Some(entry)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         self.build_request_sync(events)
     }
 }
@@ -225,8 +226,8 @@ impl AzureMonitorLogsSink {
         })
     }
 
-    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Vec<u8>>> {
-        let body = serde_json::to_vec(&events)?;
+    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
+        let body = crate::serde::json::to_bytes(&events)?.freeze();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body)?;

@@ -92,7 +92,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let tests = tests
         .into_iter()
         .map(|test| test.resolve_outputs(&graph))
-        .collect();
+        .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
         let config = Config {
@@ -149,7 +149,7 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-pub fn expand_globs(config: &mut ConfigBuilder) {
+pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .iter()
@@ -254,7 +254,7 @@ mod test {
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -270,11 +270,11 @@ mod test {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -290,7 +290,7 @@ mod test {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
     }
 

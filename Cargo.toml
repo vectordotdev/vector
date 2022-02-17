@@ -94,8 +94,6 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
-  "lib/datadog/filter-test",
-  "lib/vector-datadog-filter",
   "lib/soak"
 ]
 
@@ -108,6 +106,7 @@ file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
+value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
@@ -164,13 +163,13 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 reqwest = { version = "0.11", optional = true }
 
 # Tower
-tower = { version = "0.4.10", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
 serde = { version = "1.0.136", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.78", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.79", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.12.0", default-features = false, features = ["macros"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
@@ -189,8 +188,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.29", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.29", default-features = false, optional = true }
+async-graphql = { version = "3.0.30", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.30", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -202,7 +201,6 @@ tui = { version = "0.17.0", optional = true, default-features = false, features 
 # Datadog Pipelines
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 datadog-filter = { path = "lib/datadog/filter" }
-vector-datadog-filter = { path = "lib/vector-datadog-filter" }
 sha2 = { version = "0.10.1", optional = true }
 hex = { version = "0.4.3", optional = true }
 
@@ -214,9 +212,11 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 lookup = { path = "lib/lookup" }
 
 # External libs
+arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
+bitmask-enum = { version = "1.1.3", default-features = false }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
@@ -248,7 +248,7 @@ http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.17", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-infer = { version = "0.6.0", default-features = false, optional = true}
+infer = { version = "0.7.0", default-features = false, optional = true}
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
@@ -274,7 +274,7 @@ percent-encoding = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
-rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
@@ -289,6 +289,8 @@ socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.26", default-features = false }
+strum = { version = "0.23", default-features = false }
+strum_macros = { version = "0.23", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
@@ -322,13 +324,11 @@ prost-build = { version = "0.9", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
-datadog-filter-test = { path = "lib/datadog/filter-test"}
-
 approx = "0.5.1"
 assert_cmd = "2.0.4"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.117"
+libc = "0.2.118"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.1.0"
@@ -346,7 +346,7 @@ lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
-
+value = { path = "lib/value", features = ["test"] }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
@@ -791,8 +791,21 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap", "bollard"]
 
 disable-resolv-conf = []
-shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
+shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+vector-unit-test-tests = [
+  "sources-demo_logs",
+  "transforms-add_fields",
+  "transforms-remap",
+  "transforms-route",
+  "transforms-filter",
+  "transforms-reduce",
+  "transforms-compound",
+  "transforms-add_tags",
+  "transforms-log_to_metric",
+  "transforms-remove_fields",
+  "sinks-console"
+]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions

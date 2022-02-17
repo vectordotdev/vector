@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
@@ -20,7 +21,7 @@ use crate::{
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     api_key: String,
 
     // TODO: we probably want to make this a template
@@ -118,13 +119,12 @@ impl HttpSink for HoneycombConfig {
         Some(data)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
-        let buf = serde_json::to_vec(&events).unwrap();
-
-        request.body(buf).map_err(Into::into)
+        request.body(body).map_err(Into::into)
     }
 }
 

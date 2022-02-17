@@ -1,4 +1,5 @@
 use super::{state::VmState, Variable, VmArgumentList};
+use crate::value::{VrlValueArithmetic, VrlValueConvert};
 use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
 use diagnostic::Span;
 use std::{collections::BTreeMap, ops::Deref};

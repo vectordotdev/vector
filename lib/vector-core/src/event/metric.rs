@@ -12,6 +12,8 @@ use float_eq::FloatEq;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
+#[cfg(feature = "vrl")]
+use vrl_core::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
