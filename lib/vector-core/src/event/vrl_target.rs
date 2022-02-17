@@ -65,7 +65,7 @@ impl VrlTarget {
 }
 
 impl vrl_core::Target for VrlTarget {
-    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
+    fn target_insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => log
                 .insert(path.clone(), value)
@@ -138,11 +138,12 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
+    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
+    fn target_get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
         match self {
             VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log
                 .get(path)
-                .map(|val| val.map(|val| val.clone().into()))
+                .map(|val| val.cloned())
                 .map_err(|err| err.to_string()),
             VrlTarget::Metric(metric) => {
                 if path.is_root() {
@@ -209,7 +210,7 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn remove(
+    fn target_remove(
         &mut self,
         path: &LookupBuf,
         compact: bool,
@@ -220,7 +221,7 @@ impl vrl_core::Target for VrlTarget {
                     Ok(Some({
                         let mut map = Value::Object(BTreeMap::new());
                         std::mem::swap(log, &mut map);
-                        map.into()
+                        map
                     }))
                 } else {
                     log.remove(path, compact)
@@ -420,7 +421,7 @@ mod test {
             let target = VrlTarget::new(Event::Log(LogEvent::from(value)));
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(vrl_core::Target::get(&target, &path), expect);
+            assert_eq!(vrl_core::Target::target_get(&target, &path), expect);
         }
     }
 
@@ -527,10 +528,13 @@ mod test {
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                vrl_core::Target::insert(&mut target, &path, value.clone()),
+                vrl_core::Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
-            assert_eq!(vrl_core::Target::get(&target, &path), Ok(Some(value)));
+            assert_eq!(
+                vrl_core::Target::target_get(&target, &path),
+                Ok(Some(value))
+            );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
         }
     }
@@ -617,14 +621,14 @@ mod test {
         for (object, segments, compact, expect) in cases {
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
             let path = LookupBuf::from_segments(segments);
-            let removed = vrl_core::Target::get(&target, &path).unwrap();
+            let removed = vrl_core::Target::target_get(&target, &path).unwrap();
 
             assert_eq!(
-                vrl_core::Target::remove(&mut target, &path, compact),
+                vrl_core::Target::target_remove(&mut target, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                vrl_core::Target::get(&target, &LookupBuf::root()),
+                vrl_core::Target::target_get(&target, &LookupBuf::root()),
                 Ok(expect)
             );
         }
@@ -669,7 +673,7 @@ mod test {
             let mut target =
                 VrlTarget::new(Event::Log(LogEvent::new_with_metadata(metadata.clone())));
 
-            vrl_core::Target::insert(&mut target, &LookupBuf::root(), value).unwrap();
+            vrl_core::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
                 target.into_events().collect::<Vec<_>>(),
@@ -710,7 +714,7 @@ mod test {
                 }
                 .into()
             )),
-            target.get(&LookupBuf::root())
+            target.target_get(&LookupBuf::root())
         );
     }
 
@@ -755,13 +759,13 @@ mod test {
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
 
-            assert_eq!(Ok(current), target.get(&path));
-            assert_eq!(Ok(()), target.insert(&path, new.clone()));
-            assert_eq!(Ok(Some(new.clone())), target.get(&path));
+            assert_eq!(Ok(current), target.target_get(&path));
+            assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
+            assert_eq!(Ok(Some(new.clone())), target.target_get(&path));
 
             if delete {
-                assert_eq!(Ok(Some(new)), target.remove(&path, true));
-                assert_eq!(Ok(None), target.get(&path));
+                assert_eq!(Ok(Some(new)), target.target_remove(&path, true));
+                assert_eq!(Ok(None), target.target_get(&path));
             }
         }
     }
@@ -792,7 +796,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.get(&LookupBuf::from_str("zork").unwrap())
+            target.target_get(&LookupBuf::from_str("zork").unwrap())
         );
 
         assert_eq!(
@@ -800,7 +804,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
+            target.target_insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
@@ -808,7 +812,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.remove(&LookupBuf::from_str("zork").unwrap(), true)
+            target.target_remove(&LookupBuf::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
@@ -816,7 +820,7 @@ mod test {
                 "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.get(&LookupBuf::from_str("tags.foo.flork").unwrap())
+            target.target_get(&LookupBuf::from_str("tags.foo.flork").unwrap())
         );
     }
 }

@@ -1864,6 +1864,7 @@ dependencies = [
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.30",
+ "value",
  "vector_common",
  "vrl-compiler",
 ]
@@ -8141,6 +8142,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.1.0",
  "chrono",
+ "indoc",
  "lookup",
  "mlua",
  "ordered-float",
@@ -8656,6 +8658,7 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "value",
  "vector_common",
  "vrl",
  "woothee",
