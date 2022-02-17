@@ -44,7 +44,7 @@ use crate::config::ComponentKey;
 
 #[derive(Interface)]
 #[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
-pub enum MetricType {
+pub(crate) enum MetricType {
     Uptime(Uptime),
     ProcessedEventsTotal(ProcessedEventsTotal),
     ProcessedBytesTotal(ProcessedBytesTotal),
