@@ -20,7 +20,7 @@ use chrono::{DateTime, Utc};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::EventsInTotal;
 pub(self) use events_out::EventsOutTotal;
-pub use filter::*;
+pub(crate) use filter::*;
 pub use output::*;
 pub use processed_bytes::{
     ComponentProcessedBytesThroughput, ComponentProcessedBytesTotal, ProcessedBytesTotal,
