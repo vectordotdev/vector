@@ -75,7 +75,7 @@ pub fn component_by_component_key(component_key: &ComponentKey) -> Option<Compon
 }
 
 /// Gets a component by output_id
-pub fn component_by_output_id(output_id: &OutputId) -> Option<Component> {
+pub(crate) fn component_by_output_id(output_id: &OutputId) -> Option<Component> {
     filter_components(|(key, component)| {
         if key == &output_id.component {
             Some(component.clone())
