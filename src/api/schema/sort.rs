@@ -47,7 +47,10 @@ pub trait SortableByField<T: InputType> {
 }
 
 /// Performs an in-place sort against a slice of Sortable<T>, with the provided SortField<T>s
-pub fn by_fields<T: InputType>(f: &mut [impl SortableByField<T>], sort_fields: &[SortField<T>]) {
+pub(crate) fn by_fields<T: InputType>(
+    f: &mut [impl SortableByField<T>],
+    sort_fields: &[SortField<T>],
+) {
     f.sort_by(|a, b| {
         sort_fields
             .iter()

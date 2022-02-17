@@ -1,4 +1,5 @@
-pub mod file;
+
+pub(crate) mod file;
 mod generic;
 
 use async_graphql::Interface;
