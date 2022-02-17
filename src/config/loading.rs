@@ -399,7 +399,9 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
+pub(super) fn prepare_input<R: std::io::Read>(
+    mut input: R,
+) -> Result<(String, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)

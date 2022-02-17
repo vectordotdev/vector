@@ -6,7 +6,7 @@ use super::{ComponentKey, Config};
 
 pub struct ConfigDiff {
     pub sources: Difference,
-    pub transforms: Difference,
+    pub(crate) transforms: Difference,
     pub sinks: Difference,
     pub enrichment_tables: Difference,
 }
