@@ -45,7 +45,9 @@ services:
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
-      - shutdown-tests
+      - "shutdown-tests"
+      - "--test"
+      - "shutdown"
       - "--"
       - "--test-threads"
       - "4"
