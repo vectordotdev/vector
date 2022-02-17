@@ -52,7 +52,7 @@ impl SourceConfig for UnitTestSourceConfig {
 }
 
 #[derive(Clone)]
-pub enum UnitTestSinkCheck {
+pub(crate) enum UnitTestSinkCheck {
     // Check sets of conditions against received events
     Checks(Vec<Vec<Condition>>),
     // Check that no events were received
