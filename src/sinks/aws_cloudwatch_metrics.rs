@@ -98,7 +98,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

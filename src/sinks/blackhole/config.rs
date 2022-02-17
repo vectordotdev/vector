@@ -39,7 +39,7 @@ impl SinkConfig for BlackholeConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

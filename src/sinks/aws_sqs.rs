@@ -134,7 +134,7 @@ impl SinkConfig for SqsSinkConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
