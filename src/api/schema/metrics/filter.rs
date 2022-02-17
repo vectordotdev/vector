@@ -175,7 +175,7 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
+pub(super) fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
