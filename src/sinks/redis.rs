@@ -90,7 +90,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct RedisSinkConfig {
+pub(super) struct RedisSinkConfig {
     encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     data_type: DataTypeConfig,
