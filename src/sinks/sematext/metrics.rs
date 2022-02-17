@@ -54,7 +54,7 @@ struct SematextMetricsConfig {
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    request: TowerRequestConfig,
 }
 
 inventory::submit! {
