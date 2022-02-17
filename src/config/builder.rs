@@ -36,7 +36,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+    pub(crate) transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
     pub(super) provider: Option<Box<dyn provider::ProviderConfig>>,
