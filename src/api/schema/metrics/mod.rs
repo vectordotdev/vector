@@ -31,7 +31,9 @@ use processed_events::{
 pub(super) use received_events::{
     ComponentReceivedEventsThroughput, ComponentReceivedEventsTotal, ReceivedEventsTotal,
 };
-pub use sent_events::{ComponentSentEventsThroughput, ComponentSentEventsTotal, SentEventsTotal};
+pub(self) use sent_events::{
+    ComponentSentEventsThroughput, ComponentSentEventsTotal, SentEventsTotal,
+};
 pub use sink::{IntoSinkMetrics, SinkMetrics};
 pub(super) use source::{IntoSourceMetrics, SourceMetrics};
 use tokio_stream::{Stream, StreamExt};
