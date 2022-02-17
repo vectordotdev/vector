@@ -36,7 +36,7 @@ impl State {
 }
 
 /// A resource version candidate, can be used to update the resource version.
-pub struct Candidate(String);
+pub(crate) struct Candidate(String);
 
 impl Candidate {
     /// Obtain a resource version [`Candidate`] from a [`WatchEvent`].
