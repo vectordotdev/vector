@@ -16,7 +16,7 @@ impl Value {
         }
     }
 
-    /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Map`.
+    /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Object`.
     pub fn into_object(self) -> Option<BTreeMap<String, Self>> {
         match self {
             Value::Object(map) => Some(map),
@@ -37,7 +37,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Map`.
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Self> {
+    pub fn as_object_mut_unwrap(&mut self) -> &mut BTreeMap<String, Self> {
         match self {
             Value::Object(ref mut m) => m,
             _ => panic!("Tried to call `Value::as_map` on a non-map value."),

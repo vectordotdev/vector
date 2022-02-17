@@ -164,7 +164,7 @@ impl LogEvent {
     {
         if from_key != to_key {
             if let Some(val) = Arc::make_mut(&mut self.fields)
-                .as_map_mut()
+                .as_object_mut_unwrap()
                 .remove(from_key.as_ref())
             {
                 self.insert_flat(to_key, val);
