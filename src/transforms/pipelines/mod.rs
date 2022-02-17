@@ -85,6 +85,7 @@ inventory::submit! {
 pub struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
+    #[serde(default)]
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 

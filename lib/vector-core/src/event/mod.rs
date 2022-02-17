@@ -19,7 +19,6 @@ pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
 };
-pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -31,7 +30,6 @@ pub mod array;
 pub mod discriminant;
 pub mod error;
 mod finalization;
-mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
