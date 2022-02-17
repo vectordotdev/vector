@@ -116,7 +116,7 @@ pub async fn build_unit_tests(
     }
 }
 
-pub struct UnitTestBuildMetadata {
+pub(crate) struct UnitTestBuildMetadata {
     // A set of all valid insert_at targets, used to validate test inputs.
     available_insert_targets: HashSet<ComponentKey>,
     // A mapping from transform name to unit test source name.
