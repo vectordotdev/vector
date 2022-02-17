@@ -152,7 +152,7 @@ struct ServiceInfo {
     pub(super) description: OsString,
 
     pub executable_path: std::path::PathBuf,
-    pub launch_arguments: Vec<OsString>,
+    pub(self) launch_arguments: Vec<OsString>,
 }
 
 impl Default for ServiceInfo {
