@@ -103,7 +103,7 @@ impl sort::SortableByField<ComponentsSortFieldName> for Component {
 }
 
 #[derive(Default)]
-pub struct ComponentsQuery;
+pub(super) struct ComponentsQuery;
 
 #[Object]
 impl ComponentsQuery {
