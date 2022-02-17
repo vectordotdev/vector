@@ -36,7 +36,7 @@ impl Value {
     ///
     /// # Panics
     ///
-    /// This function will panic if self is anything other than `Value::Map`.
+    /// This function will panic if self is anything other than `Value::Object`.
     pub fn as_object_mut_unwrap(&mut self) -> &mut BTreeMap<String, Self> {
         match self {
             Value::Object(ref mut m) => m,
