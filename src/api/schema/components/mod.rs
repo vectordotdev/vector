@@ -249,7 +249,7 @@ impl ComponentsSubscription {
 }
 
 /// Update the 'global' configuration that will be consumed by component queries
-pub fn update_config(config: &Config) {
+pub(crate) fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
