@@ -311,7 +311,7 @@ fn finish_metric(item: (MetricSeries, MetricEntry)) -> Metric {
     Metric::from_parts(series, data, metadata)
 }
 
-pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+pub(crate) fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
     if samples.is_empty() {
         return Vec::new();
     }
