@@ -5,7 +5,7 @@ use super::handlers::RecordDecodeError;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
-pub enum RequestError {
+pub(crate) enum RequestError {
     #[snafu(display(
         "Missing access key. X-Amz-Firehose-Access-Key required for request: {}",
         request_id
