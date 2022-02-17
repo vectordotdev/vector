@@ -558,7 +558,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{metric, EventArray, LogEvent, Metric},
-        schema,
         test_util::trace_init,
     };
 
