@@ -43,7 +43,7 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
 }
 
 fn default_metric_namespace_value() -> String {
