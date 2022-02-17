@@ -1,7 +1,7 @@
 pub mod sink;
 pub mod source;
 mod state;
-pub mod transform;
+pub(super) mod transform;
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use once_cell::sync::Lazy;
