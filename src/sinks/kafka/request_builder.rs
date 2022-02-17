@@ -12,7 +12,7 @@ use crate::{
     template::Template,
 };
 
-pub struct KafkaRequestBuilder {
+pub(super) struct KafkaRequestBuilder {
     pub(super) key_field: Option<String>,
     pub(super) headers_key: Option<String>,
     pub(crate) topic_template: Template,

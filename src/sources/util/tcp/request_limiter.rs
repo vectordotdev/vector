@@ -6,7 +6,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;
 
-pub struct RequestLimiterPermit {
+pub(crate) struct RequestLimiterPermit {
     semaphore_permit: Option<OwnedSemaphorePermit>,
     request_limiter_data: Arc<Mutex<RequestLimiterData>>,
 }

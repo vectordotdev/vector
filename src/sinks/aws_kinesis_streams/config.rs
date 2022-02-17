@@ -63,7 +63,7 @@ pub struct KinesisSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig<KinesisDefaultBatchSettings>,
+    pub(super) batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
