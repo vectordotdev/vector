@@ -3,7 +3,7 @@ pub(crate) mod log;
 pub mod metric;
 pub mod notification;
 pub mod output;
-pub mod trace;
+pub(crate) mod trace;
 
 use std::collections::HashSet;
 
