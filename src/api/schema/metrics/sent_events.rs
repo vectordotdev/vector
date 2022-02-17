@@ -94,7 +94,7 @@ impl ComponentSentEventsTotal {
     }
 }
 
-pub struct ComponentSentEventsThroughput {
+pub(crate) struct ComponentSentEventsThroughput {
     component_key: ComponentKey,
     throughput: i64,
     outputs: Vec<OutputThroughput>,
