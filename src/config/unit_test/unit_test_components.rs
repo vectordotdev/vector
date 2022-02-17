@@ -77,7 +77,7 @@ pub struct UnitTestSinkResult {
 #[derivative(Debug)]
 pub(super) struct UnitTestSinkConfig {
     // Name of the test this sink is part of
-    pub test_name: String,
+    pub(crate) test_name: String,
     // Name of the transform/branch associated with this sink
     pub(super) transform_id: String,
     #[serde(skip)]
