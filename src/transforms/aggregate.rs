@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct AggregateConfig {
+pub(crate) struct AggregateConfig {
     /// The interval between flushes in milliseconds.
     #[serde(default = "default_interval_ms")]
     pub interval_ms: u64,
