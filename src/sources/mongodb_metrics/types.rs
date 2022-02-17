@@ -293,7 +293,7 @@ pub struct CommandServerStatusStorageEngine {
 #[serde(rename_all = "camelCase")]
 pub struct CommandServerStatusWiredTiger {
     #[serde(rename = "block-manager")]
-    pub block_manager: CommandServerStatusWiredTigerBlockManager,
+    pub(crate) block_manager: CommandServerStatusWiredTigerBlockManager,
     pub cache: CommandServerStatusWiredTigerCache,
     pub concurrent_transactions: CommandServerStatusWiredTigerConcurrentTransactions,
     pub log: CommandServerStatusWiredTigerLog,
