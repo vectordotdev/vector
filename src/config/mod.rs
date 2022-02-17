@@ -128,7 +128,23 @@ impl Config {
             .unwrap_or_else(|| vec![identifier.clone()])
     }
 
-    pub fn propagate_acknowledgements(&mut self) {
+    pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        let errors:Vec<_> = self
+            .sinks
+            .iter()
+            .filter_map(|(name,sink)| {
+                (sink.acknowledgements.enabled() && !sink.inner.can_acknowledge()).then(|| {
+                    format!(
+                        "Sink `{}` has acknowledgements enabled but does not support them. Silent data loss could occur.",
+                        name,
+                    )
+                })
+            })
+            .collect();
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
         let inputs: Vec<_> = self
             .sinks
             .iter()
@@ -138,18 +154,13 @@ impl Config {
                     .enabled()
             })
             .flat_map(|(name, sink)| {
-                if !sink.inner.can_acknowledge() {
-                    warn!(
-                        message = "Sink has acknowledgements enabled but does not support them. Silent data loss could occur.",
-                        name = %name,
-                    );
-                }
                 sink.inputs
                     .iter()
                     .map(|input| (name.clone(), input.clone()))
             })
             .collect();
         self.propagate_acks_rec(inputs);
+        Ok(())
     }
 
     fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
