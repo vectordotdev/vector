@@ -130,7 +130,7 @@ impl SwapMetrics {
     }
 }
 
-pub struct CpuMetrics(Vec<Metric>);
+pub(crate) struct CpuMetrics(Vec<Metric>);
 
 #[Object]
 impl CpuMetrics {
