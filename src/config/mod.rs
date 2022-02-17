@@ -323,7 +323,7 @@ impl SourceContext {
     }
 }
 
-pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+pub(super) type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 
 inventory::collect!(SourceDescription);
 
