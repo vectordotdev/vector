@@ -9,7 +9,7 @@ use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
 pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
-pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
+type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 
 #[derive(Default)]
 pub struct AbsoluteMetricNormalizer;

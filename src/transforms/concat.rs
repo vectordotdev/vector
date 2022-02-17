@@ -17,7 +17,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub(super) struct ConcatConfig {
     pub(crate) target: String,
-    pub joiner: Option<String>,
+    pub(self) joiner: Option<String>,
     pub(super) items: Vec<String>,
 }
 

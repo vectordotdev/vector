@@ -4,4 +4,4 @@ pub mod response;
 pub(super) mod service;
 pub mod util;
 
-pub use util::*;
+pub(crate) use util::*;
