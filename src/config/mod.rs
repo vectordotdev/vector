@@ -33,7 +33,7 @@ mod builder;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
-pub mod datadog;
+pub(crate) mod datadog;
 mod diff;
 pub mod format;
 mod graph;
