@@ -84,7 +84,7 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum ComponentsSortFieldName {
+pub(super) enum ComponentsSortFieldName {
     ComponentKey,
     ComponentKind,
 }
