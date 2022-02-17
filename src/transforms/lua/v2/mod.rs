@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::event::lua;
+
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::{

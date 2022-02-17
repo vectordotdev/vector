@@ -15,10 +15,6 @@ pub use decoding::{
     OctetCountingDecoderConfig,
 };
 #[cfg(feature = "sources-syslog")]
-pub(super) use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
-pub(super) use encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializer, RawMessageSerializerConfig,
-};
+pub(super) use decoding::{SyslogDeserializer};
+
 pub use ready_frames::ReadyFrames;

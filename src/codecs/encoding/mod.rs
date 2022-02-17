@@ -5,8 +5,7 @@ mod format;
 pub mod framing;
 
 pub(crate) use format::{
-    BoxedSerializer, JsonSerializer, JsonSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
@@ -260,7 +259,7 @@ impl EncodingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codecs::RawMessageSerializer;
+    use crate::codecs::encoding::format::RawMessageSerializer;
     use bytes::BufMut;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
