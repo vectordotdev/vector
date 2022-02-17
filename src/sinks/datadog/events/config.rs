@@ -26,7 +26,7 @@ use crate::{
 pub struct DatadogEventsConfig {
     pub endpoint: Option<String>,
     // Deprecated, replaced by the site option
-    pub region: Option<Region>,
+    pub(crate) region: Option<Region>,
     pub(self) site: Option<String>,
     pub default_api_key: String,
 
