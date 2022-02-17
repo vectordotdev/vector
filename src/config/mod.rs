@@ -611,7 +611,7 @@ inventory::collect!(TransformDescription);
 #[derive(Deserialize, Serialize, Debug)]
 pub struct EnrichmentTableOuter {
     #[serde(flatten)]
-    pub inner: Box<dyn EnrichmentTableConfig>,
+    pub(crate) inner: Box<dyn EnrichmentTableConfig>,
 }
 
 impl EnrichmentTableOuter {
