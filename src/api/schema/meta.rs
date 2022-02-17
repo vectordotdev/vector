@@ -1,7 +1,7 @@
 use async_graphql::Object;
 
 #[derive(Default)]
-pub struct Meta;
+struct Meta;
 
 #[Object]
 impl Meta {
