@@ -17,7 +17,7 @@ impl Meta {
 }
 
 #[derive(Default)]
-pub struct MetaQuery;
+pub(crate) struct MetaQuery;
 
 #[Object]
 impl MetaQuery {

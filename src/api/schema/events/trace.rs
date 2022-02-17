@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Trace {
+pub(crate) struct Trace {
     output_id: OutputId,
     event: event::TraceEvent,
 }
