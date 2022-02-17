@@ -10,7 +10,7 @@ mod sink;
 pub use config::*;
 pub use encoding::*;
 use model::*;
-pub use service::*;
+use service::*;
 pub use sink::*;
 
 pub use super::{Healthcheck, VectorSink};
