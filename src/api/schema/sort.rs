@@ -36,7 +36,7 @@ impl Default for Direction {
     params(FileSourceMetricFilesSortFieldName)
 ))]
 pub struct SortField<T: InputType> {
-    pub field: T,
+    pub(super) field: T,
     #[graphql(default_with = "Direction::default()")]
     pub(crate) direction: Direction,
 }
