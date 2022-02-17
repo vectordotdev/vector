@@ -16,7 +16,7 @@ pub enum ExampleError {
 /// Describes a component plugin storing its type name, an example config, and
 /// other useful information about the plugin.
 pub struct ComponentDescription<T: Sized> {
-    pub type_str: &'static str,
+    type_str: &'static str,
     example_value: fn() -> Option<Value>,
     component_type: PhantomData<T>,
 }
