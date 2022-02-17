@@ -9,6 +9,7 @@
 pub mod builder;
 pub use vector_core::fanout;
 mod running;
+mod schema;
 mod task;
 
 #[cfg(test)]

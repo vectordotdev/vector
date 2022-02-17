@@ -178,11 +178,11 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -217,6 +217,7 @@ impl Ec2MetadataTransform {
                     metric.insert_tag(k.to_string(), String::from_utf8_lossy(v).to_string());
                 });
             }
+            Event::Trace(_) => panic!("Traces are not supported."),
         }
         event
     }

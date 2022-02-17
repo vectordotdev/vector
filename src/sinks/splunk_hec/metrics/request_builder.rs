@@ -10,7 +10,7 @@ use crate::sinks::{
 };
 
 pub struct HecMetricsRequestBuilder {
-    pub compression: Compression,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {

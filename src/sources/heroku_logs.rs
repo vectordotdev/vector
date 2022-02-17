@@ -31,7 +31,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexConfig {
+pub(crate) struct LogplexConfig {
     address: SocketAddr,
     #[serde(default)]
     query_parameters: Vec<String>,
@@ -306,7 +306,7 @@ mod tests {
         components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
                 address,

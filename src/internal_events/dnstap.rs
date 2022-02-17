@@ -26,7 +26,7 @@ impl InternalEvent for DnstapEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct DnstapParseError<'a> {
+pub(crate) struct DnstapParseError<'a> {
     pub error: &'a str,
 }
 

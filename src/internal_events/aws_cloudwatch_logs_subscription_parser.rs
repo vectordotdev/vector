@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParserError {
-    pub error: serde_json::Error,
+    pub(crate) error: serde_json::Error,
 }
 
 impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {

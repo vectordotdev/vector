@@ -7,13 +7,11 @@ use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::ByteSizeOf;
+use crate::{schema, ByteSizeOf};
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(
-    Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters,
-)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters)]
 pub struct EventMetadata {
     /// Used to store the datadog API from sources to sinks
     #[getset(get = "pub", set = "pub")]
@@ -25,6 +23,22 @@ pub struct EventMetadata {
     splunk_hec_token: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+
+    /// An identifier for a globaly registered schema definition which provides information about
+    /// the event shape (type information, and semantic meaning of fields).
+    #[serde(default = "schema::Id::empty", skip)]
+    schema_id: schema::Id,
+}
+
+impl Default for EventMetadata {
+    fn default() -> Self {
+        Self {
+            datadog_api_key: Default::default(),
+            splunk_hec_token: Default::default(),
+            finalizers: Default::default(),
+            schema_id: schema::Id::empty(),
+        }
+    }
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -92,6 +106,16 @@ impl EventMetadata {
     /// Merges the given finalizers into the existing set of finalizers.
     pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
         self.finalizers.merge(finalizers);
+    }
+
+    /// Get the schema ID.
+    pub fn schema_id(&self) -> schema::Id {
+        self.schema_id
+    }
+
+    /// Set the schema ID.
+    pub fn set_schema_id(&mut self, id: schema::Id) {
+        self.schema_id = id;
     }
 }
 

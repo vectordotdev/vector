@@ -33,6 +33,7 @@ use crate::{
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 
 #[derive(Clone)]
@@ -62,6 +63,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -126,7 +128,8 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

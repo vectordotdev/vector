@@ -154,7 +154,7 @@ mod tests {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(source);

@@ -1107,7 +1107,7 @@ mod integration_tests {
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

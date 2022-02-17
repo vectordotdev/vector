@@ -29,7 +29,7 @@ struct EventStoreDbConfig {
     default_namespace: Option<String>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -154,7 +154,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
 

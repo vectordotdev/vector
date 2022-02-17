@@ -247,7 +247,7 @@ mod source {
     const WATCH_FAILED: &str = "watch_failed";
 
     #[derive(Debug)]
-    pub struct FileWatchError<'a> {
+    struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
     }
