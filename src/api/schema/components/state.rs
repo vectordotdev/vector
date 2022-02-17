@@ -8,7 +8,8 @@ use once_cell::sync::Lazy;
 use super::{sink, source, transform, Component};
 use crate::config::{ComponentKey, OutputId};
 
-pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
+pub(super) const INVARIANT: &str =
+    "Couldn't acquire lock on Vector components. Please report this.";
 
 pub static COMPONENTS: Lazy<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
