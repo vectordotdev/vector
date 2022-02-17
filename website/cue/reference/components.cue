@@ -547,15 +547,15 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
-			_acknowledgements: {
+			_source_acknowledgements: {
 				common:      true
-				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings."
+				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
 				required:    false
 				type: object: options: {
 					enabled: {
 						common:      true
 						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
-						warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+						warnings: ["This setting is deprecated in favor of enabling `acknowledgements` in the destination sink.", "Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
 						required: false
 						type: bool: default: false
 					}
