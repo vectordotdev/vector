@@ -71,7 +71,7 @@ tokio-test = "0.4.2"
 ndarray = "0.15.4"
 ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
-rand = "0.8.4"
+rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.8", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
