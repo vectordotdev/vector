@@ -7,7 +7,7 @@ use crate::sinks::splunk_hec;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-pub enum Encoding {
+enum Encoding {
     Json,
     Text,
 }

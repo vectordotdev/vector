@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
@@ -15,9 +16,9 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
-    pub tags: IndexMap<String, String>,
+    tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(super) overwrite: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -50,8 +51,8 @@ impl TransformConfig for AddTagsConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn outputs(&self) -> Vec<Output> {

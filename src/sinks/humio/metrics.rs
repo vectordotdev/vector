@@ -8,7 +8,7 @@ use vector_core::{sink::StreamSink, transform::Transform};
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{
-        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
+        GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription, TransformConfig,
         TransformContext,
     },
     event::{Event, EventArray, EventContainer},
@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HumioMetricsConfig {
+struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
     token: String,
@@ -107,8 +107,8 @@ impl SinkConfig for HumioMetricsConfig {
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {

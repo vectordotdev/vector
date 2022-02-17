@@ -6,13 +6,13 @@ use std::{
 };
 
 use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     time::{timeout, Duration},
 };
+use tracing_futures::Instrument;
 use vector_core::{
     buffers::{
         topology::{
@@ -27,12 +27,13 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
+    schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
     event::{Event, EventArray, EventContainer},
@@ -42,9 +43,8 @@ use crate::{
     SourceSender,
 };
 
-lazy_static! {
-    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
-}
+static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
+    Lazy::new(enrichment::TableRegistry::default);
 
 pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
@@ -141,6 +141,8 @@ pub async fn build_pieces(
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
 
+    let mut schema_registry = schema::Registry::default();
+
     // Build sources
     for (key, source) in config
         .sources
@@ -153,6 +155,8 @@ pub async fn build_pieces(
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
+        let mut schema_ids = HashMap::with_capacity(source_outputs.len());
+
         for output in source_outputs {
             let rx = builder.add_output(output.clone());
 
@@ -166,10 +170,26 @@ pub async fn build_pieces(
             controls.insert(
                 OutputId {
                     component: key.clone(),
-                    port: output.port,
+                    port: output.port.clone(),
                 },
                 control,
             );
+
+            // Each individual output of a source carries its own schema definition. These
+            // definitions are inserted in the global schema registry. The resuting `schema::Id` is
+            // stored, together with the output identifier, which the source can access through the
+            // `SourceContext`, so that the source can annotate each individual event it receives
+            // with the given ID. This ID can then be used by subsequent components to get the
+            // schema of an event at runtime.
+            let schema_id = schema_registry
+                .register_definition(
+                    output
+                        .log_schema_definition
+                        .unwrap_or_else(schema::Definition::empty),
+                )
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
         }
 
         let pump = async move {
@@ -194,6 +214,8 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
+            acknowledgements: source.sink_acknowledgements,
+            schema_ids,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -239,17 +261,32 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
+        for output in transform.inner.outputs() {
+            let definition = match output.log_schema_definition {
+                Some(definition) => definition,
+                None => schema::merged_definition(&transform.inputs, config),
+            };
+
+            let schema_id = schema_registry
+                .register_definition(definition)
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
+        }
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+            schema_ids,
         };
 
         let node = TransformNode {
             key: key.clone(),
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
-            input_type: transform.inner.input_type(),
+            input_details: transform.inner.input(),
             outputs: transform.inner.outputs(),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
@@ -262,7 +299,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -283,13 +320,13 @@ pub async fn build_pieces(
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
-        let input_type = sink.inner.input_type();
+        let input_type = sink.inner.input().data_type();
 
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::Memory { .. } => "memory",
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
@@ -446,18 +483,18 @@ pub async fn build_pieces(
 }
 
 const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(event, Event::Log(_)),
-        DataType::Metric => matches!(event, Event::Metric(_)),
+    match event {
+        Event::Log(_) => data_type.contains(DataType::Log),
+        Event::Metric(_) => data_type.contains(DataType::Metric),
+        Event::Trace(_) => data_type.contains(DataType::Trace),
     }
 }
 
 const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(events, EventArray::Logs(_)),
-        DataType::Metric => matches!(events, EventArray::Metrics(_)),
+    match events {
+        EventArray::Logs(_) => data_type.contains(DataType::Log),
+        EventArray::Metrics(_) => data_type.contains(DataType::Metric),
+        EventArray::Traces(_) => data_type.contains(DataType::Trace),
     }
 }
 
@@ -466,7 +503,7 @@ struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
     inputs: Vec<OutputId>,
-    input_type: DataType,
+    input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
 }
@@ -480,9 +517,13 @@ fn build_transform(
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
         Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
-        Transform::Task(t) => {
-            build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
+        Transform::Task(t) => build_task_transform(
+            t,
+            input_rx,
+            node.input_details.data_type(),
+            node.typetag,
+            &node.key,
+        ),
     }
 }
 
@@ -493,7 +534,7 @@ fn build_sync_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs);
 
-    let runner = Runner::new(t, input_rx, node.input_type, outputs);
+    let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
     } else {
@@ -628,7 +669,7 @@ impl Runner {
                                 }
 
                                 outputs_buf
-                            });
+                            }.in_current_span());
                             in_flight.push(task);
                         }
                         None => {

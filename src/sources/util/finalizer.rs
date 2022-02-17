@@ -10,7 +10,7 @@ use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
 /// order they are received from the source*. The type `T` is the
 /// source-specific data associated with each entry to be used to
 /// complete the finalization.
-pub struct OrderedFinalizer<T> {
+pub(crate) struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
 }
 

@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use std::{io, sync::Arc};
 
 use vector_core::{buffers::Ackable, ByteSizeOf};
@@ -13,7 +14,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct DatadogEventsRequest {
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub metadata: Metadata,
 }
 
@@ -64,7 +65,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     type Metadata = Metadata;
     type Events = LogEvent;
     type Encoder = EncodingConfigFixed<StandardJsonEncoding>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = DatadogEventsRequest;
     type Error = io::Error;
 

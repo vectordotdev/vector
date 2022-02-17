@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use chrono::{offset::TimeZone, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref REGEX_GLOG: Regex = Regex::new(
+static REGEX_GLOG: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r#"(?x)                                                     # Ignore whitespace and comments in the regex expression.
         ^\s*                                                        # Start with any number of whitespaces.
         (?P<level>\w)                                               # Match one word character (expecting `I`,`W`,`E` or `F`).
@@ -19,8 +19,8 @@ lazy_static! {
         (?P<message>.*?)                                            # Match any characters (non-greedily).
         \s*$                                                        # Match any number of whitespaces to be stripped from the end.
     "#)
-    .expect("failed compiling regex for glog");
-}
+                                                 .expect("failed compiling regex for glog")
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGlog;
@@ -131,19 +131,19 @@ impl Expression for ParseGlogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<&str, Kind>(type_def())
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, Kind> {
-    map! {
-        "level": Kind::Bytes,
-        "timestamp": Kind::Timestamp,
-        "id": Kind::Integer,
-        "file": Kind::Bytes,
-        "line": Kind::Integer,
-        "message": Kind::Bytes,
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("level".into(), Kind::bytes()),
+        ("timestamp".into(), Kind::timestamp()),
+        ("id".into(), Kind::integer()),
+        ("file".into(), Kind::bytes()),
+        ("line".into(), Kind::integer()),
+        ("message".into(), Kind::bytes()),
+    ])
 }
 
 #[cfg(test)]
@@ -166,7 +166,7 @@ mod tests {
                 "line" => 9,
                 "message" => "Hello world!",
             }),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_strip_whitespace {
@@ -179,31 +179,31 @@ mod tests {
                 "line" => 9,
                 "message" => "Hello world!",
             }),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid {
             args: func_args![value: "not a glog line"],
             want: Err("failed parsing glog message"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_log_level {
             args: func_args![value: "X20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
             want: Err(r#"unrecognized log level "X""#),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: "I20210000 14:48:54.411655 15520 main.c++:9] Hello world!"],
             want: Err("failed parsing timestamp 20210000 14:48:54.411655: input is out of range"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_id {
             args: func_args![value: "I20210131 14:48:54.411655 99999999999999999999999999999 main.c++:9] Hello world!"],
             want: Err("failed parsing id"),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

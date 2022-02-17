@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
@@ -28,7 +28,7 @@ use merge_strategy::*;
 pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,
 
-    pub flush_period_ms: Option<u64>,
+    pub(self) flush_period_ms: Option<u64>,
 
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
@@ -57,8 +57,8 @@ impl TransformConfig for ReduceConfig {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -152,8 +152,8 @@ pub struct Reduce {
     group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
-    ends_when: Option<Box<dyn Condition>>,
-    starts_when: Option<Box<dyn Condition>>,
+    ends_when: Option<Condition>,
+    starts_when: Option<Condition>,
 }
 
 impl Reduce {

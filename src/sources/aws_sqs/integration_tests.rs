@@ -49,7 +49,12 @@ async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Cli
 
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
-        .credentials_provider(AwsAuthentication::test_auth().credentials_provider().await)
+        .credentials_provider(
+            AwsAuthentication::test_auth()
+                .credentials_provider()
+                .await
+                .unwrap(),
+        )
         .endpoint_resolver(Endpoint::immutable(
             Uri::from_str(sqs_address().as_str()).unwrap(),
         ))
@@ -60,7 +65,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 }
 
 #[tokio::test]
-pub async fn test() {
+pub(crate) async fn test() {
     let sqs_client = get_sqs_client().await;
     let queue_name = gen_queue_name();
     let queue_url = ensure_queue(&queue_name, &sqs_client)
@@ -81,7 +86,7 @@ pub async fn test() {
     let (tx, rx) = SourceSender::new_test();
     tokio::spawn(async move {
         config
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap()
             .await

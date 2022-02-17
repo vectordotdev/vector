@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSourceConfig {
+struct MockSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
 }
@@ -59,6 +59,10 @@ impl SourceConfig for MockSourceConfig {
 
     fn source_type(&self) -> &'static str {
         "mock"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

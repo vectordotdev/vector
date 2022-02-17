@@ -1,5 +1,6 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
+use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
 use vector_common::encode_logfmt;
@@ -22,7 +23,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
+        LokiOutOfOrderEventRewritten, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -49,7 +50,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -96,7 +97,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = LokiRequest;
     type Error = RequestBuildError;
 
@@ -213,8 +214,9 @@ impl EventEncoder {
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
 
-            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
-                .expect("Logfmt encoding should never fail."),
+            Encoding::Logfmt => {
+                encode_logfmt::to_string(log.as_map()).expect("Logfmt encoding should never fail.")
+            }
         };
 
         // If no labels are provided we set our own default

@@ -6,7 +6,7 @@ use vector_core::{
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 #[derive(Default)]
-pub struct DatadogMetricsNormalizer;
+pub(crate) struct DatadogMetricsNormalizer;
 
 impl MetricNormalize for DatadogMetricsNormalizer {
     fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {

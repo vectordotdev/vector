@@ -79,19 +79,19 @@ impl Expression for PushFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let item = TypeDef::new()
-            .infallible()
-            .array_mapped::<i32, TypeDef>(map! {
-                0: self.item.type_def(state),
-            });
+        let item = TypeDef::array(BTreeMap::from([(
+            0.into(),
+            self.item.type_def(state).into(),
+        )]));
 
-        self.value.type_def(state).merge(item).infallible()
+        self.value.type_def(state).merge_append(item).infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vector_common::btreemap;
 
     test_function![
         push => Push;
@@ -99,30 +99,30 @@ mod tests {
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::bytes(),
             }),
         }
 
         new_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!("foo")],
             want: Ok(value!([11, false, 42.5, "foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::bytes(),
             }),
         }
 
         already_exists_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!(42.5)],
             want: Ok(value!([11, false, 42.5, 42.5])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Float,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::float(),
             }),
         }
     ];

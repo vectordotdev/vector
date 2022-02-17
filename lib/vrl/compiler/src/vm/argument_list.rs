@@ -26,7 +26,7 @@ impl<'a> VmArgument<'a> {
     /// have already done the required typechecking.
     fn kind(&self) -> Option<Kind> {
         match self {
-            VmArgument::Value(value) => Some(value.kind()),
+            VmArgument::Value(value) => Some(value.into()),
             VmArgument::Any(_) => None,
         }
     }
@@ -98,7 +98,7 @@ impl<'a> VmArgumentList<'a> {
         for (param, args) in self.args.iter().zip(self.values.iter()) {
             match args.as_ref() {
                 None if param.required => return Err("parameter is required".into()),
-                Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(kind)) => {
+                Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(&kind)) => {
                     return Err("parameter type mismatch".into())
                 }
                 _ => (),

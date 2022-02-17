@@ -21,13 +21,12 @@
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
-#[cfg(feature = "api")]
-pub mod api;
 pub mod config;
 pub mod event;
 pub mod fanout;
 pub mod mapping;
 pub mod metrics;
+pub mod schema;
 pub mod sink;
 pub mod source;
 #[cfg(test)]

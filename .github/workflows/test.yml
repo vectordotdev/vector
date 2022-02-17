@@ -80,7 +80,7 @@ jobs:
             docker:
               - 'distribution/docker/**'
 
-  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
@@ -341,7 +341,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    container: timberio/ci_image
+    container: timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
     needs: changes
     steps:
       - uses: actions/checkout@v2.4.0
@@ -378,12 +378,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.10
+        uses: EmbarkStudios/cargo-deny-action@v1.2.12
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.10
+        uses: EmbarkStudios/cargo-deny-action@v1.2.12
         with:
           command: check licenses
       - name: Check Cue docs

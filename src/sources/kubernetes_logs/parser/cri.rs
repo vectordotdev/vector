@@ -25,7 +25,7 @@ pub const NEW_LINE_TAG: &str = "new_line_tag";
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Cri {
+pub(super) struct Cri {
     #[derivative(Debug = "ignore")]
     regex_parser: Box<dyn FunctionTransform>,
 }
@@ -67,7 +67,7 @@ impl FunctionTransform for Cri {
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Remove possible new_line tag
-    // for additional details, see https://github.com/timberio/vector/issues/8606
+    // for additional details, see https://github.com/vectordotdev/vector/issues/8606
     let _ = log.remove(NEW_LINE_TAG);
     // Detect if this is a partial event.
     let multiline_tag = log

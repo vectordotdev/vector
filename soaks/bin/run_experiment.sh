@@ -3,7 +3,7 @@
 #set -o errexit # grep will exit 1 without a match, even with --count
 set -o pipefail
 set -o nounset
-set -o xtrace
+#set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOAK_ROOT="${__dir}/.."
@@ -82,6 +82,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+SAMPLE_ATTEMPT_LIMIT=1000
 TOTAL_SAMPLES=200
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
@@ -125,6 +126,10 @@ do
     fi
     recorded_samples=$observed_samples
     (( periods = periods + 1 ))
+    if [ $periods -gt $SAMPLE_ATTEMPT_LIMIT ]; then
+        echo "INSUFFICIENT SAMPLES COlLECTED BEFORE DEADLINE. THIS INDICATES A PROBLEM WITH THE EXPERIMENT."
+        exit 1
+    fi
     sleep 1
 done
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR} complete in ${periods} seconds. At least ${recorded_samples} collected."

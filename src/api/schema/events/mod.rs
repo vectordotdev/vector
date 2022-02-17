@@ -1,7 +1,9 @@
 mod encoding;
 pub mod log;
+pub mod metric;
 pub mod notification;
 pub mod output;
+pub mod trace;
 
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;

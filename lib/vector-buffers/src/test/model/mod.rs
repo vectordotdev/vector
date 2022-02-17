@@ -1,5 +1,4 @@
-mod in_memory_v1;
-mod in_memory_v2;
+mod in_memory;
 mod on_disk_v1;
 mod on_disk_v2;
 
@@ -15,10 +14,7 @@ use tokio::runtime::Runtime;
 use super::common::Variant;
 use crate::test::{
     common::{Action, Message},
-    model::{
-        in_memory_v1::InMemoryV1, in_memory_v2::InMemoryV2, on_disk_v1::OnDiskV1,
-        on_disk_v2::OnDiskV2,
-    },
+    model::{in_memory::InMemory, on_disk_v1::OnDiskV1, on_disk_v2::OnDiskV2},
 };
 
 #[derive(Debug)]
@@ -42,7 +38,7 @@ trait Model {
 
 fn check(variant: &Variant) -> bool {
     match variant {
-        Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => true,
+        Variant::Memory { .. } => true,
         Variant::DiskV1 { id, data_dir, .. } | Variant::DiskV2 { id, data_dir, .. } => {
             // determine if data_dir is in temp_dir/id
             let mut prefix = std::path::PathBuf::new();
@@ -62,7 +58,7 @@ struct VariantGuard {
 impl VariantGuard {
     fn new(variant: Variant) -> Self {
         match variant {
-            Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => VariantGuard { inner: variant },
+            Variant::Memory { .. } => VariantGuard { inner: variant },
             Variant::DiskV1 {
                 max_size,
                 when_full,
@@ -118,7 +114,7 @@ impl AsRef<Variant> for VariantGuard {
 impl Drop for VariantGuard {
     fn drop(&mut self) {
         match &self.inner {
-            Variant::MemoryV1 { .. } | Variant::MemoryV2 { .. } => {}
+            Variant::Memory { .. } => {}
             Variant::DiskV1 { data_dir, .. } | Variant::DiskV2 { data_dir, .. } => {
                 // SAFETY: Here we clean up the data_dir of the inner `Variant`,
                 // see note in the constructor for this type.
@@ -145,8 +141,7 @@ fn model_check() {
 
         let guard = VariantGuard::new(variant);
         let mut model: Box<dyn Model> = match guard.as_ref() {
-            Variant::MemoryV1 { .. } => Box::new(InMemoryV1::new(guard.as_ref(), 1)),
-            Variant::MemoryV2 { .. } => Box::new(InMemoryV2::new(guard.as_ref())),
+            Variant::Memory { .. } => Box::new(InMemory::new(guard.as_ref())),
             Variant::DiskV1 { .. } => Box::new(OnDiskV1::new(guard.as_ref())),
             Variant::DiskV2 { .. } => Box::new(OnDiskV2::new(guard.as_ref())),
         };

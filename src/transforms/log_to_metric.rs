@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{
@@ -13,8 +13,8 @@ use crate::{
         Event, Value,
     },
     internal_events::{
-        LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
-        LogToMetricTemplateParseError, TemplateRenderingFailed,
+        LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        ParserMissingFieldError,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -132,8 +132,8 @@ impl TransformConfig for LogToMetricConfig {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -191,7 +191,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(&crate::internal_events::TemplateRenderingError {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -388,10 +388,10 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNullError {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(&ParserMissingFieldError {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
@@ -401,7 +401,7 @@ impl FunctionTransform for LogToMetric {
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&crate::internal_events::TemplateRenderingError {
                         error,
                         drop_event: false,
                         field: None,

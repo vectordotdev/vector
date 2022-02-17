@@ -72,7 +72,7 @@ impl Expression for ToSyslogSeverityFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+        TypeDef::integer().fallible()
     }
 }
 
@@ -86,61 +86,61 @@ mod tests {
         emergency {
             args: func_args![value: value!("emerg")],
             want: Ok(value!(0)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         alert {
             args: func_args![value: value!("alert")],
             want: Ok(value!(1)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         critical {
             args: func_args![value: value!("crit")],
             want: Ok(value!(2)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         error {
             args: func_args![value: value!("err")],
             want: Ok(value!(3)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         warning {
             args: func_args![value: value!("warn")],
             want: Ok(value!(4)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         notice {
             args: func_args![value: value!("notice")],
             want: Ok(value!(5)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         informational {
             args: func_args![value: value!("info")],
             want: Ok(value!(6)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         debug {
             args: func_args![value: value!("debug")],
             want: Ok(value!(7)),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         invalid_level_1 {
             args: func_args![value: value!("oopsie")],
             want: Err("syslog level oopsie not valid"),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         invalid_level_2 {
             args: func_args![value: value!("aww schucks")],
             want: Err("syslog level aww schucks not valid"),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
     ];
 }

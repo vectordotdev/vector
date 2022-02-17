@@ -181,7 +181,7 @@ where
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-pub struct Inner<E> {
+struct Inner<E> {
     codec: E,
     #[serde(default)]
     schema: Option<String>,

@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_sqs: components._aws & {
+components: sources: aws_sqs: components._aws_new_sdk & {
 	title: "AWS SQS"
 
 	features: {
@@ -51,7 +51,7 @@ components: sources: aws_sqs: components._aws & {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		poll_secs: {
 			common:      true
 			description: "How long to wait when polling SQS for new messages. 0-20 seconds"

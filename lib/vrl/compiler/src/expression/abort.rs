@@ -3,6 +3,7 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast::Node;
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{ExpressionError, Resolved},
     value::Kind,
@@ -32,7 +33,7 @@ impl Abort {
                     })
                 } else if !type_def.is_bytes() {
                     Err(Error {
-                        variant: ErrorVariant::NonString(type_def.kind()),
+                        variant: ErrorVariant::NonString(type_def.into()),
                         expr_span,
                     })
                 } else {
@@ -69,7 +70,7 @@ impl Expression for Abort {
     }
 
     fn type_def(&self, _: &State) -> TypeDef {
-        TypeDef::new().infallible().null()
+        TypeDef::null().infallible()
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
@@ -138,7 +139,7 @@ impl DiagnosticError for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        match self.variant {
+        match &self.variant {
             ErrorVariant::FallibleExpr => vec![
                 Label::primary(
                     "abort only accepts an infallible expression argument",

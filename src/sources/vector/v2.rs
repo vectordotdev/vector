@@ -52,7 +52,7 @@ impl proto::Service for Service {
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events))
+            .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
                 emit!(&StreamClosedError { error, count });
@@ -121,7 +121,7 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
@@ -131,7 +131,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -147,13 +147,13 @@ async fn run(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     cx: SourceContext,
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: bool,
 ) -> crate::Result<()> {
     let span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: acknowledgements.enabled(),
+        acknowledgements,
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
@@ -228,7 +228,10 @@ mod tests {
 
         components::init_test();
         let (tx, rx) = SourceSender::new_test();
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         test_util::wait_for_tcp(addr).await;
 

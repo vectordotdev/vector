@@ -191,6 +191,10 @@ impl SourceConfig for Config {
     fn source_type(&self) -> &'static str {
         COMPONENT_ID
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -446,7 +450,7 @@ impl Source {
         let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
-        let event_processing_loop = out.send_all(&mut stream);
+        let event_processing_loop = out.send_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
         {
@@ -549,7 +553,7 @@ const fn default_max_read_bytes() -> usize {
 
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
+    // https://github.com/vectordotdev/vector/issues/6967
     //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.

@@ -1,21 +1,24 @@
 use std::{collections::HashMap, str::FromStr};
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use vrl::prelude::*;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(
+static RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         r"(?ix)                        # i: case-insensitive, x: ignore whitespace + comments
             \A
             (?P<value>[0-9]*\.?[0-9]+) # value: integer or float
             \s?                        # optional space between value and unit
             (?P<unit>[µa-z]{1,2})      # unit: one or two letters
-            \z"
+            \z",
     )
-    .unwrap();
-    static ref UNITS: HashMap<String, Decimal> = vec![
+    .unwrap()
+});
+
+static UNITS: Lazy<HashMap<String, Decimal>> = Lazy::new(|| {
+    vec![
         ("ns", Decimal::new(1, 9)),
         ("us", Decimal::new(1, 6)),
         ("µs", Decimal::new(1, 6)),
@@ -29,8 +32,8 @@ lazy_static! {
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v))
-    .collect();
-}
+    .collect()
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseDuration;
@@ -112,11 +115,11 @@ impl Expression for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(number.into())
+        Ok(Value::from_f64_or_zero(number))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().float()
+        TypeDef::float().fallible()
     }
 }
 
@@ -131,77 +134,77 @@ mod tests {
             args: func_args![value: "30s",
                              unit: "m"],
             want: Ok(value!(0.5)),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         ms_ms {
             args: func_args![value: "100ms",
                              unit: "ms"],
             want: Ok(100.0),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         ms_s {
             args: func_args![value: "1005ms",
                              unit: "s"],
             want: Ok(1.005),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         ns_ms {
             args: func_args![value: "100ns",
                              unit: "ms"],
             want: Ok(0.0001),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         d_s {
             args: func_args![value: "1d",
                              unit: "s"],
             want: Ok(86400.0),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         s_ns {
             args: func_args![value: "1 s",
                              unit: "ns"],
             want: Ok(1000000000.0),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         us_ms {
             args: func_args![value: "1 µs",
                              unit: "ms"],
             want: Ok(0.001),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         error_invalid {
             args: func_args![value: "foo",
                              unit: "ms"],
             want: Err("unable to parse duration: 'foo'"),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         error_ns {
             args: func_args![value: "1",
                              unit: "ns"],
             want: Err("unable to parse duration: '1'"),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         error_unit {
             args: func_args![value: "1w",
                              unit: "ns"],
             want: Err("unknown duration unit: 'w'"),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
 
         error_format {
             args: func_args![value: "1s",
                              unit: "w"],
             want: Err("unknown unit format: 'w'"),
-            tdef: TypeDef::new().fallible().float(),
+            tdef: TypeDef::float().fallible(),
         }
     ];
 }

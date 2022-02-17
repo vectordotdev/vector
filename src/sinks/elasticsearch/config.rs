@@ -10,10 +10,10 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::rusoto::RegionOrEndpoint,
-    config::{log_schema, DataType, SinkConfig, SinkContext},
+    config::{log_schema, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
             encoder::ElasticSearchEncoder,
@@ -196,7 +196,7 @@ impl DataStreamConfig {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -209,7 +209,7 @@ impl DataStreamConfig {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -222,7 +222,7 @@ impl DataStreamConfig {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -243,8 +243,8 @@ impl DataStreamConfig {
         let existing = log
             .as_map_mut()
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Map(BTreeMap::new()))
-            .as_map_mut();
+            .or_insert_with(|| Value::Object(BTreeMap::new()))
+            .as_object_mut_unwrap();
         if let Some(dtype) = dtype {
             existing
                 .entry("type".into())
@@ -266,7 +266,7 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_map());
+            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy())
@@ -341,8 +341,8 @@ impl SinkConfig for ElasticSearchConfig {
         Ok((stream, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

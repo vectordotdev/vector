@@ -81,13 +81,12 @@ impl SourceConfig for AwsS3Config {
             .as_ref()
             .map(|config| config.try_into())
             .transpose()?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, acknowledgements),
+                    .run(cx, self.acknowledgements),
             )),
         }
     }
@@ -98,6 +97,10 @@ impl SourceConfig for AwsS3Config {
 
     fn source_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -111,7 +114,7 @@ impl AwsS3Config {
 
         let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
+        let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
@@ -536,7 +539,7 @@ mod integration_tests {
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
         let (tx, rx) = SourceSender::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx);
+        let cx = SourceContext::new_test(tx, None);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
 

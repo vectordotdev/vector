@@ -3,14 +3,14 @@ use serde::{self, Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     transforms::Transform,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CompoundConfig {
+struct CompoundConfig {
     steps: Vec<TransformStep>,
 }
 
@@ -62,12 +62,12 @@ impl TransformConfig for CompoundConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

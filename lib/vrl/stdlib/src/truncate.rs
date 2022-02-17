@@ -104,7 +104,7 @@ impl Expression for TruncateFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -120,7 +120,7 @@ mod tests {
                               limit: 0,
              ],
              want: Ok(""),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         ellipsis {
@@ -129,7 +129,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         complete {
@@ -137,7 +137,7 @@ mod tests {
                              limit: 10
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         exact {
@@ -146,7 +146,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         big {
@@ -154,7 +154,7 @@ mod tests {
                              limit: 5
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         big_ellipsis {
@@ -163,7 +163,7 @@ mod tests {
                              ellipsis: true,
             ],
             want: Ok("Super..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         unicode {
@@ -172,7 +172,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("♔♕♖♗♘♙..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

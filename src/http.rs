@@ -159,7 +159,7 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
 
     if !request.headers().contains_key("Accept-Encoding") {
         // hardcoding until we support compressed responses:
-        // https://github.com/timberio/vector/issues/5440
+        // https://github.com/vectordotdev/vector/issues/5440
         request
             .headers_mut()
             .insert("Accept-Encoding", HeaderValue::from_static("identity"));
