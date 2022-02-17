@@ -1,7 +1,7 @@
 mod errors;
 mod events_in;
 mod events_out;
-pub mod filter;
+pub(super) mod filter;
 mod output;
 mod processed_bytes;
 mod processed_events;
