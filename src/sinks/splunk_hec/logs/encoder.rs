@@ -22,7 +22,7 @@ pub(super) struct HecData {
     #[serde(flatten)]
     pub event: HecEvent,
     pub(super) fields: LogEvent,
-    pub time: f64,
+    pub(crate) time: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
