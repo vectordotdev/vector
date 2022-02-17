@@ -38,7 +38,7 @@ impl Default for Direction {
 pub struct SortField<T: InputType> {
     pub field: T,
     #[graphql(default_with = "Direction::default()")]
-    pub direction: Direction,
+    pub(crate) direction: Direction,
 }
 
 /// Defines a type as sortable by a given field
