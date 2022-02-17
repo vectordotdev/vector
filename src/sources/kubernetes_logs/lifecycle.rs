@@ -21,7 +21,7 @@ use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 /// managed futures are requested to shutdown. They can do so gracefully after
 /// completing their work.
 #[derive(Debug)]
-pub struct Lifecycle<'bound> {
+pub(super) struct Lifecycle<'bound> {
     futs: FuturesUnordered<BoxFuture<'bound, ()>>,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
 }
