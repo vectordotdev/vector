@@ -17,7 +17,9 @@ pub(crate) fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> 
     }
 }
 
-pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
+pub(crate) fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(
+    names: I,
+) -> Result<(), Vec<String>> {
     let errors: Vec<_> = names
         .filter(|component_key| component_key.id().contains('.'))
         .map(|component_key| {
