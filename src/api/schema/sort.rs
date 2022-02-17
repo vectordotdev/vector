@@ -15,7 +15,7 @@ use crate::api::schema::{
 };
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
-pub enum Direction {
+pub(crate) enum Direction {
     Asc,
     Desc,
 }
