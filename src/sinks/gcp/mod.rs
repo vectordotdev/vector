@@ -189,7 +189,7 @@ pub struct GcpInterval {
     )]
     pub start_time: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(serialize_with = "serialize_datetime")]
-    pub end_time: chrono::DateTime<chrono::Utc>,
+    pub(super) end_time: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Serialize, Debug, Clone, Copy)]
