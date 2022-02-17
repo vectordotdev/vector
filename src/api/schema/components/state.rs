@@ -87,6 +87,6 @@ pub fn component_by_output_id(output_id: &OutputId) -> Option<Component> {
 }
 
 /// Overwrites component state with new components.
-pub fn update(new_components: HashMap<ComponentKey, Component>) {
+pub(super) fn update(new_components: HashMap<ComponentKey, Component>) {
     *COMPONENTS.write().expect(INVARIANT) = new_components
 }
