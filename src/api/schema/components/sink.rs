@@ -21,7 +21,7 @@ pub struct Data {
 }
 
 #[derive(Debug, Clone)]
-pub struct Sink(pub Data);
+pub struct Sink(pub(crate) Data);
 
 impl Sink {
     pub const fn get_component_key(&self) -> &ComponentKey {

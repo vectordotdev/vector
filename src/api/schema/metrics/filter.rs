@@ -250,7 +250,7 @@ pub fn counter_throughput(
 
 /// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
 /// and filtered by the provided `filter_fn`, aggregated against each component.
-pub fn component_counter_throughputs(
+pub(super) fn component_counter_throughputs(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Vec<(Metric, f64)>> {
