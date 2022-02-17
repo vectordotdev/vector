@@ -9,7 +9,7 @@ pub struct Options {
     pub enabled: bool,
 
     #[serde(default = "default_address")]
-    pub address: Option<SocketAddr>,
+    pub(crate) address: Option<SocketAddr>,
 
     #[serde(default = "default_playground")]
     pub playground: bool,
