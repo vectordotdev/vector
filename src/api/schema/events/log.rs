@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Log {
+pub(crate) struct Log {
     output_id: OutputId,
     event: event::LogEvent,
 }
