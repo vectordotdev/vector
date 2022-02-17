@@ -28,7 +28,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub datadog: Option<datadog::Options>,
     #[serde(default)]
-    pub healthchecks: HealthcheckOptions,
+    pub(crate) healthchecks: HealthcheckOptions,
     #[serde(default)]
     pub(crate) enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
