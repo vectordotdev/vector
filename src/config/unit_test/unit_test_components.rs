@@ -118,7 +118,7 @@ pub struct UnitTestSink {
     pub test_name: String,
     pub(crate) transform_id: String,
     // None for NoOp test sinks
-    pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
+    pub(crate) result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
     pub check: UnitTestSinkCheck,
 }
 
