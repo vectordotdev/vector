@@ -78,7 +78,7 @@ impl ComponentReceivedEventsTotal {
     }
 }
 
-pub struct ComponentReceivedEventsThroughput {
+pub(crate) struct ComponentReceivedEventsThroughput {
     component_key: ComponentKey,
     throughput: i64,
 }
