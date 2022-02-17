@@ -259,7 +259,7 @@ impl DiskMetrics {
     }
 }
 
-pub struct HostMetrics(host_metrics::HostMetrics);
+pub(crate) struct HostMetrics(host_metrics::HostMetrics);
 
 impl HostMetrics {
     /// Primes the host metrics pump by passing through a new `HostMetrics`
