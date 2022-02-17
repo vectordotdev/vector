@@ -20,7 +20,7 @@ pub enum ComponentHint {
 impl ComponentHint {
     /// Returns the component string field that should host a component -- e.g. sources,
     /// transforms, etc.
-    fn as_component_field(&self) -> &str {
+    const fn as_component_field(&self) -> &str {
         match self {
             ComponentHint::Source => "sources",
             ComponentHint::Transform => "transforms",
@@ -30,8 +30,9 @@ impl ComponentHint {
         }
     }
 
-    /// Joins a component sub-folder to a provided path, for traversal.
-    pub fn join_path(&self, path: &Path) -> PathBuf {
+    /// Joins a component sub-folder to a provided path, for traversal. Since `Self` is a
+    /// `Copy`, this is more efficient to pass by value than ref.
+    pub fn join_path(self, path: &Path) -> PathBuf {
         path.join(self.as_component_field())
     }
 }
