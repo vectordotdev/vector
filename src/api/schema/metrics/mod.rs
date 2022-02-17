@@ -37,7 +37,7 @@ pub(self) use sent_events::{
 pub use sink::{IntoSinkMetrics, SinkMetrics};
 pub(super) use source::{IntoSourceMetrics, SourceMetrics};
 use tokio_stream::{Stream, StreamExt};
-pub use transform::{IntoTransformMetrics, TransformMetrics};
+pub(crate) use transform::{IntoTransformMetrics, TransformMetrics};
 pub(super) use uptime::Uptime;
 
 use crate::config::ComponentKey;
