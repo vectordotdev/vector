@@ -160,7 +160,7 @@ impl LoadAverageMetrics {
     }
 }
 
-pub struct NetworkMetrics(Vec<Metric>);
+struct NetworkMetrics(Vec<Metric>);
 
 #[Object]
 impl NetworkMetrics {
