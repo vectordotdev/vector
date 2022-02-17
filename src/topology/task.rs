@@ -24,7 +24,7 @@ pub enum TaskOutput {
 
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
     key: ComponentKey,

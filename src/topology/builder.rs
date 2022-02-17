@@ -115,7 +115,7 @@ pub struct Pieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
-    pub source_tasks: HashMap<ComponentKey, Task>,
+    pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
