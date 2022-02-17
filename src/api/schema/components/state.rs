@@ -25,7 +25,7 @@ pub fn filter_components<T>(map_func: impl Fn((&ComponentKey, &Component)) -> Op
 }
 
 /// Returns all components
-pub fn get_components() -> Vec<Component> {
+pub(super) fn get_components() -> Vec<Component> {
     filter_components(|(_component_key, components)| Some(components.clone()))
 }
 
