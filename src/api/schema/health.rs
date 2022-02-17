@@ -4,7 +4,7 @@ use tokio::time::Duration;
 use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 #[derive(SimpleObject)]
-pub struct Heartbeat {
+struct Heartbeat {
     utc: DateTime<Utc>,
 }
 
