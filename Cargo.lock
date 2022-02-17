@@ -315,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.30"
+version = "3.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1f36037ea7e7dfc8d4ee917933f3cfd1eb0b642f2c159b8ca73a72f97a02e5"
+checksum = "55e5d4e4b27d5058f397bfb40c6355af7a077dcfe9479a4e57d196dddebb1026"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -1353,9 +1353,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.14"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b63edc3f163b3c71ec8aa23f9bd6070f77edbf3d1d198b164afa90ff00e4ec62"
+checksum = "e5f1fea81f183005ced9e59cdb01737ef2423956dac5a6d731b06b2ecfaa3467"
 dependencies = [
  "atty",
  "bitflags",
@@ -1864,6 +1864,7 @@ dependencies = [
  "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.30",
+ "value",
  "vector_common",
  "vrl-compiler",
 ]
@@ -8141,6 +8142,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.1.0",
  "chrono",
+ "indoc",
  "lookup",
  "mlua",
  "ordered-float",
@@ -8397,7 +8399,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.0.14",
+ "clap 3.1.0",
  "crc32fast",
  "criterion",
  "crossbeam-utils",
@@ -8656,6 +8658,7 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "value",
  "vector_common",
  "vrl",
  "woothee",
