@@ -22,7 +22,7 @@ use std::{
 };
 
 use futures::{Future, FutureExt};
-pub use running::RunningTopology;
+pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::{
     topology::channel::{BufferReceiver, BufferSender},
