@@ -117,7 +117,7 @@ pub struct Pieces {
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
-    pub shutdown_coordinator: SourceShutdownCoordinator,
+    pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(super) enrichment_tables: enrichment::TableRegistry,
 }
