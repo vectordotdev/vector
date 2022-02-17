@@ -182,7 +182,11 @@ pub async fn build_pieces(
             // with the given ID. This ID can then be used by subsequent components to get the
             // schema of an event at runtime.
             let schema_id = schema_registry
-                .register_definition(output.log_schema_definition)
+                .register_definition(
+                    output
+                        .log_schema_definition
+                        .unwrap_or_else(schema::Definition::empty),
+                )
                 .map_err(|err| vec![err.to_string()])?;
 
             schema_ids.insert(output.port, schema_id);
@@ -256,10 +260,25 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
+        for output in transform.inner.outputs() {
+            let definition = match output.log_schema_definition {
+                Some(definition) => definition,
+                None => schema::merged_definition(&transform.inputs, config),
+            };
+
+            let schema_id = schema_registry
+                .register_definition(definition)
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
+        }
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+            schema_ids,
         };
 
         let node = TransformNode {
