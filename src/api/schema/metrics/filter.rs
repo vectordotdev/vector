@@ -328,7 +328,7 @@ pub fn component_sent_events_totals_metrics_with_outputs(
 
 /// Returns the throughput of the 'component_sent_events_total' metric, sampled over `interval` milliseconds,
 /// for each component. Within a particular component, throughput per output stream is also included.
-pub fn component_sent_events_total_throughputs_with_outputs(
+pub(super) fn component_sent_events_total_throughputs_with_outputs(
     interval: i32,
 ) -> impl Stream<Item = Vec<(ComponentKey, i64, Vec<OutputThroughput>)>> {
     let mut cache = BTreeMap::new();
