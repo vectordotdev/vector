@@ -35,7 +35,7 @@ pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
 pub struct TlsConfig {
     pub enabled: Option<bool>,
     #[serde(flatten)]
-    pub options: TlsOptions,
+    pub(crate) options: TlsOptions,
 }
 
 impl TlsConfig {
