@@ -20,7 +20,7 @@ use crate::{
 pub struct FieldsSpec {
     pub pod_name: String,
     pub pod_namespace: String,
-    pub pod_uid: String,
+    pub(self) pod_uid: String,
     pub pod_ip: String,
     pub pod_ips: String,
     pub pod_labels: String,

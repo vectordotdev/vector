@@ -22,7 +22,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 
-pub mod parser;
+pub(crate) mod parser;
 use parser::NginxStubStatus;
 
 macro_rules! counter {
