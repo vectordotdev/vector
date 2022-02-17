@@ -294,7 +294,7 @@ pub(crate) fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
-pub async fn init_dashboard<'a>(
+pub(crate) async fn init_dashboard<'a>(
     url: &'a str,
     opts: &'a super::Opts,
     mut state_rx: state::StateRx,

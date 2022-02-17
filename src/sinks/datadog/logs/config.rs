@@ -34,7 +34,7 @@ use crate::{
 pub(super) const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub(super) const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub(crate) const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub(super) const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct DatadogLogsDefaultBatchSettings;
