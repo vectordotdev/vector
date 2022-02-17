@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]
-    pub enabled: bool,
+    pub(crate) enabled: bool,
 
     #[serde(default = "default_address")]
     pub(crate) address: Option<SocketAddr>,
