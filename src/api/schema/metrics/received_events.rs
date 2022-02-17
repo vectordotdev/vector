@@ -44,7 +44,7 @@ impl From<Metric> for ReceivedEventsTotal {
     }
 }
 
-pub struct ComponentReceivedEventsTotal {
+pub(crate) struct ComponentReceivedEventsTotal {
     component_key: ComponentKey,
     metric: Metric,
 }
