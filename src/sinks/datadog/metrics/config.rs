@@ -99,7 +99,7 @@ impl DatadogMetricsEndpointConfiguration {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
-    pub default_namespace: Option<String>,
+    default_namespace: Option<String>,
     pub endpoint: Option<String>,
     // Deprecated, replaced by the site option
     pub region: Option<Region>,
