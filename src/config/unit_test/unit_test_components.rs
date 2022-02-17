@@ -75,7 +75,7 @@ pub struct UnitTestSinkResult {
 
 #[derive(Serialize, Deserialize, Default, Derivative)]
 #[derivative(Debug)]
-pub struct UnitTestSinkConfig {
+pub(super) struct UnitTestSinkConfig {
     // Name of the test this sink is part of
     pub test_name: String,
     // Name of the transform/branch associated with this sink
