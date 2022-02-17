@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Metric {
+pub(crate) struct Metric {
     output_id: OutputId,
     event: event::Metric,
 }
