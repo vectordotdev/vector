@@ -21,7 +21,7 @@ pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::EventsInTotal;
 pub(self) use events_out::EventsOutTotal;
 pub(crate) use filter::*;
-pub use output::*;
+pub(super) use output::*;
 pub(crate) use processed_bytes::{
     ComponentProcessedBytesThroughput, ComponentProcessedBytesTotal, ProcessedBytesTotal,
 };
