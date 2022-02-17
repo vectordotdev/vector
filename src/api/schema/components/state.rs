@@ -54,7 +54,7 @@ pub fn get_sinks() -> Vec<sink::Sink> {
 }
 
 /// Returns the current component component_keys as a HashSet
-pub fn get_component_keys() -> HashSet<ComponentKey> {
+pub(super) fn get_component_keys() -> HashSet<ComponentKey> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
