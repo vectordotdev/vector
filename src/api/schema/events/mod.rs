@@ -45,7 +45,7 @@ impl TapPatterns {
 }
 
 #[derive(Debug, Default)]
-pub struct EventsSubscription;
+pub(super) struct EventsSubscription;
 
 #[Subscription]
 impl EventsSubscription {
