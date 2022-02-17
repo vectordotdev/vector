@@ -19,7 +19,7 @@ pub struct Options {
     pub enabled: bool,
 
     #[serde(default)]
-    pub api_key: Option<String>,
+    pub(crate) api_key: Option<String>,
 
     configuration_key: String,
 
