@@ -1026,7 +1026,7 @@ mod tests {
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
                 address,

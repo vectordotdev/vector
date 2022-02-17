@@ -90,10 +90,19 @@ impl Input {
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
+
     // NOTE: schema definitions are only implemented/supported for log-type events. There is no
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
-    pub log_schema_definition: schema::Definition,
+    ///
+    /// The `None` variant of a schema definition has two distinct meanings for a source component
+    /// versus a transform component:
+    ///
+    /// For *sources*, a `None` schema is identical to a `Some(Definition::undefined())` schema.
+    ///
+    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
+    /// of its inputs, without modifying the schema further.
+    pub log_schema_definition: Option<schema::Definition>,
 }
 
 impl Output {
@@ -105,13 +114,13 @@ impl Output {
         Self {
             port: None,
             ty,
-            log_schema_definition: schema::Definition::empty(),
+            log_schema_definition: None,
         }
     }
 
     /// Set the schema definition for this output.
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
-        self.log_schema_definition = schema_definition;
+        self.log_schema_definition = Some(schema_definition);
         self
     }
 }
@@ -121,7 +130,7 @@ impl<T: Into<String>> From<(T, DataType)> for Output {
         Self {
             port: Some(name.into()),
             ty,
-            log_schema_definition: schema::Definition::empty(),
+            log_schema_definition: None,
         }
     }
 }

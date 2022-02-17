@@ -1073,7 +1073,7 @@ mod integration_tests {
         let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await

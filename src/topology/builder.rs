@@ -27,6 +27,7 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
+    schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
 };
@@ -140,6 +141,8 @@ pub async fn build_pieces(
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
 
+    let mut schema_registry = schema::Registry::default();
+
     // Build sources
     for (key, source) in config
         .sources
@@ -152,6 +155,8 @@ pub async fn build_pieces(
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
+        let mut schema_ids = HashMap::with_capacity(source_outputs.len());
+
         for output in source_outputs {
             let rx = builder.add_output(output.clone());
 
@@ -165,10 +170,26 @@ pub async fn build_pieces(
             controls.insert(
                 OutputId {
                     component: key.clone(),
-                    port: output.port,
+                    port: output.port.clone(),
                 },
                 control,
             );
+
+            // Each individual output of a source carries its own schema definition. These
+            // definitions are inserted in the global schema registry. The resuting `schema::Id` is
+            // stored, together with the output identifier, which the source can access through the
+            // `SourceContext`, so that the source can annotate each individual event it receives
+            // with the given ID. This ID can then be used by subsequent components to get the
+            // schema of an event at runtime.
+            let schema_id = schema_registry
+                .register_definition(
+                    output
+                        .log_schema_definition
+                        .unwrap_or_else(schema::Definition::empty),
+                )
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
         }
 
         let pump = async move {
@@ -193,6 +214,7 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
+            schema_ids,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -238,10 +260,25 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
+        for output in transform.inner.outputs() {
+            let definition = match output.log_schema_definition {
+                Some(definition) => definition,
+                None => schema::merged_definition(&transform.inputs, config),
+            };
+
+            let schema_id = schema_registry
+                .register_definition(definition)
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
+        }
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+            schema_ids,
         };
 
         let node = TransformNode {

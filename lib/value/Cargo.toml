@@ -20,13 +20,13 @@ tracing = { version = "0.1.30", default-features = false }
 async-graphql = { version = "3.0.30", default-features = false, optional = true }
 mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"], optional = true }
-serde_json = { version = "1.0.79", default-features = false, optional = true }
+serde_json = { version = "1.0.79", optional = true }
 toml = { version = "0.5.8", default-features = false, optional = true }
 quickcheck = { version = "1.0.3", optional = true }
 
 [features]
 lua = ["mlua"]
-api = ["async-graphql"]
+api = ["async-graphql", "json"]
 json = ["serde", "serde_json"]
 test = []
 arbitrary = ["quickcheck"]
