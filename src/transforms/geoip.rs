@@ -19,7 +19,7 @@ pub(self) struct GeoipConfig {
     source: String,
     pub database: String,
     #[serde(default = "default_geoip_target_field")]
-    pub target: String,
+    pub(super) target: String,
 }
 
 #[derive(Derivative)]

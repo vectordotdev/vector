@@ -27,7 +27,7 @@ enum V2 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfigV2 {
+pub(super) struct VectorConfigV2 {
     version: Option<V2>,
     #[serde(flatten)]
     config: v2::VectorConfig,

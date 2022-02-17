@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct FieldsSpec {
+pub(crate) struct FieldsSpec {
     pub(super) namespace_labels: String,
 }
 
