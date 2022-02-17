@@ -79,7 +79,7 @@ impl<T: InputType + PartialEq + Eq + Ord> ListFilter<T> {
 
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentKindFilter", params(ComponentKind)))]
-pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
+pub(crate) struct EqualityFilter<T: InputType + PartialEq + Eq> {
     pub equals: Option<T>,
     pub not_equals: Option<T>,
 }
