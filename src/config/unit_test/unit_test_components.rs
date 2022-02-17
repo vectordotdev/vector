@@ -79,7 +79,7 @@ pub struct UnitTestSinkConfig {
     // Name of the test this sink is part of
     pub test_name: String,
     // Name of the transform/branch associated with this sink
-    pub transform_id: String,
+    pub(super) transform_id: String,
     #[serde(skip)]
     // Sender used to transmit the test result
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
