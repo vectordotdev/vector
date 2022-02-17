@@ -7,6 +7,8 @@ pub mod decoding;
 pub mod encoding;
 mod ready_frames;
 
+#[cfg(feature = "sources-syslog")]
+pub(super) use decoding::SyslogDeserializer;
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, JsonDeserializer,
@@ -14,7 +16,5 @@ pub use decoding::{
     NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
     OctetCountingDecoderConfig,
 };
-#[cfg(feature = "sources-syslog")]
-pub(super) use decoding::{SyslogDeserializer};
 
 pub use ready_frames::ReadyFrames;

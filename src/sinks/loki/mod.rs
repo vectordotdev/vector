@@ -25,7 +25,6 @@ mod tests;
 pub(self) use config::valid_label_name;
 use config::LokiConfig;
 
-
 use crate::config::SinkDescription;
 
 inventory::submit! {

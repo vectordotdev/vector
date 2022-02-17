@@ -10,7 +10,7 @@ type IdentifiedMetric = (ComponentKey, i64);
 #[derive(Debug)]
 pub struct SentEventsMetric {
     pub key: ComponentKey,
-    pub total: i64,
+    pub(crate) total: i64,
     pub outputs: HashMap<String, i64>,
 }
 
