@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
-pub enum TaskOutput {
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
