@@ -2,7 +2,7 @@ use async_graphql::{Enum, SimpleObject};
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 /// Event notification type
-pub enum EventNotificationType {
+pub(crate) enum EventNotificationType {
     /// A component was found that matched the provided pattern
     Matched,
     /// There isn't currently a component that matches this pattern
