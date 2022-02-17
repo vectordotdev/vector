@@ -34,7 +34,7 @@ use self::unit_test_components::{
 use super::{compiler::expand_globs, graph::Graph, OutputId};
 
 pub struct UnitTest {
-    pub name: String,
+    pub(crate) name: String,
     config: Config,
     pieces: Pieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
