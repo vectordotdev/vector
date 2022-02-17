@@ -74,6 +74,7 @@ for exp in bytes_written.experiment.unique():
     results.append({'experiment': exp,
                     'Δ mean': diff.mean(),
                     'Δ mean %': percent_change,
+                    'confidence': common.confidence(res.pvalue),
                     'baseline mean': baseline_mean,
                     'baseline stdev': baseline_stdev,
                     'baseline stderr': baseline_stderr,
@@ -127,16 +128,14 @@ p_value_violation = results['p-value'] < args.p_value
 erratic_violation = results.erratic == True
 
 changes = results[p_value_violation & drift_filter & ~declared_erratic].copy(deep=True)
-changes['Δ confidence'] = changes['p-value'].apply(common.confidence)
 changes = changes.drop(labels=['p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
                                'baseline outlier %', 'baseline CoV',
                                'comparison outlier %', 'comparison CoV', 'erratic',
-                               'comparison stdev', 'declared erratic'], axis=1)
+                               'comparison stdev', 'declared erratic', 'baseline stderr',
+                               'comparison stderr'], axis=1)
 changes = changes.sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
-changes['baseline stderr'] = changes['baseline stderr'].apply(common.human_bytes)
-changes['comparison stderr'] = changes['comparison stderr'].apply(common.human_bytes)
 
 no_longer_erratic = results[~erratic_violation & declared_erratic].copy(deep=True)
 no_longer_erratic = no_longer_erratic.drop(labels=['p-value', 'baseline mean',
@@ -184,6 +183,7 @@ print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
 results = results.sort_values('Δ mean %', ascending=False)
+results = results.drop(labels=["p-value"], axis=1) # only used for detecting changes
 results['Δ mean'] = results['Δ mean'].apply(common.human_bytes)
 results['baseline mean'] = results['baseline mean'].apply(common.human_bytes)
 results['baseline stdev'] = results['baseline stdev'].apply(common.human_bytes)
