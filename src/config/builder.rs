@@ -34,7 +34,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+    pub(crate) sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
     pub(crate) transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
