@@ -248,7 +248,7 @@ mod test {
     struct MockSinkConfig;
 
     #[async_trait]
-    #[typetag::serde(name = "mock")]
+    #[typetag::serde(name = "mock_source")]
     impl SourceConfig for MockSourceConfig {
         async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
             unimplemented!()
@@ -264,7 +264,7 @@ mod test {
     }
 
     #[async_trait]
-    #[typetag::serde(name = "mock")]
+    #[typetag::serde(name = "mock_transform")]
     impl TransformConfig for MockTransformConfig {
         async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
             unimplemented!()
