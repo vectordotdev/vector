@@ -161,7 +161,7 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
 }
 
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
-pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
+pub(super) fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let controller = get_controller();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
