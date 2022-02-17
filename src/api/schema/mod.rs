@@ -1,5 +1,5 @@
 pub mod components;
-pub mod events;
+pub(crate) mod events;
 pub(super) mod filter;
 mod health;
 mod meta;

@@ -1,5 +1,5 @@
 pub mod sink;
-pub mod source;
+pub(crate) mod source;
 mod state;
 pub(super) mod transform;
 
