@@ -34,7 +34,7 @@ impl Sink {
 }
 
 #[derive(Default, InputObject)]
-pub struct SinksFilter {
+pub(super) struct SinksFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_type: Option<Vec<filter::StringFilter>>,
     or: Option<Vec<Self>>,
