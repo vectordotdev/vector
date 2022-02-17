@@ -428,5 +428,5 @@ pub struct CommandServerStatusWiredTigerTransaction {
 pub struct CommandServerStatusNetwork {
     pub bytes_in: i64,
     pub bytes_out: i64,
-    pub num_requests: i64,
+    pub(super) num_requests: i64,
 }
