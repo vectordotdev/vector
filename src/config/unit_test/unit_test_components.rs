@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
-pub struct UnitTestSourceConfig {
+pub(super) struct UnitTestSourceConfig {
     #[serde(skip)]
     pub(crate) events: Vec<Event>,
 }
