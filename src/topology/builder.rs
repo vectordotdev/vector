@@ -119,7 +119,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<ComponentKey, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub enrichment_tables: enrichment::TableRegistry,
+    pub(super) enrichment_tables: enrichment::TableRegistry,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
