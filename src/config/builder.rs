@@ -39,7 +39,7 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    pub(super) provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
 #[cfg(feature = "datadog-pipelines")]

@@ -28,7 +28,7 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
-pub fn spawn_thread<'a>(
+pub(crate) fn spawn_thread<'a>(
     config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
     delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
