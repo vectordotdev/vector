@@ -63,7 +63,7 @@ impl MetricsQuery {
 }
 
 #[derive(Default)]
-pub struct MetricsSubscription;
+pub(crate) struct MetricsSubscription;
 
 #[Subscription]
 impl MetricsSubscription {
