@@ -70,7 +70,9 @@ impl UnitTest {
     }
 }
 
-pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
+pub(crate) async fn build_unit_tests_main(
+    paths: &[ConfigPath],
+) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
     let (config_builder, _) = loading::load_builder_from_paths(paths)?;
