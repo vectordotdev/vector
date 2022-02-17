@@ -92,7 +92,8 @@ pub struct ConnectionFields {
 }
 
 /// Relay connection result
-pub type ConnectionResult<T> = Result<Connection<Base64Cursor, T, ConnectionFields, EmptyFields>>;
+pub(super) type ConnectionResult<T> =
+    Result<Connection<Base64Cursor, T, ConnectionFields, EmptyFields>>;
 
 /// Relay-compliant connection parameters to page results by cursor/page size
 pub(crate) struct Params {
