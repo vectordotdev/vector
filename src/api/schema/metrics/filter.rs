@@ -279,7 +279,7 @@ pub(super) fn component_counter_throughputs(
 /// Returns a stream of `Vec<(Metric, Vec<Metric>)>`, where `Metric` is the
 /// total `component_sent_events_total` metric for a component and `Vec<Metric>`
 /// is the `component_sent_events_total` metric split by output
-pub fn component_sent_events_totals_metrics_with_outputs(
+pub(crate) fn component_sent_events_totals_metrics_with_outputs(
     interval: i32,
 ) -> impl Stream<Item = Vec<(Metric, Vec<Metric>)>> {
     let mut cache = BTreeMap::new();
