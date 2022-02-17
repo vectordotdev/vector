@@ -391,16 +391,9 @@ impl Expression for FunctionCall {
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        //
-        // FIXME: need mutable access to compiler state here, but the VM implementation doesn't
-        // allow that yet...
-        // let external_context = state.swap_external_contexts(AnyMap::new());
-        let external_context = AnyMap::new();
-
-        let mut compile_ctx = FunctionCompileContext::new(self.span, external_context);
+        // The VM also calls `Function::Compile`, so handling the `anymap` is handled there, and we
+        // can just pass in a no-op empty map here.
+        let compile_ctx = FunctionCompileContext::new(self.span, AnyMap::new());
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
@@ -409,7 +402,7 @@ impl Expression for FunctionCall {
             // Call `compile_argument` for functions that need to perform any compile time processing
             // on the argument.
             match fun
-                .compile_argument(&args, &mut compile_ctx, keyword, argument)
+                .compile_argument(&args, &compile_ctx, keyword, argument)
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
@@ -433,9 +426,6 @@ impl Expression for FunctionCall {
                 },
             }
         }
-
-        // Re-insert the external context into the compiler state.
-        // let _ = state.swap_external_contexts(compile_ctx.into_external_contexts());
 
         // Call the function with the given id.
         vm.write_opcode(OpCode::Call);

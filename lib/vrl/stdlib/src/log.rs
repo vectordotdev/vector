@@ -114,7 +114,7 @@ impl Function for Log {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
+        ctx: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
