@@ -51,7 +51,7 @@ pub enum MetricType {
 }
 
 #[derive(Default)]
-pub struct MetricsQuery;
+pub(super) struct MetricsQuery;
 
 #[Object]
 impl MetricsQuery {
