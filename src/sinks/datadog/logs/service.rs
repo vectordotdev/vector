@@ -44,7 +44,7 @@ impl RetryLogic for LogApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct LogApiRequest {
-    pub batch_size: usize,
+    pub(super) batch_size: usize,
     pub(crate) api_key: Arc<str>,
     pub compression: Compression,
     pub body: Bytes,
