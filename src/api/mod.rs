@@ -1,7 +1,7 @@
 mod handler;
 mod schema;
 mod server;
-pub mod tap;
+mod tap;
 #[cfg(all(test, feature = "vector-api-tests"))]
 mod tests;
 

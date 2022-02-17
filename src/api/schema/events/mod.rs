@@ -1,5 +1,5 @@
 mod encoding;
-pub mod log;
+pub(crate) mod log;
 pub mod metric;
 pub mod notification;
 pub mod output;

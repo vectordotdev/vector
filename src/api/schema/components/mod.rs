@@ -1,6 +1,6 @@
 pub mod sink;
 pub mod source;
-pub mod state;
+mod state;
 pub mod transform;
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
