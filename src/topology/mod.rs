@@ -91,7 +91,10 @@ pub async fn build_or_log_errors(
     }
 }
 
-pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(ComponentKey, Task)> {
+pub(super) fn take_healthchecks(
+    diff: &ConfigDiff,
+    pieces: &mut Pieces,
+) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
         .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))
