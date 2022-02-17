@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
 
-pub struct KinesisSink {
+pub(crate) struct KinesisSink {
     pub batch_settings: BatcherSettings,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
     pub(crate) acker: Acker,

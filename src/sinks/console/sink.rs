@@ -18,7 +18,7 @@ use crate::{
 
 pub struct WriterSink<T> {
     pub acker: Acker,
-    pub output: T,
+    pub(crate) output: T,
     pub(super) encoding: EncodingConfig<StandardEncodings>,
 }
 
