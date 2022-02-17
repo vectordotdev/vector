@@ -41,7 +41,7 @@ impl Format {
 /// Parse the string represented in the specified format.
 /// If the format is unknown - fallback to the default format and attempt
 /// parsing using that.
-pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
+pub(crate) fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
 {
