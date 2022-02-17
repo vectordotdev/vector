@@ -53,7 +53,7 @@ pub struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
     pub equals: Option<Vec<T>>,
     pub not_equals: Option<Vec<T>>,
     pub contains: Option<T>,
-    pub not_contains: Option<T>,
+    pub(super) not_contains: Option<T>,
 }
 
 impl<T: InputType + PartialEq + Eq + Ord> ListFilter<T> {
