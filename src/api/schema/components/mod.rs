@@ -59,7 +59,7 @@ impl Component {
 }
 
 #[derive(Default, InputObject)]
-pub struct ComponentsFilter {
+struct ComponentsFilter {
     component_id: Option<Vec<filter::StringFilter>>,
     component_kind: Option<Vec<filter::EqualityFilter<ComponentKind>>>,
     or: Option<Vec<Self>>,
