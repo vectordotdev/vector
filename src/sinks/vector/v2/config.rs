@@ -29,7 +29,7 @@ use crate::{
 pub struct VectorConfig {
     address: String,
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+    pub(self) batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
     pub(self) request: TowerRequestConfig,
     #[serde(default)]
