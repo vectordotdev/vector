@@ -39,7 +39,7 @@ pub struct LokiConfig {
     pub auth: Option<Auth>,
 
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    request: TowerRequestConfig,
 
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,

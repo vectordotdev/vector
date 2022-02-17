@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct AwsSqsEventSent<'a> {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub message_id: Option<&'a String>,
 }
 
