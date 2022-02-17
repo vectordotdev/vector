@@ -150,7 +150,7 @@ pub enum MarkerOffset {
 /// ### Detecting record gaps and the length of undecodable records
 ///
 /// Additionally, and as hinted at above, markers can be added without a known length: this may
-/// happen when a record is read but it cannot be docoded, and thus determining the true length is
+/// happen when a record is read but it cannot be decoded, and thus determining the true length is
 /// not possible.
 ///
 /// When markers that have an unknown length are added, `OrderedAcknowledgements` will do one of two things:
