@@ -52,7 +52,7 @@ type Outputs = HashMap<OutputId, fanout::ControlChannel>;
 // `Outputs`. This could be expanded in the future to send an enum of types if,
 // for example, this included a new 'Inputs' type.
 type WatchTx = watch::Sender<Outputs>;
-pub type WatchRx = watch::Receiver<Outputs>;
+pub(super) type WatchRx = watch::Receiver<Outputs>;
 
 pub async fn start_validated(
     config: Config,
