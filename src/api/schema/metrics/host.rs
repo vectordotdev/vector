@@ -214,7 +214,7 @@ impl NetworkMetrics {
     }
 }
 
-pub struct FileSystemMetrics(Vec<Metric>);
+struct FileSystemMetrics(Vec<Metric>);
 
 #[Object]
 impl FileSystemMetrics {
