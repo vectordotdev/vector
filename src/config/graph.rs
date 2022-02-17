@@ -5,7 +5,7 @@ use indexmap::{set::IndexSet, IndexMap};
 use super::{ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter};
 
 #[derive(Debug, Clone)]
-pub enum Node {
+pub(crate) enum Node {
     Source {
         outputs: Vec<Output>,
     },

@@ -15,7 +15,7 @@ use crate::{
     Error,
 };
 
-pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
+pub(crate) fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
 where
     for<'a> T: Deserialize<'a> + SinkConfig,
 {
