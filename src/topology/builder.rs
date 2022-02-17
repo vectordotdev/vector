@@ -55,7 +55,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(num_cpus::get)
 });
 
-pub async fn load_enrichment_tables<'a>(
+pub(self) async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
     diff: &'a ConfigDiff,
 ) -> (&'static enrichment::TableRegistry, Vec<String>) {
