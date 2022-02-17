@@ -94,7 +94,6 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
-  "lib/datadog/filter-test",
   "lib/soak"
 ]
 
@@ -323,8 +322,6 @@ prost-build = { version = "0.9", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
-datadog-filter-test = { path = "lib/datadog/filter-test"}
-
 approx = "0.5.1"
 assert_cmd = "2.0.4"
 base64 = "0.13.0"
