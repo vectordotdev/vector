@@ -727,7 +727,7 @@ pub struct TestDefinition<T = OutputId> {
     #[serde(default)]
     pub inputs: Vec<TestInput>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput<T>>,
+    pub(self) outputs: Vec<TestOutput<T>>,
     #[serde(default)]
     pub no_outputs_from: Vec<T>,
 }
