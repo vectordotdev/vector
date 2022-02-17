@@ -227,7 +227,7 @@ static COMPONENT_CHANGED: Lazy<tokio::sync::broadcast::Sender<ComponentChanged>>
     });
 
 #[derive(Debug, Default)]
-pub struct ComponentsSubscription;
+pub(crate) struct ComponentsSubscription;
 
 #[Subscription]
 impl ComponentsSubscription {
