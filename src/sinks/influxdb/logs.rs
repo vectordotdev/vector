@@ -158,6 +158,10 @@ impl SinkConfig for InfluxDbLogsConfig {
     fn sink_type(&self) -> &'static str {
         "influxdb_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]

@@ -699,6 +699,10 @@ impl SinkConfig for DatadogArchivesSinkConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 // Make a header pair from a key-value string pair

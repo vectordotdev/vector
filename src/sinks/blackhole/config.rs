@@ -37,6 +37,10 @@ impl SinkConfig for BlackholeConfig {
     fn sink_type(&self) -> &'static str {
         "blackhole"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl GenerateConfig for BlackholeConfig {

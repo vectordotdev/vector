@@ -298,6 +298,10 @@ mod test {
         fn input(&self) -> Input {
             Input::all()
         }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
     }
 
     #[test]

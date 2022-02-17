@@ -138,6 +138,12 @@ impl Config {
                     .enabled()
             })
             .flat_map(|(name, sink)| {
+                if !sink.inner.can_acknowledge() {
+                    warn!(
+                        message = "Sink has acknowledgements enabled but does not support them. Silent data loss could occur.",
+                        name = %name,
+                    );
+                }
                 sink.inputs
                     .iter()
                     .map(|input| (name.clone(), input.clone()))
@@ -154,7 +160,7 @@ impl Config {
                     source.sink_acknowledgements = true;
                 } else {
                     warn!(
-                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Data loss could occur.",
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
                         source = component.id(),
                         sink = sink.id(),
                     );
@@ -472,6 +478,8 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
+
+    fn can_acknowledge(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]

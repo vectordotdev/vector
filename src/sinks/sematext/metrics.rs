@@ -122,6 +122,10 @@ impl SinkConfig for SematextMetricsConfig {
     fn sink_type(&self) -> &'static str {
         "sematext_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn write_uri(endpoint: &str) -> Result<Uri> {

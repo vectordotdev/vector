@@ -134,6 +134,10 @@ impl SinkConfig for NewRelicConfig {
     fn sink_type(&self) -> &'static str {
         "new_relic"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
