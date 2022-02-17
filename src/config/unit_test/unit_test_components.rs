@@ -19,7 +19,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct UnitTestSourceConfig {
     #[serde(skip)]
-    pub events: Vec<Event>,
+    pub(crate) events: Vec<Event>,
 }
 
 #[async_trait::async_trait]
