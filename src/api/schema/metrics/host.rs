@@ -5,7 +5,7 @@ use crate::{
     sources::host_metrics,
 };
 
-pub struct MemoryMetrics(Vec<Metric>);
+pub(crate) struct MemoryMetrics(Vec<Metric>);
 
 #[Object]
 /// Host memory metrics
