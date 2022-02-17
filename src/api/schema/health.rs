@@ -26,7 +26,7 @@ impl HealthQuery {
 }
 
 #[derive(Default)]
-pub struct HealthSubscription;
+pub(super) struct HealthSubscription;
 
 #[Subscription]
 impl HealthSubscription {
