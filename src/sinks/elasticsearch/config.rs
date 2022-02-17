@@ -266,7 +266,7 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_map());
+            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy())

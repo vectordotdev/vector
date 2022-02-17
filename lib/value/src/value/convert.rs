@@ -8,14 +8,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 impl Value {
-    /// Returns self as `&BTreeMap<String, Value>`, only if self is `Value::Map`.
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Self>> {
-        match &self {
-            Value::Object(map) => Some(map),
-            _ => None,
-        }
-    }
-
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
     pub fn as_float(&self) -> Option<NotNan<f64>> {
         match self {
@@ -57,7 +49,7 @@ impl Value {
     /// # Panics
     ///
     /// This function will panic if self is anything other than `Value::Array`.
-    pub fn as_array_unwrap(&self) -> &Vec<Self> {
+    pub fn as_array_unwrap(&self) -> &[Self] {
         match self {
             Value::Array(ref a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
