@@ -20,7 +20,7 @@ use super::{
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
-    pub global: GlobalOptions,
+    pub(crate) global: GlobalOptions,
     #[cfg(feature = "api")]
     #[serde(default)]
     pub(super) api: api::Options,
