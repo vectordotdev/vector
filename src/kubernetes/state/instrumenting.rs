@@ -7,7 +7,7 @@ use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// adds instrumentation.
-pub struct Writer<T> {
+pub(crate) struct Writer<T> {
     inner: T,
 }
 
