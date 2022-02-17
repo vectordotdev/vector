@@ -8,7 +8,7 @@ mod processed_events;
 mod received_events;
 mod sent_events;
 mod sink;
-pub mod source;
+pub(super) mod source;
 mod transform;
 mod uptime;
 
