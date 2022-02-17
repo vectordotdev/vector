@@ -143,7 +143,7 @@ pub(crate) fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>>
 
 /// To avoid collisions between `output` metric tags, check that a component
 /// does not have a named output with the name [`DEFAULT_OUTPUT`]
-pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(super) fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
         let outputs = source.inner.outputs();
