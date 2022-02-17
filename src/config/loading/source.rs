@@ -1,6 +1,5 @@
-use super::{ComponentHint, Loader, Process, ProcessedFile};
-use crate::config::{format, Format};
-use serde_toml_merge::{merge_into_table, merge_tables};
+use super::{ComponentHint, Loader, Process};
+use serde_toml_merge::merge_into_table;
 use std::io::Read;
 use toml::{
     map::Map,
@@ -27,34 +26,8 @@ impl Process for SourceLoader {
         Ok((source_string, vec![]))
     }
 
-    fn merge(
-        &mut self,
-        name: String,
-        value: Value,
-        hint: Option<ComponentHint>,
-    ) -> Result<(), Vec<String>> {
-        let mut out_table = Table::new();
-
-        // If there's a component hint, host it under a component field. Otherwise, deserialize
-        // as a 'root' value.
-        if let Some(hint) = hint {
-            let mut component = Table::new();
-            component.insert(name, value);
-
-            out_table.insert(
-                hint.as_component_field().to_owned(),
-                Value::Table(component),
-            );
-        } else {
-            match value {
-                Value::Table(table) => {
-                    out_table = table;
-                }
-                _ => return Err(vec!["expected TOML table object".to_owned()]),
-            }
-        }
-
-        merge_into_table(&mut self.table, out_table).map_err(|e| vec![e.to_string()])
+    fn merge(&mut self, table: Table, _hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        merge_into_table(&mut self.table, table).map_err(|e| vec![e.to_string()])
     }
 }
 

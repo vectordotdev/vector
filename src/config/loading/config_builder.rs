@@ -1,13 +1,12 @@
-use super::{deserialize_value, loader, prepare_input};
-use super::{ComponentHint, Process, ProcessedFile};
+use super::{deserialize_table, loader, prepare_input};
+use super::{ComponentHint, Process};
 use crate::config::{
-    format, ComponentKey, ConfigBuilder, EnrichmentTableOuter, Format, SinkOuter, SourceOuter,
-    TestDefinition, TransformOuter,
+    ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 use indexmap::IndexMap;
-use serde::de::DeserializeOwned;
 use std::io::Read;
-use toml::value::{Table, Value};
+use toml::value::Table;
 
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
@@ -26,41 +25,37 @@ impl Process for ConfigBuilderLoader {
         prepare_input(input)
     }
 
-    fn merge(
-        &mut self,
-        name: String,
-        value: Value,
-        hint: Option<ComponentHint>,
-    ) -> Result<(), Vec<String>> {
-        let component_key = ComponentKey::from(name);
-
+    fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder
-                    .sources
-                    .insert(component_key, deserialize_value(value)?);
+                self.builder.sources.extend(deserialize_table::<
+                    IndexMap<ComponentKey, SourceOuter>,
+                >(table)?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder
-                    .sinks
-                    .insert(component_key, deserialize_value(value)?);
+                self.builder.sinks.extend(
+                    deserialize_table::<IndexMap<ComponentKey, SinkOuter<_>>>(table)?,
+                );
             }
             Some(ComponentHint::Transform) => {
-                self.builder
-                    .transforms
-                    .insert(component_key, deserialize_value(value)?);
+                self.builder.transforms.extend(deserialize_table::<
+                    IndexMap<ComponentKey, TransformOuter<_>>,
+                >(table)?);
             }
             Some(ComponentHint::EnrichmentTable) => {
-                self.builder
-                    .enrichment_tables
-                    .insert(component_key, deserialize_value(value)?);
+                self.builder.enrichment_tables.extend(deserialize_table::<
+                    IndexMap<ComponentKey, EnrichmentTableOuter>,
+                >(table)?);
             }
-            Some(ComponentHint::Test) => self
-                .builder
-                .tests
-                .extend(deserialize_value::<Vec<TestDefinition<String>>>(value)?),
+            Some(ComponentHint::Test) => {
+                self.builder.tests.extend(
+                    deserialize_table::<IndexMap<ComponentKey, TestDefinition<String>>>(table)?
+                        .into_iter()
+                        .map(|(_, test)| test),
+                );
+            }
             None => {
-                self.builder.append(deserialize_value(value)?)?;
+                self.builder.append(deserialize_table(table)?)?;
             }
         };
 

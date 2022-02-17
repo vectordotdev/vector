@@ -11,11 +11,10 @@ use std::{
 };
 
 use config_builder::ConfigBuilderLoader;
-use loader::process::{ComponentHint, Process, ProcessedFile};
+use loader::process::{ComponentHint, Process};
 
 use super::{
-    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint,
+    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
