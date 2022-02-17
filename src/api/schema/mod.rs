@@ -26,6 +26,6 @@ pub struct Subscription(
 );
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types
-pub fn build_schema() -> SchemaBuilder<Query, EmptyMutation, Subscription> {
+pub(super) fn build_schema() -> SchemaBuilder<Query, EmptyMutation, Subscription> {
     Schema::build(Query::default(), EmptyMutation, Subscription::default())
 }
