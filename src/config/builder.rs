@@ -26,7 +26,7 @@ pub struct ConfigBuilder {
     pub(super) api: api::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
-    pub datadog: Option<datadog::Options>,
+    pub(crate) datadog: Option<datadog::Options>,
     #[serde(default)]
     pub(crate) healthchecks: HealthcheckOptions,
     #[serde(default)]
