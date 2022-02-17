@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 
 use crate::event::{Metric, MetricValue};
 
-pub struct Uptime(Metric);
+pub(crate) struct Uptime(Metric);
 
 impl Uptime {
     pub const fn new(m: Metric) -> Self {
