@@ -22,7 +22,7 @@ pub struct Data {
 }
 
 #[derive(Debug, Clone)]
-pub struct Transform(pub Data);
+pub struct Transform(pub(crate) Data);
 
 impl Transform {
     pub const fn get_component_key(&self) -> &ComponentKey {
