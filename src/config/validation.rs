@@ -35,7 +35,7 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
     }
 }
 
-pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub(crate) fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
     if config.sources.is_empty() {

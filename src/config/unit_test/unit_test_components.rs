@@ -116,7 +116,7 @@ impl SinkConfig for UnitTestSinkConfig {
 
 pub struct UnitTestSink {
     pub test_name: String,
-    pub transform_id: String,
+    pub(crate) transform_id: String,
     // None for NoOp test sinks
     pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
     pub check: UnitTestSinkCheck,
