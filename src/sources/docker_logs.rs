@@ -1588,7 +1588,7 @@ mod integration_tests {
         assert!(log
             .get("label")
             .unwrap()
-            .as_map()
+            .as_object()
             .unwrap()
             .get(label)
             .is_some());
