@@ -23,7 +23,7 @@ pub struct ConfigBuilder {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     #[serde(default)]
-    pub api: api::Options,
+    pub(super) api: api::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
     pub datadog: Option<datadog::Options>,
