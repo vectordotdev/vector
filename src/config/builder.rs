@@ -32,7 +32,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub(crate) enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
-    pub sources: IndexMap<ComponentKey, SourceOuter>,
+    pub(super) sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
     pub(crate) sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
