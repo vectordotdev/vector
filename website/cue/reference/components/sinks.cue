@@ -75,61 +75,59 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.buffer.enabled {
-			buffer: {
-				common:      false
-				description: "Configures the sink specific buffer behavior."
-				required:    false
-				type: object: {
-					examples: []
-					options: {
-						max_events: {
-							common:        true
-							description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
-							required:      false
-							relevant_when: "type = \"memory\""
-							type: uint: {
-								default: 500
-								unit:    "events"
-							}
+		buffer: {
+			common:      false
+			description: "Configures the sink specific buffer behavior."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					max_events: {
+						common:        true
+						description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
+						required:      false
+						relevant_when: "type = \"memory\""
+						type: uint: {
+							default: 500
+							unit:    "events"
 						}
-						max_size: {
-							description:   "The maximum size of the buffer on the disk."
-							required:      true
-							relevant_when: "type = \"disk\""
-							type: uint: {
-								examples: [104900000]
-								unit: "bytes"
-							}
+					}
+					max_size: {
+						description:   "The maximum size of the buffer on the disk."
+						required:      true
+						relevant_when: "type = \"disk\""
+						type: uint: {
+							examples: [104900000]
+							unit: "bytes"
 						}
-						type: {
-							common:      true
-							description: "The buffer's type and storage mechanism."
-							required:    false
-							type: string: {
-								default: "memory"
-								enum: {
-									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk: """
+					}
+					type: {
+						common:      true
+						description: "The buffer's type and storage mechanism."
+						required:    false
+						type: string: {
+							default: "memory"
+							enum: {
+								memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
+								disk: """
 									Stores the sink's buffer on disk. This is less performant, but durable.
 									Data will not be lost between restarts.
 									Will also hold data in memory to enhance performance.
 									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
 									For comparison, AWS gp2 volumes are usually too slow for common cases.
 									"""
-								}
 							}
 						}
-						when_full: {
-							common:      false
-							description: "The behavior when the buffer becomes full."
-							required:    false
-							type: string: {
-								default: "block"
-								enum: {
-									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
-									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
-								}
+					}
+					when_full: {
+						common:      false
+						description: "The behavior when the buffer becomes full."
+						required:    false
+						type: string: {
+							default: "block"
+							enum: {
+								block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
+								drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 							}
 						}
 					}
