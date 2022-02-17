@@ -49,9 +49,7 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        state: &state::Compiler,
-        _info: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = state
             .get_external_context::<TableRegistry>()

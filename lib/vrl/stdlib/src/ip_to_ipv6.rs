@@ -28,9 +28,7 @@ impl Function for IpToIpv6 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

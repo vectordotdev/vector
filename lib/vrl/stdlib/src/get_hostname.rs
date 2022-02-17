@@ -10,9 +10,7 @@ impl Function for GetHostname {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        _: ArgumentList,
+        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(GetHostnameFn))
     }

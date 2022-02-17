@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
@@ -164,11 +165,19 @@ impl FunctionCall {
                 })
             })?;
 
-        let compile_ctx = FunctionCompileContext { span: call_span };
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = state.swap_external_contexts(AnyMap::new());
+
+        let mut compile_ctx = FunctionCompileContext::new(call_span, external_context);
 
         let mut expr = function
-            .compile(state, &compile_ctx, list)
+            .compile(state, &mut compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
+
+        // Re-insert the external context into the compiler state.
+        let _ = state.swap_external_contexts(compile_ctx.into_external_contexts());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
@@ -382,7 +391,16 @@ impl Expression for FunctionCall {
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        let compile_ctx = FunctionCompileContext { span: self.span };
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        //
+        // FIXME: need mutable access to compiler state here, but the VM implementation doesn't
+        // allow that yet...
+        // let external_context = state.swap_external_contexts(AnyMap::new());
+        let external_context = AnyMap::new();
+
+        let mut compile_ctx = FunctionCompileContext::new(self.span, external_context);
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
@@ -391,7 +409,7 @@ impl Expression for FunctionCall {
             // Call `compile_argument` for functions that need to perform any compile time processing
             // on the argument.
             match fun
-                .compile_argument(&args, &compile_ctx, keyword, argument)
+                .compile_argument(&args, &mut compile_ctx, keyword, argument)
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
@@ -415,6 +433,9 @@ impl Expression for FunctionCall {
                 },
             }
         }
+
+        // Re-insert the external context into the compiler state.
+        // let _ = state.swap_external_contexts(compile_ctx.into_external_contexts());
 
         // Call the function with the given id.
         vm.write_opcode(OpCode::Call);
@@ -851,7 +872,7 @@ mod tests {
         fn compile(
             &self,
             _state: &crate::State,
-            _info: &FunctionCompileContext,
+            _ctx: &mut FunctionCompileContext,
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))

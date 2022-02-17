@@ -33,9 +33,7 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
-        mut arguments: ArgumentList,
+        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
     ) -> Compiled {
         let keys = vec![value!("datadog_api_key"), value!("splunk_hec_token")];
         let key = arguments
