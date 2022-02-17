@@ -114,7 +114,7 @@ impl SinkConfig for UnitTestSinkConfig {
     }
 }
 
-pub struct UnitTestSink {
+pub(super) struct UnitTestSink {
     pub test_name: String,
     pub(crate) transform_id: String,
     // None for NoOp test sinks
