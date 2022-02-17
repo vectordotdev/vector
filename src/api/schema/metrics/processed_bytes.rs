@@ -78,7 +78,7 @@ impl ComponentProcessedBytesTotal {
     }
 }
 
-pub struct ComponentProcessedBytesThroughput {
+pub(crate) struct ComponentProcessedBytesThroughput {
     component_key: ComponentKey,
     throughput: i64,
 }
