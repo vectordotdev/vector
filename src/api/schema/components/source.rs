@@ -27,7 +27,7 @@ pub struct Data {
     pub(crate) component_key: ComponentKey,
     pub(super) component_type: String,
     pub(crate) output_type: DataType,
-    pub outputs: Vec<String>,
+    pub(crate) outputs: Vec<String>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
