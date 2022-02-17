@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 pub use self::source::*;
 
 #[derive(Debug)]
-pub struct FileOpen {
+pub(crate) struct FileOpen {
     pub count: usize,
 }
 
