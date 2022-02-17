@@ -11,7 +11,7 @@ use crate::config::{ComponentKey, OutputId};
 pub(super) const INVARIANT: &str =
     "Couldn't acquire lock on Vector components. Please report this.";
 
-pub static COMPONENTS: Lazy<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
+pub(crate) static COMPONENTS: Lazy<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Filter components with the provided `map_func`
