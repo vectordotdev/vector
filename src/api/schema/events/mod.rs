@@ -1,7 +1,7 @@
 mod encoding;
 pub(crate) mod log;
 pub mod metric;
-pub mod notification;
+pub(crate) mod notification;
 pub mod output;
 pub(crate) mod trace;
 
