@@ -20,7 +20,7 @@ macro_rules! filter_check {
 pub struct StringFilter {
     pub equals: Option<String>,
     pub not_equals: Option<String>,
-    pub contains: Option<String>,
+    pub(crate) contains: Option<String>,
     pub not_contains: Option<String>,
     pub starts_with: Option<String>,
     pub(super) ends_with: Option<String>,
