@@ -43,7 +43,7 @@ mod acknowledgements;
 // Event fields unique to splunk_hec source
 pub(super) const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
-pub const SOURCE: &str = "splunk_source";
+const SOURCE: &str = "splunk_source";
 const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Accepts HTTP requests.

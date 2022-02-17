@@ -27,7 +27,7 @@ pub struct DatadogEventsConfig {
     pub endpoint: Option<String>,
     // Deprecated, replaced by the site option
     pub region: Option<Region>,
-    pub site: Option<String>,
+    pub(self) site: Option<String>,
     pub default_api_key: String,
 
     // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?

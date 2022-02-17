@@ -85,7 +85,7 @@ pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
 pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1; // one second
 pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
 pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
+pub(self) const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
 pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1; // one second
 pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
 
