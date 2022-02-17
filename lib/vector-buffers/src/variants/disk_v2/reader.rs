@@ -461,8 +461,9 @@ where
         let data_file = File::open(&data_file_path).await?;
         let metadata = data_file.metadata().await?;
 
-        let decrease_amount = bytes_read
-            .map(|bytes_read| {
+        let decrease_amount = bytes_read.map_or_else(
+            || metadata.len(),
+            |bytes_read| {
                 let size_delta = metadata.len() - bytes_read;
                 if size_delta > 0 {
                     debug!(
@@ -473,8 +474,8 @@ where
                 }
 
                 size_delta
-            })
-            .unwrap_or_else(|| metadata.len());
+            },
+        );
 
         if decrease_amount > 0 {
             self.ledger.decrement_total_buffer_size(decrease_amount);
@@ -503,13 +504,15 @@ where
     ) -> io::Result<()> {
         // Acknowledgements effectively happen in two layers: record acknowledgement and data file
         // acknowledgement.  Since records can contain multiple events, we need to track when a
-        // record itself has been fully acknowledged.  Likewise, data files contain multiple events,
-        // so we need to track when a data file has been full acknowledged.
+        // record itself has been fully acknowledged.  Likewise, data files contain multiple records,
+        // so we need to track when all records we've read from a data file have been acknowledged.
 
-        // Drive record acknowledgement first.  Once a record has been fully acknowledged, we update
-        // the buffer size in case any writers were blocked on the buffer hitting its maximum size
-        // limit.  If we get a gap marker -- a marker for records that were skipped/corrupted --
-        // then there won't be any bytes to account for.
+        // Drive record acknowledgement first.
+        //
+        // We only do this if we actually consume any acknowledgements, and immediately update the
+        // buffer and ledger to more quickly get those metrics into good shape.  We defer notifying
+        // writers until after, though, in case we also have data files to delete, so that we can
+        // coalesce the notifications together at the very end of the method.
         let mut had_eligible_records = false;
         let mut records_acknowledged: u64 = 0;
         let mut events_acknowledged: u64 = 0;
@@ -520,34 +523,24 @@ where
         if consumed_acks > 0 {
             self.record_acks.add_acknowledgements(consumed_acks);
 
-            while let Some(EligibleMarker { id, len, data }) =
+            while let Some(EligibleMarker { len, data, .. }) =
                 self.record_acks.get_next_eligible_marker()
             {
                 had_eligible_records = true;
 
                 match len {
-                    // Any marker with an assumed length implies a missing marker and thus lost
-                    // records/events, whether we lost them due to corruption or due to missing entirely
-                    // from the data file i.e. failed flush, etc.
+                    // Any marker with an assumed length implies a gap marker, which gets added
+                    // automatically and represents a portion of the record ID range that was
+                    // expected but missing. This is a long way of saying: we're missing records.
+                    //
+                    // We tally this up so that we can emit a single log event/set of metrics, as
+                    // there may be many gap markers and emitting for each of them could be very noisy.
                     EligibleMarkerLength::Assumed(count) => {
-                        error!(
-                            gap_record_id = id,
-                            "Detected {} missing events.  Buffer data loss has occurred.", count
-                        );
-
-                        // TODO: we probably need to make this actually decrement the buffer records total
-                        // since the total represents the delta between received/sent, and sent does not
-                        // include events that are corrupted, because we never actually got anything to send
-                        emit(&EventsCorrupted { count });
-
-                        // We need to account for skipped events, too, so that our "last reader record
-                        // ID" value stays correct as we process these gap markers.
-                        events_skipped = events_skipped.checked_add(1).expect(
-                            "acknowledging more than 2^64 records at a time is obviously a bug",
-                        );
+                        events_skipped = events_skipped
+                            .checked_add(count)
+                            .expect("skipping more than 2^64 events at a time is obviously a bug");
                     }
-                    // We got a valid marker representing a known number of events, so we can tally
-                    // this up and update the appropriate buffer/ledger accounting bits.
+                    // We got a valid marker representing a known number of events.
                     EligibleMarkerLength::Known(len) => {
                         // We specifically pass the size of the record, in bytes, as the marker data.
                         let record_bytes = data.expect("record bytes should always be known");
@@ -567,10 +560,11 @@ where
 
             // We successfully processed at least one record, so update our buffer and ledger accounting.
             if had_eligible_records {
-                // TODO: figure out if we want to remove corrupted events from events sent or not
                 self.ledger
                     .track_reads(events_acknowledged, bytes_acknowledged);
 
+                // We need to account for skipped events, too, so that our "last reader record ID"
+                // value stays correct as we process these gap markers.
                 let last_increment_amount = events_acknowledged + events_skipped;
                 self.ledger
                     .state()
@@ -579,9 +573,26 @@ where
                 self.data_file_acks
                     .add_acknowledgements(records_acknowledged);
             }
+
+            // If any events were skipped, do our logging/metrics for that.
+            if events_skipped > 0 {
+                error!(
+                    dropped_events = events_skipped,
+                    "Detected missing/dropped events.  Buffer data loss has occurred."
+                );
+
+                // TODO: We probably need to make this actually decrement the buffer events gauge directly.
+                //
+                // We don't update it unless there's a received/sent event emitted, which these
+                // events naturally will not be part of as they don't flow out of the buffer.
+                emit(&EventsCorrupted {
+                    count: events_skipped,
+                });
+            }
         }
 
         // If we processed any eligible records, we may now also have eligible data files.
+        //
         // Alternatively, the core `next` logic may have just rolled over to a new data file, and
         // we're seeing if we can fast track any eligible data file deletions rather than waiting
         // for more acknowledgements to come in.
@@ -611,7 +622,6 @@ where
         // If we managed to processed any records _or_ any data file deletions, we've made
         // meaningful progress that writers may care about, so notify them.
         if had_eligible_data_files || had_eligible_records {
-            // Since we actually managed to process records, notify any waiting writers.
             self.ledger.notify_reader_waiters();
 
             if self.ready_to_read {
@@ -700,14 +710,6 @@ where
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        // TODO: Add a test that can correctly suss out this situation and prove
-                        // this invariant for us:
-                        //
-                        // If the reader/writer file IDs are not the same, and we try to open our
-                        // current file and it doesn't exist, we're in a scenario where we deleted
-                        // the file but didn't get to the step where we increment our "current
-                        // reader file ID".  We simply increment that to set ourselves to the right
-                        // position and try again.
                         if reader_file_id == writer_file_id {
                             debug!(
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
@@ -734,18 +736,13 @@ where
         }
     }
 
-    /// Seeks to the next record that the reader should read.
-    ///
-    /// Under normal operation, the writer next/reader last record IDs are staggered, such that
-    /// in a fresh buffer, the "next" record ID for the writer to use when writing a record is
-    /// `1`, and the "last" record ID for the reader to use when reading a record is `0`.  No
-    /// seeking or adjusting of file cursors is necessary, as the writer/reader should move in
-    /// lockstep, including when new data files are created.
+    /// Seeks to where this reader previously left off.
     ///
     /// In cases where Vector has restarted, but the reader hasn't yet finished a file, we would
     /// open the correct data file for reading, but our file cursor would be at the very
     /// beginning, essentially pointed at the wrong record.  We read out records here until we
-    /// reach a point where we've read up to the record right before `get_last_reader_record_id`.
+    /// reach a point where we've read up to the record referenced by `get_last_reader_record_id`.
+    ///
     /// This ensures that a subsequent call to `next` is ready to read the correct record.
     ///
     /// # Errors
@@ -771,20 +768,18 @@ where
         );
 
         // We may end up in a situation where a data file hasn't yet been deleted but we've moved on
-        // to the next data file, including reading an acknowledging records within it.  If Vector
+        // to the next data file, including reading acknowledging records within it.  If Vector
         // is stopped at a point like this, and we restart it and load the buffer, we'll start on
         // the old data file.  That's wasteful to read all over again.
         //
         // In our seek loop, we have a fast path where we check the last record of a data file while
-        // the reader and write file IDs don't match.  If we see that the record is still below the
+        // the reader and writer file IDs don't match.  If we see that the record is still below the
         // last reader record ID, we do the necessary clean up to delete that file and move to the
         // next file.  This is safe because we know that if we managed to acknowledge records with
         // an ID higher than the highest record ID in the data file, it was meant to have been
         // deleted.
         //
-        // Once the reader/write file IDs are identical, we fall back to the slow path and read up
-        // until the specific record we left off on.
-
+        // Once the reader/writer file IDs are identical, we fall back to the slow path.
         while self.ledger.get_current_reader_file_id() != self.ledger.get_current_writer_file_id() {
             let current_data_file_path = self.ledger.get_current_reader_data_file_path();
             self.ensure_ready_for_read().await.context(IoSnafu)?;
@@ -850,12 +845,16 @@ where
             }
         }
 
-        // Just read through each record until we've caught up to where we left off.
+        // We rely on `next` to close out the data file if we've actually reached the end, and we
+        // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
+        // update `self.last_reader_record_id`, so basically... just keep reading records until
+        // we're past the last record we had acknowledged.
         while self.last_reader_record_id < ledger_last {
             if self.next().await?.is_none() && self.last_reader_record_id == 0 {
-                // We've hit a point where there's no more data to read.  If our last reader record
-                // ID hasn't moved at all, that means the buffer was already empty, so we just pin
-                // ourselves to where the ledger says we left off, and we're good to go.
+                // We've hit a point where there's no more data to read.  If our "last reader record
+                // ID" hasn't moved at all, that means the buffer was already empty and we're caught
+                // up, so we just pin ourselves to where the ledger says we left off, and we're good
+                // to go.
                 self.last_reader_record_id = ledger_last;
                 break;
             }
@@ -1020,7 +1019,7 @@ where
         };
 
         // We got a read token, so our record is present in the reader, and now we can actually read
-        // it out and return a reference to it.
+        // it out and return it.
         let record_id = token.record_id();
         let record_bytes = token.record_bytes() as u64;
 

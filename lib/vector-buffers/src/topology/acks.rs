@@ -220,7 +220,24 @@ impl<D> OrderedAcknowledgements<D> {
     ///   `MarkerOffset::NotEnoughInformation` is returned, as we require a fixed-size marker to
     ///   correctly calculate the next expected marker ID
     fn get_marker_id_offset(&self, id: u64) -> MarkerOffset {
-        if !self.pending_markers.is_empty() {
+        if self.pending_markers.is_empty() {
+            // We have no pending markers, but our acknowledged ID offset should match the marker ID
+            // being given here, otherwise it would imply that the markers were not contiguous.
+            //
+            // We return the difference between the ID and our acknowledged ID offset with the
+            // assumption that the new ID is monotonic.  Since IDs wraparound, we don't bother
+            // looking at if it's higher or lower because we can't reasonably tell if this record ID
+            // is actually correct but other markers in between went missing, etc.
+            //
+            // Basically, it's up to the caller to figure this out.  We're just trying to give them
+            // as much information as we can.
+            if self.acked_marker_id != id {
+                return MarkerOffset::Gap(
+                    self.acked_marker_id,
+                    id.wrapping_sub(self.acked_marker_id),
+                );
+            }
+        } else {
             let back = self
                 .pending_markers
                 .back()
@@ -237,31 +254,14 @@ impl<D> OrderedAcknowledgements<D> {
                 if id != expected_next {
                     if expected_next < back.id && id < expected_next {
                         return MarkerOffset::MonotonicityViolation;
-                    } else {
-                        return MarkerOffset::Gap(expected_next, id.wrapping_sub(expected_next));
                     }
+
+                    return MarkerOffset::Gap(expected_next, id.wrapping_sub(expected_next));
                 }
             } else {
                 // Without a fixed-size marker, we cannot be sure whether this marker ID is aligned
                 // or not.
                 return MarkerOffset::NotEnoughInformation(back.id);
-            }
-        } else {
-            // We have no pending markers, but our acknowledged ID offset should match the marker ID
-            // being given here, otherwise it would imply that the markers were not contiguous.
-            //
-            // We return the difference between the ID and our acknowledged ID offset with the
-            // assumption that the new ID is monotonic.  Since IDs wraparound, we don't bother
-            // looking at if it's higher or lower because we can't reasonably tell if this record ID
-            // is actually correct but other markers in between went missing, etc.
-            //
-            // Basically, it's up to the caller to figure this out.  We're just trying to give them
-            // as much information as we can.
-            if self.acked_marker_id != id {
-                return MarkerOffset::Gap(
-                    self.acked_marker_id,
-                    id.wrapping_sub(self.acked_marker_id),
-                );
             }
         }
 
@@ -337,9 +337,7 @@ impl<D> OrderedAcknowledgements<D> {
         // Now insert our new pending marker.
         self.pending_markers.push_back(PendingMarker {
             id,
-            len: marker_len
-                .map(PendingMarkerLength::Known)
-                .unwrap_or(PendingMarkerLength::Unknown),
+            len: marker_len.map_or(PendingMarkerLength::Unknown, PendingMarkerLength::Known),
             data,
         });
 
@@ -511,10 +509,12 @@ mod tests {
 
     #[test]
     fn basic_cases() {
-        let cases = [
-            // Empty:
-            vec![step!(GetNextEligibleMarker, result => None)],
-            // Simple through-and-through:
+        // Smoke test.
+        run_test_case("empty", vec![step!(GetNextEligibleMarker, result => None)]);
+
+        // Simple through-and-through:
+        run_test_case(
+            "through_and_through",
             vec![
                 step!(AddMarker, input => (0, Some(5)), result => Ok(())),
                 step!(Acknowledge, input => 5, result => 5),
@@ -524,16 +524,14 @@ mod tests {
                     }
                 )),
             ],
-            // A marker with a length of 0 should be immediately available:
-            vec![
-                step!(AddMarker, input => (0, Some(0)), result => Ok(())),
-                step!(GetNextEligibleMarker, result => Some(
-                    EligibleMarker {
-                        id: 0, len: EligibleMarkerLength::Known(0), data: None,
-                    }
-                )),
-            ],
-            // Checking for an eligible record between incremental acknowledgement:
+        );
+    }
+
+    #[test]
+    fn invariant_cases() {
+        // Checking for an eligible record between incremental acknowledgement:
+        run_test_case(
+            "eligible_multi_ack",
             vec![
                 step!(AddMarker, input => (0, Some(13)), result => Ok(())),
                 step!(Acknowledge, input => 5, result => 5),
@@ -547,15 +545,23 @@ mod tests {
                     }
                 )),
             ],
-            // Unknown length markers can't be returned until a marker exists after them, even if we
-            // could maximally acknowledge them:
+        );
+
+        // Unknown length markers can't be returned until a marker exists after them, even if we
+        // could maximally acknowledge them:
+        run_test_case(
+            "unknown_len_no_subsequent_marker",
             vec![
                 step!(AddMarker, input => (0, None), result => Ok(())),
                 step!(Acknowledge, input => 5, result => 5),
                 step!(GetNextEligibleMarker, result => None),
             ],
-            // We can always get back an unknown marker, with its length, regardless of
-            // acknowledgements, so long as there's a marker exists after them: fixed.
+        );
+
+        // We can always get back an unknown marker, with its length, regardless of
+        // acknowledgements, so long as there's a marker exists after them: fixed.
+        run_test_case(
+            "unknown_len_subsequent_marker_fixed",
             vec![
                 step!(AddMarker, input => (0, None), result => Ok(())),
                 step!(AddMarker, input => (5, Some(1)), result => Ok(())),
@@ -566,8 +572,28 @@ mod tests {
                 )),
                 step!(GetNextEligibleMarker, result => None),
             ],
-            // Can add a marker without a known length and it will generate a synthetic gap marker
-            // that is immediately eligible:
+        );
+
+        // We can always get back an unknown marker, with its length, regardless of
+        // acknowledgements, so long as there's a marker exists after them: unknown.
+        run_test_case(
+            "unknown_len_subsequent_marker_unknown",
+            vec![
+                step!(AddMarker, input => (0, None), result => Ok(())),
+                step!(AddMarker, input => (5, None), result => Ok(())),
+                step!(GetNextEligibleMarker, result => Some(
+                    EligibleMarker {
+                        id: 0, len: EligibleMarkerLength::Assumed(5), data: None,
+                    }
+                )),
+                step!(GetNextEligibleMarker, result => None),
+            ],
+        );
+
+        // Can add a marker without a known length and it will generate a synthetic gap marker
+        // that is immediately eligible:
+        run_test_case(
+            "unknown_len_no_pending_synthetic_gap",
             vec![
                 step!(AddMarker, input => (1, None), result => Ok(())),
                 step!(GetNextEligibleMarker, result => Some(
@@ -577,16 +603,24 @@ mod tests {
                 )),
                 step!(GetNextEligibleMarker, result => None),
             ],
-            // When another marker exists, and is fixed size, we correctly detect when trying to add
-            // another marker whose ID comes before the last pending marker we have:
+        );
+
+        // When another marker exists, and is fixed size, we correctly detect when trying to add
+        // another marker whose ID comes before the last pending marker we have:
+        run_test_case(
+            "detect_monotonicity_violation",
             vec![
                 step!(AddMarker, input => (u64::MAX, Some(3)), result => Ok(())),
                 step!(AddMarker, input => (1, Some(2)), result => Err(MarkerError::MonotonicityViolation)),
             ],
-            // When another marker exists, and is fixed size, we correctly detect when trying to add
-            // another marker whose ID comes after the last pending marker we have, including the
-            // length of the last pending marker, by updating the marker's unknown length to an
-            // assumed length, which is immediately eligible:
+        );
+
+        // When another marker exists, and is fixed size, we correctly detect when trying to add
+        // another marker whose ID comes after the last pending marker we have, including the
+        // length of the last pending marker, by updating the marker's unknown length to an
+        // assumed length, which is immediately eligible:
+        run_test_case(
+            "unknown_len_updated_fixed_marker",
             vec![
                 step!(AddMarker, input => (0, Some(4)), result => Ok(())),
                 step!(AddMarker, input => (9, Some(3)), result => Ok(())),
@@ -603,44 +637,64 @@ mod tests {
                 )),
                 step!(GetNextEligibleMarker, result => None),
             ],
-            // When we have a fized-size marker whose required acked marker ID lands right on the
-            // current acked marker ID, it should not be eligible unless there are enough unclaimed
-            // acks to actually account for it:
+        );
+    }
+
+    #[test]
+    fn advanced_cases() {
+        // A marker with a length of 0 should be immediately available:
+        run_test_case(
+            "zero_length_eligible",
             vec![
-                step!(AddMarker, input => (2686784444737799532, Some(15759959628971752084)), result => Ok(())),
-                step!(AddMarker, input => (0, None), result => Ok(())),
-                step!(AddMarker, input => (8450737568, None), result => Ok(())),
+                step!(AddMarker, input => (0, Some(0)), result => Ok(())),
                 step!(GetNextEligibleMarker, result => Some(
                     EligibleMarker {
-                        id: 0, len: EligibleMarkerLength::Assumed(2686784444737799532), data: None,
+                        id: 0, len: EligibleMarkerLength::Known(0), data: None,
+                    }
+                )),
+            ],
+        );
+
+        // When we have a fized-size marker whose required acked marker ID lands right on the
+        // current acked marker ID, it should not be eligible unless there are enough unclaimed
+        // acks to actually account for it:
+        run_test_case(
+            "fixed_size_u64_boundary_overlap",
+            vec![
+                step!(AddMarker, input => (2_686_784_444_737_799_532, Some(15_759_959_628_971_752_084)), result => Ok(())),
+                step!(AddMarker, input => (0, None), result => Ok(())),
+                step!(AddMarker, input => (8_450_737_568, None), result => Ok(())),
+                step!(GetNextEligibleMarker, result => Some(
+                    EligibleMarker {
+                        id: 0, len: EligibleMarkerLength::Assumed(2_686_784_444_737_799_532), data: None,
                     }
                 )),
                 step!(GetNextEligibleMarker, result => None),
-                step!(Acknowledge, input => 15759959628971752084, result => 15759959628971752084),
+                step!(Acknowledge, input => 15_759_959_628_971_752_084, result => 15_759_959_628_971_752_084),
                 step!(GetNextEligibleMarker, result => Some(
                     EligibleMarker {
-                        id: 2686784444737799532, len: EligibleMarkerLength::Known(15759959628971752084), data: None,
+                        id: 2_686_784_444_737_799_532, len: EligibleMarkerLength::Known(15_759_959_628_971_752_084), data: None,
                     }
                 )),
                 step!(GetNextEligibleMarker, result => Some(
                     EligibleMarker {
-                        id: 0, len: EligibleMarkerLength::Assumed(8450737568), data: None,
+                        id: 0, len: EligibleMarkerLength::Assumed(8_450_737_568), data: None,
                     }
                 )),
                 step!(GetNextEligibleMarker, result => None),
             ],
-        ];
+        );
+    }
 
-        for case in cases {
-            let mut sut = OrderedAcknowledgements::from_acked(0);
-            for (action, expected_result) in case {
-                let actual_result = apply_action_sut(&mut sut, action);
-                assert_eq!(
-                    expected_result, actual_result,
-                    "ran action {:?} expecting result {:?}, but got result {:?} instead",
-                    action, expected_result, actual_result
-                );
-            }
+    fn run_test_case(name: &str, case: Vec<(Action, ActionResult)>) {
+        let mut sut = OrderedAcknowledgements::from_acked(0);
+        for (action, expected_result) in case {
+            let actual_result = apply_action_sut(&mut sut, action);
+            assert_eq!(
+                expected_result, actual_result,
+                "{}: ran action {:?} expecting result {:?}, but got result {:?} instead",
+                name, action, expected_result, actual_result
+            );
         }
     }
 
@@ -691,7 +745,7 @@ mod tests {
 
                             Ok(())
                         } else {
-                            let (back_id, back_len) = marker_stack.back().cloned().expect("must exist");
+                            let (back_id, back_len) = marker_stack.back().copied().expect("must exist");
                             match back_len {
                                 PendingMarkerLength::Known(len) => {
                                     // We know exactly where the next marker ID should be.
@@ -733,8 +787,7 @@ mod tests {
                                 // If adding the pending marker actually succeeded, now we need to track it.
                                 if result.is_ok() {
                                     let len = maybe_len
-                                        .map(PendingMarkerLength::Known)
-                                        .unwrap_or(PendingMarkerLength::Unknown);
+                                        .map_or(PendingMarkerLength::Unknown, PendingMarkerLength::Known);
 
                                     assert!(marker_state.insert(id), "should not be able to add marker that is already in-flight");
                                     marker_stack.push_back((id, len));
@@ -750,7 +803,7 @@ mod tests {
 
                             assert_eq!(expected_marker_id, marker.id, "SUT eligible marker doesn't match expected ID");
 
-                            let unclaimed_acks_to_consume = match (original_len, marker.len.clone()) {
+                            let unclaimed_acks_to_consume = match (original_len, marker.len) {
                                 (PendingMarkerLength::Known(a), EligibleMarkerLength::Known(b)) => {
                                     prop_assert_eq!(a, b, "SUT marker len and model marker len should match");
                                     b

@@ -380,12 +380,6 @@ impl Ledger {
         self.decrement_total_buffer_size(total_record_size);
         self.usage_handle
             .increment_sent_event_count_and_byte_size(event_count, total_record_size);
-
-        trace!(
-            events_acked = event_count,
-            bytes_acked = total_record_size,
-            "Fully acknowledged events. Updating buffer size."
-        );
     }
 
     /// Marks the writer as finished.
@@ -421,9 +415,9 @@ impl Ledger {
         let last_unacked_reader_file_id_offset = self
             .unacked_reader_file_id_offset
             .fetch_add(1, Ordering::AcqRel);
-        debug!(
-            "bumping unacked reader file ID offset from {}",
-            last_unacked_reader_file_id_offset
+        trace!(
+            unacked_reader_file_id_offset = last_unacked_reader_file_id_offset + 1,
+            "Incremented unacknowledged reader file ID."
         );
     }
 
@@ -448,7 +442,6 @@ impl Ledger {
     /// here to keep the "current" file ID stable.
     pub fn increment_acked_reader_file_id(&self) {
         let new_reader_file_id = self.state().increment_reader_file_id();
-        debug!("setting (acked) reader file ID to {}", new_reader_file_id);
 
         // We ignore the return value because when the value is already zero, we don't want to do an
         // update, so we return `None`, which causes `fetch_update` to return `Err`.  It's not
@@ -466,7 +459,12 @@ impl Ledger {
                 }
             },
         );
-        debug!(message = "adjusted unacked reader file ID offset", ?result);
+
+        trace!(
+            unacked_reader_file_id_offset = result.map(|n| n - 1).unwrap_or(0),
+            acked_reader_file_id_offset = new_reader_file_id,
+            "Incremented acknowledged reader file ID offset with corresponding unacknowledged decrement."
+        );
     }
 
     /// Determines whether or not all files should be flushed/fsync'd to disk.
@@ -559,7 +557,7 @@ impl Ledger {
         let ledger_metadata = ledger_handle.metadata().await.context(IoSnafu)?;
         let ledger_len = ledger_metadata.len();
         if ledger_len == 0 {
-            debug!("ledger file is brand new, populating with default state");
+            debug!("Ledger file empty.  Initializing with default ledger state.");
             let mut buf = BytesMut::new();
             loop {
                 match BackedArchive::from_value(&mut buf, LedgerState::default()) {
@@ -648,14 +646,14 @@ impl Ledger {
                 // of filenames from another program/OS, then it would be a different story.
                 #[allow(clippy::case_sensitive_file_extension_comparisons)]
                 if file_name.ends_with(".dat") {
-                    let file_size = dir_entry.metadata().await.context(IoSnafu)?;
-                    total_buffer_size += file_size.len();
+                    let metadata = dir_entry.metadata().await.context(IoSnafu)?;
+                    total_buffer_size += metadata.len();
 
                     debug!(
-                        "found buffer data file '{}', {} bytes (total buffer size: {} bytes)",
-                        file_name,
-                        file_size.len(),
-                        total_buffer_size
+                        data_file = file_name,
+                        file_size = metadata.len(),
+                        total_buffer_size,
+                        "Found existing data file."
                     );
                 }
             }

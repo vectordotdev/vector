@@ -255,7 +255,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
 #[tokio::test]
 async fn reader_still_works_when_record_id_wraps_around() {
-    let _ = install_tracing_helpers();
+    let _a = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 

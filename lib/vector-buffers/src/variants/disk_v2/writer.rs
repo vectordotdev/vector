@@ -553,15 +553,10 @@ where
                 }
             }
             // The record payload was corrupted, somehow: we know the checksum failed to match on
-            // both sides, but it could be cosmic radiation that flipped a bit or some processed
+            // both sides, but it could be cosmic radiation that flipped a bit or some process
             // trampled over the data file... who knows.
             //
             // We skip to the next data file to try and start from a clean slate.
-            //
-            // TODO: This almost certainly messes up the buffer usage metrics.
-            //       We should think about what this do to the metrics in both cases (ledger is
-            //       up-to-date vs ledger is not up-to-date) and what will end up happening if we
-            //       read the remaining records down to zero.
             RecordStatus::Corrupted { .. } => {
                 error!(
                     "Last written record did not match the expected checksum. Corruption likely."
@@ -574,11 +569,6 @@ where
             // really don't know why it happened, only that it happened.
             //
             // We skip to the next data file to try and start from a clean slate.
-            //
-            // TODO: This almost certainly messes up the buffer usage metrics.
-            //       We should think about what this do to the metrics in both cases (ledger is
-            //       up-to-date vs ledger is not up-to-date) and what will end up happening if we
-            //       read the remaining records down to zero.
             RecordStatus::FailedDeserialization(de) => {
                 let reason = de.into_inner();
                 error!(

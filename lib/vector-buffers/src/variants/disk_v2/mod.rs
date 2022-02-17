@@ -91,12 +91,6 @@
 //!
 //! ## Behaviorial invariants, lemmas, proofs, and more: oh my!
 //!
-//! ### Global definitions
-//!
-//! - K_m: the highest possible record ID before wraparound
-//! - D_m: the maximum size, in bytes, of a single data file
-//! - F_m: the maximum number of data files that may exist at any moment
-//!
 //! ### Lemmas
 //!
 //! Lemma 1: A writer always writes a new record using the "next writer record ID" from the ledger.

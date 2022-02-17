@@ -2,7 +2,10 @@ use crossbeam_queue::ArrayQueue;
 use futures::{ready, task::AtomicWaker};
 use std::{
     cmp, fmt,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore};
@@ -45,6 +48,7 @@ impl<T> Clone for Inner<T> {
 
 pub struct LimitedSender<T> {
     inner: Inner<T>,
+    sender_count: Arc<AtomicUsize>,
     slot: Option<T>,
 }
 
@@ -181,10 +185,7 @@ impl<T: Bufferable> LimitedSender<T> {
     /// permanently, and should no longer be called.
     pub fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
         // We can't close until any pending item is fully sent through.
-        let result = ready!(self.poll_flush(cx));
-
-        self.inner.limiter.close();
-        Poll::Ready(result)
+        self.poll_flush(cx)
     }
 }
 
@@ -214,8 +215,11 @@ impl<T: Bufferable> LimitedReceiver<T> {
 
 impl<T> Clone for LimitedSender<T> {
     fn clone(&self) -> Self {
+        self.sender_count.fetch_add(1, Ordering::SeqCst);
+
         Self {
             inner: self.inner.clone(),
+            sender_count: Arc::clone(&self.sender_count),
             slot: None,
         }
     }
@@ -223,7 +227,10 @@ impl<T> Clone for LimitedSender<T> {
 
 impl<T> Drop for LimitedSender<T> {
     fn drop(&mut self) {
-        self.inner.limiter.close();
+        // If we're the last sender to drop, close the semaphore on our way out the door.
+        if self.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.inner.limiter.close();
+        }
     }
 }
 
@@ -238,6 +245,7 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
 
     let sender = LimitedSender {
         inner: inner.clone(),
+        sender_count: Arc::new(AtomicUsize::new(1)),
         slot: None,
     };
     let receiver = LimitedReceiver { inner };
