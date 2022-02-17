@@ -116,7 +116,7 @@ pub struct Pieces {
     pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
-    pub healthchecks: HashMap<ComponentKey, Task>,
+    pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(super) enrichment_tables: enrichment::TableRegistry,
