@@ -6,7 +6,7 @@ use crate::{
     event::{Metric, MetricValue},
 };
 
-pub struct ErrorsTotal(Metric);
+pub(crate) struct ErrorsTotal(Metric);
 
 impl ErrorsTotal {
     pub const fn new(m: Metric) -> Self {
