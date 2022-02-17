@@ -46,7 +46,7 @@ use crate::{
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
-pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
