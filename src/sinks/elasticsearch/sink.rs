@@ -23,7 +23,7 @@ use crate::{
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
     pub(super) index: String,
-    pub bulk_action: BulkAction,
+    pub(self) bulk_action: BulkAction,
 }
 
 pub struct BatchedEvents {
