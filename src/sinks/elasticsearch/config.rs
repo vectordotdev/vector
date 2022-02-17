@@ -16,13 +16,13 @@ use crate::{
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
-            encoder::ElasticSearchEncoder,
+            encoder::ElasticsearchEncoder,
             request_builder::ElasticsearchRequestBuilder,
-            retry::ElasticSearchRetryLogic,
-            service::{ElasticSearchService, HttpRequestBuilder},
-            sink::ElasticSearchSink,
-            BatchActionTemplateSnafu, ElasticSearchAuth, ElasticSearchCommon,
-            ElasticSearchCommonMode, ElasticSearchMode, IndexTemplateSnafu,
+            retry::ElasticsearchRetryLogic,
+            service::{ElasticsearchService, HttpRequestBuilder},
+            sink::ElasticsearchSink,
+            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
@@ -40,7 +40,7 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ElasticSearchConfig {
+pub struct ElasticsearchConfig {
     pub endpoint: String,
 
     pub doc_type: Option<String>,
@@ -49,7 +49,7 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
     #[serde(default)]
-    pub mode: ElasticSearchMode,
+    pub mode: ElasticsearchMode,
 
     #[serde(default)]
     pub compression: Compression,
@@ -57,13 +57,13 @@ pub struct ElasticSearchConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
-    pub auth: Option<ElasticSearchAuth>,
+    pub auth: Option<ElasticsearchAuth>,
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
@@ -82,7 +82,7 @@ pub enum Encoding {
     Default,
 }
 
-impl ElasticSearchConfig {
+impl ElasticsearchConfig {
     pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
         Ok(self
             .bulk
@@ -102,17 +102,17 @@ impl ElasticSearchConfig {
         Ok(Template::try_from(index.as_str()).context(IndexTemplateSnafu)?)
     }
 
-    pub fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
+    pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
-            ElasticSearchMode::Bulk => {
+            ElasticsearchMode::Bulk => {
                 let index = self.index()?;
                 let bulk_action = self.bulk_action()?;
-                Ok(ElasticSearchCommonMode::Bulk {
+                Ok(ElasticsearchCommonMode::Bulk {
                     index,
                     action: bulk_action,
                 })
             }
-            ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
+            ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
             )),
         }
@@ -287,9 +287,9 @@ impl DataStreamConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
-impl SinkConfig for ElasticSearchConfig {
+impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticSearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self)?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -320,10 +320,10 @@ impl SinkConfig for ElasticSearchConfig {
         };
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, ElasticSearchRetryLogic)
-            .service(ElasticSearchService::new(http_client, http_request_builder));
+            .settings(request_limits, ElasticsearchRetryLogic)
+            .service(ElasticsearchService::new(http_client, http_request_builder));
 
-        let sink = ElasticSearchSink {
+        let sink = ElasticsearchSink {
             batch_settings,
             request_builder,
             compression: self.compression,
@@ -334,7 +334,7 @@ impl SinkConfig for ElasticSearchConfig {
             id_key_field: self.id_key.clone(),
         };
 
-        let common = ElasticSearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self)?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
         let stream = VectorSink::from_event_streamsink(sink);
@@ -356,12 +356,12 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+        crate::test_util::test_generate_config::<ElasticsearchConfig>();
     }
 
     #[test]
     fn parse_aws_auth() {
-        toml::from_str::<ElasticSearchConfig>(
+        toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             auth.strategy = "aws"
@@ -370,7 +370,7 @@ mod tests {
         )
         .unwrap();
 
-        toml::from_str::<ElasticSearchConfig>(
+        toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             auth.strategy = "aws"
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn parse_mode() {
-        let config = toml::from_str::<ElasticSearchConfig>(
+        let config = toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             mode = "data_stream"
@@ -389,7 +389,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(config.mode, ElasticSearchMode::DataStream));
+        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
     }
 }
