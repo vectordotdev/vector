@@ -68,7 +68,7 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
-pub mod tokenizer;
+pub(super) mod tokenizer;
 
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,

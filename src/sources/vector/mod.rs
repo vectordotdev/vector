@@ -37,7 +37,7 @@ pub struct VectorConfigV2 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum VectorConfig {
+pub(crate) enum VectorConfig {
     V1(VectorConfigV1),
     V2(VectorConfigV2),
 }
