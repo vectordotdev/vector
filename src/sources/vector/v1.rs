@@ -23,7 +23,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfig {
+pub(crate) struct VectorConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -75,7 +75,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -130,7 +130,7 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use tokio::{
         io::AsyncWriteExt,
@@ -169,7 +169,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -254,6 +257,7 @@ mod test {
                 out: tx,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();
@@ -292,6 +296,7 @@ mod test {
                 out: tx,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();

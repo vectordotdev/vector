@@ -24,7 +24,7 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 #[derive(Clone)]
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
-    pub message: String,
+    pub(super) message: String,
     pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,

@@ -270,7 +270,7 @@ pub mod service_control {
         Ok(())
     }
 
-    pub fn open_service(
+    pub(super) fn open_service(
         service_def: &ServiceDefinition,
         access: windows_service::service::ServiceAccess,
     ) -> crate::Result<windows_service::service::Service> {

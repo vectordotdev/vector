@@ -55,7 +55,7 @@ struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -436,7 +436,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -486,7 +489,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -669,7 +675,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;

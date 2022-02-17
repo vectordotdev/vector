@@ -49,7 +49,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct SplunkConfig {
+pub(self) struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
@@ -70,16 +70,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(SplunkConfig);
-
-impl SplunkConfig {
-    #[cfg(test)]
-    pub fn on(address: SocketAddr) -> Self {
-        SplunkConfig {
-            address,
-            ..Self::default()
-        }
-    }
-}
 
 impl Default for SplunkConfig {
     fn default() -> Self {
@@ -1037,7 +1027,7 @@ mod tests {
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
                 address,

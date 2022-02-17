@@ -151,7 +151,7 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-pub fn expand_globs(config: &mut ConfigBuilder) {
+pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .iter()
@@ -256,7 +256,7 @@ mod test {
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
 
         fn can_acknowledge(&self) -> bool {
@@ -276,11 +276,11 @@ mod test {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -296,7 +296,7 @@ mod test {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
     }
 

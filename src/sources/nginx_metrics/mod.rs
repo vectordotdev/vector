@@ -65,7 +65,7 @@ struct NginxMetricsConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(super) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -276,7 +276,7 @@ mod integration_tests {
 
         let (sender, mut recv) = SourceSender::new_test();
 
-        let mut ctx = SourceContext::new_test(sender);
+        let mut ctx = SourceContext::new_test(sender, None);
         ctx.proxy = proxy;
 
         tokio::spawn(async move {

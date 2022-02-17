@@ -83,7 +83,7 @@ pub struct FileConfig {
     pub glob_minimum_cooldown_ms: u64,
     // Deprecated name
     #[serde(alias = "fingerprinting")]
-    pub fingerprint: FingerprintConfig,
+    fingerprint: FingerprintConfig,
     pub ignore_not_found: bool,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis

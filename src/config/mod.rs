@@ -19,6 +19,7 @@ pub use vector_core::{
 use crate::{
     conditions,
     event::Metric,
+    schema,
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
@@ -261,6 +262,12 @@ pub struct SourceContext {
     pub out: SourceSender,
     pub proxy: ProxyConfig,
     pub acknowledgements: bool,
+
+    /// Tracks the schema IDs assigned to schemas exposed by the source.
+    ///
+    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
+    /// that `Output`.
+    pub schema_ids: HashMap<Option<String>, schema::Id>,
 }
 
 impl SourceContext {
@@ -279,13 +286,17 @@ impl SourceContext {
                 out,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema_ids: HashMap::default(),
             },
             shutdown,
         )
     }
 
     #[cfg(test)]
-    pub fn new_test(out: SourceSender) -> Self {
+    pub fn new_test(
+        out: SourceSender,
+        schema_ids: Option<HashMap<Option<String>, schema::Id>>,
+    ) -> Self {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
@@ -293,6 +304,7 @@ impl SourceContext {
             out,
             proxy: Default::default(),
             acknowledgements: false,
+            schema_ids: schema_ids.unwrap_or_default(),
         }
     }
 

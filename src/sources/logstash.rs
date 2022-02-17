@@ -600,7 +600,7 @@ mod test {
             acknowledgements: true.into(),
             connection_limit: None,
         }
-        .build(SourceContext::new_test(sender))
+        .build(SourceContext::new_test(sender, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -751,7 +751,7 @@ mod integration_tests {
                 acknowledgements: false.into(),
                 connection_limit: None,
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

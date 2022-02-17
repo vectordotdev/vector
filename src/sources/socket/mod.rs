@@ -210,6 +210,7 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use std::{
+        collections::HashMap,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -270,7 +271,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -292,7 +293,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -316,7 +317,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -348,7 +349,7 @@ mod test {
         ));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -384,7 +385,7 @@ mod test {
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -428,7 +429,7 @@ mod test {
         }));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -620,6 +621,7 @@ mod test {
                 out: sender,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema_ids: HashMap::default(),
             })
             .await
             .unwrap();
@@ -782,7 +784,7 @@ mod test {
             Mode::UnixDatagram(config)
         };
         let server = SocketConfig { mode }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
         tokio::spawn(server);

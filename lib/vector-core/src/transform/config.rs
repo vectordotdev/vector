@@ -1,9 +1,12 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::config::{ComponentKey, GlobalOptions, Input, Output};
+use crate::{
+    config::{ComponentKey, GlobalOptions, Input, Output},
+    schema,
+};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
@@ -19,7 +22,7 @@ pub enum ExpandType {
     Serial { alias: bool },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
     // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
@@ -28,6 +31,23 @@ pub struct TransformContext {
     pub globals: GlobalOptions,
     #[cfg(feature = "vrl")]
     pub enrichment_tables: enrichment::TableRegistry,
+
+    /// Tracks the schema IDs assigned to schemas exposed by the transform.
+    ///
+    /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
+    /// that `Output`.
+    pub schema_ids: HashMap<Option<String>, schema::Id>,
+}
+
+impl Default for TransformContext {
+    fn default() -> Self {
+        Self {
+            key: Default::default(),
+            globals: Default::default(),
+            enrichment_tables: Default::default(),
+            schema_ids: HashMap::from([(None, schema::Id::empty())]),
+        }
+    }
 }
 
 impl TransformContext {
@@ -37,6 +57,14 @@ impl TransformContext {
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,
+            ..Default::default()
+        }
+    }
+
+    #[cfg(any(test, feature = "test"))]
+    pub fn new_test(schema_ids: HashMap<Option<String>, schema::Id>) -> Self {
+        Self {
+            schema_ids,
             ..Default::default()
         }
     }

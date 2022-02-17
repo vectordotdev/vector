@@ -47,7 +47,7 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct DockerLogsConfig {
+pub(super) struct DockerLogsConfig {
     #[serde(default = "host_key")]
     host_key: String,
     docker_host: Option<String>,
@@ -1081,7 +1081,7 @@ mod integration_tests {
         let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await
