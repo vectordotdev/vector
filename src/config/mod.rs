@@ -842,7 +842,7 @@ pub struct TestInput {
     pub(super) type_str: String,
     pub value: Option<String>,
     log_fields: Option<IndexMap<String, TestInputValue>>,
-    pub metric: Option<Metric>,
+    pub(crate) metric: Option<Metric>,
 }
 
 fn default_test_input_type() -> String {
