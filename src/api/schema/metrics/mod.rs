@@ -33,7 +33,7 @@ pub(super) use received_events::{
 };
 pub use sent_events::{ComponentSentEventsThroughput, ComponentSentEventsTotal, SentEventsTotal};
 pub use sink::{IntoSinkMetrics, SinkMetrics};
-pub use source::{IntoSourceMetrics, SourceMetrics};
+pub(super) use source::{IntoSourceMetrics, SourceMetrics};
 use tokio_stream::{Stream, StreamExt};
 pub use transform::{IntoTransformMetrics, TransformMetrics};
 pub(super) use uptime::Uptime;
