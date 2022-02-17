@@ -34,7 +34,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
-    pub compression: Compression,
+    pub(crate) compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]

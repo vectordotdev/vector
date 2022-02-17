@@ -58,7 +58,7 @@ impl InternalEvent for MongoDbMetricsCollectCompleted {
 }
 
 pub struct MongoDbMetricsRequestError<'a> {
-    pub error: MongoError,
+    pub(crate) error: MongoError,
     pub endpoint: &'a str,
 }
 
