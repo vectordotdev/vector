@@ -476,7 +476,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub acker: Acker,
+    pub(super) acker: Acker,
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
