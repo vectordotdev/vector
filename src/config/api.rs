@@ -12,7 +12,7 @@ pub struct Options {
     pub(crate) address: Option<SocketAddr>,
 
     #[serde(default = "default_playground")]
-    pub playground: bool,
+    pub(crate) playground: bool,
 }
 
 impl Default for Options {
