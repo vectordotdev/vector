@@ -109,6 +109,8 @@ pub(crate) fn decode_log_body(
                             if let Some(k) = &api_key {
                                 log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                             }
+
+                            log.metadata_mut().set_schema_id(source.logs_schema_id);
                         }
 
                         decoded.push(event);

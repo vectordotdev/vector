@@ -17,6 +17,7 @@ use crate::{
         Event, MetricKind,
     },
     internal_events::EventsReceived,
+    schema,
     sources::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -81,6 +82,7 @@ fn sketches_service(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
+                            source.metrics_schema_id,
                         )
                     });
                 if multiple_outputs {
@@ -122,6 +124,7 @@ fn series_v1_service(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
+                            source.metrics_schema_id,
                         )
                     });
                 if multiple_outputs {
@@ -154,6 +157,7 @@ fn series_v2_service() -> BoxedFilter<(Response,)> {
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
+    schema_id: schema::Id,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -164,7 +168,7 @@ fn decode_datadog_sketches(
         return Ok(Vec::new());
     }
 
-    let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
+    let metrics = decode_ddsketch(body, &api_key, schema_id).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!("Error decoding Datadog sketch: {:?}", error),
@@ -182,6 +186,7 @@ fn decode_datadog_sketches(
 fn decode_datadog_series(
     body: Bytes,
     api_key: Option<Arc<str>>,
+    schema_id: schema::Id,
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
@@ -202,7 +207,7 @@ fn decode_datadog_series(
     let decoded_metrics: Vec<Event> = metrics
         .series
         .into_iter()
-        .flat_map(|m| into_vector_metric(m, api_key.clone()))
+        .flat_map(|m| into_vector_metric(m, api_key.clone(), schema_id))
         .collect();
 
     emit!(&EventsReceived {
@@ -213,7 +218,11 @@ fn decode_datadog_series(
     Ok(decoded_metrics)
 }
 
-fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>) -> Vec<Event> {
+fn into_vector_metric(
+    dd_metric: DatadogSeriesMetric,
+    api_key: Option<Arc<str>>,
+    schema_id: schema::Id,
+) -> Vec<Event> {
     let mut tags: BTreeMap<String, String> = dd_metric
         .tags
         .unwrap_or_default()
@@ -287,6 +296,9 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
                 .metadata_mut()
                 .set_datadog_api_key(Some(Arc::clone(k)));
         }
+
+        metric.metadata_mut().set_schema_id(schema_id);
+
         metric.into()
     })
     .collect()
@@ -301,6 +313,7 @@ use dd_proto::SketchPayload;
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
+    schema_id: schema::Id,
 ) -> crate::Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
@@ -346,6 +359,9 @@ pub(crate) fn decode_ddsketch(
                         .metadata_mut()
                         .set_datadog_api_key(Some(Arc::clone(k)));
                 }
+
+                metric.metadata_mut().set_schema_id(schema_id);
+
                 metric.into()
             })
         })

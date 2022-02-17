@@ -86,9 +86,26 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let logs_schema_id = *cx
+            .schema_ids
+            .get(&Some(LOGS.to_owned()))
+            .or_else(|| cx.schema_ids.get(&None))
+            .expect("registered log schema required");
+        let metrics_schema_id = *cx
+            .schema_ids
+            .get(&Some(METRICS.to_owned()))
+            .or_else(|| cx.schema_ids.get(&None))
+            .expect("registered metrics schema required");
+
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
+        let source = DatadogAgentSource::new(
+            self.store_api_key,
+            decoder,
+            tls.http_protocol_name(),
+            logs_schema_id,
+            metrics_schema_id,
+        );
         let listener = tls.bind(&self.address).await?;
         let filters = source.build_warp_filters(
             cx.out,
@@ -193,6 +210,8 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_schema_source_type_key: &'static str,
     pub(crate) decoder: codecs::Decoder,
     protocol: &'static str,
+    logs_schema_id: schema::Id,
+    metrics_schema_id: schema::Id,
 }
 
 #[derive(Clone)]
@@ -227,6 +246,8 @@ impl DatadogAgentSource {
         store_api_key: bool,
         decoder: codecs::Decoder,
         protocol: &'static str,
+        logs_schema_id: schema::Id,
+        metrics_schema_id: schema::Id,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -239,6 +260,8 @@ impl DatadogAgentSource {
             log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
+            logs_schema_id,
+            metrics_schema_id,
         }
     }
 

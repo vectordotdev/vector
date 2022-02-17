@@ -154,7 +154,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
 

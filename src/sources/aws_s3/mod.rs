@@ -536,7 +536,7 @@ mod integration_tests {
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
         let (tx, rx) = SourceSender::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx);
+        let cx = SourceContext::new_test(tx, None);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
 

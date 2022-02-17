@@ -165,7 +165,10 @@ mod test {
             tls: tls.clone(),
             acknowledgements: AcknowledgementsConfig::default(),
         };
-        let source = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
         let sink = RemoteWriteConfig {
@@ -269,7 +272,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
         tokio::time::sleep(Duration::from_secs(2)).await;

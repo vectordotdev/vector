@@ -362,7 +362,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -425,7 +425,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -459,7 +459,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
