@@ -66,7 +66,7 @@ pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
-pub mod prometheus;
+pub(super) mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]

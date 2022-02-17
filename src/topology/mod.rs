@@ -7,7 +7,7 @@
 //! each type of component.
 
 pub mod builder;
-pub use vector_core::fanout;
+pub(crate) use vector_core::fanout;
 mod running;
 mod schema;
 mod task;
