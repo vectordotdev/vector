@@ -36,7 +36,7 @@ impl From<Metric> for ErrorsTotal {
     }
 }
 
-pub struct ComponentErrorsTotal {
+pub(crate) struct ComponentErrorsTotal {
     component_key: ComponentKey,
     metric: Metric,
 }
