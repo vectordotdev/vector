@@ -506,7 +506,7 @@ impl SinkContext {
     }
 }
 
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+pub(super) type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
