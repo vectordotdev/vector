@@ -38,7 +38,7 @@ pub enum SourcesSortFieldName {
 }
 
 #[derive(Debug, Clone)]
-pub struct Source(pub Data);
+pub struct Source(pub(crate) Data);
 
 impl Source {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
