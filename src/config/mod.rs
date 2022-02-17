@@ -31,7 +31,7 @@ use crate::{
 pub mod api;
 mod builder;
 mod compiler;
-pub mod component;
+pub(crate) mod component;
 #[cfg(feature = "datadog-pipelines")]
 pub(crate) mod datadog;
 mod diff;
