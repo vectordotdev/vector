@@ -188,7 +188,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 }
 
 /// Return Vec<Metric> based on a component id tag.
-pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
+pub(crate) fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
         .into_iter()
