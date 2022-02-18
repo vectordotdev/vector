@@ -74,7 +74,7 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
 #[derive(Debug)]
 pub(crate) struct GotHttpError<'a> {
     pub error: &'a Error,
-    pub roundtrip: Duration,
+    pub(crate) roundtrip: Duration,
 }
 
 impl<'a> InternalEvent for GotHttpError<'a> {
