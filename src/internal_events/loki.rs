@@ -12,7 +12,7 @@ impl InternalEvent for LokiEventUnlabeled {
 }
 
 #[derive(Debug)]
-pub struct LokiEventsProcessed {
+pub(crate) struct LokiEventsProcessed {
     pub byte_size: usize,
 }
 
