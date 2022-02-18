@@ -105,7 +105,7 @@ impl TransformConfig for RemapConfig {
     }
 
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        // We need to compile the VRL program in order to know the schema definition outpuf of this
+        // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         //
