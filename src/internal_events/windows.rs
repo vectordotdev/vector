@@ -26,7 +26,7 @@ impl<'a> InternalEvent for WindowsServiceStart<'a> {
 #[derive(Debug)]
 pub struct WindowsServiceStop<'a> {
     pub already_stopped: bool,
-    pub name: &'a str,
+    name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceStop<'a> {
