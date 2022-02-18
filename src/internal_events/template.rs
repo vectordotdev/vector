@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 pub struct TemplateRenderingError<'a> {
-    pub field: Option<&'a str>,
+    pub(crate) field: Option<&'a str>,
     pub(crate) drop_event: bool,
     pub(crate) error: crate::template::TemplateRenderingError,
 }
