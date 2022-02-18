@@ -41,7 +41,7 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
 
 #[derive(Debug)]
 pub(crate) struct MongoDbMetricsCollectCompleted {
-    pub start: Instant,
+    pub(crate) start: Instant,
     pub(crate) end: Instant,
 }
 
