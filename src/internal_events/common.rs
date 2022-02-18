@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct BytesReceived {
     pub byte_size: usize,
-    pub protocol: &'static str,
+    pub(crate) protocol: &'static str,
 }
 
 impl InternalEvent for BytesReceived {
