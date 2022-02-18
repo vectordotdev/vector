@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DedupeEventDiscarded {
-    pub event: crate::event::Event,
+    pub(crate) event: crate::event::Event,
 }
 
 impl InternalEvent for DedupeEventDiscarded {
