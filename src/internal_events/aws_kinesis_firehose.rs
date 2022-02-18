@@ -26,7 +26,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct AwsKinesisFirehoseRequestError<'a> {
+pub(crate) struct AwsKinesisFirehoseRequestError<'a> {
     pub request_id: Option<&'a str>,
     pub code: hyper::StatusCode,
     pub error: &'a str,
