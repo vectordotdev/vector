@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
-    pub path: &'a std::path::Path,
+    pub(crate) path: &'a std::path::Path,
 }
 
 impl InternalEvent for UnixSocketConnectionEstablished<'_> {
