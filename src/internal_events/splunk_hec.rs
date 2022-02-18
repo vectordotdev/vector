@@ -25,14 +25,20 @@ mod sink {
             error!(
                 message = "Error encoding Splunk HEC event to JSON.",
                 error = ?self.error,
-                error_type = "encode_failed",
+                error_code = "failed_serializing_json",
+                error_type = "encoder_failed",
                 stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 30,
             );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => error_stage::PROCESSING);
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "failed_serializing_json",
+                "error_type" => "encoder_failed",
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 
@@ -48,17 +54,28 @@ mod sink {
             error!(
                 message = "Invalid metric received.",
                 error = ?self.error,
+                error_code = "invalid_metric",
+                error_type = "encoder_failed",
+                stage = error_stage::PROCESSING,
                 value = ?self.value,
                 kind = ?self.kind,
-                error_type = "invalid_metric",
-                stage = error_stage::PROCESSING,
-                internal_log_rate_secs = 30,
+                internal_log_rate_secs = 10,
             )
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "stage" => error_stage::PROCESSING, "error_type" => "invalid_metric");
-            counter!("component_discarded_events_total", 1);
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "invalid_metric",
+                "error_type" => "encoder_failed",
+                "stage" => error_stage::PROCESSING,
+            );
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_code" => "invalid_metric",
+                "error_type" => "encoder_failed",
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 
@@ -69,10 +86,22 @@ mod sink {
 
     impl InternalEvent for SplunkResponseParseError {
         fn emit_logs(&self) {
-            warn!(
+            error!(
                 message = "Unable to parse Splunk HEC response. Acknowledging based on initial 200 OK.",
                 error = ?self.error,
-                internal_log_rate_secs = 30,
+                error_code = "invalid_response",
+                error_type = "parser_failed",
+                stage = error_stage::SENDING,
+                internal_log_rate_secs = 10,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "invalid_response",
+                "error_type" => "parser_failed",
+                "stage" => error_stage::SENDING,
             );
         }
     }
@@ -88,14 +117,20 @@ mod sink {
             error!(
                 message = self.message,
                 error = ?self.error,
-                error_type = "acknowledgements_error",
+                error_code = "indexer_ack_failed",
+                error_type = "acknowledgement_failed",
                 stage = error_stage::SENDING,
-                internal_log_rate_secs = 30,
+                internal_log_rate_secs = 10,
             );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => error_stage::SENDING);
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "indexer_ack_failed",
+                "error_type" => "acknowledgement_failed",
+                "stage" => error_stage::SENDING,
+            );
         }
     }
 
@@ -104,9 +139,21 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
         fn emit_logs(&self) {
-            warn!(
+            error!(
                 message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
-                internal_log_rate_secs = 30,
+                error_code = "indexer_ack_unavailable",
+                error_type = "acknowledgement_failed",
+                stage = error_stage::SENDING,
+                internal_log_rate_secs = 10,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "indexer_ack_unavailable",
+                "error_type" => "acknowledgement_failed",
+                "stage" => error_stage::SENDING,
             );
         }
     }
