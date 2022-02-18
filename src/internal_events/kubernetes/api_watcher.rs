@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct RequestPrepared<R> {
-    pub request: R,
+    pub(crate) request: R,
 }
 
 impl<R: Debug> InternalEvent for RequestPrepared<R> {
