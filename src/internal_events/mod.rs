@@ -9,7 +9,10 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
@@ -169,7 +172,10 @@ pub(crate) use self::ansi_stripper::*;
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub(crate) use self::api::*;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
