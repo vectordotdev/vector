@@ -21,12 +21,12 @@ pub struct Opts {
 }
 
 impl Opts {
-    pub fn get_matches() -> Self {
+    pub fn get_matches() -> Result<Self, clap::Error> {
         let version = get_version();
         let app = Opts::command()
             .version(version.as_str())
             .global_setting(AppSettings::DeriveDisplayOrder);
-        Opts::from_arg_matches(&app.get_matches()).expect("couldn't initialize CLI. Please report.")
+        Opts::from_arg_matches(&app.get_matches())
     }
 
     pub const fn log_level(&self) -> &'static str {
