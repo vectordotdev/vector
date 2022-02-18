@@ -840,7 +840,7 @@ pub struct TestInput {
     pub(self) insert_at: ComponentKey,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub(super) type_str: String,
-    pub value: Option<String>,
+    pub(super) value: Option<String>,
     log_fields: Option<IndexMap<String, TestInputValue>>,
     pub(crate) metric: Option<Metric>,
 }
