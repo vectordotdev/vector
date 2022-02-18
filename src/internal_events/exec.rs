@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ExecEventsReceived<'a> {
-    pub count: usize,
+    pub(crate) count: usize,
     pub(crate) command: &'a str,
     pub byte_size: usize,
 }
