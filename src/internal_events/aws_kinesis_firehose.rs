@@ -58,7 +58,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
 }
 
 #[derive(Debug)]
-pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
+pub(crate) struct AwsKinesisFirehoseAutomaticRecordDecodeError {
     pub compression: Compression,
     pub error: std::io::Error,
 }
