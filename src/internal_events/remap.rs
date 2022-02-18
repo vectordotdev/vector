@@ -36,7 +36,7 @@ impl InternalEvent for RemapMappingError {
 pub struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
     /// during mapping. This internal event will reflect that in its messaging.
-    pub event_dropped: bool,
+    pub(crate) event_dropped: bool,
 }
 
 impl InternalEvent for RemapMappingAbort {
