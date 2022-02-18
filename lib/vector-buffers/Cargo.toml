@@ -27,7 +27,7 @@ tokio-stream = { version = "0.1", default-features = false, features = ["sync"] 
 tokio-util = { version = "0.6", default-features = false }
 tokio = { version = "1.17.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.31", default-features = false, features = ["attributes"] }
-vector_common = { path = "../vector-common", default-features = false }
+vector_common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 
 [dev-dependencies]
 clap = "3.1.0"

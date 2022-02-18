@@ -21,6 +21,8 @@ aws_cloudwatch_logs_subscription = [
 
 btreemap = []
 
+byte_size_of = ["bytes", "chrono"]
+
 conversion = [
   "bytes",
   "chrono",
