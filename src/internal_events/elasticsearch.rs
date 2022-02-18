@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct ElasticsearchEventEncoded {
     pub(crate) byte_size: usize,
-    pub index: String,
+    pub(crate) index: String,
 }
 
 impl InternalEvent for ElasticsearchEventEncoded {
