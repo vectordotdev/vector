@@ -13,7 +13,7 @@ impl<'a> InternalEvent for RenameFieldsFieldOverwritten<'a> {
 
 #[derive(Debug)]
 pub struct RenameFieldsFieldDoesNotExist<'a> {
-    pub field: &'a str,
+    pub(crate) field: &'a str,
 }
 
 impl<'a> InternalEvent for RenameFieldsFieldDoesNotExist<'a> {
