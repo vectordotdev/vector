@@ -482,7 +482,7 @@ pub struct SinkContext {
     pub(super) acker: Acker,
     pub(crate) healthcheck: SinkHealthcheckOptions,
     pub(crate) globals: GlobalOptions,
-    pub proxy: ProxyConfig,
+    pub(crate) proxy: ProxyConfig,
 }
 
 impl SinkContext {
