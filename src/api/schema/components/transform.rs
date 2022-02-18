@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Data {
+pub(crate) struct Data {
     pub component_key: ComponentKey,
     pub(super) component_type: String,
     pub(super) inputs: Vec<OutputId>,
