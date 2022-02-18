@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct KeyValueParserError {
+pub(crate) struct KeyValueParserError {
     pub(crate) key: String,
     pub error: crate::types::Error,
 }
