@@ -77,7 +77,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
 
 #[derive(Debug)]
 pub struct ParserTargetExistsError<'a> {
-    pub target_field: &'a str,
+    pub(crate) target_field: &'a str,
 }
 
 impl<'a> InternalEvent for ParserTargetExistsError<'a> {
