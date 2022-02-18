@@ -48,7 +48,7 @@ impl InternalEvent for NatsEventSendSuccess {
 }
 
 #[derive(Debug)]
-pub struct NatsEventSendFail {
+pub(crate) struct NatsEventSendFail {
     pub(crate) error: Error,
 }
 
