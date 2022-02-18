@@ -53,7 +53,7 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 
 #[derive(Debug)]
 pub(crate) struct AwsEcsMetricsParseError<'a> {
-    pub error: serde_json::Error,
+    pub(crate) error: serde_json::Error,
     pub endpoint: &'a str,
     pub body: Cow<'a, str>,
 }
