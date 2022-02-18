@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::event::metric::Metric;
 
 #[derive(Debug)]
-pub struct SematextMetricsInvalidMetricReceived<'a> {
+pub(crate) struct SematextMetricsInvalidMetricReceived<'a> {
     pub metric: &'a Metric,
 }
 
