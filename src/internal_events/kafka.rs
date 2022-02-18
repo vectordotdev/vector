@@ -141,7 +141,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
 }
 
 pub struct KafkaHeaderExtractionFailed<'a> {
-    pub header_field: &'a str,
+    pub(crate) header_field: &'a str,
 }
 
 impl InternalEvent for KafkaHeaderExtractionFailed<'_> {
