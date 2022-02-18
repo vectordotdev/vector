@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Data {
     pub component_key: ComponentKey,
-    pub component_type: String,
+    pub(super) component_type: String,
     pub(super) inputs: Vec<OutputId>,
     pub(crate) outputs: Vec<String>,
 }
