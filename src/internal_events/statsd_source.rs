@@ -14,6 +14,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
         error!(
             message = "Invalid packet from statsd, discarding.",
             error = %self.error,
+            error_code = "invalid_packet",
             error_type = "parse_error",
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
@@ -24,7 +25,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
+            "error_code" => "invalid_packet",
             "error_type" => "parse_error",
             "stage" => error_stage::PROCESSING,
         );
@@ -80,6 +81,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
         error!(
             message = %message,
             error = %error,
+            error_code = %self.error_code(),
             error_type = "connection_failed",
             stage = error_stage::RECEIVING,
             rate_limit_secs = 10,
@@ -89,7 +91,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error_code(),
+            "error_code" => self.error_code(),
             "error_type" => "connection_failed",
             "stage" => error_stage::RECEIVING,
         );
