@@ -174,7 +174,7 @@ impl Config {
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(default)]
 pub struct HealthcheckOptions {
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     pub require_healthy: bool,
 }
 
