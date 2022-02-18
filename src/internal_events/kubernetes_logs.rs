@@ -148,7 +148,7 @@ const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 #[derive(Debug)]
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
-    pub error: E,
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEvent
