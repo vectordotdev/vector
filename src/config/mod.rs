@@ -99,7 +99,7 @@ impl ConfigPath {
 #[derive(Debug, Default)]
 pub struct Config {
     #[cfg(feature = "api")]
-    pub api: api::Options,
+    pub(super) api: api::Options,
     pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
     pub(super) datadog: Option<datadog::Options>,
