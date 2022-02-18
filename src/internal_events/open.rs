@@ -10,7 +10,7 @@ use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ConnectionOpen {
+pub(crate) struct ConnectionOpen {
     pub count: usize,
 }
 
