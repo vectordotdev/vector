@@ -33,7 +33,7 @@ impl<'a> InternalEvent for DecoderDeserializeFailed<'a> {
 
 #[derive(Debug)]
 pub(crate) struct EncoderFramingFailed<'a> {
-    pub error: &'a crate::codecs::encoding::BoxedFramingError,
+    pub(crate) error: &'a crate::codecs::encoding::BoxedFramingError,
 }
 
 impl<'a> InternalEvent for EncoderFramingFailed<'a> {
