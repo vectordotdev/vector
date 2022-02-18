@@ -1,4 +1,3 @@
-
 pub(crate) mod source {
     use metrics::counter;
     use rusoto_core::RusotoError;

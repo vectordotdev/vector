@@ -4,7 +4,7 @@ use std::net::AddrParseError;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct GeoipIpAddressParseError<'a> {
+pub(crate) struct GeoipIpAddressParseError<'a> {
     pub(crate) error: AddrParseError,
     pub address: &'a str,
 }
