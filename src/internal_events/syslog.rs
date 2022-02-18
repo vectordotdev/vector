@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[cfg(feature = "codecs")]
 #[derive(Debug)]
-pub struct SyslogUdpReadError {
+pub(crate) struct SyslogUdpReadError {
     pub error: crate::codecs::decoding::Error,
 }
 
