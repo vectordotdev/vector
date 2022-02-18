@@ -71,7 +71,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     }
 }
 
-pub struct LogToMetricTemplateParseError {
+pub(crate) struct LogToMetricTemplateParseError {
     pub error: TemplateParseError,
 }
 
