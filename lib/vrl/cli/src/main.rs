@@ -1,6 +1,6 @@
 extern crate vrl_cli;
 
-use structopt::StructOpt;
+use clap::Parser;
 use vrl_cli::{cmd::cmd, Opts};
 
 fn main() {
