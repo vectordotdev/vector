@@ -84,7 +84,7 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
     }
 }
 
-pub struct MongoDbMetricsBsonParseError<'a> {
+pub(crate) struct MongoDbMetricsBsonParseError<'a> {
     pub(crate) error: bson::de::Error,
     pub(crate) endpoint: &'a str,
 }
