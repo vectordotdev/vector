@@ -73,7 +73,7 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
 
 #[cfg(feature = "rusoto")]
 pub(crate) struct AwsBytesSent {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub region: rusoto_core::Region,
 }
 
