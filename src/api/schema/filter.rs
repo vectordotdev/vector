@@ -115,7 +115,7 @@ where
 }
 
 /// Filters items based on an implementation of `CustomFilter<T>`.
-pub fn filter_items<Item, Iter, Filter>(items: Iter, f: &Filter) -> Vec<Item>
+pub(crate) fn filter_items<Item, Iter, Filter>(items: Iter, f: &Filter) -> Vec<Item>
 where
     Iter: Iterator<Item = Item>,
     Filter: CustomFilter<Item>,
