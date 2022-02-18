@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct WindowsServiceStart<'a> {
     pub already_started: bool,
-    pub name: &'a str,
+    name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceStart<'a> {
