@@ -118,7 +118,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
 }
 
 #[derive(Debug)]
-pub struct ExecCommandExecuted<'a> {
+pub(crate) struct ExecCommandExecuted<'a> {
     pub(crate) command: &'a str,
     pub(crate) exit_status: Option<i32>,
     pub(crate) exec_duration: Duration,
