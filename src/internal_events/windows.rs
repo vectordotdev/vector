@@ -100,7 +100,7 @@ impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceDoesNotExist<'a> {
+pub(super) struct WindowsServiceDoesNotExist<'a> {
     pub name: &'a str,
 }
 
