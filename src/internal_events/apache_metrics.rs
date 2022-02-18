@@ -9,7 +9,7 @@ use crate::sources::apache_metrics;
 #[derive(Debug)]
 pub struct ApacheMetricsEventsReceived<'a> {
     pub byte_size: usize,
-    pub count: usize,
+    pub(crate) count: usize,
     pub endpoint: &'a str,
 }
 
