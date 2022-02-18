@@ -6,7 +6,7 @@ use crate::event::Event;
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
-    pub file: &'a str,
+    pub(crate) file: &'a str,
     pub byte_size: usize,
     pub pod_name: Option<&'a str>,
 }
