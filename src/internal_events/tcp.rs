@@ -86,7 +86,7 @@ impl InternalEvent for TcpSocketConnectionError {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketError {
+pub(crate) struct TcpSocketError {
     pub error: std::io::Error,
 }
 
