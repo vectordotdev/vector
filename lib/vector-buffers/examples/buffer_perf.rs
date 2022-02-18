@@ -9,7 +9,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut};
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use futures::{stream, SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
@@ -122,7 +122,7 @@ struct Configuration {
 
 impl Configuration {
     pub fn from_cli() -> Result<Self, String> {
-        let matches = App::new("buffer-perf")
+        let matches = Command::new("buffer-perf")
             .about("Runner for performance testing of buffers")
             .arg(
                 Arg::new("buffer_type")

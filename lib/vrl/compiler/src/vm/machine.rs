@@ -389,7 +389,7 @@ impl Vm {
 
                     match &variable {
                         Variable::External(path) => {
-                            let value = ctx.target().get(path)?.unwrap_or(Value::Null);
+                            let value = ctx.target().target_get(path)?.unwrap_or(Value::Null);
                             state.stack.push(value);
                         }
                         Variable::Internal(ident, path) => {
@@ -558,7 +558,7 @@ fn set_variable<'a>(
                     .insert_variable(ident.clone(), value.at_path(path)),
             }
         }
-        Variable::External(path) => ctx.target_mut().insert(path, value)?,
+        Variable::External(path) => ctx.target_mut().target_insert(path, value)?,
 
         // Setting these cases should not be allowed by the compiler.
         Variable::None | Variable::Stack(_) => (),
