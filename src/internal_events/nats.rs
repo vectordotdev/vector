@@ -49,7 +49,7 @@ impl InternalEvent for NatsEventSendSuccess {
 
 #[derive(Debug)]
 pub struct NatsEventSendFail {
-    pub error: Error,
+    pub(crate) error: Error,
 }
 
 impl InternalEvent for NatsEventSendFail {
