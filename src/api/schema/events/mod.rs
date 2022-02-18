@@ -2,7 +2,7 @@ mod encoding;
 pub(crate) mod log;
 pub(crate) mod metric;
 pub(crate) mod notification;
-pub mod output;
+pub(crate) mod output;
 pub(crate) mod trace;
 
 use std::collections::HashSet;
