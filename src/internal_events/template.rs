@@ -2,7 +2,7 @@ use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-pub struct TemplateRenderingError<'a> {
+pub(crate) struct TemplateRenderingError<'a> {
     pub(crate) field: Option<&'a str>,
     pub(crate) drop_event: bool,
     pub(crate) error: crate::template::TemplateRenderingError,
