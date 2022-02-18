@@ -43,7 +43,7 @@ impl InternalEvent for DecoderMalformedReplacement {
 
 #[derive(Debug)]
 pub(crate) struct EncoderUnmappableReplacement {
-    pub to_encoding: &'static str,
+    pub(crate) to_encoding: &'static str,
 }
 
 impl InternalEvent for EncoderUnmappableReplacement {
