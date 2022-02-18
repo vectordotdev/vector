@@ -48,7 +48,7 @@ impl InternalEvent for SocketEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct SocketEventsSent {
+pub(crate) struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
     pub byte_size: usize,
