@@ -1,7 +1,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-pub use vector_core::config::ComponentKey;
+pub(crate) use vector_core::config::ComponentKey;
 
 // Unlike `ComponentKey`, we never deserialize these directly out of user configs, so it's fine to
 // use the derive. They should really only be triggered by our hacky roundtrip-through-serde clone.
