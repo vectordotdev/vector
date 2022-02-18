@@ -14,7 +14,7 @@ static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct Options {
+pub(crate) struct Options {
     #[serde(default = "default_enabled")]
     pub(crate) enabled: bool,
 
