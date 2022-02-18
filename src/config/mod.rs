@@ -103,7 +103,7 @@ pub struct Config {
     pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
     pub(super) datadog: Option<datadog::Options>,
-    pub global: GlobalOptions,
+    pub(super) global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     pub(crate) sources: IndexMap<ComponentKey, SourceOuter>,
     pub(super) sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
