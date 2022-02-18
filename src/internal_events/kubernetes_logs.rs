@@ -147,7 +147,7 @@ const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
 #[derive(Debug)]
 pub struct KubernetesLifecycleError<E> {
-    pub message: &'static str,
+    pub(crate) message: &'static str,
     pub(crate) error: E,
 }
 
