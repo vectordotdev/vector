@@ -23,7 +23,7 @@ impl SocketMode {
 
 #[derive(Debug)]
 pub struct SocketEventsReceived {
-    pub mode: SocketMode,
+    pub(crate) mode: SocketMode,
     pub byte_size: usize,
     pub count: usize,
 }
