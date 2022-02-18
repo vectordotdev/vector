@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RouteEventDiscarded<'a> {
+pub(crate) struct RouteEventDiscarded<'a> {
     pub output: &'a str,
 }
 
