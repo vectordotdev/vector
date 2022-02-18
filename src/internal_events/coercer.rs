@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct CoercerConversionError<'a> {
+pub(crate) struct CoercerConversionError<'a> {
     pub(crate) field: &'a str,
     pub(crate) error: crate::types::Error,
 }
