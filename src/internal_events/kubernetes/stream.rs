@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ChunkProcessed {
+pub(crate) struct ChunkProcessed {
     pub byte_size: usize,
 }
 
