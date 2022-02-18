@@ -90,7 +90,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
 
 #[derive(Debug)]
 pub struct ApacheMetricsResponseError<'a> {
-    pub code: hyper::StatusCode,
+    pub(crate) code: hyper::StatusCode,
     pub(crate) endpoint: &'a str,
 }
 
