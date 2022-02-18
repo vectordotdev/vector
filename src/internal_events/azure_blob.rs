@@ -39,7 +39,7 @@ impl InternalEvent for AzureBlobHttpError {
 }
 
 pub struct AzureBlobEventSent {
-    pub request_id: Uuid,
+    pub(crate) request_id: Uuid,
     pub byte_size: usize,
 }
 
