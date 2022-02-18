@@ -11,7 +11,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct ConnectionOpen {
-    pub count: usize,
+    pub(crate) count: usize,
 }
 
 impl InternalEvent for ConnectionOpen {

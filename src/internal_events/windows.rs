@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct WindowsServiceStart<'a> {
+pub(crate) struct WindowsServiceStart<'a> {
     already_started: bool,
     name: &'a str,
 }
