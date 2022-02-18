@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct BlackholeEventReceived {
+pub(crate) struct BlackholeEventReceived {
     pub byte_size: usize,
 }
 
