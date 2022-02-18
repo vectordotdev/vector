@@ -6,7 +6,7 @@ use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct MongoDbMetricsEventsReceived<'a> {
+pub(crate) struct MongoDbMetricsEventsReceived<'a> {
     pub(crate) count: usize,
     pub(crate) byte_size: usize,
     pub(crate) uri: &'a str,
