@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct JsonParserError<'a> {
     pub(crate) field: &'a str,
-    pub value: &'a str,
+    pub(crate) value: &'a str,
     pub error: Error,
     pub drop_invalid: bool,
 }
