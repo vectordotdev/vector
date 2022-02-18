@@ -24,7 +24,7 @@ impl InternalEvent for RedisReceiveEventFailed {
 
 #[derive(Debug)]
 pub struct RedisEventSent {
-    pub count: usize,
+    pub(crate) count: usize,
     pub byte_size: usize,
 }
 
