@@ -604,7 +604,7 @@ impl TransformOuter<String> {
     }
 }
 
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+pub(crate) type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
 
