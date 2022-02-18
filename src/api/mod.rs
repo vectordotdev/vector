@@ -2,6 +2,8 @@ mod handler;
 mod schema;
 mod server;
 pub mod tap;
+#[cfg(all(test, feature = "vector-api-tests"))]
+mod tests;
 
 pub use schema::build_schema;
 pub use server::Server;

@@ -28,7 +28,7 @@ use merge_strategy::*;
 pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,
 
-    pub(self) flush_period_ms: Option<u64>,
+    pub flush_period_ms: Option<u64>,
 
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
