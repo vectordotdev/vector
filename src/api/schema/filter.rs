@@ -50,7 +50,7 @@ impl StringFilter {
 #[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
 // Filter for GraphQL lists
 pub(crate) struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
-    pub equals: Option<Vec<T>>,
+    pub(super) equals: Option<Vec<T>>,
     pub not_equals: Option<Vec<T>>,
     pub contains: Option<T>,
     pub(super) not_contains: Option<T>,
