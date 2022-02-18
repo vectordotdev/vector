@@ -15,7 +15,7 @@ impl<R: Debug> InternalEvent for RequestPrepared<R> {
 
 #[derive(Debug)]
 pub struct ResponseReceived<R> {
-    pub response: R,
+    pub(crate) response: R,
 }
 
 impl<R: Debug> InternalEvent for ResponseReceived<R> {
