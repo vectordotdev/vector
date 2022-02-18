@@ -159,7 +159,7 @@ impl Resolver for VrlFilter {}
 impl VrlFilter {
     pub fn run(matcher: &fast_matcher::FastMatcher, obj: &Value) -> bool {
         match &matcher.mode {
-            Mode::One(op) => exec(&op, obj),
+            Mode::One(op) => exec(op, obj),
             Mode::Any(ops) => ops.iter().any(|op| exec(op, obj)),
             Mode::All(ops) => ops.iter().all(|op| exec(op, obj)),
         }
@@ -171,7 +171,7 @@ fn exec(op: &fast_matcher::Op, obj: &Value) -> bool {
         Op::True => true,
         Op::False => true,
         Op::Exists(field) => exists(field, obj),
-        Op::NotExists(field) => !exists(&field, obj),
+        Op::NotExists(field) => !exists(field, obj),
         Op::Equals { field, value } => equals(field, value, obj),
         Op::TagExists(_) => unimplemented!(),
         Op::RegexMatch { field, re } => regex_match(field, re, obj),
@@ -285,7 +285,7 @@ pub fn word_regex(to_match: &str) -> bytes::Regex {
 }
 
 fn equals(field: &Field, to_match: &str, obj: &Value) -> bool {
-    let buf = lookup_field(&field);
+    let buf = lookup_field(field);
 
     match field {
         // Default fields are compared by word boundary.
@@ -318,7 +318,7 @@ fn equals(field: &Field, to_match: &str, obj: &Value) -> bool {
 }
 
 fn prefix(field: &Field, pfx: &str, obj: &Value) -> bool {
-    let buf = lookup_field(&field);
+    let buf = lookup_field(field);
 
     match field {
         // Default fields are matched by word boundary.
@@ -340,11 +340,11 @@ fn prefix(field: &Field, pfx: &str, obj: &Value) -> bool {
 }
 
 fn regex_match(field: &Field, re: &regex::Regex, obj: &Value) -> bool {
-    let buf = lookup_field(&field);
+    let buf = lookup_field(field);
 
     resolve_value(&buf, obj, |val: &Value| match val {
         Value::Bytes(s) => {
-            if let Some(s) = std::str::from_utf8(&s).ok() {
+            if let Ok(s) = std::str::from_utf8(s) {
                 re.is_match(s)
             } else {
                 false
@@ -355,7 +355,7 @@ fn regex_match(field: &Field, re: &regex::Regex, obj: &Value) -> bool {
 }
 
 fn wildcard(field: &Field, wildcard: &str, obj: &Value) -> bool {
-    let buf = lookup_field(&field);
+    let buf = lookup_field(field);
 
     match field {
         Field::Default(_) => resolve_value(&buf, obj, |val: &Value| {
@@ -382,7 +382,7 @@ fn compare(
     comparison_value: &ComparisonValue,
     obj: &Value,
 ) -> bool {
-    let buf = lookup_field(&field);
+    let buf = lookup_field(field);
     let rhs = Cow::from(comparison_value.to_string());
 
     match field {

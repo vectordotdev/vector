@@ -55,7 +55,7 @@ pub struct EventFilter;
 impl EventFilter {
     pub fn run(matcher: &fast_matcher::FastMatcher, log: &LogEvent) -> bool {
         match &matcher.mode {
-            Mode::One(op) => exec(&op, log),
+            Mode::One(op) => exec(op, log),
             Mode::Any(ops) => ops.iter().any(|op| exec(op, log)),
             Mode::All(ops) => ops.iter().all(|op| exec(op, log)),
         }
@@ -67,7 +67,7 @@ fn exec(op: &Op, log: &LogEvent) -> bool {
         Op::True => true,
         Op::False => true,
         Op::Exists(field) => exists(field, log),
-        Op::NotExists(field) => !exists(&field, log),
+        Op::NotExists(field) => !exists(field, log),
         Op::Equals { field, value } => match field {
             Field::Reserved(f) | Field::Facet(f) => equals(f, value, log),
             _ => false,
@@ -194,7 +194,7 @@ fn tag_exists(to_match: &str, log: &LogEvent) -> bool {
 fn regex_match(field: &str, re: &Regex, log: &LogEvent) -> bool {
     match log.get(field) {
         Some(Value::Bytes(s)) => {
-            if let Some(s) = std::str::from_utf8(&s).ok() {
+            if let Ok(s) = std::str::from_utf8(s) {
                 re.is_match(s)
             } else {
                 false
@@ -230,7 +230,7 @@ fn prefix(field: &Field, pfx: &str, log: &LogEvent) -> bool {
         Field::Default(field) => match log.get(field.as_str()) {
             Some(Value::Bytes(v)) => {
                 let re = word_regex(&format!("{}*", pfx));
-                re.is_match(&v)
+                re.is_match(v)
             }
             _ => false,
         },
@@ -257,7 +257,7 @@ fn wildcard(field: &Field, wildcard: &str, log: &LogEvent) -> bool {
         Field::Default(field) => match log.get(field.as_str()) {
             Some(Value::Bytes(v)) => {
                 let re = word_regex(wildcard);
-                re.is_match(&v)
+                re.is_match(v)
             }
             _ => false,
         },
@@ -273,7 +273,7 @@ fn wildcard(field: &Field, wildcard: &str, log: &LogEvent) -> bool {
         Field::Reserved(field) | Field::Facet(field) => match log.get(field.as_str()) {
             Some(Value::Bytes(v)) => {
                 let re = wildcard_regex(wildcard);
-                re.is_match(&v)
+                re.is_match(v)
             }
             _ => false,
         },

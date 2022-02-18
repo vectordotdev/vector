@@ -900,9 +900,3 @@ path = "benches/codecs/main.rs"
 harness = false
 test = false
 required-features = ["codecs-benches"]
-
-[[bench]]
-name = "dd_search"
-path = "benches/dd_search.rs"
-harness = false
-test = false

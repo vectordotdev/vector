@@ -74,7 +74,7 @@ where
             let matchers = filter
                 .build_fields(attr)
                 .into_iter()
-                .map(|field| Op::Exists(field))
+                .map(Op::Exists)
                 .collect();
 
             FastMatcher::any(matchers)
@@ -83,7 +83,7 @@ where
             let matchers = filter
                 .build_fields(attr)
                 .into_iter()
-                .map(|field| Op::NotExists(field))
+                .map(Op::NotExists)
                 .collect();
 
             FastMatcher::all(matchers)
