@@ -196,7 +196,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug)]
-pub struct PrometheusNoNameError;
+struct PrometheusNoNameError;
 
 impl InternalEvent for PrometheusNoNameError {
     fn emit_logs(&self) {
