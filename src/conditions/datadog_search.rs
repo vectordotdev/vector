@@ -1,10 +1,12 @@
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
 use datadog_filter::{
     fast_matcher::{self, Mode, Op},
+    regex::wildcard_bytes_regex as wildcard_regex,
+    regex::word_bytes_regex as word_regex,
     Resolver,
 };
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
-use regex::{bytes, Regex};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use vector_core::event::{Event, LogEvent, Value};
@@ -202,26 +204,6 @@ fn regex_match(field: &str, re: &Regex, log: &LogEvent) -> bool {
         }
         _ => false,
     }
-}
-
-/// Returns compiled word boundary regex.
-#[must_use]
-pub fn word_regex(to_match: &str) -> bytes::Regex {
-    bytes::Regex::new(&format!(
-        r#"\b{}\b"#,
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
-}
-
-/// Returns compiled wildcard regex.
-#[must_use]
-pub fn wildcard_regex(to_match: &str) -> bytes::Regex {
-    bytes::Regex::new(&format!(
-        "^{}$",
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
 }
 
 fn prefix(field: &Field, pfx: &str, log: &LogEvent) -> bool {
