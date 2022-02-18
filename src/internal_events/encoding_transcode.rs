@@ -22,7 +22,7 @@ impl InternalEvent for DecoderBomRemoval {
 
 #[derive(Debug)]
 pub(crate) struct DecoderMalformedReplacement {
-    pub from_encoding: &'static str,
+    pub(crate) from_encoding: &'static str,
 }
 
 impl InternalEvent for DecoderMalformedReplacement {
