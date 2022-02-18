@@ -4,7 +4,7 @@ use metrics::histogram;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AdaptiveConcurrencyLimit {
+pub(crate) struct AdaptiveConcurrencyLimit {
     pub concurrency: u64,
     pub reached_limit: bool,
     pub(crate) had_back_pressure: bool,

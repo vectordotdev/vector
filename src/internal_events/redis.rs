@@ -41,7 +41,7 @@ impl InternalEvent for RedisEventSent {
 
 #[derive(Debug)]
 pub(crate) struct RedisSendEventFailed {
-    pub error: String,
+    pub(crate) error: String,
 }
 
 impl InternalEvent for RedisSendEventFailed {
