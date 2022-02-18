@@ -47,7 +47,7 @@ struct InstallOpts {
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
     #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
         use_value_delimiter(true)
