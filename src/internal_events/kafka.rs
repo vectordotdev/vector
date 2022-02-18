@@ -100,7 +100,7 @@ impl InternalEvent for KafkaKeyExtractionFailed<'_> {
 }
 
 #[derive(Debug)]
-pub struct KafkaStatisticsReceived<'a> {
+pub(crate) struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
 }
 
