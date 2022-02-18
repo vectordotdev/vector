@@ -511,7 +511,7 @@ pub(super) type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter<T> {
+pub(crate) struct TransformOuter<T> {
     #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
     pub(super) inputs: Vec<T>,
     #[serde(flatten)]
