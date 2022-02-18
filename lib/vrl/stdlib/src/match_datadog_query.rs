@@ -173,7 +173,7 @@ fn exec(op: &fast_matcher::Op, obj: &Value) -> bool {
         Op::Exists(field) => exists(field, obj),
         Op::NotExists(field) => !exists(field, obj),
         Op::Equals { field, value } => equals(field, value, obj),
-        Op::TagExists(_) => unimplemented!(),
+        Op::TagExists(to_match) => tag_exists(to_match, obj),
         Op::RegexMatch { field, re } => regex_match(field, re, obj),
         Op::Prefix(field, value) => prefix(field, value, obj),
         Op::Wildcard(field, value) => wildcard(field, value, obj),
@@ -243,6 +243,23 @@ where
     }
 }
 
+fn tag_exists(to_match: &str, obj: &Value) -> bool {
+    let buf = parse_lookup("tags")
+        .expect("should parse lookup buf")
+        .into_buf();
+
+    resolve_value(&buf, obj, |val: &Value| match val {
+        Value::Array(values) => values.iter().any(|value| {
+            if let Value::Bytes(bytes) = value {
+                bytes == to_match.as_bytes()
+            } else {
+                false
+            }
+        }),
+        _ => false,
+    })
+}
+
 fn exists(field: &Field, obj: &Value) -> bool {
     let buf = lookup_field(field);
 
@@ -270,7 +287,7 @@ fn exists(field: &Field, obj: &Value) -> bool {
             _ => false,
         }),
         // Other field types have already resolved at this point, so just return true.
-        _ => true,
+        _ => resolve_value(&buf, obj, |_val: &Value| true),
     }
 }
 
