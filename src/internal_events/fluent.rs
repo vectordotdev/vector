@@ -24,7 +24,7 @@ impl InternalEvent for FluentMessageReceived {
 
 #[derive(Debug)]
 pub struct FluentMessageDecodeError<'a> {
-    pub error: &'a DecodeError,
+    pub(crate) error: &'a DecodeError,
     pub(crate) base64_encoded_message: String,
 }
 
