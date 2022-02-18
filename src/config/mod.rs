@@ -46,7 +46,7 @@ mod validation;
 mod vars;
 pub(super) mod watcher;
 
-pub use builder::ConfigBuilder;
+pub(super) use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
