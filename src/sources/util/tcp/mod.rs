@@ -28,7 +28,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+        TcpBytesReceived, TcpSendAckError, TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -243,7 +243,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(&TcpSocketConnectionError { error });
+                emit!(&TcpSocketTlsConnectionError { error });
                 return;
             }
         },
