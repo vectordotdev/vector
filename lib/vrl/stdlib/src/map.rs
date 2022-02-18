@@ -10,11 +10,18 @@ impl Function for Map {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            kind: kind::OBJECT | kind::ARRAY,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::OBJECT | kind::ARRAY,
+                required: true,
+            },
+            Parameter {
+                keyword: "recursive",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -63,6 +70,93 @@ impl Function for Map {
                 result: Ok(r#"{"a": 0, "b": 1, "c": 2}"#),
             },
             Example {
+                title: "no recursion with nested arrays",
+                source: r#"map(["a", ["b"], "c"]) -> |index, value| { value }"#,
+                result: Ok(r#"[
+                "a",
+                [
+                "b"
+                ], 
+                "c"
+                ]"#),
+            },
+            Example {
+                title: "recursion with nested arrays",
+                source: r#"map(["a", ["b", "c", ["d"]], "e"], true) -> |index, value| { [index, value] }"#,
+                result: Ok(r#"[
+              [
+                0,
+                "a"
+              ],
+              [
+                1,
+                [
+                  "b",
+                  "c",
+                  [
+                    "d"
+                  ]
+                ]
+              ],
+              [
+                2,
+                "e"
+              ],
+              [
+                0,
+                "b"
+              ],
+              [
+                1,
+                "c"
+              ],
+              [
+                2,
+                [
+                  "d"
+                ]
+              ],
+              [
+                0,
+                "d"
+              ]
+            ]
+            "#),
+            },
+            Example {
+                title: "no recursion with nested objects",
+                source: r#"map({"a": 1, "b": {"c": 2, "d": {"e": 3}}}) -> |key, value| { [key, value] }"#,
+                result: Ok(r#"{
+               "a": 1,
+                 "b": {
+                   "c": 2,
+                     "d": {
+                        "e": 3
+                      }
+                    }
+                }
+             "#),
+            },
+            Example {
+                title: "recursion with nested objects",
+                source: r#"map({"a": 1, "b": {"c": 2, "d": {"e": 3}}}, true) -> |key, value| { [key, value] }"#,
+                result: Ok(r#"{
+               "a": 1,
+                 "b": {
+                   "c": 2,
+                     "d": {
+                        "e": 3
+                      }
+                      },
+                "c": 2,
+                "d": {
+                    "e": 3
+                      },
+                "e": 3
+                }
+             "#),
+            },
+            Example {
                 title: "non array return value for object iteration does not compile",
                 source: r#"map({"b": 2}) -> |index, value| { { "a": 1} }"#,
 
@@ -94,9 +188,14 @@ impl Function for Map {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
+        let recursive = arguments.optional("recursive");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(MapFn { value, closure }))
+        Ok(Box::new(MapFn {
+            value,
+            closure,
+            recursive,
+        }))
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -135,6 +234,7 @@ impl Function for Map {
 #[derive(Debug, Clone)]
 struct MapFn {
     value: Box<dyn Expression>,
+    recursive: Option<Box<dyn Expression>>,
     closure: Closure,
 }
 
@@ -150,6 +250,10 @@ impl Expression for MapFn {
         //   different closure variables, and it takes an `Fn` to apply to the data.
 
         let value = self.value.resolve(ctx)?;
+        let recursive = match &self.recursive {
+            None => false,
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
+        };
         let result = match &value {
             Value::Array(array) => Value::Array(Vec::with_capacity(array.len())),
             Value::Object(_) => Value::Object(BTreeMap::default()),
@@ -185,7 +289,8 @@ impl Expression for MapFn {
             }
         };
 
-        self.closure.resolve(ctx, value, &mut map, result)
+        self.closure
+            .resolve(ctx, value, &mut map, recursive, result)
 
         // let result = match self.value.resolve(ctx)? {
         //     Value::Object(object) => {

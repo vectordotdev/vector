@@ -1,6 +1,8 @@
 use crate::expression::Block;
 use crate::parser::{Ident, Node};
 use crate::{Context, Expression, ExpressionError, Value};
+use std::collections::vec_deque::VecDeque;
+use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,6 +25,7 @@ impl FunctionClosure {
         ctx: &mut Context,
         value: Value,
         mut func: impl FnMut(&Context, Value, Value) -> Result<Value, ExpressionError>,
+        recursive: bool,
         mut result: Value,
     ) -> Result<Value, ExpressionError> {
         match value {
@@ -40,7 +43,7 @@ impl FunctionClosure {
                     .clone()
                     .into_inner();
 
-                for (key, value) in object.into_iter() {
+                for (key, value) in ObjectRecursive::create_iter(object, recursive) {
                     let state = ctx.state_mut();
                     state.insert_variable(key_ident.clone(), key.into());
                     state.insert_variable(value_ident.clone(), value);
@@ -69,7 +72,7 @@ impl FunctionClosure {
                     .clone()
                     .into_inner();
 
-                for (index, value) in array.into_iter().enumerate() {
+                for (index, value) in ArrayRecursive::create_iter(array, recursive) {
                     let state = ctx.state_mut();
                     state.insert_variable(index_ident.clone(), index.into());
                     state.insert_variable(value_ident.clone(), value);
@@ -110,11 +113,76 @@ impl fmt::Display for FunctionClosure {
     }
 }
 
-pub enum Output {
-    Object { key: String, value: Value },
-    Array { element: Value },
+struct ObjectRecursive {
+    queue: VecDeque<(String, Value)>,
 }
 
+impl ObjectRecursive {
+    fn new(map: BTreeMap<String, Value>) -> Self {
+        let queue = map.into_iter().collect();
+        Self { queue }
+    }
+
+    fn create_iter(
+        map: BTreeMap<String, Value>,
+        recursive: bool,
+    ) -> Box<dyn Iterator<Item = (String, Value)>> {
+        if recursive {
+            Box::new(ObjectRecursive::new(map).into_iter())
+        } else {
+            Box::new(map.into_iter())
+        }
+    }
+}
+
+impl Iterator for ObjectRecursive {
+    type Item = (String, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (key, value) = self.queue.pop_front()?;
+        match value {
+            Value::Object(ref map) => {
+                self.queue.extend(map.clone().into_iter());
+                Some((key, value))
+            }
+            _ => Some((key, value)),
+        }
+    }
+}
+
+struct ArrayRecursive {
+    queue: VecDeque<(usize, Value)>,
+}
+
+impl ArrayRecursive {
+    fn new(array: Vec<Value>) -> Self {
+        let queue = array.into_iter().enumerate().collect();
+        Self { queue }
+    }
+
+    fn create_iter(array: Vec<Value>, recursive: bool) -> Box<dyn Iterator<Item = (usize, Value)>> {
+        if recursive {
+            Box::new(ArrayRecursive::new(array).into_iter())
+        } else {
+            Box::new(array.into_iter().enumerate())
+        }
+    }
+}
+
+impl Iterator for ArrayRecursive {
+    type Item = (usize, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, value) = self.queue.pop_front()?;
+        match value {
+            Value::Array(ref array) => {
+                self.queue.extend(array.clone().into_iter().enumerate());
+                Some((index, value))
+            }
+            _ => Some((index, value)),
+        }
+    }
+}
 // impl crate::Expression for FunctionClosure {
 //     fn resolve(&self, ctx: &mut crate::Context) -> Result<crate::Value, crate::ExpressionError> {
 //         Ok(crate::value!(null))
