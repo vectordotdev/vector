@@ -27,7 +27,7 @@ impl InternalEvent for EventStoreDbMetricsEventsReceived {
 
 #[derive(Debug)]
 pub struct EventStoreDbMetricsHttpError {
-    pub error: crate::Error,
+    pub(crate) error: crate::Error,
 }
 
 impl InternalEvent for EventStoreDbMetricsHttpError {
