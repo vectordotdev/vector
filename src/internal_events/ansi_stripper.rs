@@ -6,7 +6,7 @@ const FIELD_MISSING: &str = "field_missing";
 
 #[derive(Debug)]
 pub struct AnsiStripperFieldMissingError<'a> {
-    pub field: &'a str,
+    pub(crate) field: &'a str,
 }
 
 impl InternalEvent for AnsiStripperFieldMissingError<'_> {
