@@ -36,7 +36,7 @@ pub struct Opts {
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[clap(short = 't', long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
 }
 

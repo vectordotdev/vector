@@ -39,7 +39,7 @@ pub struct Cmd {
     #[clap(short, long)]
     logging: bool,
 
-    #[clap(short = 't', long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
 }
 
