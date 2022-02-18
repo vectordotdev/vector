@@ -33,7 +33,7 @@ use self::unit_test_components::{
 
 use super::{compiler::expand_globs, graph::Graph, OutputId};
 
-pub struct UnitTest {
+pub(crate) struct UnitTest {
     pub(crate) name: String,
     config: Config,
     pieces: Pieces,
