@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub(super) use crate::schema::{Definition, Registry};
 use crate::{config::OutputId, topology};
 
@@ -25,6 +27,21 @@ use crate::{config::OutputId, topology};
 /// Finally, The merged definition (named `Definition 1 & 2`), and `Definition 4` are merged
 /// together to produce the new `Definition` returned by this method.
 pub(super) fn merged_definition(inputs: &[OutputId], config: &topology::Config) -> Definition {
+    let mut cache = HashMap::default();
+
+    inner_merged_definition(inputs, config, &mut cache)
+}
+
+fn inner_merged_definition(
+    inputs: &[OutputId],
+    config: &topology::Config,
+    cache: &mut HashMap<Vec<OutputId>, Definition>,
+) -> Definition {
+    // Try to get the definition from the cache.
+    if let Some(definition) = cache.get(inputs) {
+        return definition.clone();
+    }
+
     let mut definition = Definition::empty();
 
     for input in inputs {
@@ -83,12 +100,14 @@ pub(super) fn merged_definition(inputs: &[OutputId], config: &topology::Config) 
                 Some(transform_definition) => transform_definition,
                 // If we get no match, we need to recursively call this method for the inputs of
                 // the given transform.
-                None => merged_definition(&transform.inputs, config),
+                None => inner_merged_definition(&transform.inputs, config, cache),
             };
 
             definition = definition.merge(transform_definition);
         }
     }
+
+    cache.insert(inputs.to_vec(), definition.clone());
 
     definition
 }
