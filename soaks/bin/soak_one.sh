@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
           shift # past value
           ;;
       --build-image)
-          USE_BUILD_IMAGE=$2
+          BUILD_IMAGE=$2
           shift # past argument
           shift # past value
           ;;
@@ -92,7 +92,7 @@ pushd "${__dir}"
 
 
 IMAGE="vector:${TAG}"
-if [[ "$(docker images -q $IMAGE 2> /dev/null)" == "" ]]; then
+if [[ "$(docker images -q "$IMAGE" 2> /dev/null)" == "" ]]; then
   if [ "${BUILD_IMAGE}" = "true" ]; then
     echo "Image $IMAGE doesn't exist, building"
 

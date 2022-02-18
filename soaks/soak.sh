@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
           shift # past value
           ;;
       --no-build-image)
-          NO_BUILD_IMAGE="true"
+          BUILD_IMAGE="true"
           shift # past argument
           ;;
       --vector-cpus)
