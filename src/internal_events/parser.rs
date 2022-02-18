@@ -106,7 +106,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
 }
 
 #[derive(Debug)]
-pub struct ParserConversionError<'a> {
+pub(crate) struct ParserConversionError<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,
 }
