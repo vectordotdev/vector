@@ -244,9 +244,7 @@ where
 }
 
 fn tag_exists(to_match: &str, obj: &Value) -> bool {
-    let buf = parse_lookup("tags")
-        .expect("should parse lookup buf")
-        .into_buf();
+    let buf = LookupBuf::from("tags");
 
     resolve_value(&buf, obj, |val: &Value| match val {
         Value::Array(values) => values.iter().any(|value| {
