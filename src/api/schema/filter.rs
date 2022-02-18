@@ -51,7 +51,7 @@ impl StringFilter {
 // Filter for GraphQL lists
 pub(crate) struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
     pub(super) equals: Option<Vec<T>>,
-    pub not_equals: Option<Vec<T>>,
+    pub(super) not_equals: Option<Vec<T>>,
     pub(crate) contains: Option<T>,
     pub(super) not_contains: Option<T>,
 }
