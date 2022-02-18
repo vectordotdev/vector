@@ -6,7 +6,7 @@ use crate::event::metric::{MetricKind, MetricValue};
 #[derive(Debug)]
 pub(crate) struct StatsdInvalidMetricReceived<'a> {
     pub value: &'a MetricValue,
-    pub kind: &'a MetricKind,
+    pub(crate) kind: &'a MetricKind,
 }
 
 impl<'a> InternalEvent for StatsdInvalidMetricReceived<'a> {
