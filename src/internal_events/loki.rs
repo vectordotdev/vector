@@ -32,7 +32,7 @@ impl InternalEvent for LokiUniqueStream {
 }
 
 #[derive(Debug)]
-pub struct LokiOutOfOrderEventDropped;
+pub(crate) struct LokiOutOfOrderEventDropped;
 
 impl InternalEvent for LokiOutOfOrderEventDropped {
     fn emit_logs(&self) {
