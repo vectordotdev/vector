@@ -84,7 +84,7 @@ impl<'a> InternalEvent for DockerLogsContainerWatch<'a> {
 
 #[derive(Debug)]
 pub struct DockerLogsContainerUnwatch<'a> {
-    pub container_id: &'a str,
+    pub(crate) container_id: &'a str,
 }
 
 impl<'a> InternalEvent for DockerLogsContainerUnwatch<'a> {
