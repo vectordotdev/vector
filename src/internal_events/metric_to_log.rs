@@ -4,7 +4,7 @@ use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct MetricToLogSerializeError {
+pub(crate) struct MetricToLogSerializeError {
     pub(crate) error: Error,
 }
 
