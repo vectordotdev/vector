@@ -17,7 +17,7 @@ impl<'a> InternalEvent for DecoderFramingFailed<'a> {
 }
 
 #[derive(Debug)]
-pub struct DecoderDeserializeFailed<'a> {
+pub(crate) struct DecoderDeserializeFailed<'a> {
     pub error: &'a crate::Error,
 }
 
