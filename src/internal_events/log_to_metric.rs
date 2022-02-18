@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 
 use crate::template::TemplateParseError;
 
-pub struct LogToMetricFieldNullError<'a> {
+pub(crate) struct LogToMetricFieldNullError<'a> {
     pub(crate) field: &'a str,
 }
 
