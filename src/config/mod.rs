@@ -44,7 +44,7 @@ mod recursive;
 mod unit_test;
 mod validation;
 mod vars;
-pub mod watcher;
+pub(super) mod watcher;
 
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
