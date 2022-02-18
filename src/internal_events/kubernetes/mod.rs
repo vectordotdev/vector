@@ -4,4 +4,4 @@ pub(crate) mod api_watcher;
 pub(crate) mod instrumenting_state;
 pub(crate) mod instrumenting_watcher;
 pub(crate) mod reflector;
-pub mod stream;
+pub(crate) mod stream;
