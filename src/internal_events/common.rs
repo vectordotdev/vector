@@ -97,7 +97,7 @@ const STREAM_CLOSED: &str = "stream_closed";
 #[derive(Debug)]
 pub struct StreamClosedError {
     pub error: crate::source_sender::ClosedError,
-    pub count: usize,
+    pub(crate) count: usize,
 }
 
 impl InternalEvent for StreamClosedError {
