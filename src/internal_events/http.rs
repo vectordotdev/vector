@@ -122,7 +122,7 @@ impl InternalEvent for HttpEventEncoded {
 #[derive(Debug)]
 pub struct HttpDecompressError<'a> {
     pub error: &'a dyn Error,
-    pub encoding: &'a str,
+    pub(crate) encoding: &'a str,
 }
 
 impl<'a> InternalEvent for HttpDecompressError<'a> {
