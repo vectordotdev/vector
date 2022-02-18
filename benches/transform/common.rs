@@ -7,7 +7,35 @@ use std::{
 };
 
 use futures::{task::noop_waker, Stream};
-use vector::event::Event;
+use vector::{conditions::Condition, event::Event};
+
+// == Conditions ==
+
+// ==== AlwaysPass ====
+
+#[derive(Debug, Clone)]
+/// A struct that will always pass its check `Event`s.
+pub struct AlwaysPass;
+
+impl Condition for AlwaysPass {
+    #[inline]
+    fn check(&self, _event: &Event) -> bool {
+        true
+    }
+}
+
+// ==== AlwaysFail ====
+
+#[derive(Debug, Clone)]
+/// A struct that will always fail its check `Event`s.
+pub struct AlwaysFail;
+
+impl Condition for AlwaysFail {
+    #[inline]
+    fn check(&self, _event: &Event) -> bool {
+        false
+    }
+}
 
 // == Streams ==
 
