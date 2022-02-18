@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct LokiEventUnlabeled;
+pub(crate) struct LokiEventUnlabeled;
 
 impl InternalEvent for LokiEventUnlabeled {
     fn emit_metrics(&self) {
