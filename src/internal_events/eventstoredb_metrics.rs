@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct EventStoreDbMetricsEventsReceived {
     pub count: usize,
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
 }
 
 impl InternalEvent for EventStoreDbMetricsEventsReceived {
