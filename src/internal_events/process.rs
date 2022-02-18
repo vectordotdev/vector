@@ -91,7 +91,7 @@ impl InternalEvent for VectorReloadFailed {
 }
 
 #[derive(Debug)]
-pub struct VectorConfigLoadFailed;
+pub(crate) struct VectorConfigLoadFailed;
 
 impl InternalEvent for VectorConfigLoadFailed {
     fn emit_logs(&self) {
