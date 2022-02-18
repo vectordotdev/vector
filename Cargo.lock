@@ -7969,9 +7969,9 @@ dependencies = [
 
 [[package]]
 name = "uaparser"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "787229e52a75439a1f640d67139897233ea33094292b3000de9b24e2b82ef205"
+checksum = "b7ce30305c85c8234dbea6fab090a21d53000a368df718d1aa11422a4a540971"
 dependencies = [
  "derive_more",
  "lazy_static",
