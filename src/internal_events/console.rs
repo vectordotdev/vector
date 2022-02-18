@@ -14,7 +14,7 @@ impl InternalEvent for ConsoleEventProcessed {
 
 #[derive(Debug)]
 pub(super) struct ConsoleFieldNotFound<'a> {
-    pub missing_field: &'a str,
+    missing_field: &'a str,
 }
 
 impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
