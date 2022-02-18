@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 const FIELD_MISSING: &str = "field_missing";
 
 #[derive(Debug)]
-pub struct AnsiStripperFieldMissingError<'a> {
+pub(crate) struct AnsiStripperFieldMissingError<'a> {
     pub(crate) field: &'a str,
 }
 
