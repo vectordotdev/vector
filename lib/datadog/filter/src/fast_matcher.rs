@@ -7,43 +7,6 @@ pub struct FastMatcher {
     pub mode: Mode,
 }
 
-// impl FastMatcher {
-//     /// Returns true if `value` matches, else false
-//     pub fn run(&self, log: &LogEvent) -> bool {
-//         match op {
-//             Op::True => true,
-//             Op::False => true,
-//             Op::Exists(field) => exists(field, log),
-//             Op::NotExists(field) => !exists(&field, log),
-//             Op::Equals { field, value } => equals(field, value, log),
-//             Op::TagExists(value) => tag_exists(value, log),
-//             Op::RegexMatch { field, re } => regex_match(field, re, log),
-//             Op::Prefix(field, value) => {
-//                 todo!()
-//             }
-//             Op::Wildcard(field, value) => {
-//                 todo!()
-//             }
-//             Op::Compare(field, comparison, comparison_value) => {
-//                 todo!()
-//             }
-//             Op::Range {
-//                 field,
-//                 lower,
-//                 lower_inclusive,
-//                 upper,
-//                 upper_inclusive,
-//             } => {
-//                 todo!()
-//             }
-//             Op::Not(matcher) => {
-//                 todo!()
-//             }
-//             Op::Nested(matcher) => EventFilter::run(matcher, log),
-//         }
-//     }
-// }
-
 #[derive(Debug, Clone)]
 pub enum Mode {
     One(Op),

@@ -4,8 +4,9 @@ use datadog_filter::{
     Resolver,
 };
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
-use regex::Regex;
+use regex::{bytes, Regex};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use vector_core::event::{Event, LogEvent, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
@@ -70,79 +71,101 @@ fn exec(op: &Op, log: &LogEvent) -> bool {
         Op::Equals { field, value } => equals(field, value, log),
         Op::TagExists(value) => tag_exists(value, log),
         Op::RegexMatch { field, re } => regex_match(field, re, log),
-        // Op::Prefix(field, value) => {
-        //     todo!()
-        // }
-        // Op::Wildcard(field, value) => {
-        //     todo!()
-        // }
-        // Op::Compare(field, comparison, comparison_value) => {
-        //     todo!()
-        // }
-        // Op::Range {
-        //     field,
-        //     lower,
-        //     lower_inclusive,
-        //     upper,
-        //     upper_inclusive,
-        // } => {
-        //     todo!()
-        // }
-        // Op::Not(matcher) => {
-        //     todo!()
-        // }
+        Op::Prefix(field, value) => prefix(field, value, log),
+        Op::Wildcard(field, value) => wildcard(field, value, log),
+        Op::Compare(field, comparison, comparison_value) => {
+            compare(field, *comparison, comparison_value, log)
+        }
+        Op::Range {
+            field,
+            lower,
+            lower_inclusive,
+            upper,
+            upper_inclusive,
+        } => {
+            match (&lower, &upper) {
+                // If both bounds are wildcards, just check that the field exists to catch the
+                // special case for "tags".
+                (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => exists(field, log),
+                // Unbounded lower.
+                (ComparisonValue::Unbounded, _) => {
+                    let op = if *upper_inclusive {
+                        Comparison::Lte
+                    } else {
+                        Comparison::Lt
+                    };
+                    compare(field, op, upper, log)
+                }
+                // Unbounded upper.
+                (_, ComparisonValue::Unbounded) => {
+                    let op = if *lower_inclusive {
+                        Comparison::Gte
+                    } else {
+                        Comparison::Gt
+                    };
+
+                    compare(field, op, lower, log)
+                }
+                // Definitive range.
+                _ => {
+                    let lower_op = if *lower_inclusive {
+                        Comparison::Gte
+                    } else {
+                        Comparison::Gt
+                    };
+
+                    let upper_op = if *upper_inclusive {
+                        Comparison::Lte
+                    } else {
+                        Comparison::Lt
+                    };
+
+                    compare(field, lower_op, lower, log) && compare(field, upper_op, upper, log)
+                }
+            }
+        }
+        Op::Not(matcher) => !EventFilter::run(matcher, log),
         Op::Nested(matcher) => EventFilter::run(matcher, log),
-        _ => unimplemented!(),
     }
 }
 
 fn exists(field: &Field, log: &LogEvent) -> bool {
     match field {
-        Field::Tag(tag) => {
-            // println!("exists tag");
-            match log.get("tags") {
-                Some(Value::Array(values)) => values
-                    .iter()
-                    .filter_map(|value| {
-                        if let Value::Bytes(bytes) = value {
-                            std::str::from_utf8(bytes).ok()
-                        } else {
-                            None
-                        }
-                    })
-                    .any(|value| {
-                        value == tag
-                            || (value.starts_with(tag) && value.chars().nth(tag.len()) == Some(':'))
-                    }),
-                _ => false,
-            }
-        }
+        Field::Tag(tag) => match log.get("tags") {
+            Some(Value::Array(values)) => values
+                .iter()
+                .filter_map(|value| {
+                    if let Value::Bytes(bytes) = value {
+                        std::str::from_utf8(bytes).ok()
+                    } else {
+                        None
+                    }
+                })
+                .any(|value| {
+                    value == tag
+                        || (value.starts_with(tag) && value.chars().nth(tag.len()) == Some(':'))
+                }),
+            _ => false,
+        },
         // Literal field 'tags' needs to be compared by key.
-        Field::Reserved(field) if field == "tags" => {
-            // println!("exists literal tags");
-            match log.get("tags") {
-                Some(Value::Array(values)) => values
-                    .iter()
-                    .filter_map(|value| {
-                        if let Value::Bytes(bytes) = value {
-                            std::str::from_utf8(bytes).ok()
-                        } else {
-                            None
-                        }
-                    })
-                    .any(|value| value == field),
-                _ => false,
-            }
-        }
-        Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
-            // println!("exists plain");
-            log.contains(&f)
-        }
+        Field::Reserved(field) if field == "tags" => match log.get("tags") {
+            Some(Value::Array(values)) => values
+                .iter()
+                .filter_map(|value| {
+                    if let Value::Bytes(bytes) = value {
+                        std::str::from_utf8(bytes).ok()
+                    } else {
+                        None
+                    }
+                })
+                .any(|value| value == field),
+            _ => false,
+        },
+        Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => log.contains(&f),
     }
 }
 
 fn equals(field: &str, value: &str, log: &LogEvent) -> bool {
-    // println!("'{field}' equals '{value}'");
     match log.get(field) {
         Some(Value::Bytes(s)) => s == value.as_bytes(),
         _ => false,
@@ -150,7 +173,6 @@ fn equals(field: &str, value: &str, log: &LogEvent) -> bool {
 }
 
 fn tag_exists(to_match: &str, log: &LogEvent) -> bool {
-    // println!("tag exists");
     match log.get("tags") {
         Some(Value::Array(values)) => values.iter().any(|value| {
             if let Value::Bytes(bytes) = value {
@@ -164,7 +186,6 @@ fn tag_exists(to_match: &str, log: &LogEvent) -> bool {
 }
 
 fn regex_match(field: &str, re: &Regex, log: &LogEvent) -> bool {
-    // println!("regex");
     match log.get(field) {
         Some(Value::Bytes(s)) => {
             if let Some(s) = std::str::from_utf8(&s).ok() {
@@ -177,516 +198,185 @@ fn regex_match(field: &str, re: &Regex, log: &LogEvent) -> bool {
     }
 }
 
+/// Returns compiled word boundary regex.
+#[must_use]
+pub fn word_regex(to_match: &str) -> bytes::Regex {
+    bytes::Regex::new(&format!(
+        r#"\b{}\b"#,
+        regex::escape(to_match).replace("\\*", ".*")
+    ))
+    .expect("invalid wildcard regex")
+}
+
+/// Returns compiled wildcard regex.
+#[must_use]
+pub fn wildcard_regex(to_match: &str) -> bytes::Regex {
+    bytes::Regex::new(&format!(
+        "^{}$",
+        regex::escape(to_match).replace("\\*", ".*")
+    ))
+    .expect("invalid wildcard regex")
+}
+
+fn prefix(field: &Field, pfx: &str, log: &LogEvent) -> bool {
+    match field {
+        // Default fields are matched by word boundary.
+        Field::Default(field) => match log.get(field.as_str()) {
+            Some(Value::Bytes(v)) => {
+                let re = word_regex(&format!("{}*", pfx));
+                re.is_match(&v)
+            }
+            _ => false,
+        },
+        // Tags are recursed until a match is found.
+        Field::Tag(tag) => match log.get("tags") {
+            Some(Value::Array(values)) => {
+                let starts_with: String = format!("{}:{}", tag, pfx);
+                values
+                    .iter()
+                    .any(|val: &Value| val.coerce_to_bytes().starts_with(starts_with.as_bytes()))
+            }
+            _ => false,
+        },
+        // All other field types are compared by complete value.
+        Field::Reserved(field) | Field::Facet(field) => match log.get(field.as_str()) {
+            Some(Value::Bytes(v)) => v.starts_with(pfx.as_bytes()),
+            _ => false,
+        },
+    }
+}
+
+fn wildcard(field: &Field, wildcard: &str, log: &LogEvent) -> bool {
+    match field {
+        Field::Default(field) => match log.get(field.as_str()) {
+            Some(Value::Bytes(v)) => {
+                let re = word_regex(wildcard);
+                re.is_match(&v)
+            }
+            _ => false,
+        },
+        Field::Tag(tag) => match log.get("tags") {
+            Some(Value::Array(values)) => {
+                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                values
+                    .iter()
+                    .any(|val: &Value| re.is_match(&val.coerce_to_bytes()))
+            }
+            _ => false,
+        },
+        Field::Reserved(field) | Field::Facet(field) => match log.get(field.as_str()) {
+            Some(Value::Bytes(v)) => {
+                let re = wildcard_regex(wildcard);
+                re.is_match(&v)
+            }
+            _ => false,
+        },
+    }
+}
+
+fn compare(
+    field: &Field,
+    comparator: Comparison,
+    comparison_value: &ComparisonValue,
+    log: &LogEvent,
+) -> bool {
+    let rhs = Cow::from(comparison_value.to_string());
+
+    match field {
+        // Facets are compared numerically if the value is numeric, or as strings otherwise.
+        Field::Facet(f) => {
+            match (log.get(&f), comparison_value) {
+                // Integers.
+                (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => match comparator {
+                    Comparison::Lt => lhs < rhs,
+                    Comparison::Lte => lhs <= rhs,
+                    Comparison::Gt => lhs > rhs,
+                    Comparison::Gte => lhs >= rhs,
+                },
+                // Integer value - Float boundary
+                (Some(Value::Integer(lhs)), ComparisonValue::Float(rhs)) => match comparator {
+                    Comparison::Lt => (*lhs as f64) < *rhs,
+                    Comparison::Lte => *lhs as f64 <= *rhs,
+                    Comparison::Gt => *lhs as f64 > *rhs,
+                    Comparison::Gte => *lhs as f64 >= *rhs,
+                },
+                // Floats.
+                (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => match comparator {
+                    Comparison::Lt => lhs.into_inner() < *rhs,
+                    Comparison::Lte => lhs.into_inner() <= *rhs,
+                    Comparison::Gt => lhs.into_inner() > *rhs,
+                    Comparison::Gte => lhs.into_inner() >= *rhs,
+                },
+                // Float value - Integer boundary
+                (Some(Value::Float(lhs)), ComparisonValue::Integer(rhs)) => match comparator {
+                    Comparison::Lt => lhs.into_inner() < *rhs as f64,
+                    Comparison::Lte => lhs.into_inner() <= *rhs as f64,
+                    Comparison::Gt => lhs.into_inner() > *rhs as f64,
+                    Comparison::Gte => lhs.into_inner() >= *rhs as f64,
+                },
+                // Where the rhs is a string ref, the lhs is coerced into a string.
+                (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
+                    let lhs = String::from_utf8_lossy(v);
+                    let rhs = Cow::from(rhs);
+
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }
+                // Otherwise, compare directly as strings.
+                (Some(Value::Bytes(v)), _) => {
+                    let lhs = String::from_utf8_lossy(v);
+
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }
+                _ => false,
+            }
+        }
+        // Tag values need extracting by "key:value" to be compared.
+        Field::Tag(tag) => match log.get("tags") {
+            Some(Value::Array(values)) => values.iter().any(|val: &Value| {
+                match String::from_utf8_lossy(&val.coerce_to_bytes()).split_once(":") {
+                    Some((t, lhs)) if t == tag => {
+                        let lhs = Cow::from(lhs);
+
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
+                    }
+                    _ => false,
+                }
+            }),
+            _ => false,
+        },
+        // All other tag types are compared by string.
+        Field::Default(field) | Field::Reserved(field) => match log.get(field) {
+            Some(Value::Bytes(lhs)) => {
+                let rhs = rhs.as_bytes();
+                match comparator {
+                    Comparison::Lt => *lhs < rhs,
+                    Comparison::Lte => *lhs <= rhs,
+                    Comparison::Gt => *lhs > rhs,
+                    Comparison::Gte => *lhs >= rhs,
+                }
+            }
+            _ => false,
+        },
+    }
+}
+
 /// Uses the default `Resolver`, to build a `Vec<Field>`.
 impl Resolver for EventFilter {}
-
-// impl Filter<LogEvent> for EventFilter {
-//     fn exists(&self, field: Field) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:", tag);
-
-//                 any_string_match("tags", move |value| {
-//                     value == tag || value.starts_with(&starts_with)
-//                 })
-//             }
-//             // Literal field 'tags' needs to be compared by key.
-//             Field::Reserved(field) if field == "tags" => {
-//                 any_string_match("tags", move |value| value == field)
-//             }
-//             Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
-//                 Run::boxed(move |log: &LogEvent| log.get(&f).is_some())
-//             }
-//         }
-//     }
-
-//     fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             // Default fields are compared by word boundary.
-//             Field::Default(field) => {
-//                 let re = word_regex(to_match);
-
-//                 string_match(&field, move |value| re.is_match(&value))
-//             }
-//             // A literal "tags" field should match by key.
-//             Field::Reserved(field) if field == "tags" => {
-//                 let to_match = to_match.to_owned();
-
-//                 array_match(field, move |values| {
-//                     values.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-//                 })
-//             }
-//             // Individual tags are compared by element key:value.
-//             Field::Tag(tag) => {
-//                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
-
-//                 array_match("tags", move |values| values.contains(&value_bytes))
-//             }
-//             // Everything else is matched by string equality.
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let to_match = to_match.to_owned();
-
-//                 string_match(field, move |value| value == to_match)
-//             }
-//         }
-//     }
-
-//     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             // Default fields are matched by word boundary.
-//             Field::Default(field) => {
-//                 let re = word_regex(&format!("{}*", prefix));
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//             // Tags are recursed until a match is found.
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:{}", tag, prefix);
-
-//                 any_string_match("tags", move |value| value.starts_with(&starts_with))
-//             }
-//             // All other field types are compared by complete value.
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let prefix = prefix.to_owned();
-
-//                 string_match(field, move |value| value.starts_with(&prefix))
-//             }
-//         }
-//     }
-
-//     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             Field::Default(field) => {
-//                 let re = word_regex(wildcard);
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//             Field::Tag(tag) => {
-//                 let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
-
-//                 any_string_match("tags", move |value| re.is_match(&value))
-//             }
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let re = wildcard_regex(wildcard);
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//         }
-//     }
-
-//     fn compare(
-//         &self,
-//         field: Field,
-//         comparator: Comparison,
-//         comparison_value: ComparisonValue,
-//     ) -> Box<dyn Matcher<LogEvent>> {
-//         let rhs = Cow::from(comparison_value.to_string());
-
-//         match field {
-//             // Facets are compared numerically if the value is numeric, or as strings otherwise.
-//             Field::Facet(f) => {
-//                 Run::boxed(
-//                     move |log: &LogEvent| match (log.get(&f), &comparison_value) {
-//                         // Integers.
-//                         (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         // Integer value - Float boundary
-//                         (Some(Value::Integer(lhs)), ComparisonValue::Float(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => (*lhs as f64) < *rhs,
-//                                 Comparison::Lte => *lhs as f64 <= *rhs,
-//                                 Comparison::Gt => *lhs as f64 > *rhs,
-//                                 Comparison::Gte => *lhs as f64 >= *rhs,
-//                             }
-//                         }
-//                         // Floats.
-//                         (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs.into_inner() < *rhs,
-//                                 Comparison::Lte => lhs.into_inner() <= *rhs,
-//                                 Comparison::Gt => lhs.into_inner() > *rhs,
-//                                 Comparison::Gte => lhs.into_inner() >= *rhs,
-//                             }
-//                         }
-//                         // Float value - Integer boundary
-//                         (Some(Value::Float(lhs)), ComparisonValue::Integer(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs.into_inner() < *rhs as f64,
-//                                 Comparison::Lte => lhs.into_inner() <= *rhs as f64,
-//                                 Comparison::Gt => lhs.into_inner() > *rhs as f64,
-//                                 Comparison::Gte => lhs.into_inner() >= *rhs as f64,
-//                             }
-//                         }
-//                         // Where the rhs is a string ref, the lhs is coerced into a string.
-//                         (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
-//                             let lhs = String::from_utf8_lossy(v);
-//                             let rhs = Cow::from(rhs);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         // Otherwise, compare directly as strings.
-//                         (Some(Value::Bytes(v)), _) => {
-//                             let lhs = String::from_utf8_lossy(v);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         _ => false,
-//                     },
-//                 )
-//             }
-//             // Tag values need extracting by "key:value" to be compared.
-//             Field::Tag(tag) => any_string_match("tags", move |value| match value.split_once(":") {
-//                 Some((t, lhs)) if t == tag => {
-//                     let lhs = Cow::from(lhs);
-
-//                     match comparator {
-//                         Comparison::Lt => lhs < rhs,
-//                         Comparison::Lte => lhs <= rhs,
-//                         Comparison::Gt => lhs > rhs,
-//                         Comparison::Gte => lhs >= rhs,
-//                     }
-//                 }
-//                 _ => false,
-//             }),
-//             // All other tag types are compared by string.
-//             Field::Default(field) | Field::Reserved(field) => {
-//                 string_match(field, move |lhs| match comparator {
-//                     Comparison::Lt => lhs < rhs,
-//                     Comparison::Lte => lhs <= rhs,
-//                     Comparison::Gt => lhs > rhs,
-//                     Comparison::Gte => lhs >= rhs,
-//                 })
-//             }
-//         }
-//     }
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to a string which
-// /// matches the provided `func`.
-// fn string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     let field = field.into();
-
-//     Run::boxed(move |log: &LogEvent| match log.get(&field) {
-//         Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
-//         _ => false,
-//     })
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to an array, where
-// /// the vector of `Value`s the array contains matches the provided `func`.
-// fn array_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(&Vec<Value>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     let field = field.into();
-
-//     Run::boxed(move |log: &LogEvent| match log.get(&field) {
-//         Some(Value::Array(values)) => func(values),
-//         _ => false,
-//     })
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to an array, where
-// /// at least one `Value` it contains matches the provided `func`.
-// fn any_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(&Value) -> bool + Send + Sync + Clone + 'static,
-// {
-//     array_match(field, move |values| values.iter().any(&func))
-// }
-
-// /// Retrns a `Matcher` that returns true if the log event resolves to an array of strings,
-// /// where at least one string matches the provided `func`.
-// fn any_string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     any_match(field, move |value| {
-//         let bytes = value.coerce_to_bytes();
-//         func(String::from_utf8_lossy(&bytes))
-//     })
-// }
-
-//------------------------------------------------------------------------------
-
-// #[derive(Default, Clone)]
-// struct EventFilter;
-
-// /// Uses the default `Resolver`, to build a `Vec<Field>`.
-// impl Resolver for EventFilter {}
-
-// impl Filter<LogEvent> for EventFilter {
-//     fn exists(&self, field: Field) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:", tag);
-
-//                 any_string_match("tags", move |value| {
-//                     value == tag || value.starts_with(&starts_with)
-//                 })
-//             }
-//             // Literal field 'tags' needs to be compared by key.
-//             Field::Reserved(field) if field == "tags" => {
-//                 any_string_match("tags", move |value| value == field)
-//             }
-//             Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
-//                 Run::boxed(move |log: &LogEvent| log.get(&f).is_some())
-//             }
-//         }
-//     }
-
-//     fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             // Default fields are compared by word boundary.
-//             Field::Default(field) => {
-//                 let re = word_regex(to_match);
-
-//                 string_match(&field, move |value| re.is_match(&value))
-//             }
-//             // A literal "tags" field should match by key.
-//             Field::Reserved(field) if field == "tags" => {
-//                 let to_match = to_match.to_owned();
-
-//                 array_match(field, move |values| {
-//                     values.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-//                 })
-//             }
-//             // Individual tags are compared by element key:value.
-//             Field::Tag(tag) => {
-//                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
-
-//                 array_match("tags", move |values| values.contains(&value_bytes))
-//             }
-//             // Everything else is matched by string equality.
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let to_match = to_match.to_owned();
-
-//                 string_match(field, move |value| value == to_match)
-//             }
-//         }
-//     }
-
-//     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             // Default fields are matched by word boundary.
-//             Field::Default(field) => {
-//                 let re = word_regex(&format!("{}*", prefix));
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//             // Tags are recursed until a match is found.
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:{}", tag, prefix);
-
-//                 any_string_match("tags", move |value| value.starts_with(&starts_with))
-//             }
-//             // All other field types are compared by complete value.
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let prefix = prefix.to_owned();
-
-//                 string_match(field, move |value| value.starts_with(&prefix))
-//             }
-//         }
-//     }
-
-//     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {
-//         match field {
-//             Field::Default(field) => {
-//                 let re = word_regex(wildcard);
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//             Field::Tag(tag) => {
-//                 let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
-
-//                 any_string_match("tags", move |value| re.is_match(&value))
-//             }
-//             Field::Reserved(field) | Field::Facet(field) => {
-//                 let re = wildcard_regex(wildcard);
-
-//                 string_match(field, move |value| re.is_match(&value))
-//             }
-//         }
-//     }
-
-//     fn compare(
-//         &self,
-//         field: Field,
-//         comparator: Comparison,
-//         comparison_value: ComparisonValue,
-//     ) -> Box<dyn Matcher<LogEvent>> {
-//         let rhs = Cow::from(comparison_value.to_string());
-
-//         match field {
-//             // Facets are compared numerically if the value is numeric, or as strings otherwise.
-//             Field::Facet(f) => {
-//                 Run::boxed(
-//                     move |log: &LogEvent| match (log.get(&f), &comparison_value) {
-//                         // Integers.
-//                         (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         // Integer value - Float boundary
-//                         (Some(Value::Integer(lhs)), ComparisonValue::Float(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => (*lhs as f64) < *rhs,
-//                                 Comparison::Lte => *lhs as f64 <= *rhs,
-//                                 Comparison::Gt => *lhs as f64 > *rhs,
-//                                 Comparison::Gte => *lhs as f64 >= *rhs,
-//                             }
-//                         }
-//                         // Floats.
-//                         (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs.into_inner() < *rhs,
-//                                 Comparison::Lte => lhs.into_inner() <= *rhs,
-//                                 Comparison::Gt => lhs.into_inner() > *rhs,
-//                                 Comparison::Gte => lhs.into_inner() >= *rhs,
-//                             }
-//                         }
-//                         // Float value - Integer boundary
-//                         (Some(Value::Float(lhs)), ComparisonValue::Integer(rhs)) => {
-//                             match comparator {
-//                                 Comparison::Lt => lhs.into_inner() < *rhs as f64,
-//                                 Comparison::Lte => lhs.into_inner() <= *rhs as f64,
-//                                 Comparison::Gt => lhs.into_inner() > *rhs as f64,
-//                                 Comparison::Gte => lhs.into_inner() >= *rhs as f64,
-//                             }
-//                         }
-//                         // Where the rhs is a string ref, the lhs is coerced into a string.
-//                         (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
-//                             let lhs = String::from_utf8_lossy(v);
-//                             let rhs = Cow::from(rhs);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         // Otherwise, compare directly as strings.
-//                         (Some(Value::Bytes(v)), _) => {
-//                             let lhs = String::from_utf8_lossy(v);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         _ => false,
-//                     },
-//                 )
-//             }
-//             // Tag values need extracting by "key:value" to be compared.
-//             Field::Tag(tag) => any_string_match("tags", move |value| match value.split_once(":") {
-//                 Some((t, lhs)) if t == tag => {
-//                     let lhs = Cow::from(lhs);
-
-//                     match comparator {
-//                         Comparison::Lt => lhs < rhs,
-//                         Comparison::Lte => lhs <= rhs,
-//                         Comparison::Gt => lhs > rhs,
-//                         Comparison::Gte => lhs >= rhs,
-//                     }
-//                 }
-//                 _ => false,
-//             }),
-//             // All other tag types are compared by string.
-//             Field::Default(field) | Field::Reserved(field) => {
-//                 string_match(field, move |lhs| match comparator {
-//                     Comparison::Lt => lhs < rhs,
-//                     Comparison::Lte => lhs <= rhs,
-//                     Comparison::Gt => lhs > rhs,
-//                     Comparison::Gte => lhs >= rhs,
-//                 })
-//             }
-//         }
-//     }
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to a string which
-// /// matches the provided `func`.
-// fn string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     let field = field.into();
-
-//     Run::boxed(move |log: &LogEvent| match log.get(&field) {
-//         Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
-//         _ => false,
-//     })
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to an array, where
-// /// the vector of `Value`s the array contains matches the provided `func`.
-// fn array_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(&Vec<Value>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     let field = field.into();
-
-//     Run::boxed(move |log: &LogEvent| match log.get(&field) {
-//         Some(Value::Array(values)) => func(values),
-//         _ => false,
-//     })
-// }
-
-// /// Returns a `Matcher` that returns true if the log event resolves to an array, where
-// /// at least one `Value` it contains matches the provided `func`.
-// fn any_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(&Value) -> bool + Send + Sync + Clone + 'static,
-// {
-//     array_match(field, move |values| values.iter().any(&func))
-// }
-
-// /// Retrns a `Matcher` that returns true if the log event resolves to an array of strings,
-// /// where at least one string matches the provided `func`.
-// fn any_string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
-// where
-//     S: Into<String>,
-//     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
-// {
-//     any_match(field, move |value| {
-//         let bytes = value.coerce_to_bytes();
-//         func(String::from_utf8_lossy(&bytes))
-//     })
-// }
 
 //------------------------------------------------------------------------------
 
@@ -695,10 +385,7 @@ mod test {
     use super::*;
 
     use crate::log_event;
-    use datadog_filter::{
-        fast_matcher::{self, Mode, Op},
-        Resolver,
-    };
+    use datadog_filter::fast_matcher;
     use datadog_search_syntax::parse;
     use serde_json::json;
     use vector_core::event::Event;
@@ -1399,26 +1086,6 @@ mod test {
         ]
     }
 
-    // /// Test a `Matcher` by providing a `Filter<V>` and a processor that receives an
-    // /// `Event`, and returns a `V`. This allows testing against the pass/fail events that are returned
-    // /// from `get_checks()` and modifying into a type that allows for their processing.
-    // fn test_filter<V, F, P>(filter: F, processor: P)
-    // where
-    //     V: std::fmt::Debug + Send + Sync + Clone + 'static,
-    //     F: Resolver,
-    //     P: Fn(Event) -> V,
-    // {
-    //     let checks = get_checks();
-
-    //     for (source, pass, fail) in checks {
-    //         let node = parse(source).unwrap();
-    //         let matcher = fast_matcher::build_matcher(&node, &filter);
-
-    //         assert!(matcher.run(&processor(pass)));
-    //         assert!(!matcher.run(&processor(fail)));
-    //     }
-    // }
-
     #[test]
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
@@ -1426,8 +1093,18 @@ mod test {
             let node = parse(source).unwrap();
             let matcher = fast_matcher::build_matcher(&node, &EventFilter::default());
 
-            assert!(EventFilter::run(&matcher, &pass.into_log()));
-            assert!(!EventFilter::run(&matcher, &fail.into_log()));
+            assert!(
+                EventFilter::run(&matcher, &pass.clone().into_log()),
+                "should pass: {}\nevent: {:?}",
+                source,
+                pass.as_log()
+            );
+            assert!(
+                !EventFilter::run(&matcher, &fail.clone().into_log()),
+                "should fail: {}\nevent: {:?}",
+                source,
+                fail.as_log()
+            );
         }
     }
 
