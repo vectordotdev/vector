@@ -5,7 +5,7 @@ use crate::event::metric::Metric;
 
 #[derive(Debug)]
 pub(crate) struct SematextMetricsInvalidMetricReceived<'a> {
-    pub metric: &'a Metric,
+    pub(crate) metric: &'a Metric,
 }
 
 impl<'a> InternalEvent for SematextMetricsInvalidMetricReceived<'a> {

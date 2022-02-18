@@ -7,7 +7,7 @@ use crate::sources::aws_kinesis_firehose::Compression;
 #[derive(Debug)]
 pub(crate) struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
-    pub source_arn: Option<&'a str>,
+    pub(crate) source_arn: Option<&'a str>,
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
