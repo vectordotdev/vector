@@ -25,7 +25,7 @@ impl InternalEvent for JournaldEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct JournaldInvalidRecordError {
+pub(crate) struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub(crate) text: String,
 }
