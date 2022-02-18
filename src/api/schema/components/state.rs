@@ -46,7 +46,7 @@ pub(super) fn get_transforms() -> Vec<transform::Transform> {
 }
 
 /// Filters components, and returns a clone of sinks
-pub fn get_sinks() -> Vec<sink::Sink> {
+pub(super) fn get_sinks() -> Vec<sink::Sink> {
     filter_components(|(_, components)| match components {
         Component::Sink(s) => Some(s.clone()),
         _ => None,
