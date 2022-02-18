@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub(crate) struct KeyValueParserError {
     pub(crate) key: String,
-    pub error: crate::types::Error,
+    pub(crate) error: crate::types::Error,
 }
 
 impl InternalEvent for KeyValueParserError {
