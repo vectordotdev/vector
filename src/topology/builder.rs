@@ -119,7 +119,6 @@ pub struct Pieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub(super) enrichment_tables: enrichment::TableRegistry,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -473,7 +472,6 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)

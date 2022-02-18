@@ -44,10 +44,6 @@ impl Task {
         }
     }
 
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
-    }
-
     pub fn id(&self) -> &str {
         self.key.id()
     }
