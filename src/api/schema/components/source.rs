@@ -23,7 +23,7 @@ pub enum SourceOutputType {
 }
 
 #[derive(Debug, Clone)]
-pub struct Data {
+pub(crate) struct Data {
     pub(crate) component_key: ComponentKey,
     pub(super) component_type: String,
     pub(crate) output_type: DataType,
