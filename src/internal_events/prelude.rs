@@ -1,5 +1,5 @@
 // Set of `stage` tags to use when emiting error events.
-pub mod error_stage {
+pub(crate) mod error_stage {
     pub const RECEIVING: &str = "receiving";
     pub const PROCESSING: &str = "processing";
     pub const SENDING: &str = "sending";
