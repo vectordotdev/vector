@@ -25,7 +25,7 @@ impl SocketMode {
 pub struct SocketEventsReceived {
     pub(crate) mode: SocketMode,
     pub byte_size: usize,
-    pub count: usize,
+    pub(crate) count: usize,
 }
 
 impl InternalEvent for SocketEventsReceived {
