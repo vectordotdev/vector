@@ -723,7 +723,7 @@ impl Display for Resource {
 #[serde(deny_unknown_fields)]
 pub(crate) struct TestDefinition<T = OutputId> {
     pub name: String,
-    pub input: Option<TestInput>,
+    pub(super) input: Option<TestInput>,
     #[serde(default)]
     pub(self) inputs: Vec<TestInput>,
     #[serde(default)]
