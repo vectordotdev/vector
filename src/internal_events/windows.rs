@@ -83,7 +83,7 @@ impl<'a> InternalEvent for WindowsServiceInstall<'a> {
 
 #[derive(Debug)]
 pub(self) struct WindowsServiceUninstall<'a> {
-    pub name: &'a str,
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
