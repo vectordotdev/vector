@@ -59,7 +59,7 @@ impl InternalEvent for NginxMetricsCollectCompleted {
 
 pub struct NginxMetricsRequestError<'a> {
     pub error: crate::Error,
-    pub endpoint: &'a str,
+    pub(crate) endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
