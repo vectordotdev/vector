@@ -48,7 +48,7 @@ impl<'a> InternalEvent for EncoderFramingFailed<'a> {
 
 #[derive(Debug)]
 pub struct EncoderSerializeFailed<'a> {
-    pub error: &'a crate::Error,
+    pub(crate) error: &'a crate::Error,
 }
 
 impl<'a> InternalEvent for EncoderSerializeFailed<'a> {
