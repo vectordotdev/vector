@@ -8,7 +8,7 @@ use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub count: usize,
     pub(crate) uri: &'a str,
 }
