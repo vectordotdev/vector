@@ -41,7 +41,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
 
 #[derive(Debug)]
 pub(crate) struct ConcatSubstringSourceMissing<'a> {
-    pub source: &'a str,
+    pub(crate) source: &'a str,
 }
 
 impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {
