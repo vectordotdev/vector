@@ -39,7 +39,7 @@ pub use container::{Container, Variant};
 pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
-pub use function_closure::{FunctionClosure, Output as ClosureOutput};
+pub use function_closure::FunctionClosure;
 pub use group::Group;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
