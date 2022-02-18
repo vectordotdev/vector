@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ElasticsearchEventEncoded {
+pub(crate) struct ElasticSearchEventEncoded {
     pub(crate) byte_size: usize,
     pub(crate) index: String,
 }
