@@ -28,7 +28,7 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricReceived<'a> {
 
 #[derive(Debug)]
 pub struct SematextMetricsEncodeEventFailed {
-    pub error: &'static str,
+    pub(crate) error: &'static str,
 }
 
 impl InternalEvent for SematextMetricsEncodeEventFailed {
