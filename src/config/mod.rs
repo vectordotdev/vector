@@ -839,7 +839,7 @@ pub enum TestInputValue {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestInput {
+pub(crate) struct TestInput {
     pub(self) insert_at: ComponentKey,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub(super) type_str: String,
