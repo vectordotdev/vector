@@ -23,7 +23,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
 #[derive(Debug)]
 pub(crate) struct UnixSocketConnectionFailed<'a, E> {
     pub(crate) error: E,
-    pub path: &'a std::path::Path,
+    pub(crate) path: &'a std::path::Path,
 }
 
 impl<E> InternalEvent for UnixSocketConnectionFailed<'_, E>
