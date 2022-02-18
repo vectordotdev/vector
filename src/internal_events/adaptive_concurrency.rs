@@ -10,7 +10,7 @@ pub struct AdaptiveConcurrencyLimit {
     pub(crate) had_back_pressure: bool,
     pub(crate) current_rtt: Option<Duration>,
     pub past_rtt: Duration,
-    pub past_rtt_deviation: Duration,
+    pub(crate) past_rtt_deviation: Duration,
 }
 
 impl InternalEvent for AdaptiveConcurrencyLimit {
