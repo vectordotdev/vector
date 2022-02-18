@@ -80,7 +80,7 @@ pub(crate) async fn build_unit_tests_main(
     build_unit_tests(config_builder).await
 }
 
-pub async fn build_unit_tests(
+pub(crate) async fn build_unit_tests(
     mut config_builder: ConfigBuilder,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
