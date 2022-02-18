@@ -203,7 +203,7 @@ type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 /// local cache to match against the `component_id` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
-pub fn component_counter_metrics(
+pub(super) fn component_counter_metrics(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Vec<Metric>> {
