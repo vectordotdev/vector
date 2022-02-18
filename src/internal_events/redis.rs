@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RedisReceiveEventFailed {
+pub(self) struct RedisReceiveEventFailed {
     pub error: redis::RedisError,
 }
 
