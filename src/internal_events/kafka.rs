@@ -63,7 +63,7 @@ const KAFKA_READ: &str = "kafka_read";
 
 #[derive(Debug)]
 pub struct KafkaReadError {
-    pub error: rdkafka::error::KafkaError,
+    pub(crate) error: rdkafka::error::KafkaError,
 }
 
 impl InternalEvent for KafkaReadError {
