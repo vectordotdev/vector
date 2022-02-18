@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::event::metric::{MetricKind, MetricValue};
 
 #[derive(Debug)]
-pub struct StatsdInvalidMetricReceived<'a> {
+pub(crate) struct StatsdInvalidMetricReceived<'a> {
     pub value: &'a MetricValue,
     pub kind: &'a MetricKind,
 }
