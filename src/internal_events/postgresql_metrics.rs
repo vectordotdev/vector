@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub(crate) struct PostgresqlMetricsCollectCompleted {
     pub(crate) start: Instant,
-    pub end: Instant,
+    pub(crate) end: Instant,
 }
 
 impl InternalEvent for PostgresqlMetricsCollectCompleted {
