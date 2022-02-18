@@ -24,9 +24,6 @@ jobs:
   cancel-previous:
     runs-on: ubuntu-20.04
     timeout-minutes: 3
-    if: |
-      github.ref != 'refs/heads/master' &&
-      ${{ github.actor != 'dependabot[bot]' }}
     steps:
       - uses: styfle/cancel-workflow-action@0.9.1
         with:
@@ -35,7 +32,6 @@ jobs:
 
   compute-soak-meta:
     name: Compute metadata for soaks
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
@@ -110,7 +106,6 @@ jobs:
 
   compute-test-plan:
     name: Compute soak test plan
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs: [compute-soak-meta]
     outputs:
@@ -146,7 +141,6 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
@@ -192,7 +186,6 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
@@ -238,7 +231,6 @@ jobs:
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
@@ -286,7 +278,6 @@ jobs:
 
   detect-erratic-baseline:
     name: Erratic detection - baseline
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -326,7 +317,6 @@ jobs:
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
@@ -374,7 +364,6 @@ jobs:
 
   detect-erratic-comparison:
     name: Erratic detection - comparison
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -414,7 +403,6 @@ jobs:
 
   analyze-results:
     name: Soak analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -470,7 +458,6 @@ jobs:
 
   detect-regressions:
     name: Regression analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -509,7 +496,6 @@ jobs:
 
   plot-analysis:
     name: Plot analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
