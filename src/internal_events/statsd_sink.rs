@@ -5,7 +5,7 @@ use crate::event::metric::{MetricKind, MetricValue};
 
 #[derive(Debug)]
 pub(crate) struct StatsdInvalidMetricReceived<'a> {
-    pub value: &'a MetricValue,
+    pub(crate) value: &'a MetricValue,
     pub(crate) kind: &'a MetricKind,
 }
 
