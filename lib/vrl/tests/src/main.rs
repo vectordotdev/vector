@@ -68,7 +68,7 @@ fn should_run(name: &str, pat: &Option<String>) -> bool {
 }
 
 fn main() {
-    let cmd = Cmd::from_args();
+    let cmd = Cmd::parse();
 
     if cmd.logging {
         tracing_subscriber::fmt::init();
