@@ -4,7 +4,7 @@ use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct Heartbeat {
+pub(crate) struct Heartbeat {
     pub(crate) since: Instant,
 }
 
