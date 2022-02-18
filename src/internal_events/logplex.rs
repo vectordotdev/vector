@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct HerokuLogplexRequestReceived<'a> {
-    pub msg_count: usize,
+    pub(crate) msg_count: usize,
     pub(crate) frame_id: &'a str,
     pub drain_token: &'a str,
 }
