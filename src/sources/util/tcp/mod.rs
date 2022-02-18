@@ -125,7 +125,7 @@ where
         acknowledgements: AcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
-        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
 
         let listenfd = ListenFd::from_env();
 
@@ -205,7 +205,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled(),
+                                acknowledgements,
                                 request_limiter,
                             );
 

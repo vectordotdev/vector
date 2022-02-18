@@ -95,7 +95,7 @@ impl Expression for UnnestFn {
         };
 
         let root = target
-            .get(&LookupBuf::root())
+            .target_get(&LookupBuf::root())
             .expect("must never fail")
             .expect("always a value");
 
@@ -124,8 +124,8 @@ impl Expression for UnnestFn {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => match state.target_type_def() {
-                Some(root_type_def) => invert_array_at_path(root_type_def, self.path.path()),
+            Target::External => match state.target_kind().cloned().map(TypeDef::from) {
+                Some(root_type_def) => invert_array_at_path(&root_type_def, self.path.path()),
                 None => self.path.type_def(state).restrict_array().add_null(),
             },
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
@@ -147,7 +147,7 @@ impl Expression for UnnestFn {
 ///  ]`
 ///
 pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    use value::kind::insert;
+    use self::value::kind::insert;
 
     let type_def = typedef.at_path(&path.to_lookup());
 

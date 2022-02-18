@@ -88,7 +88,7 @@ impl TransformConfig for EventRouterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -115,7 +115,7 @@ impl TransformConfig for EventFilterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {

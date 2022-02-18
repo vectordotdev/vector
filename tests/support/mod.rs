@@ -136,7 +136,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: None,
         }
     }
@@ -145,7 +145,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: Some(data.into()),
         }
     }
@@ -157,7 +157,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
-            data_type: Some(DataType::Any),
+            data_type: Some(DataType::all()),
             data: None,
         }
     }
@@ -218,6 +218,10 @@ impl SourceConfig for MockSourceConfig {
     fn source_type(&self) -> &'static str {
         "mock"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -271,6 +275,14 @@ impl FunctionTransform for MockTransform {
                     }));
                 }
             }
+            Event::Trace(trace) => {
+                let mut v = trace
+                    .get(vector::config::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy();
+                v.push_str(&self.suffix);
+                trace.insert(vector::config::log_schema().message_key(), Value::from(v));
+            }
         };
         output.push(event);
     }
@@ -299,11 +311,11 @@ impl TransformConfig for MockTransformConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -384,7 +396,7 @@ impl SinkConfig for MockSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {

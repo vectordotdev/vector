@@ -148,6 +148,10 @@ impl SourceConfig for StatsdConfig {
             Self::Unix(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -119,6 +119,10 @@ impl SourceConfig for LogplexConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -142,6 +146,10 @@ impl SourceConfig for LogplexCompatConfig {
 
     fn resources(&self) -> Vec<Resource> {
         self.0.resources()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -306,7 +314,7 @@ mod tests {
         components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
                 address,

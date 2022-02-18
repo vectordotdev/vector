@@ -77,15 +77,15 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         // ignore empty strings if necessary
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => match parsed.get(field).expect("field does not exist") {
+                        _ => match parsed.target_get(field).expect("field does not exist") {
                             Some(Value::Array(mut values)) => values.push(value),
                             Some(v) => {
-                                parsed.insert(field, Value::Array(vec![v, value])).unwrap_or_else(
+                                parsed.target_insert(field, Value::Array(vec![v, value])).unwrap_or_else(
                                     |error| warn!(message = "Error updating field value", field = %field, %error)
                                 );
                             }
                             None => {
-                                parsed.insert(field, value).unwrap_or_else(
+                                parsed.target_insert(field, value).unwrap_or_else(
                                     |error| warn!(message = "Error updating field value", field = %field, %error)
                                 );
                             }

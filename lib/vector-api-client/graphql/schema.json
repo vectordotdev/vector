@@ -2973,6 +2973,11 @@
               "kind": "OBJECT",
               "name": "EventNotification",
               "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Trace",
+              "ofType": null
             }
           ]
         },
@@ -4149,16 +4154,24 @@
               "deprecationReason": null
             },
             {
-              "name": "outputType",
+              "name": "outputTypes",
               "description": "Source output type",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "ENUM",
-                  "name": "SourceOutputType",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "SourceOutputType",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -4469,12 +4482,6 @@
           "interfaces": null,
           "enumValues": [
             {
-              "name": "ANY",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "LOG",
               "description": null,
               "isDeprecated": false,
@@ -4482,6 +4489,12 @@
             },
             {
               "name": "METRIC",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "TRACE",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -4499,6 +4512,42 @@
               "name": "equals",
               "description": null,
               "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEquals",
+              "description": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "contains",
+              "description": null,
+              "type": {
                 "kind": "ENUM",
                 "name": "SourceOutputType",
                 "ofType": null
@@ -4506,7 +4555,7 @@
               "defaultValue": null
             },
             {
-              "name": "notEquals",
+              "name": "notContains",
               "description": null,
               "type": {
                 "kind": "ENUM",
@@ -5665,6 +5714,91 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Trace",
+          "description": "Log event with fields for querying log data",
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Id of the component associated with the log event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "string",
+              "description": "Trace event as an encoded string format",
+              "args": [
+                {
+                  "name": "encoding",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "EventEncodingType",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "json",
+              "description": "Get JSON field data on the trace event, by field name",
+              "args": [
+                {
+                  "name": "field",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Json",
                 "ofType": null
               },
               "isDeprecated": false,

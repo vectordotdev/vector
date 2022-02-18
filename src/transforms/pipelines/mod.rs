@@ -84,6 +84,7 @@ inventory::submit! {
 pub struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
+    #[serde(default)]
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
@@ -243,11 +244,11 @@ impl TransformConfig for PipelinesConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

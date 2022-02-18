@@ -63,11 +63,11 @@ impl TransformConfig for CompoundConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

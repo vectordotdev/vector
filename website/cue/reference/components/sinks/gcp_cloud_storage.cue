@@ -13,7 +13,6 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

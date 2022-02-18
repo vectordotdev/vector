@@ -1,5 +1,7 @@
 use std::{any::Any, collections::HashMap};
 
+use value::Kind;
+
 use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
 
 /// The state held by the compiler.
@@ -50,6 +52,13 @@ impl Compiler {
         }
     }
 
+    /// Get the kind information of the program target (e.g. the type accessed through `.`).
+    pub fn target_kind(&self) -> Option<&Kind> {
+        self.target()
+            .as_ref()
+            .map(|details| details.type_def.kind())
+    }
+
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
         self.variables.keys()
     }
@@ -94,11 +103,6 @@ impl Compiler {
             *self = *snapshot;
             self.external_context = context;
         }
-    }
-
-    /// Returns the root typedef for the paths (not the variables) of the object.
-    pub fn target_type_def(&self) -> Option<&TypeDef> {
-        self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
     /// Sets the external context data for VRL functions to use.

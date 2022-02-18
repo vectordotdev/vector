@@ -52,7 +52,7 @@ components: sources: splunk_hec: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements & {
+		acknowledgements: configuration._source_acknowledgements & {
 			type: object: {
 				options: {
 					max_number_of_ack_channels: {
