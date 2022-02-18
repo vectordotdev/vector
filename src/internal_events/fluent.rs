@@ -7,7 +7,7 @@ use crate::sources::fluent::DecodeError;
 
 #[derive(Debug)]
 pub struct FluentMessageReceived {
-    pub byte_size: u64,
+    pub(crate) byte_size: u64,
 }
 
 impl InternalEvent for FluentMessageReceived {
