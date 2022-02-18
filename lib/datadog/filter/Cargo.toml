@@ -10,7 +10,3 @@ datadog-search-syntax = { path = "../search-syntax" }
 vector_core = { path = "../../vector-core", default-features = false, features = ["vrl"] }
 bytes = { version = "1.1", default-features = false }
 regex = { version = "1.5", default-features = false, features = ["std", "perf"] }
-dyn-clone = { version = "1.0.4", default-features = false }
-
-[dev-dependencies]
-serde_json = { version = "1.0" }
