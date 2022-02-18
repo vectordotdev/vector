@@ -4,7 +4,7 @@ use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-pub use self::source::*;
+pub(crate) use self::source::*;
 
 #[derive(Debug)]
 pub(crate) struct FileOpen {
