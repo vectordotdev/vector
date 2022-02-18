@@ -28,7 +28,7 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
 
 #[derive(Debug)]
 pub(crate) struct HerokuLogplexRequestReadError {
-    pub error: std::io::Error,
+    pub(crate) error: std::io::Error,
 }
 
 impl InternalEvent for HerokuLogplexRequestReadError {
