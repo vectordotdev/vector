@@ -46,6 +46,10 @@ impl SourceConfig for InternalLogsConfig {
     fn source_type(&self) -> &'static str {
         "internal_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(

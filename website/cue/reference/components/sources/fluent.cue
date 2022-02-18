@@ -50,7 +50,7 @@ components: sources: fluent: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true

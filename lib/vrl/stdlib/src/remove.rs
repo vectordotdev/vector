@@ -165,7 +165,7 @@ impl Expression for RemoveFn {
         let compact = self.compact.resolve(ctx)?.try_boolean()?;
 
         let mut value = self.value.resolve(ctx)?;
-        value.remove(&path, compact)?;
+        value.target_remove(&path, compact)?;
 
         Ok(value)
     }
