@@ -40,7 +40,7 @@ impl InternalEvent for RedisEventSent {
 }
 
 #[derive(Debug)]
-pub struct RedisSendEventFailed {
+pub(crate) struct RedisSendEventFailed {
     pub error: String,
 }
 
