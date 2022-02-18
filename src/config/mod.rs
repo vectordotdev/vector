@@ -221,7 +221,7 @@ pub(crate) struct SourceOuter {
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    pub proxy: ProxyConfig,
+    pub(crate) proxy: ProxyConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
     #[serde(default, skip)]
