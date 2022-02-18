@@ -7,7 +7,7 @@ pub(crate) struct ConcatSubstringError<'a> {
     pub(crate) source: &'a str,
     pub(crate) condition: &'a str,
     pub(crate) start: usize,
-    pub end: usize,
+    pub(crate) end: usize,
     pub(crate) length: usize,
 }
 
