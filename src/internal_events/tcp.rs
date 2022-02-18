@@ -58,7 +58,7 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionError {
+pub(crate) struct TcpSocketConnectionError {
     pub error: TlsError,
 }
 
