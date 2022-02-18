@@ -89,7 +89,7 @@ impl InternalEvent for KafkaReadError {
 }
 
 #[derive(Debug)]
-pub struct KafkaKeyExtractionFailed<'a> {
+pub(crate) struct KafkaKeyExtractionFailed<'a> {
     pub key_field: &'a str,
 }
 
