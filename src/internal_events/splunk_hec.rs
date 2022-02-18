@@ -1,5 +1,5 @@
 #[cfg(feature = "sinks-splunk_hec")]
-pub use self::sink::*;
+pub(crate) use self::sink::*;
 #[cfg(feature = "sources-splunk_hec")]
 pub use self::source::*;
 
