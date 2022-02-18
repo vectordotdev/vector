@@ -8,7 +8,7 @@ use crate::event::Event;
 pub struct KubernetesLogsEventsReceived<'a> {
     pub(crate) file: &'a str,
     pub byte_size: usize,
-    pub pod_name: Option<&'a str>,
+    pub(crate) pod_name: Option<&'a str>,
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
