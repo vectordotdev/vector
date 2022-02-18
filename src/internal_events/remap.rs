@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RemapMappingError {
+pub(crate) struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
     /// mapping. This internal event will reflect that in its messaging.
     pub event_dropped: bool,
