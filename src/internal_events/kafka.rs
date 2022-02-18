@@ -33,7 +33,7 @@ impl InternalEvent for KafkaEventsReceived {
 const KAFKA_OFFSET_UPDATE: &str = "kafka_offset_update";
 
 #[derive(Debug)]
-pub struct KafkaOffsetUpdateError {
+pub(crate) struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
 }
 
