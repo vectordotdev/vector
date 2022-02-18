@@ -82,7 +82,7 @@ impl<'a> InternalEvent for WindowsServiceInstall<'a> {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceUninstall<'a> {
+pub(self) struct WindowsServiceUninstall<'a> {
     pub name: &'a str,
 }
 

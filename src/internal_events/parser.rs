@@ -46,7 +46,7 @@ impl InternalEvent for ParserMatchError<'_> {
 }
 
 #[derive(Debug)]
-pub struct ParserMissingFieldError<'a> {
+pub(crate) struct ParserMissingFieldError<'a> {
     pub field: &'a str,
 }
 
