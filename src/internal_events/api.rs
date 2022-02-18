@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ApiStarted {
+pub(crate) struct ApiStarted {
     pub(crate) addr: SocketAddr,
     pub(crate) playground: bool,
 }
