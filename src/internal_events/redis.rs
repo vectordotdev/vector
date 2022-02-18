@@ -23,7 +23,7 @@ impl InternalEvent for RedisReceiveEventFailed {
 }
 
 #[derive(Debug)]
-pub struct RedisEventSent {
+pub(crate) struct RedisEventSent {
     pub(crate) count: usize,
     pub(crate) byte_size: usize,
 }
