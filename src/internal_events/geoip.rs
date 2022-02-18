@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub(crate) struct GeoipIpAddressParseError<'a> {
     pub(crate) error: AddrParseError,
-    pub address: &'a str,
+    pub(crate) address: &'a str,
 }
 
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
