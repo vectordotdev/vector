@@ -10,7 +10,7 @@ use crate::sources::nginx_metrics::parser::ParseError;
 pub struct NginxMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub uri: &'a str,
+    pub(crate) uri: &'a str,
 }
 
 impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
