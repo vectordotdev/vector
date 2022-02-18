@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct VectorEventReceived {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
 }
 
 impl InternalEvent for VectorEventReceived {
