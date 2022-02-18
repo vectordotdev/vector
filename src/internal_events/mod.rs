@@ -149,7 +149,7 @@ mod vector;
 mod file;
 mod windows;
 
-pub mod kubernetes;
+pub(crate) mod kubernetes;
 
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
