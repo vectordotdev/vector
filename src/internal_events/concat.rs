@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ConcatSubstringError<'a> {
+pub(crate) struct ConcatSubstringError<'a> {
     pub(crate) source: &'a str,
     pub(crate) condition: &'a str,
     pub(crate) start: usize,
