@@ -20,7 +20,7 @@ impl<E: std::fmt::Debug> InternalEvent for InvocationDesyncReceived<E> {
 
 /// Emitted when reflector gets a desync from the watch command.
 #[derive(Debug)]
-pub struct StreamDesyncReceived<E> {
+pub(crate) struct StreamDesyncReceived<E> {
     /// The underlying error.
     pub error: E,
 }
