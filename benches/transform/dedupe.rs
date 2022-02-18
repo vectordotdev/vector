@@ -95,7 +95,7 @@ fn dedupe(c: &mut Criterion) {
                     (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {
-                    let output = dedupe.transform_events(input);
+                    let output = dedupe.transform(input);
                     consume(output)
                 },
                 BatchSize::SmallInput,

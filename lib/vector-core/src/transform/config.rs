@@ -44,7 +44,6 @@ impl Default for TransformContext {
         Self {
             key: Default::default(),
             globals: Default::default(),
-            #[cfg(feature = "vrl")]
             enrichment_tables: Default::default(),
             schema_ids: HashMap::from([(None, schema::Id::empty())]),
         }

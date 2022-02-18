@@ -791,12 +791,6 @@ dnstap-integration-tests = ["sources-dnstap", "bollard"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
-vector-api-tests = [
-  "sources-demo_logs",
-  "transforms-log_to_metric",
-  "transforms-remap",
-  "sinks-blackhole"
-]
 vector-unit-test-tests = [
   "sources-demo_logs",
   "transforms-add_fields",

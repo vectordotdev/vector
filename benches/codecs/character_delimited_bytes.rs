@@ -5,9 +5,7 @@ use criterion::{
 };
 use std::{fmt, time::Duration};
 use tokio_util::codec::Decoder;
-use vector::codecs::{
-    self, decoding::Deserializer, decoding::Framer, BytesDeserializer, CharacterDelimitedDecoder,
-};
+use vector::codecs::{self, BytesDeserializer, CharacterDelimitedDecoder};
 
 #[derive(Debug)]
 struct Param {
@@ -46,13 +44,13 @@ fn decoding(c: &mut Criterion) {
             |b, param| {
                 b.iter_batched(
                     || {
-                        let framer = Framer::CharacterDelimited(
+                        let framer = Box::new(
                             param
                                 .max_length
                                 .map(|ml| CharacterDelimitedDecoder::new_with_max_length(b'a', ml))
                                 .unwrap_or(CharacterDelimitedDecoder::new(b'a')),
                         );
-                        let deserializer = Deserializer::Bytes(BytesDeserializer::new());
+                        let deserializer = Box::new(BytesDeserializer::new());
                         let decoder = codecs::Decoder::new(framer, deserializer);
 
                         (Box::new(decoder), param.input.clone())
