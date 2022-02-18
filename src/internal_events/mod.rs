@@ -1,4 +1,5 @@
-pub mod prelude;
+
+mod prelude;
 
 mod adaptive_concurrency;
 mod add_fields;
