@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AwsEc2MetadataRefreshSuccessful;
+pub(crate) struct AwsEc2MetadataRefreshSuccessful;
 
 impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
     fn emit_logs(&self) {
