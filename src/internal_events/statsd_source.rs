@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub(crate) struct StatsdInvalidRecordError<'a> {
     pub(crate) error: &'a crate::sources::statsd::parser::ParseError,
-    pub bytes: Bytes,
+    pub(crate) bytes: Bytes,
 }
 
 impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
