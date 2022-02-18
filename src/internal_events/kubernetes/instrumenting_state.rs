@@ -16,7 +16,7 @@ pub struct StateItemDeleted;
 pub(crate) struct StateResynced;
 
 #[derive(Debug)]
-pub struct StateMaintenanceRequested;
+pub(crate) struct StateMaintenanceRequested;
 
 #[derive(Debug)]
 pub struct StateMaintenancePerformed;
