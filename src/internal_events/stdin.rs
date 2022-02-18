@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct StdinEventsReceived {
+pub(crate) struct StdinEventsReceived {
     pub(crate) byte_size: usize,
     pub(crate) count: usize,
 }
