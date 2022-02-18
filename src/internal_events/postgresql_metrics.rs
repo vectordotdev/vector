@@ -24,7 +24,7 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 #[derive(Debug)]
 pub(crate) struct PostgresqlMetricsCollectError<'a> {
     pub(crate) error: String,
-    pub endpoint: Option<&'a String>,
+    pub(crate) endpoint: Option<&'a String>,
 }
 
 impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
