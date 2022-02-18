@@ -6,7 +6,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct UnixSocketConnectionEstablished<'a> {
+pub(crate) struct UnixSocketConnectionEstablished<'a> {
     pub(crate) path: &'a std::path::Path,
 }
 
