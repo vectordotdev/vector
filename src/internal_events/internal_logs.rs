@@ -17,7 +17,7 @@ impl InternalEvent for InternalLogsBytesReceived {
 }
 
 #[derive(Debug)]
-pub struct InternalLogsEventsReceived {
+pub(crate) struct InternalLogsEventsReceived {
     pub byte_size: usize,
     pub(crate) count: usize,
 }
