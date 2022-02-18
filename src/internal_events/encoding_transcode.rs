@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DecoderBomRemoval {
-    pub from_encoding: &'static str,
+    pub(crate) from_encoding: &'static str,
 }
 
 impl InternalEvent for DecoderBomRemoval {
