@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RequestPrepared<R> {
+pub(crate) struct RequestPrepared<R> {
     pub request: R,
 }
 
