@@ -37,7 +37,7 @@ impl ConfigDiff {
 pub struct Difference {
     pub to_remove: HashSet<ComponentKey>,
     pub(crate) to_change: HashSet<ComponentKey>,
-    pub to_add: HashSet<ComponentKey>,
+    pub(crate) to_add: HashSet<ComponentKey>,
 }
 
 impl Difference {
