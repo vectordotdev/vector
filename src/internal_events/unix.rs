@@ -46,7 +46,7 @@ where
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
     pub(crate) error: &'a E,
-    pub path: &'a std::path::Path,
+    pub(crate) path: &'a std::path::Path,
 }
 
 impl<E> InternalEvent for UnixSocketError<'_, E>
