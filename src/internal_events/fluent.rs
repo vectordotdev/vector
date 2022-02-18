@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::sources::fluent::DecodeError;
 
 #[derive(Debug)]
-pub struct FluentMessageReceived {
+pub(crate) struct FluentMessageReceived {
     pub(crate) byte_size: u64,
 }
 
