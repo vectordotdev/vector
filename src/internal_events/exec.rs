@@ -46,7 +46,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
 #[derive(Debug)]
 pub struct ExecFailedError<'a> {
     pub(crate) command: &'a str,
-    pub error: std::io::Error,
+    pub(crate) error: std::io::Error,
 }
 
 impl InternalEvent for ExecFailedError<'_> {
