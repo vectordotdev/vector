@@ -5,7 +5,7 @@ use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct PostgresqlMetricsCollectCompleted {
+pub(crate) struct PostgresqlMetricsCollectCompleted {
     pub start: Instant,
     pub end: Instant,
 }
