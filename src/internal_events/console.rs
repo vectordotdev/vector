@@ -13,7 +13,7 @@ impl InternalEvent for ConsoleEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct ConsoleFieldNotFound<'a> {
+pub(super) struct ConsoleFieldNotFound<'a> {
     pub missing_field: &'a str,
 }
 
