@@ -41,7 +41,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
     }
 }
 
-pub struct TagCardinalityValueLimitReached<'a> {
+pub(crate) struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }
 
