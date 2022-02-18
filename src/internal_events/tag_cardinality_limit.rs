@@ -23,7 +23,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
 
 pub struct TagCardinalityLimitRejectingTag<'a> {
     pub tag_key: &'a str,
-    pub tag_value: &'a str,
+    pub(crate) tag_value: &'a str,
 }
 
 impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
