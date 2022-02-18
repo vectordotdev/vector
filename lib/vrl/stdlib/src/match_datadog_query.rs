@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use dashmap::DashMap;
 use datadog_filter::{
     fast_matcher::{self, Mode, Op},
     regex::wildcard_regex,
@@ -7,6 +8,7 @@ use datadog_filter::{
 };
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 use lookup_lib::{parser::parse_lookup, LookupBuf};
+use once_cell::sync::Lazy;
 use regex::bytes;
 use vrl::prelude::*;
 
@@ -494,13 +496,24 @@ fn compare(
     }
 }
 
+static LOOKUPS: Lazy<DashMap<String, LookupBuf>> = Lazy::new(|| {
+    let map = DashMap::new();
+    map.insert(String::from("tags"), LookupBuf::from("tags"));
+    map
+});
+
 /// If the provided field is a `Field::Tag`, will return a "tags" lookup buf. Otherwise,
 /// parses the field and returns a lookup buf is the lookup itself is valid.
 fn lookup_field(field: &Field) -> LookupBuf {
     match field {
-        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => parse_lookup(p.as_str())
-            .expect("should parse lookup buf")
-            .into_buf(),
+        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => LOOKUPS
+            .entry(String::from(p))
+            .or_insert_with(|| {
+                parse_lookup(p.as_str())
+                    .expect("should parse lookup buf")
+                    .into_buf()
+            })
+            .clone(),
         Field::Tag(_) => LookupBuf::from("tags"),
     }
 }
