@@ -17,7 +17,7 @@ use crate::sources::aws_s3::sqs::ProcessingError;
 #[derive(Debug)]
 pub struct AwsSqsEventSent<'a> {
     pub byte_size: usize,
-    pub message_id: Option<&'a String>,
+    pub(crate) message_id: Option<&'a String>,
 }
 
 impl InternalEvent for AwsSqsEventSent<'_> {
