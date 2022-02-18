@@ -36,7 +36,7 @@ impl Output {
 }
 
 #[derive(Debug, Clone)]
-pub struct OutputThroughput {
+pub(crate) struct OutputThroughput {
     output_id: String,
     throughput: i64,
 }
