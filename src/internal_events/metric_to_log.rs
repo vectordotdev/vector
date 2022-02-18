@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct MetricToLogSerializeError {
-    pub error: Error,
+    pub(crate) error: Error,
 }
 
 impl<'a> InternalEvent for MetricToLogSerializeError {
