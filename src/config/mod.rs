@@ -852,7 +852,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub(super) struct TestOutput<T = OutputId> {
-    pub extract_from: T,
+    pub(self) extract_from: T,
     pub(crate) conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
