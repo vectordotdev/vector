@@ -270,7 +270,7 @@ pub struct SourceContext {
     ///
     /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
-    pub schema_ids: HashMap<Option<String>, schema::Id>,
+    pub(crate) schema_ids: HashMap<Option<String>, schema::Id>,
 }
 
 impl SourceContext {
