@@ -8,7 +8,7 @@ pub struct ConcatSubstringError<'a> {
     pub(crate) condition: &'a str,
     pub(crate) start: usize,
     pub end: usize,
-    pub length: usize,
+    pub(crate) length: usize,
 }
 
 impl<'a> InternalEvent for ConcatSubstringError<'a> {
