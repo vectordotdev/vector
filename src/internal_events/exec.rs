@@ -121,7 +121,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
 pub struct ExecCommandExecuted<'a> {
     pub(crate) command: &'a str,
     pub(crate) exit_status: Option<i32>,
-    pub exec_duration: Duration,
+    pub(crate) exec_duration: Duration,
 }
 
 impl ExecCommandExecuted<'_> {
