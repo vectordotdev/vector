@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct UdpSocketConnectionEstablished;
+pub(crate) struct UdpSocketConnectionEstablished;
 
 impl InternalEvent for UdpSocketConnectionEstablished {
     fn emit_logs(&self) {
