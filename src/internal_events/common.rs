@@ -95,7 +95,7 @@ impl InternalEvent for AwsBytesSent {
 const STREAM_CLOSED: &str = "stream_closed";
 
 #[derive(Debug)]
-pub struct StreamClosedError {
+pub(crate) struct StreamClosedError {
     pub error: crate::source_sender::ClosedError,
     pub(crate) count: usize,
 }
