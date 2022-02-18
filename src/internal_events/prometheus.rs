@@ -11,7 +11,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct PrometheusEventsReceived {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub(crate) count: usize,
     pub(crate) uri: http::Uri,
 }
