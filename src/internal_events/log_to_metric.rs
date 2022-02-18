@@ -38,7 +38,7 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
     }
 }
 
-pub struct LogToMetricParseFloatError<'a> {
+pub(crate) struct LogToMetricParseFloatError<'a> {
     pub(crate) field: &'a str,
     pub error: ParseFloatError,
 }
