@@ -5,7 +5,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct HttpBytesReceived<'a> {
+pub(crate) struct HttpBytesReceived<'a> {
     pub byte_size: usize,
     pub http_path: &'a str,
     pub protocol: &'static str,
