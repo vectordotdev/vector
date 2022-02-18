@@ -27,7 +27,7 @@ pub struct Opts {
     input_file: Option<PathBuf>,
 
     /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
-    #[clap(short, long = "program", conflicts_with("program"), parse(from_os_str))]
+    #[clap(short, long = "program", conflicts_with("PROGRAM"), parse(from_os_str))]
     program_file: Option<PathBuf>,
 
     /// Print the (modified) event object instead of the result of the final expression. Setting
