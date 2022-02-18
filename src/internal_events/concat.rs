@@ -40,7 +40,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
 }
 
 #[derive(Debug)]
-pub struct ConcatSubstringSourceMissing<'a> {
+pub(crate) struct ConcatSubstringSourceMissing<'a> {
     pub source: &'a str,
 }
 

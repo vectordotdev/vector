@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(self) struct RedisReceiveEventFailed {
-    pub error: redis::RedisError,
+    pub(crate) error: redis::RedisError,
 }
 
 impl InternalEvent for RedisReceiveEventFailed {
