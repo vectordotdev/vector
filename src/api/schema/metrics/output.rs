@@ -83,7 +83,7 @@ pub(crate) fn outputs_by_component_key(
         .collect::<Vec<_>>()
 }
 
-pub fn filter_output_metric(metrics: &[Metric], output_name: &str) -> Option<Metric> {
+pub(crate) fn filter_output_metric(metrics: &[Metric], output_name: &str) -> Option<Metric> {
     sum_metrics(
         metrics
             .iter()
