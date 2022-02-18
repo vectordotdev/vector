@@ -8,7 +8,7 @@ pub(crate) struct JsonParserError<'a> {
     pub(crate) field: &'a str,
     pub(crate) value: &'a str,
     pub error: Error,
-    pub drop_invalid: bool,
+    pub(crate) drop_invalid: bool,
 }
 
 impl<'a> InternalEvent for JsonParserError<'a> {
