@@ -40,7 +40,7 @@ pub(crate) struct UnitTest {
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
-pub struct UnitTestResult {
+pub(crate) struct UnitTestResult {
     pub(crate) errors: Vec<String>,
 }
 
