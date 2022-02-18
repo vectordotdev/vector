@@ -51,7 +51,7 @@ impl InternalEvent for LuaScriptError {
 
 #[derive(Debug)]
 pub struct LuaBuildError {
-    pub error: crate::transforms::lua::v2::BuildError,
+    pub(crate) error: crate::transforms::lua::v2::BuildError,
 }
 
 impl InternalEvent for LuaBuildError {
