@@ -256,7 +256,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub key: ComponentKey,
+    pub(crate) key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
