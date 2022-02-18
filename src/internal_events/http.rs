@@ -33,7 +33,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
 #[derive(Debug)]
 pub struct HttpEventsReceived<'a> {
     pub count: usize,
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub http_path: &'a str,
     pub protocol: &'static str,
 }
