@@ -41,7 +41,7 @@ impl InternalEvent for AdaptiveConcurrencyLimit {
 
 #[derive(Debug)]
 pub struct AdaptiveConcurrencyInFlight {
-    pub in_flight: u64,
+    pub(crate) in_flight: u64,
 }
 
 impl InternalEvent for AdaptiveConcurrencyInFlight {
