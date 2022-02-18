@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct RouteEventDiscarded<'a> {
-    pub output: &'a str,
+    pub(crate) output: &'a str,
 }
 
 impl<'a> InternalEvent for RouteEventDiscarded<'a> {
