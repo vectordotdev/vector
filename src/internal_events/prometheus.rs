@@ -10,7 +10,7 @@ use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct PrometheusEventsReceived {
+pub(crate) struct PrometheusEventsReceived {
     pub byte_size: usize,
     pub count: usize,
     pub(crate) uri: http::Uri,
