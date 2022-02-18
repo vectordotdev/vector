@@ -253,6 +253,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: baseline-image
+          path: /tmp
 
       - name: Load baseline image
         run: |
@@ -340,6 +341,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: comparison-image
+          path: /tmp
 
       - name: Load comparison image
         run: |
