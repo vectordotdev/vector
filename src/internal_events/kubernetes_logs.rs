@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::event::Event;
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventsReceived<'a> {
+pub(crate) struct KubernetesLogsEventsReceived<'a> {
     pub(crate) file: &'a str,
     pub(crate) byte_size: usize,
     pub(crate) pod_name: Option<&'a str>,
