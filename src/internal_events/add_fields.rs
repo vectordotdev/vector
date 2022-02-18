@@ -12,7 +12,7 @@ impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
 }
 
 #[derive(Debug)]
-pub struct AddFieldsFieldNotOverwritten<'a> {
+pub(crate) struct AddFieldsFieldNotOverwritten<'a> {
     pub field: &'a str,
 }
 
