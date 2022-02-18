@@ -116,7 +116,7 @@ impl InternalEvent for TcpSendAckError {
 }
 
 #[derive(Debug)]
-pub struct TcpBytesReceived {
+pub(crate) struct TcpBytesReceived {
     pub(crate) byte_size: usize,
     pub peer_addr: IpAddr,
 }
