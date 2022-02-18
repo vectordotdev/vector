@@ -121,7 +121,7 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
@@ -147,13 +147,13 @@ async fn run(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     cx: SourceContext,
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: bool,
 ) -> crate::Result<()> {
     let span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: acknowledgements.enabled(),
+        acknowledgements,
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 

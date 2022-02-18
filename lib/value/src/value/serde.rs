@@ -170,18 +170,12 @@ impl From<serde_json::Value> for Value {
     fn from(json_value: serde_json::Value) -> Self {
         match json_value {
             serde_json::Value::Bool(b) => Self::Boolean(b),
-            serde_json::Value::Number(n) => {
-                let float_or_byte = || {
-                    n.as_f64().map_or_else(
-                        || Self::Bytes(n.to_string().into()),
-                        |f| {
-                            // JSON does not support NaN values
-                            Self::Float(NotNan::new(f).unwrap())
-                        },
-                    )
-                };
-                n.as_i64().map_or_else(float_or_byte, Self::Integer)
+            serde_json::Value::Number(n) if n.is_i64() => n.as_i64().unwrap().into(),
+            serde_json::Value::Number(n) if n.is_f64() => {
+                // JSON doesn't support NaN values
+                NotNan::new(n.as_f64().unwrap()).unwrap().into()
             }
+            serde_json::Value::Number(n) => n.to_string().into(),
             serde_json::Value::String(s) => Self::Bytes(Bytes::from(s)),
             serde_json::Value::Object(obj) => Self::Object(
                 obj.into_iter()

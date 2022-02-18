@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
@@ -25,16 +23,6 @@ pub use ::value::{
     kind::{find, insert, merge, nest, remove, Collection, Field, Index},
     Kind,
 };
-
-pub trait VrlValueKind {
-    fn kind(&self) -> Kind;
-}
-
-impl VrlValueKind for Value {
-    fn kind(&self) -> Kind {
-        self.into()
-    }
-}
 
 pub trait DefaultValue {
     /// Returns the default [`Value`] for a given [`Kind`].
@@ -88,44 +76,9 @@ impl DefaultValue for Kind {
     }
 }
 
-impl From<&Value> for Kind {
-    fn from(value: &Value) -> Self {
-        match value {
-            Value::Bytes(_) => Kind::bytes(),
-            Value::Integer(_) => Kind::integer(),
-            Value::Float(_) => Kind::float(),
-            Value::Boolean(_) => Kind::boolean(),
-            Value::Timestamp(_) => Kind::timestamp(),
-            Value::Regex(_) => Kind::regex(),
-            Value::Null => Kind::null(),
-
-            Value::Object(object) => Kind::object(
-                object
-                    .iter()
-                    .map(|(k, v)| (k.clone().into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-
-            Value::Array(array) => Kind::array(
-                array
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (i.into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-        }
-    }
-}
-
-impl From<Value> for Kind {
-    fn from(value: Value) -> Self {
-        (&value).into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::*;
 

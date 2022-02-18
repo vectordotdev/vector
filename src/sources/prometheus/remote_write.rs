@@ -75,6 +75,10 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
     fn source_type(&self) -> &'static str {
         SOURCE_NAME
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone)]
