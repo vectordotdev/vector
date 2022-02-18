@@ -263,7 +263,7 @@ pub struct SourceContext {
     pub(super) globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
-    pub proxy: ProxyConfig,
+    pub(super) proxy: ProxyConfig,
     pub acknowledgements: bool,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
