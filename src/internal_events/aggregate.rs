@@ -11,7 +11,7 @@ impl InternalEvent for AggregateEventRecorded {
 }
 
 #[derive(Debug)]
-pub struct AggregateFlushed;
+pub(crate) struct AggregateFlushed;
 
 impl InternalEvent for AggregateFlushed {
     fn emit_metrics(&self) {
