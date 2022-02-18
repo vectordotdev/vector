@@ -31,7 +31,7 @@ pub struct Data {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum SourcesSortFieldName {
+pub(crate) enum SourcesSortFieldName {
     ComponentKey,
     ComponentType,
     OutputType,
