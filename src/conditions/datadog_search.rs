@@ -73,7 +73,10 @@ fn exec(op: &Op, log: &LogEvent) -> bool {
             _ => false,
         },
         Op::TagExists(value) => tag_exists(value, log),
-        Op::RegexMatch { field, re } => regex_match(field, re, log),
+        Op::RegexMatch { field, re } => match field {
+            Field::Default(f) => regex_match(f, re, log),
+            _ => false,
+        },
         Op::Prefix(field, value) => prefix(field, value, log),
         Op::Wildcard(field, value) => wildcard(field, value, log),
         Op::Compare(field, comparison, comparison_value) => {

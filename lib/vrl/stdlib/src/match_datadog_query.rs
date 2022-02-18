@@ -109,16 +109,6 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    // fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-    //     let value = arguments.required("value");
-    //     let filter = arguments
-    //         .required_any("query")
-    //         .downcast_ref::<DynMatcher>()
-    //         .unwrap();
-
-    //     Ok(filter.0.run(&value).into())
-    // }
-
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
@@ -183,8 +173,8 @@ fn exec(op: &fast_matcher::Op, obj: &Value) -> bool {
         Op::Exists(field) => exists(field, obj),
         Op::NotExists(field) => !exists(&field, obj),
         Op::Equals { field, value } => equals(field, value, obj),
-        // Op::TagExists(value) => tag_exists(value, obj),
-        //Op::RegexMatch { field, re } => regex_match(field, re, obj),
+        Op::TagExists(_) => unimplemented!(),
+        Op::RegexMatch { field, re } => regex_match(field, re, obj),
         Op::Prefix(field, value) => prefix(field, value, obj),
         Op::Wildcard(field, value) => wildcard(field, value, obj),
         Op::Compare(field, comparison, comparison_value) => {
@@ -240,7 +230,6 @@ fn exec(op: &fast_matcher::Op, obj: &Value) -> bool {
         }
         Op::Not(matcher) => !VrlFilter::run(matcher, obj),
         Op::Nested(matcher) => VrlFilter::run(matcher, obj),
-        _ => unimplemented!(),
     }
 }
 
@@ -348,6 +337,21 @@ fn prefix(field: &Field, pfx: &str, obj: &Value) -> bool {
         // All other field types are compared by complete value.
         _ => resolve_value(&buf, obj, |val: &Value| string_value(val).starts_with(&pfx)),
     }
+}
+
+fn regex_match(field: &Field, re: &regex::Regex, obj: &Value) -> bool {
+    let buf = lookup_field(&field);
+
+    resolve_value(&buf, obj, |val: &Value| match val {
+        Value::Bytes(s) => {
+            if let Some(s) = std::str::from_utf8(&s).ok() {
+                re.is_match(s)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    })
 }
 
 fn wildcard(field: &Field, wildcard: &str, obj: &Value) -> bool {
@@ -474,283 +478,6 @@ fn compare(
         }),
     }
 }
-
-// /// Implements `Filter`, which provides methods for matching against (in this case) VRL values.
-// impl Filter<Value> for VrlFilter {
-//     fn exists(&self, field: Field) -> Box<dyn Matcher<Value>> {
-//         let buf = lookup_field(&field);
-
-//         match field {
-//             // Tags need to check the element value.
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:", tag);
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Array(v) => v.iter().any(|v| {
-//                             let str_value = string_value(v);
-
-//                             // The tag matches using either 'key' or 'key:value' syntax.
-//                             str_value == tag || str_value.starts_with(&starts_with)
-//                         }),
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             // Literal field 'tags' needs to be compared by key.
-//             Field::Reserved(f) if f == "tags" => resolve_value(
-//                 buf,
-//                 Run::boxed(|value| match value {
-//                     Value::Array(v) => v.iter().any(|v| v == value),
-//                     _ => false,
-//                 }),
-//             ),
-
-//             // Other field types have already resolved at this point, so just return true.
-//             _ => resolve_value(buf, Box::new(true)),
-//         }
-//     }
-
-//     fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<Value>> {
-//         let buf = lookup_field(&field);
-
-//         match field {
-//             // Default fields are compared by word boundary.
-//             Field::Default(_) => {
-//                 let re = word_regex(to_match);
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             // A literal "tags" field should match by key.
-//             Field::Reserved(f) if f == "tags" => {
-//                 let to_match = to_match.to_owned();
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Array(v) => {
-//                             v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-//                         }
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             // Individual tags are compared by element key:value.
-//             Field::Tag(tag) => {
-//                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Array(v) => v.contains(&value_bytes),
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             // Everything else is matched by string equality.
-//             _ => {
-//                 let to_match = to_match.to_owned();
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| string_value(value) == to_match),
-//                 )
-//             }
-//         }
-//     }
-
-//     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<Value>> {
-//         let buf = lookup_field(&field);
-
-//         match field {
-//             // Default fields are matched by word boundary.
-//             Field::Default(_) => {
-//                 let re = word_regex(&format!("{}*", prefix));
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| re.is_match(&string_value(value))),
-//                 )
-//             }
-//             // Tags are recursed until a match is found.
-//             Field::Tag(tag) => {
-//                 let starts_with = format!("{}:{}", tag, prefix);
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Array(v) => {
-//                             v.iter().any(|v| string_value(v).starts_with(&starts_with))
-//                         }
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             // All other field types are compared by complete value.
-//             _ => {
-//                 let prefix = prefix.to_owned();
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| string_value(value).starts_with(&prefix)),
-//                 )
-//             }
-//         }
-//     }
-
-//     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<Value>> {
-//         let buf = lookup_field(&field);
-
-//         match field {
-//             Field::Default(_) => {
-//                 let re = word_regex(wildcard);
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| re.is_match(&string_value(value))),
-//                 )
-//             }
-//             Field::Tag(tag) => {
-//                 let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match value {
-//                         Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
-//                         _ => false,
-//                     }),
-//                 )
-//             }
-//             _ => {
-//                 let re = wildcard_regex(wildcard);
-
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| re.is_match(&string_value(value))),
-//                 )
-//             }
-//         }
-//     }
-
-//     fn compare(
-//         &self,
-//         field: Field,
-//         comparator: Comparison,
-//         comparison_value: ComparisonValue,
-//     ) -> Box<dyn Matcher<Value>> {
-//         let buf = lookup_field(&field);
-//         let rhs = Cow::from(comparison_value.to_string());
-
-//         match field {
-//             // Facets are compared numerically if the value is numeric, or as strings otherwise.
-//             Field::Facet(_) => {
-//                 resolve_value(
-//                     buf,
-//                     Run::boxed(move |value| match (value, &comparison_value) {
-//                         // Integers.
-//                         (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
-//                             Comparison::Lt => *lhs < *rhs,
-//                             Comparison::Lte => *lhs <= *rhs,
-//                             Comparison::Gt => *lhs > *rhs,
-//                             Comparison::Gte => *lhs >= *rhs,
-//                         },
-//                         // Integer value - Float boundary
-//                         (Value::Integer(lhs), ComparisonValue::Float(rhs)) => match comparator {
-//                             Comparison::Lt => (*lhs as f64) < *rhs,
-//                             Comparison::Lte => *lhs as f64 <= *rhs,
-//                             Comparison::Gt => *lhs as f64 > *rhs,
-//                             Comparison::Gte => *lhs as f64 >= *rhs,
-//                         },
-//                         // Floats.
-//                         (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
-//                             let lhs = lhs.into_inner();
-//                             match comparator {
-//                                 Comparison::Lt => lhs < *rhs,
-//                                 Comparison::Lte => lhs <= *rhs,
-//                                 Comparison::Gt => lhs > *rhs,
-//                                 Comparison::Gte => lhs >= *rhs,
-//                             }
-//                         }
-//                         // Float value - Integer boundary
-//                         (Value::Float(lhs), ComparisonValue::Integer(rhs)) => {
-//                             let lhs = lhs.into_inner();
-//                             match comparator {
-//                                 Comparison::Lt => lhs < *rhs as f64,
-//                                 Comparison::Lte => lhs <= *rhs as f64,
-//                                 Comparison::Gt => lhs > *rhs as f64,
-//                                 Comparison::Gte => lhs >= *rhs as f64,
-//                             }
-//                         }
-//                         // Where the rhs is a string ref, the lhs is coerced into a string.
-//                         (_, ComparisonValue::String(rhs)) => {
-//                             let lhs = string_value(value);
-//                             let rhs = Cow::from(rhs);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         // Otherwise, compare directly as strings.
-//                         _ => {
-//                             let lhs = string_value(value);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                     }),
-//                 )
-//             }
-//             // Tag values need extracting by "key:value" to be compared.
-//             Field::Tag(_) => resolve_value(
-//                 buf,
-//                 Run::boxed(move |value| match value {
-//                     Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
-//                         Some((_, lhs)) => {
-//                             let lhs = Cow::from(lhs);
-
-//                             match comparator {
-//                                 Comparison::Lt => lhs < rhs,
-//                                 Comparison::Lte => lhs <= rhs,
-//                                 Comparison::Gt => lhs > rhs,
-//                                 Comparison::Gte => lhs >= rhs,
-//                             }
-//                         }
-//                         _ => false,
-//                     }),
-//                     _ => false,
-//                 }),
-//             ),
-//             // All other tag types are compared by string.
-//             _ => resolve_value(
-//                 buf,
-//                 Run::boxed(move |value| {
-//                     let lhs = string_value(value);
-
-//                     match comparator {
-//                         Comparison::Lt => lhs < rhs,
-//                         Comparison::Lte => lhs <= rhs,
-//                         Comparison::Gt => lhs > rhs,
-//                         Comparison::Gte => lhs >= rhs,
-//                     }
-//                 }),
-//             ),
-//         }
-//     }
-// }
 
 /// If the provided field is a `Field::Tag`, will return a "tags" lookup buf. Otherwise,
 /// parses the field and returns a lookup buf is the lookup itself is valid.

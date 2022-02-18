@@ -26,7 +26,7 @@ pub enum Op {
     },
     TagExists(String),
     RegexMatch {
-        field: String,
+        field: Field,
         re: Regex,
     },
     Prefix(Field, String),
@@ -97,9 +97,9 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| match field {
-                    Field::Default(field) => {
+                    f @ Field::Default(_) => {
                         let re = word_regex(value);
-                        Op::RegexMatch { field, re }
+                        Op::RegexMatch { field: f, re }
                     }
                     Field::Reserved(field) if field == "tags" => Op::TagExists(value.clone()),
                     Field::Tag(field) => {
