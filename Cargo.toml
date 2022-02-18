@@ -118,18 +118,18 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 async-stream = "0.3.2"
 async-trait = "0.1.52"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.16.1", default-features = false, features = ["full"] }
+tokio = { version = "1.17.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 console-subscriber = { version = "0.1.2", optional = true }
 
 # Tracing
-tracing = { version = "0.1.30", default-features = false }
+tracing = { version = "0.1.31", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
-tracing-subscriber = { version = "0.3.8", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
+tracing-subscriber = { version = "0.3.9", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -249,8 +249,8 @@ hyper = { version = "0.14.17", default-features = false, features = ["client", "
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
-indoc = { version = "1.0.3", default-features = false }
 infer = { version = "0.7.0", default-features = false, optional = true}
+indoc = { version = "1.0.4", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
@@ -340,7 +340,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11.9", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.16.0", features = ["test-util"] }
+tokio = { version = "1.17.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
@@ -793,6 +793,12 @@ dnstap-integration-tests = ["sources-dnstap", "bollard"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+vector-api-tests = [
+  "sources-demo_logs",
+  "transforms-log_to_metric",
+  "transforms-remap",
+  "sinks-blackhole"
+]
 vector-unit-test-tests = [
   "sources-demo_logs",
   "transforms-add_fields",
