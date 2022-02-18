@@ -38,7 +38,7 @@ pub(crate) fn get_sources() -> Vec<source::Source> {
 }
 
 /// Filters components, and returns a clone of transforms
-pub fn get_transforms() -> Vec<transform::Transform> {
+pub(super) fn get_transforms() -> Vec<transform::Transform> {
     filter_components(|(_, components)| match components {
         Component::Transform(t) => Some(t.clone()),
         _ => None,
