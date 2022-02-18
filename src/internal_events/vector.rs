@@ -6,7 +6,7 @@ use prost::DecodeError;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct VectorEventReceived {
+pub(crate) struct VectorEventReceived {
     pub byte_size: usize,
 }
 
