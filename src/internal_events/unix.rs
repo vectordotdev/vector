@@ -69,7 +69,7 @@ where
 #[derive(Debug)]
 pub struct UnixSocketFileDeleteError<'a> {
     pub(crate) path: &'a Path,
-    pub error: Error,
+    pub(crate) error: Error,
 }
 
 impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
