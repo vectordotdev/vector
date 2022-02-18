@@ -51,7 +51,7 @@ impl InternalEvent for UdpSocketError {
 
 #[derive(Debug)]
 pub struct UdpSendIncomplete {
-    pub data_size: usize,
+    pub(crate) data_size: usize,
     pub sent: usize,
 }
 
