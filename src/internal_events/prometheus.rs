@@ -13,7 +13,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct PrometheusEventsReceived {
     pub byte_size: usize,
     pub count: usize,
-    pub uri: http::Uri,
+    pub(crate) uri: http::Uri,
 }
 
 impl InternalEvent for PrometheusEventsReceived {
