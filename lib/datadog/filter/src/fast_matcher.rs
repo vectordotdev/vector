@@ -21,7 +21,7 @@ pub enum Op {
     Exists(Field),
     NotExists(Field),
     Equals {
-        field: String,
+        field: Field,
         value: String,
     },
     TagExists(String),
@@ -106,8 +106,8 @@ where
                         let full = format!("{}:{}", field, value);
                         Op::TagExists(full)
                     }
-                    Field::Reserved(field) | Field::Facet(field) => Op::Equals {
-                        field,
+                    f @ Field::Reserved(_) | f @ Field::Facet(_) => Op::Equals {
+                        field: f,
                         value: value.clone(),
                     },
                 })

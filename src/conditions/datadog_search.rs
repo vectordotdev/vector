@@ -68,7 +68,10 @@ fn exec(op: &Op, log: &LogEvent) -> bool {
         Op::False => true,
         Op::Exists(field) => exists(field, log),
         Op::NotExists(field) => !exists(&field, log),
-        Op::Equals { field, value } => equals(field, value, log),
+        Op::Equals { field, value } => match field {
+            Field::Reserved(f) | Field::Facet(f) => equals(f, value, log),
+            _ => false,
+        },
         Op::TagExists(value) => tag_exists(value, log),
         Op::RegexMatch { field, re } => regex_match(field, re, log),
         Op::Prefix(field, value) => prefix(field, value, log),
