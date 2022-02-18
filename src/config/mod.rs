@@ -35,7 +35,7 @@ pub(crate) mod component;
 #[cfg(feature = "datadog-pipelines")]
 pub(crate) mod datadog;
 mod diff;
-pub mod format;
+pub(crate) mod format;
 mod graph;
 mod id;
 mod loading;
