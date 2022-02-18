@@ -52,7 +52,7 @@ impl StringFilter {
 pub(crate) struct ListFilter<T: InputType + PartialEq + Eq + Ord> {
     pub(super) equals: Option<Vec<T>>,
     pub not_equals: Option<Vec<T>>,
-    pub contains: Option<T>,
+    pub(crate) contains: Option<T>,
     pub(super) not_contains: Option<T>,
 }
 
