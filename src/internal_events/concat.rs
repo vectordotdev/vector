@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
     pub(crate) source: &'a str,
-    pub condition: &'a str,
+    pub(crate) condition: &'a str,
     pub(crate) start: usize,
     pub end: usize,
     pub length: usize,
