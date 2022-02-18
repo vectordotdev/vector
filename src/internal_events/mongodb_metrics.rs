@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
-    pub count: usize,
+    pub(crate) count: usize,
     pub(crate) byte_size: usize,
     pub(crate) uri: &'a str,
 }
