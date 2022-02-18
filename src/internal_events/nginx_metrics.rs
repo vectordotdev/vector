@@ -42,7 +42,7 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
 
 #[derive(Debug)]
 pub(crate) struct NginxMetricsCollectCompleted {
-    pub start: Instant,
+    pub(crate) start: Instant,
     pub(crate) end: Instant,
 }
 

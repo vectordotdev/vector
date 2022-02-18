@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct DatadogMetricsEncodingError {
-    pub error: &'static str,
+    pub(crate) error: &'static str,
     pub(crate) dropped_events: u64,
 }
 
