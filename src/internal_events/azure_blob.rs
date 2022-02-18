@@ -5,7 +5,7 @@ use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AzureBlobErrorResponse {
+pub(crate) struct AzureBlobErrorResponse {
     pub(crate) code: hyper::StatusCode,
 }
 
