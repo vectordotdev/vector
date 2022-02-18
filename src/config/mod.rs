@@ -216,7 +216,7 @@ macro_rules! impl_generate_config_from_default {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct SourceOuter {
+pub(crate) struct SourceOuter {
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
