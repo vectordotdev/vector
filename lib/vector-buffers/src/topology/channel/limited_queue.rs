@@ -66,7 +66,7 @@ impl<T: Bufferable> LimitedSender<T> {
     }
 
     /// Gets the number of items that this channel could accept.
-    pub fn capacity(&self) -> usize {
+    pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
     }
 
@@ -84,7 +84,7 @@ impl<T: Bufferable> LimitedSender<T> {
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
         loop {
             if self.slot.is_none() {
-                if self.capacity() == 0 {
+                if self.available_capacity() == 0 {
                     // We have no capacity via the semaphore, so we need to wait for the reader to make
                     // some progress.  We set ourselves for a notification, but there might be a stored
                     // one hence our loop here, which should either drive us back around to a semaphore
@@ -251,4 +251,19 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
     let receiver = LimitedReceiver { inner };
 
     (sender, receiver)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn send_receive() {}
+
+    #[test]
+    fn sender_waits_for_more_capacity_when_partial_available() {}
+
+    #[test]
+    fn receiver_returns_none_when_last_sender_drops() {}
+
+    #[test]
+    fn oversized_send_allowed_when_empty() {}
 }

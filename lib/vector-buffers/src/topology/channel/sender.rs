@@ -66,7 +66,7 @@ where
 
     pub fn capacity(&self) -> Option<usize> {
         match self {
-            Self::Channel(tx) => Some(tx.capacity()),
+            Self::Channel(tx) => Some(tx.available_capacity()),
             Self::Opaque(_) => None,
         }
     }

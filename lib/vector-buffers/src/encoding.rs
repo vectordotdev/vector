@@ -180,11 +180,11 @@ impl<T: FixedEncodable> Encodable for T {
     }
 
     fn encode<B: BufMut>(self, buffer: &mut B) -> Result<(), Self::EncodeError> {
-        self.encode(buffer)
+        FixedEncodable::encode(self, buffer)
     }
 
     fn encoded_size(&self) -> Option<usize> {
-        self.encoded_size()
+        FixedEncodable::encoded_size(self)
     }
 
     fn decode<B: Buf + Clone>(_: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {

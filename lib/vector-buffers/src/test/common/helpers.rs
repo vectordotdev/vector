@@ -5,16 +5,6 @@ use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
 
-/*
-    Helper code for getting tracing data from a test:
-
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
-        .with_test_writer()
-        .init();
-*/
-
 #[macro_export]
 macro_rules! assert_file_does_not_exist_async {
     ($file_path:expr) => {{
