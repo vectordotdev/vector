@@ -118,7 +118,7 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 async-stream = "0.3.2"
 async-trait = "0.1.52"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.16.1", default-features = false, features = ["full"] }
+tokio = { version = "1.17.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -333,7 +333,7 @@ pretty_assertions = "1.1.0"
 reqwest = { version = "0.11.9", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.3.0"
-tokio = { version = "1.16.0", features = ["test-util"] }
+tokio = { version = "1.17.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
