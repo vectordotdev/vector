@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::{built_info, config};
 
 #[derive(Debug)]
-pub struct VectorStarted;
+pub(crate) struct VectorStarted;
 
 impl InternalEvent for VectorStarted {
     fn emit_logs(&self) {
