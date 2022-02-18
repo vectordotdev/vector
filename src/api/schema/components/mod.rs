@@ -27,7 +27,7 @@ use crate::{
     field(name = "component_id", type = "String"),
     field(name = "component_type", type = "String")
 )]
-pub enum Component {
+pub(crate) enum Component {
     Source(source::Source),
     Transform(transform::Transform),
     Sink(sink::Sink),
