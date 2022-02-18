@@ -17,7 +17,7 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 }
 
 #[derive(Debug)]
-pub struct ParserMatchError<'a> {
+pub(crate) struct ParserMatchError<'a> {
     pub(crate) value: &'a [u8],
 }
 
