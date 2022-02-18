@@ -17,7 +17,7 @@ macro_rules! filter_check {
 
 #[derive(Default, InputObject)]
 /// Filter for String values
-pub struct StringFilter {
+pub(super) struct StringFilter {
     pub equals: Option<String>,
     pub not_equals: Option<String>,
     pub(crate) contains: Option<String>,
