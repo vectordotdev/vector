@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AzureBlobErrorResponse {
-    pub code: hyper::StatusCode,
+    pub(crate) code: hyper::StatusCode,
 }
 
 impl InternalEvent for AzureBlobErrorResponse {
