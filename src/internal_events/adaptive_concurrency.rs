@@ -51,7 +51,7 @@ impl InternalEvent for AdaptiveConcurrencyInFlight {
 }
 
 #[derive(Debug)]
-pub struct AdaptiveConcurrencyObservedRtt {
+pub(crate) struct AdaptiveConcurrencyObservedRtt {
     pub(crate) rtt: Duration,
 }
 
