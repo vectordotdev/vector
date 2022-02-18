@@ -34,7 +34,7 @@ pub(crate) enum Component {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ComponentKind {
+pub(crate) enum ComponentKind {
     Source,
     Transform,
     Sink,
