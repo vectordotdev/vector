@@ -8,7 +8,7 @@ pub struct AdaptiveConcurrencyLimit {
     pub concurrency: u64,
     pub reached_limit: bool,
     pub had_back_pressure: bool,
-    pub current_rtt: Option<Duration>,
+    pub(crate) current_rtt: Option<Duration>,
     pub past_rtt: Duration,
     pub past_rtt_deviation: Duration,
 }
