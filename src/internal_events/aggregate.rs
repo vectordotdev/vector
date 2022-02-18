@@ -20,7 +20,7 @@ impl InternalEvent for AggregateFlushed {
 }
 
 #[derive(Debug)]
-pub struct AggregateUpdateFailed;
+pub(crate) struct AggregateUpdateFailed;
 
 impl InternalEvent for AggregateUpdateFailed {
     fn emit_metrics(&self) {
