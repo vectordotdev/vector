@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct StateItemAdded;
 
 #[derive(Debug)]
-pub struct StateItemUpdated;
+pub(crate) struct StateItemUpdated;
 
 #[derive(Debug)]
 pub struct StateItemDeleted;
