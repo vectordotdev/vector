@@ -21,7 +21,7 @@ use crate::{
             },
         },
         util::{
-            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            service::ServiceBuilderExt, BatchConfig, Compression, Concurrency, SinkBatchSettings,
             TowerRequestConfig,
         },
         Healthcheck, UriParseSnafu, VectorSink,
@@ -30,10 +30,10 @@ use crate::{
 };
 
 // The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
-// Above this limit the payload will be ignored.
+// Beyond this limit the payload will be ignored.
 pub const BATCH_GOAL_BYTES: usize = 3_200_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 10;
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
@@ -76,8 +76,7 @@ impl GenerateConfig for DatadogTracesConfig {
     }
 }
 
-/// Various metric type-specific API types.
-/// Datadog traces API has to route, one for tracees and the other one for stats.
+/// Datadog traces API has two routes: one for traces and another one for stats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DatadogTracesEndpoint {
     Traces,
@@ -185,7 +184,6 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
     Ok(result)
 }
 
-/*
 #[cfg(test)]
 mod test {
     use crate::sinks::datadog::traces::DatadogTracesConfig;
@@ -194,4 +192,4 @@ mod test {
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogTracesConfig>();
     }
-}*/
+}

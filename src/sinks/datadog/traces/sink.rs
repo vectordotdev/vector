@@ -46,7 +46,12 @@ impl Partitioner for EventPartitioner {
             Event::Metric(_) => (DatadogTracesEndpoint::APMStats, None, None, None),
             Event::Log(_) => {
                 warn!("got log instead of traces");
-                (DatadogTracesEndpoint::Traces, None, None, None)
+                (
+                    DatadogTracesEndpoint::Traces,
+                    None,
+                    None,
+                    Some("plop".to_string()),
+                )
             }
             Event::Trace(t) => (
                 DatadogTracesEndpoint::Traces,

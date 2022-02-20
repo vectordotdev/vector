@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, io::Write, sync::Arc};
 
-use bytes::{Bytes};
+use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
 use vector_core::event::EventFinalizers;
@@ -123,7 +123,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                             batch_size: n,
                             endpoint: key.endpoint,
                             finalizers: finalizers,
-                            lang: key.lang,
+                            lang: key.lang.clone(),
                         };
                         let mut compressor = Compressor::from(self.compression);
                         match compressor.write_all(&payload) {
@@ -147,8 +147,11 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let mut headers = BTreeMap::<String,String>::new();
-        headers.insert("Content-Type".to_string(), "application/x-protobuf".to_string());
+        let mut headers = BTreeMap::<String, String>::new();
+        headers.insert(
+            "Content-Type".to_string(),
+            "application/x-protobuf".to_string(),
+        );
         headers.insert("DD-API-KEY".to_string(), metadata.api_key.to_string());
         headers.insert(
             "X-Datadog-Reported-Languages".to_string(),

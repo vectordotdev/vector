@@ -1,13 +1,11 @@
 use std::{
+    collections::BTreeMap,
     task::{Context, Poll},
 };
 
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
-use http::{
-    Request, StatusCode, Uri,
-};
-use std::collections::BTreeMap;
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
@@ -20,9 +18,7 @@ use vector_core::{
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
-    sinks::util::{
-        retries::{RetryAction, RetryLogic},
-    },
+    sinks::util::retries::{RetryAction, RetryLogic},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -53,7 +49,7 @@ impl RetryLogic for TraceApiRetry {
 }
 
 #[derive(Debug, Clone)]
-pub struct TraceApiRequest{
+pub struct TraceApiRequest {
     pub batch_size: usize,
     pub body: Bytes,
     pub headers: BTreeMap<String, String>,
@@ -64,7 +60,7 @@ pub struct TraceApiRequest{
 impl TraceApiRequest {
     pub fn into_http_request(self) -> http::Result<Request<Body>> {
         let mut request = Request::post(self.uri);
-        for (k,v) in self.headers.iter() {
+        for (k, v) in self.headers.iter() {
             request = request.header(k, v);
         }
         request.body(Body::from(self.body))
