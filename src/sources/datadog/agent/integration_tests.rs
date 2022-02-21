@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::prelude::*,
     net::TcpStream,
     time::{Duration, SystemTime},
@@ -7,10 +8,11 @@ use std::{
 use chrono::Utc;
 use indoc::indoc;
 
-use super::DatadogAgentConfig;
+use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext},
     event::{EventStatus, Value},
+    schema,
     test_util::spawn_collect_n,
     SourceSender,
 };
@@ -118,7 +120,7 @@ async fn wait_for_traces() {
 
     assert_eq!(events.len(), 1);
     let trace = events.get(0).unwrap().as_trace();
-    let spans = trace.get("spans").unwrap().as_array();
+    let spans = trace.get("spans").unwrap().as_array().unwrap();
     assert_eq!(spans.len(), 1);
     let span = spans.get(0).unwrap();
     assert_eq!(span.get("name").unwrap(), Some(&Value::from("a_name")));
