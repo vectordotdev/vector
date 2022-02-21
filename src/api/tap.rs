@@ -345,7 +345,13 @@ async fn tap_handler(
     debug!(message = "Stopped tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "transforms-log_to_metric",
+    feature = "sinks-blackhole"
+))]
 mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};
     use crate::config::Config;
