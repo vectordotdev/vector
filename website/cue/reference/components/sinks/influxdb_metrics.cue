@@ -13,7 +13,6 @@ components: sinks: influxdb_metrics: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			batch: {

@@ -105,6 +105,10 @@ impl SourceConfig for DnstapConfig {
     fn source_type(&self) -> &'static str {
         "dnstap"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -278,7 +282,7 @@ mod integration_tests {
                 socket_receive_buffer_size: Some(10485760),
                 socket_send_buffer_size: Some(10485760),
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

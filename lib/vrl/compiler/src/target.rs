@@ -38,12 +38,12 @@ pub trait Target: std::fmt::Debug {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String>;
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String>;
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String>;
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<Value>, String>;
 
     /// Remove the given path from the object.
     ///
@@ -51,7 +51,7 @@ pub trait Target: std::fmt::Debug {
     ///
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
-    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
 
     fn get_metadata(&self, _key: &str) -> Result<Option<Value>, String> {
         Err("metadata not available".to_string())

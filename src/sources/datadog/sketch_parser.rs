@@ -7,7 +7,7 @@ use vector_core::{config::log_schema, metrics::AgentDDSketch};
 
 use crate::{
     event::{metric::MetricValue, Event, Metric, MetricKind},
-    Result,
+    schema, Result,
 };
 
 mod dd_proto {
@@ -16,7 +16,11 @@ mod dd_proto {
 
 use dd_proto::SketchPayload;
 
-pub(crate) fn decode_ddsketch(frame: Bytes, api_key: &Option<Arc<str>>) -> Result<Vec<Event>> {
+pub(crate) fn decode_ddsketch(
+    frame: Bytes,
+    api_key: &Option<Arc<str>>,
+    schema_id: schema::Id,
+) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
@@ -61,6 +65,9 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: &Option<Arc<str>>) -> Resul
                         .metadata_mut()
                         .set_datadog_api_key(Some(Arc::clone(k)));
                 }
+
+                metric.metadata_mut().set_schema_id(schema_id);
+
                 metric.into()
             })
         })

@@ -62,6 +62,10 @@ impl SourceConfig for EventStoreDbConfig {
     fn source_type(&self) -> &'static str {
         "eventstoredb_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn eventstoredb(
@@ -154,7 +158,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
 

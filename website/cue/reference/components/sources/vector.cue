@@ -53,7 +53,7 @@ components: sources: vector: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: """
 				The HTTP address to listen for connections on. It _must_ include a port.

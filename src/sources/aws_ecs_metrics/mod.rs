@@ -115,6 +115,10 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
     fn source_type(&self) -> &'static str {
         "aws_ecs_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn aws_ecs_metrics(
@@ -532,7 +536,7 @@ mod test {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -593,7 +597,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);

@@ -181,6 +181,10 @@ impl SourceConfig for PostgresqlMetricsConfig {
     fn source_type(&self) -> &'static str {
         "postgresql_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -969,7 +973,7 @@ mod integration_tests {
                 exclude_databases,
                 ..Default::default()
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await
