@@ -42,16 +42,10 @@ impl Partitioner for EventPartitioner {
     type Key = PartitionKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        let (e, env, hostname, lang) = match item {
+        let (endpoint, env, hostname, lang) = match item {
             Event::Metric(_) => (DatadogTracesEndpoint::APMStats, None, None, None),
             Event::Log(_) => {
-                warn!("got log instead of traces");
-                (
-                    DatadogTracesEndpoint::Traces,
-                    None,
-                    None,
-                    Some("plop".to_string()),
-                )
+                panic!("unexpected log");
             }
             Event::Trace(t) => (
                 DatadogTracesEndpoint::Traces,
@@ -63,10 +57,10 @@ impl Partitioner for EventPartitioner {
 
         PartitionKey {
             api_key: item.metadata().datadog_api_key().clone(),
-            env: env,
-            hostname: hostname,
-            lang: lang,
-            endpoint: e,
+            env,
+            hostname,
+            lang,
+            endpoint,
         }
     }
 }

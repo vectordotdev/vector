@@ -23,21 +23,15 @@ mod dd_proto {
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(display("Failed to build the request builder: {}", error_type))]
-    FailedToBuild { error_type: &'static str },
-
     #[snafu(display("Encoding of a request payload failed ({})", reason))]
     FailedToEncode {
         reason: &'static str,
         dropped_events: u64,
     },
 
-    #[snafu(display("A split payload was still too big to encode/compress within size limits"))]
-    FailedToSplit { dropped_events: u64 },
-
-    #[snafu(display("An unexpected error occurred"))]
-    Unexpected {
-        error_type: &'static str,
+    #[snafu(display("Unsupported endpoint ({})", reason))]
+    UnsupportedEndpoint {
+        reason: &'static str,
         dropped_events: u64,
     },
 }
@@ -45,16 +39,14 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     pub const fn into_parts(self) -> (&'static str, u64) {
         match self {
-            Self::FailedToBuild { error_type } => (error_type, 0),
             Self::FailedToEncode {
                 reason,
                 dropped_events,
             } => (reason, dropped_events),
-            Self::FailedToSplit { dropped_events } => ("split_failed", dropped_events),
-            Self::Unexpected {
-                error_type,
+            Self::UnsupportedEndpoint {
+                reason,
                 dropped_events,
-            } => (error_type, dropped_events),
+            } => (reason, dropped_events),
         }
     }
 }
@@ -71,12 +63,13 @@ impl DatadogTracesRequestBuilder {
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
+        max_size: usize,
     ) -> Result<Self, RequestBuilderError> {
         Ok(Self {
             api_key,
             endpoint_configuration,
             compression,
-            trace_encoder: DatadogTracesEncoder::default(),
+            trace_encoder: DatadogTracesEncoder { max_size },
         })
     }
 }
@@ -104,43 +97,47 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let n = events.len();
         match key.endpoint {
             DatadogTracesEndpoint::APMStats => {
-                results.push(Err(RequestBuilderError::FailedToEncode {
+                results.push(Err(RequestBuilderError::UnsupportedEndpoint {
                     reason: "APM stats are not yet supported.",
                     dropped_events: n as u64,
                 }))
             }
             DatadogTracesEndpoint::Traces => {
-                // Only keep traces
-                let mut traces_event = events
+                let traces_event = events
                     .into_iter()
                     .filter_map(|e| e.try_into_trace())
                     .collect();
-                match self.trace_encoder.encode_trace(&key, &traces_event) {
-                    Ok(payload) => {
-                        let finalizers = traces_event.take_finalizers();
-                        let metadata = RequestMetadata {
-                            api_key: key.api_key.take().unwrap_or(Arc::clone(&self.api_key)),
-                            batch_size: n,
-                            endpoint: key.endpoint,
-                            finalizers: finalizers,
-                            lang: key.lang.clone(),
-                        };
-                        let mut compressor = Compressor::from(self.compression);
-                        match compressor.write_all(&payload) {
-                            Ok(()) => {
-                                results.push(Ok((metadata, compressor.into_inner().freeze())))
+                self.trace_encoder
+                    .encode_trace(&key, traces_event)
+                    .into_iter()
+                    .for_each(|r| match r {
+                        Ok((payload, mut processed)) => {
+                            let metadata = RequestMetadata {
+                                api_key: key
+                                    .api_key
+                                    .take()
+                                    .unwrap_or_else(|| Arc::clone(&self.api_key)),
+                                batch_size: n,
+                                lang: key.lang.clone(),
+                                endpoint: key.endpoint,
+                                finalizers: processed.take_finalizers(),
+                            };
+                            let mut compressor = Compressor::from(self.compression);
+                            match compressor.write_all(&payload) {
+                                Ok(()) => {
+                                    results.push(Ok((metadata, compressor.into_inner().freeze())))
+                                }
+                                Err(_) => results.push(Err(RequestBuilderError::FailedToEncode {
+                                    reason: "Payload compression failed.",
+                                    dropped_events: n as u64,
+                                })),
                             }
-                            Err(_) => results.push(Err(RequestBuilderError::FailedToEncode {
-                                reason: "Payload compression failed.",
-                                dropped_events: n as u64,
-                            })),
                         }
-                    }
-                    Err(err) => results.push(Err(RequestBuilderError::Unexpected {
-                        error_type: err.as_error_type(),
-                        dropped_events: n as u64,
-                    })),
-                }
+                        Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
+                            reason: err.parts().0,
+                            dropped_events: err.parts().1,
+                        })),
+                    })
             }
         }
         results
@@ -155,7 +152,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         headers.insert("DD-API-KEY".to_string(), metadata.api_key.to_string());
         headers.insert(
             "X-Datadog-Reported-Languages".to_string(),
-            metadata.lang.unwrap_or("".into()),
+            metadata.lang.unwrap_or_else(|| "".into()),
         );
         if let Some(ce) = self.compression.content_encoding() {
             headers.insert("Content-Encoding".to_string(), ce.to_string());
@@ -172,28 +169,20 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     }
 }
 
-#[derive(Default)]
 pub struct DatadogTracesEncoder {
     max_size: usize,
 }
 
 #[derive(Debug, Snafu)]
 pub enum EncoderError {
-    #[snafu(display("Failed to encode sketch metrics to Protocol Buffers: {}", source))]
-    ProtoEncodingFailed { source: prost::EncodeError },
-
     #[snafu(display("Unable to split payload into small enough chunks"))]
-    UnableToSplit,
+    UnableToSplit { dropped_events: u64 },
 }
 
 impl EncoderError {
-    /// Gets the telemetry-friendly string version of this error.
-    ///
-    /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub const fn parts(&self) -> (&'static str, u64) {
         match self {
-            Self::ProtoEncodingFailed { .. } => "proto encoding failed",
-            Self::UnableToSplit { .. } => "unable to split into small chunks",
+            Self::UnableToSplit { dropped_events: n } => ("unable to split into small chunks", *n),
         }
     }
 }
@@ -201,33 +190,48 @@ impl DatadogTracesEncoder {
     fn encode_trace(
         &self,
         key: &PartitionKey,
-        events: &Vec<TraceEvent>,
-    ) -> Result<Vec<u8>, EncoderError> {
-        let payload = DatadogTracesEncoder::trace_into_payload(key, events);
-        warn!("trace={:?}", payload);
+        events: Vec<TraceEvent>,
+    ) -> Vec<Result<(Vec<u8>, Vec<TraceEvent>), EncoderError>> {
+        let mut encoded_payloads = Vec::new();
+        let payload = DatadogTracesEncoder::trace_into_payload(key, &events);
         let encoded_payload = payload.encode_to_vec();
+        // This may happen exceptionnally
         if encoded_payload.len() > self.max_size {
-            warn!("max size exceeded");
-            // Todo: attempt to split the processed trace into multiple chunks
+            warn!("Maximum payload size exceeded.");
+            let n_chunks: usize = (encoded_payload.len() / self.max_size) + 1;
+            let chunk_size = (events.len() / n_chunks) + 1;
+            events.chunks(chunk_size).for_each(|events| {
+                let chunked_payload = DatadogTracesEncoder::trace_into_payload(key, events);
+                let encoded_chunk = chunked_payload.encode_to_vec();
+                if encoded_chunk.len() > self.max_size {
+                    encoded_payloads.push(Err(EncoderError::UnableToSplit {
+                        dropped_events: events.len() as u64,
+                    }));
+                } else {
+                    encoded_payloads.push(Ok((encoded_chunk, events.to_vec())));
+                }
+            })
+        } else {
+            encoded_payloads.push(Ok((encoded_payload, events)));
         }
-        Ok(encoded_payload)
+        encoded_payloads
     }
 
-    fn trace_into_payload(key: &PartitionKey, events: &Vec<TraceEvent>) -> dd_proto::TracePayload {
+    fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::TracePayload {
         let mut traces: Vec<dd_proto::ApiTrace> = Vec::new();
         let mut transactions: Vec<dd_proto::Span> = Vec::new();
-        for e in events.into_iter() {
+        for e in events.iter() {
             if e.contains("spans") {
-                warn!("encoding a trace");
-                traces.push(DatadogTracesEncoder::vector_trace_into_dd_trace(&e));
+                trace!("Encoding a trace.");
+                traces.push(DatadogTracesEncoder::vector_trace_into_dd_trace(e));
             } else {
-                warn!("encoding an APM event ");
+                trace!("Encoding an APM event.");
                 transactions.push(DatadogTracesEncoder::convert_span(e.as_map()));
             }
         }
         dd_proto::TracePayload {
-            host_name: key.hostname.clone().unwrap_or("".to_string()),
-            env: key.env.clone().unwrap_or("".into()),
+            host_name: key.hostname.clone().unwrap_or_else(|| "".to_string()),
+            env: key.env.clone().unwrap_or_else(|| "".into()),
             traces,
             transactions,
         }
@@ -294,18 +298,18 @@ impl DatadogTracesEncoder {
             .map(|m| m.as_map())
             .flatten()
             .map(|m| {
-                m.into_iter()
+                m.iter()
                     .map(|(k, v)| (k.clone(), v.to_string_lossy()))
                     .collect::<BTreeMap<String, String>>()
             })
-            .unwrap_or(BTreeMap::new());
+            .unwrap_or_else(BTreeMap::new);
 
         let metrics = span
             .get("metrics")
             .map(|m| m.as_map())
             .flatten()
             .map(|m| {
-                m.into_iter()
+                m.iter()
                     .filter_map(|(k, v)| {
                         if let Value::Float(f) = v {
                             Some((k.clone(), f.into_inner()))
@@ -315,31 +319,31 @@ impl DatadogTracesEncoder {
                     })
                     .collect::<BTreeMap<String, f64>>()
             })
-            .unwrap_or(BTreeMap::new());
+            .unwrap_or_else(BTreeMap::new);
 
         dd_proto::Span {
             service: span
                 .get("service")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or("".into()),
+                .unwrap_or_else(|| "".into()),
             name: span
                 .get("name")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or("".into()),
+                .unwrap_or_else(|| "".into()),
             resource: span
                 .get("resource")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or("".into()),
+                .unwrap_or_else(|| "".into()),
             r#type: span
                 .get("type")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or("".into()),
+                .unwrap_or_else(|| "".into()),
             trace_id: trace_id as u64,
             span_id: span_id as u64,
             parent_id: parent_id as u64,
-            start: start,
-            duration: duration,
             error: error as i32,
+            start,
+            duration,
             meta,
             metrics,
         }

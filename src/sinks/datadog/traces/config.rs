@@ -30,10 +30,13 @@ use crate::{
 };
 
 // The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
-// Beyond this limit the payload will be ignored.
-pub const BATCH_GOAL_BYTES: usize = 3_200_000;
+// Beyond this limit the payload will be ignored, enforcing a slight lower
+// limit as a safety margin.
+pub const BATCH_GOAL_BYTES: usize = 3_000_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 10;
+
+pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
@@ -137,7 +140,8 @@ impl DatadogTracesConfig {
         let request_builder = DatadogTracesRequestBuilder::new(
             Arc::clone(&default_api_key),
             endpoints,
-            self.compression.unwrap_or(Compression::gzip_default()),
+            self.compression.unwrap_or_else(Compression::gzip_default),
+            PAYLOAD_LIMIT,
         )?;
         let sink = TracesSink::new(cx, service, request_builder, batcher_settings);
         Ok(VectorSink::from_event_streamsink(sink))
@@ -169,6 +173,7 @@ impl SinkConfig for DatadogTracesConfig {
     }
 
     fn input(&self) -> Input {
+        // Metric will be accepted as soon as APM stats will be handled
         Input::trace()
     }
 
