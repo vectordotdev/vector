@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, http_error_code};
 use http::Response;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -27,7 +27,7 @@ pub struct ElasticSearchResponseError<'a> {
 
 impl<'a> ElasticSearchResponseError<'a> {
     fn error_code(&self) -> String {
-        format!("http_error_{}", self.response.status().as_str())
+        http_error_code(self.response.status().as_u16())
     }
 }
 

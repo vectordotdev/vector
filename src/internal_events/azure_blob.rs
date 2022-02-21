@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, http_error_code};
 use metrics::counter;
 use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
@@ -11,8 +11,8 @@ pub struct AzureBlobErrorResponse {
 impl InternalEvent for AzureBlobErrorResponse {
     fn emit_logs(&self) {
         error!(
-            message = %format!("HTTP error response: {}", self.code.canonical_reason().unwrap_or_else(|| self.code.as_str())),
-            error_code = %format!("http_response_{}", self.code.as_u16()),
+            message = "HTTP error response",
+            error_code = %format!("http_response_{}", http_error_code(self.code.as_u16())),
             error_type = "request_failed",
             stage = error_stage::SENDING,
         );
@@ -21,7 +21,7 @@ impl InternalEvent for AzureBlobErrorResponse {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => format!("http_response_{}", self.code.as_u16()),
+            "error_code" => format!("http_response_{}", http_error_code(self.code.as_u16())),
             "error_type" => "request_failed",
             "stage" => error_stage::SENDING,
         );
