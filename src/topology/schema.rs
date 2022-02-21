@@ -155,6 +155,10 @@ mod tests {
         fn source_type(&self) -> &'static str {
             unimplemented!()
         }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
     }
 
     #[async_trait::async_trait]
@@ -174,10 +178,6 @@ mod tests {
 
         fn input(&self) -> Input {
             unimplemented!()
-        }
-
-        fn can_acknowledge(&self) -> bool {
-            false
         }
     }
 
