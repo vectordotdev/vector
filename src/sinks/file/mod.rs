@@ -284,7 +284,7 @@ impl FileSink {
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
                     emit!(&FileIoError {
-                        code: "failed_opning_file",
+                        code: "failed_opening_file",
                         message: "Unable to open the file.",
                         error,
                         path: Some(&path),
