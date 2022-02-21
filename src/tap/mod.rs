@@ -24,7 +24,15 @@ pub struct Opts {
     #[structopt(default_value = "json", possible_values = &["json", "yaml", "logfmt"], short = "f", long)]
     format: TapEncodingFormat,
 
-    /// Components IDs to observe (comma-separated; accepts glob patterns)
-    #[structopt(default_value = "*", use_delimiter(true))]
+    /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true))]
     component_id_patterns: Vec<String>,
+
+    /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true), long)]
+    outputs_of: Vec<String>,
+
+    /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true), long)]
+    inputs_of: Vec<String>,
 }
