@@ -12,9 +12,9 @@ pub mod vm;
 
 pub use crate::value::Value;
 pub use context::Context;
-pub use core::{value, Target};
+pub use core::{value, ExpressionError, Resolved, Target};
 pub(crate) use diagnostic::Span;
-pub use expression::{Expression, ExpressionError, Resolved};
+pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::Program;

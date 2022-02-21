@@ -8619,6 +8619,7 @@ version = "0.1.0"
 dependencies = [
  "lookup",
  "value",
+ "vrl-diagnostic",
 ]
 
 [[package]]
