@@ -1,0 +1,6 @@
+# The `datadog_agent` source accepts logs, metrics, and traces from the Datadog
+# Agent.
+#
+# Setup: ...
+# Configuration: https://vector.dev/docs/reference/configuration/sources/datadog_agent/
+type = "syslog"

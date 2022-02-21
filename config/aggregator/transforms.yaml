@@ -1,0 +1,10 @@
+# The following transfors represent our data processing graph. Transforming
+# data coming from sources and forwarding them to sinks.
+
+transforms:
+  remap:
+    type: remap
+    inputs:
+      - source.*
+    source: |-
+      .new_field = "new value"

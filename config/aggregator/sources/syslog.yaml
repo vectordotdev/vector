@@ -1,0 +1,7 @@
+# The `syslog` source accepts data via the Syslog protocol as specified by
+# RFC 3164 and RFC 5424. Vector also makes a best effort to support common
+# deviations from clients in the wild.
+#
+# Setup: ...
+# Configuration: https://vector.dev/docs/reference/configuration/sources/syslog/
+type = "syslog"
