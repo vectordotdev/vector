@@ -15,7 +15,8 @@ interpreted as described in the [terminology document][terminology_document].
   - [3. Agent Architecture](#3-agent-architecture)
   - [4. Aggregator Architecture](#4-aggregator-architecture)
   - [5. Unified Architecture](#5-unified-architecture)
-- [Hardening](#hardening)
+- [6. Hardening](#6-hardening)
+- [7. Sizing & Scaling](#7-sizing--scaling)
 
 ## 1. Introduction
 
@@ -85,17 +86,32 @@ this architecture:
   * SHOULD deploy across 2 availability zones, MUST be overridable by the user.
 * Sizing
   * MUST deploy in a way that takes full advantage of all system resources.
+    The Vector service should not be artificially limited with resource
+    limiters such as cgroups.
   * SHOULD request 8 vCPUs, MUST be overridable by the user.
   * SHOULD request 2 GiB of memory per vCPU (16 GiB in this case), MUST be
     overridable by the user.
-  * SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
+  * SHOULD request 6 GiB of disk space per vCPU (48 GiB in this case), MUST be
+    overridable by the user.
+  * SHOULD use the following instances if deployed in a listed cloud.
+    * AWS SHOULD default to `c6g.2xlarge` instances with 48 GiB of EBS `io2`
+      disk space.
+    * Azure SHOULD default to `f8` instances with 48 GiB of standard SSD disk
+      space.
+    * GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
+      48 GiB of SSD persisted disk space.
+* Scaling
+  * Load-balancing?...
+  * Autoscaling SHOULD be enabled by default driven by an 85% CPU utilization
+    target over a rolling 5 minute window.
+  * Autoscaling SHOULD have a stabilization period of 5 minutes.
 
 ### 5. Unified Architecture
 
 TODO: Should we support this as a top-level architecture, or have users deploy
 both the agent and aggregator separately and integrate them by default?
 
-## Hardening
+## 6. Hardening
 
 * Setup
   * An unprivileged Vector service account SHOULD be created upon installation
@@ -127,6 +143,7 @@ both the agent and aggregator separately and integrate them by default?
 * Network hardening
   * Configured sources and sinks SHOULD use encrypted channels by default.
 
+## 7. Sizing & Scaling
 
 [agent_architecture]: https://www.notion.so/Agent-Architecture-3e3c9950398f4f349dff9e83ac6dea83
 [agent_architecture_design]: ...
