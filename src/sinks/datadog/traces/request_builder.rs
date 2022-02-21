@@ -254,7 +254,7 @@ impl DatadogTracesEncoder {
         let spans = match trace.get("spans") {
             Some(Value::Array(v)) => v
                 .iter()
-                .filter_map(|s| s.as_map().map(DatadogTracesEncoder::convert_span))
+                .filter_map(|s| s.as_object().map(DatadogTracesEncoder::convert_span))
                 .collect(),
             _ => vec![],
         };
@@ -295,7 +295,7 @@ impl DatadogTracesEncoder {
 
         let meta = span
             .get("meta")
-            .map(|m| m.as_map())
+            .map(|m| m.as_object())
             .flatten()
             .map(|m| {
                 m.iter()
@@ -306,7 +306,7 @@ impl DatadogTracesEncoder {
 
         let metrics = span
             .get("metrics")
-            .map(|m| m.as_map())
+            .map(|m| m.as_object())
             .flatten()
             .map(|m| {
                 m.iter()
