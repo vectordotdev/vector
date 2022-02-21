@@ -56,7 +56,11 @@ async fn wait_for_agent(port: Option<u16>) {
 async fn wait_for_message() {
     wait_for_agent(Some(8182)).await;
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-    let context = SourceContext::new_test(sender, None);
+    let schema_ids = HashMap::from([
+        (Some(LOGS.to_owned()), schema::Id::empty()),
+        (Some(METRICS.to_owned()), schema::Id::empty()),
+    ]);
+    let context = SourceContext::new_test(sender, Some(schema_ids));
     tokio::spawn(async move {
         let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
         config.build(context).await.unwrap().await.unwrap()

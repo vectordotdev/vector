@@ -2,7 +2,7 @@ use bytes::Bytes;
 use std::collections::BTreeMap;
 
 use super::{Error, Value};
-use crate::value::{VrlValueConvert, VrlValueKind};
+use crate::value::VrlValueConvert;
 use crate::ExpressionError;
 
 pub trait VrlValueArithmetic: Sized {

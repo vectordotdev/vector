@@ -87,7 +87,13 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
     if query.is_external() {
-        return Ok(ctx.target_mut().get(path).ok().flatten().is_some().into());
+        return Ok(ctx
+            .target_mut()
+            .target_get(path)
+            .ok()
+            .flatten()
+            .is_some()
+            .into());
     }
 
     if let Some(ident) = query.variable_ident() {

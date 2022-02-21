@@ -904,28 +904,28 @@ async fn decode_traces() {
         assert_eq!(trace["env"], "an_environment".into());
         assert_eq!(trace["language"], "ada".into());
         assert!(trace.contains("spans"));
-        assert_eq!(trace["spans"].as_array().len(), 1);
-        let span_from_trace = trace["spans"].as_array()[0].as_map().unwrap();
+        assert_eq!(trace["spans"].as_array().unwrap().len(), 1);
+        let span_from_trace = trace["spans"].as_array().unwrap()[0].as_object().unwrap();
         assert_eq!(span_from_trace["service"], "a_service".into());
         assert_eq!(span_from_trace["name"], "a_name".into());
         assert_eq!(span_from_trace["resource"], "a_resource".into());
-        assert_eq!(span_from_trace["trace_id"], 123.into());
-        assert_eq!(span_from_trace["span_id"], 456.into());
-        assert_eq!(span_from_trace["parent_id"], 789.into());
+        assert_eq!(span_from_trace["trace_id"], Value::Integer(123));
+        assert_eq!(span_from_trace["span_id"], Value::Integer(456));
+        assert_eq!(span_from_trace["parent_id"], Value::Integer(789));
         assert_eq!(
             span_from_trace["start"],
             Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
         );
-        assert_eq!(span_from_trace["duration"], 1_000_000_000.into());
-        assert_eq!(span_from_trace["error"], 404.into());
-        assert_eq!(span_from_trace["meta"].as_map().unwrap().len(), 1);
+        assert_eq!(span_from_trace["duration"], Value::Integer(1_000_000_000));
+        assert_eq!(span_from_trace["error"], Value::Integer(404));
+        assert_eq!(span_from_trace["meta"].as_object().unwrap().len(), 1);
         assert_eq!(
-            span_from_trace["meta"].as_map().unwrap()["foo"],
+            span_from_trace["meta"].as_object().unwrap()["foo"],
             "bar".into()
         );
-        assert_eq!(span_from_trace["metrics"].as_map().unwrap().len(), 1);
+        assert_eq!(span_from_trace["metrics"].as_object().unwrap().len(), 1);
         assert_eq!(
-            span_from_trace["metrics"].as_map().unwrap()["a_metrics"],
+            span_from_trace["metrics"].as_object().unwrap()["a_metrics"],
             0.577.into()
         );
         assert_eq!(
@@ -1071,7 +1071,7 @@ fn test_config_outputs() {
     struct TestCase {
         decoding: DeserializerConfig,
         multiple_outputs: bool,
-        want: HashMap<Option<&'static str>, schema::Definition>,
+        want: HashMap<Option<&'static str>, Option<schema::Definition>>,
     }
 
     for (
@@ -1089,14 +1089,16 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .required_field("status", Kind::bytes(), Some("severity"))
-                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                        .required_field("hostname", Kind::bytes(), Some("host"))
-                        .required_field("service", Kind::bytes(), None)
-                        .required_field("ddsource", Kind::bytes(), None)
-                        .required_field("ddtags", Kind::bytes(), None),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), None)
+                            .required_field("ddsource", Kind::bytes(), None)
+                            .required_field("ddtags", Kind::bytes(), None),
+                    ),
                 )]),
             },
         ),
@@ -1107,14 +1109,16 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .required_field("status", Kind::bytes(), Some("severity"))
-                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                        .required_field("hostname", Kind::bytes(), Some("host"))
-                        .required_field("service", Kind::bytes(), None)
-                        .required_field("ddsource", Kind::bytes(), None)
-                        .required_field("ddtags", Kind::bytes(), None),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), None)
+                            .required_field("ddsource", Kind::bytes(), None)
+                            .required_field("ddtags", Kind::bytes(), None),
+                    ),
                 )]),
             },
         ),
@@ -1126,17 +1130,19 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field("message", Kind::bytes(), Some("message"))
+                                .required_field("status", Kind::bytes(), Some("severity"))
+                                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                                .required_field("hostname", Kind::bytes(), Some("host"))
+                                .required_field("service", Kind::bytes(), None)
+                                .required_field("ddsource", Kind::bytes(), None)
+                                .required_field("ddtags", Kind::bytes(), None),
+                        ),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
-                    (Some(TRACES), schema::Definition::empty()),
+                    (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),
@@ -1147,9 +1153,15 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
-                        .unknown_fields(Kind::json()),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field(
+                                "timestamp",
+                                Kind::json().or_timestamp(),
+                                Some("timestamp"),
+                            )
+                            .unknown_fields(Kind::json()),
+                    ),
                 )]),
             },
         ),
@@ -1161,16 +1173,18 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        schema::Definition::empty()
-                            .required_field(
-                                "timestamp",
-                                Kind::json().or_timestamp(),
-                                Some("timestamp"),
-                            )
-                            .unknown_fields(Kind::json()),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field(
+                                    "timestamp",
+                                    Kind::json().or_timestamp(),
+                                    Some("timestamp"),
+                                )
+                                .unknown_fields(Kind::json()),
+                        ),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
-                    (Some(TRACES), schema::Definition::empty()),
+                    (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),
@@ -1182,29 +1196,7 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                        .optional_field("hostname", Kind::bytes(), None)
-                        .optional_field("severity", Kind::bytes(), Some("severity"))
-                        .optional_field("facility", Kind::bytes(), None)
-                        .optional_field("version", Kind::integer(), None)
-                        .optional_field("appname", Kind::bytes(), None)
-                        .optional_field("msgid", Kind::bytes(), None)
-                        .optional_field("procid", Kind::integer().or_bytes(), None)
-                        .unknown_fields(Kind::bytes()),
-                )]),
-            },
-        ),
-        #[cfg(feature = "sources-syslog")]
-        (
-            "syslog / multiple output",
-            TestCase {
-                decoding: DeserializerConfig::Syslog,
-                multiple_outputs: true,
-                want: HashMap::from([
-                    (
-                        Some(LOGS),
+                    Some(
                         schema::Definition::empty()
                             .required_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1217,8 +1209,34 @@ fn test_config_outputs() {
                             .optional_field("procid", Kind::integer().or_bytes(), None)
                             .unknown_fields(Kind::bytes()),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
-                    (Some(TRACES), schema::Definition::empty()),
+                )]),
+            },
+        ),
+        #[cfg(feature = "sources-syslog")]
+        (
+            "syslog / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Syslog,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field("message", Kind::bytes(), Some("message"))
+                                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                                .optional_field("hostname", Kind::bytes(), None)
+                                .optional_field("severity", Kind::bytes(), Some("severity"))
+                                .optional_field("facility", Kind::bytes(), None)
+                                .optional_field("version", Kind::integer(), None)
+                                .optional_field("appname", Kind::bytes(), None)
+                                .optional_field("msgid", Kind::bytes(), None)
+                                .optional_field("procid", Kind::integer().or_bytes(), None)
+                                .unknown_fields(Kind::bytes()),
+                        ),
+                    ),
+                    (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),

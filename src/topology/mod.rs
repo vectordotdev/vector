@@ -7,7 +7,7 @@
 //! each type of component.
 
 pub mod builder;
-pub use vector_core::fanout;
+pub(super) use vector_core::fanout;
 mod running;
 mod schema;
 mod task;
@@ -22,7 +22,7 @@ use std::{
 };
 
 use futures::{Future, FutureExt};
-pub use running::RunningTopology;
+pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::{
     topology::channel::{BufferReceiver, BufferSender},
@@ -52,7 +52,7 @@ type Outputs = HashMap<OutputId, fanout::ControlChannel>;
 // `Outputs`. This could be expanded in the future to send an enum of types if,
 // for example, this included a new 'Inputs' type.
 type WatchTx = watch::Sender<Outputs>;
-pub type WatchRx = watch::Receiver<Outputs>;
+pub(super) type WatchRx = watch::Receiver<Outputs>;
 
 pub async fn start_validated(
     config: Config,
@@ -91,7 +91,10 @@ pub async fn build_or_log_errors(
     }
 }
 
-pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(ComponentKey, Task)> {
+pub(super) fn take_healthchecks(
+    diff: &ConfigDiff,
+    pieces: &mut Pieces,
+) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
         .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))

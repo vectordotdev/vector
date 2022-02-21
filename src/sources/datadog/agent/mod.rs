@@ -107,15 +107,15 @@ impl SourceConfig for DatadogAgentConfig {
             metrics_schema_id,
         );
         let listener = tls.bind(&self.address).await?;
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
         let filters = source.build_warp_filters(
             cx.out,
-            self.acknowledgements.enabled(),
+            acknowledgements,
             !self.disable_logs,
             !self.disable_metrics,
             !self.disable_traces,
             self.multiple_outputs,
         )?;
-
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
@@ -184,6 +184,10 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
