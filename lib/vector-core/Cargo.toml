@@ -56,7 +56,7 @@ twox-hash = { version = "1.6.2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
-vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
+vrl = { package = "vrl", path = "../vrl/vrl", optional = true }
 
 [build-dependencies]
 prost-build = "0.9"
@@ -81,7 +81,9 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 api = ["async-graphql", "value/api"]
 default = []
 lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-core", "enrichment"]
+# Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
+# https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
+vrl_ = ["vrl", "enrichment"]
 test = ["vector_common/test"]
 
 [[bench]]
