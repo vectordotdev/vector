@@ -152,6 +152,10 @@ impl SourceConfig for SplunkConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 /// Shared data for responding to requests.
@@ -164,10 +168,7 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let acknowledgements = cx
-            .globals
-            .acknowledgements
-            .merge(&config.acknowledgements.inner);
+        let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
@@ -175,7 +176,7 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = acknowledgements.enabled().then(|| {
+        let idx_ack = acknowledgements.then(|| {
             Arc::new(IndexerAcknowledgement::new(
                 config.acknowledgements.clone(),
                 shutdown,
@@ -1026,7 +1027,7 @@ mod tests {
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
                 address,

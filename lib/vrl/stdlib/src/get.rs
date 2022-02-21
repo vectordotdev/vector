@@ -141,7 +141,11 @@ impl Expression for GetFn {
             }
         };
 
-        Ok(self.value.resolve(ctx)?.get(&path)?.unwrap_or(Value::Null))
+        Ok(self
+            .value
+            .resolve(ctx)?
+            .target_get(&path)?
+            .unwrap_or(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

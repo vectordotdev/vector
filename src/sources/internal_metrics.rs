@@ -103,6 +103,10 @@ impl SourceConfig for InternalMetricsConfig {
     fn source_type(&self) -> &'static str {
         "internal_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
@@ -259,7 +263,7 @@ mod tests {
 
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await

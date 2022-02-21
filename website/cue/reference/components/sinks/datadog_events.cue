@@ -8,7 +8,6 @@ components: sinks: datadog_events: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

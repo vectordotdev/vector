@@ -27,6 +27,7 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
+    schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
 };
@@ -45,7 +46,7 @@ use crate::{
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
-pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -54,7 +55,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(num_cpus::get)
 });
 
-pub async fn load_enrichment_tables<'a>(
+pub(self) async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
     diff: &'a ConfigDiff,
 ) -> (&'static enrichment::TableRegistry, Vec<String>) {
@@ -111,14 +112,13 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
-    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
-    pub tasks: HashMap<ComponentKey, Task>,
-    pub source_tasks: HashMap<ComponentKey, Task>,
-    pub healthchecks: HashMap<ComponentKey, Task>,
-    pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub enrichment_tables: enrichment::TableRegistry,
+    pub(super) inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
+    pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
+    pub(super) tasks: HashMap<ComponentKey, Task>,
+    pub(crate) source_tasks: HashMap<ComponentKey, Task>,
+    pub(super) healthchecks: HashMap<ComponentKey, Task>,
+    pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -140,6 +140,8 @@ pub async fn build_pieces(
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
 
+    let mut schema_registry = schema::Registry::default();
+
     // Build sources
     for (key, source) in config
         .sources
@@ -152,6 +154,8 @@ pub async fn build_pieces(
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
+        let mut schema_ids = HashMap::with_capacity(source_outputs.len());
+
         for output in source_outputs {
             let rx = builder.add_output(output.clone());
 
@@ -165,10 +169,26 @@ pub async fn build_pieces(
             controls.insert(
                 OutputId {
                     component: key.clone(),
-                    port: output.port,
+                    port: output.port.clone(),
                 },
                 control,
             );
+
+            // Each individual output of a source carries its own schema definition. These
+            // definitions are inserted in the global schema registry. The resuting `schema::Id` is
+            // stored, together with the output identifier, which the source can access through the
+            // `SourceContext`, so that the source can annotate each individual event it receives
+            // with the given ID. This ID can then be used by subsequent components to get the
+            // schema of an event at runtime.
+            let schema_id = schema_registry
+                .register_definition(
+                    output
+                        .log_schema_definition
+                        .unwrap_or_else(schema::Definition::empty),
+                )
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
         }
 
         let pump = async move {
@@ -193,6 +213,8 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
+            acknowledgements: source.sink_acknowledgements,
+            schema_ids,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -238,10 +260,25 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
+        for output in transform.inner.outputs() {
+            let definition = match output.log_schema_definition {
+                Some(definition) => definition,
+                None => schema::merged_definition(&transform.inputs, config),
+            };
+
+            let schema_id = schema_registry
+                .register_definition(definition)
+                .map_err(|err| vec![err.to_string()])?;
+
+            schema_ids.insert(output.port, schema_id);
+        }
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+            schema_ids,
         };
 
         let node = TransformNode {
@@ -435,7 +472,6 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)

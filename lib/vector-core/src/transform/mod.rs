@@ -445,6 +445,12 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     }
 }
 
+impl From<Vec<Event>> for OutputBuffer {
+    fn from(events: Vec<Event>) -> Self {
+        Self(events)
+    }
+}
+
 struct WrapEventTask<T>(T);
 
 impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for WrapEventTask<T> {

@@ -113,6 +113,10 @@ impl SourceConfig for PrometheusScrapeConfig {
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -157,6 +161,10 @@ impl SourceConfig for PrometheusCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -428,7 +436,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -478,7 +489,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -661,7 +675,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
