@@ -35,10 +35,8 @@ impl RetryLogic for TraceApiRetry {
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status_code;
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
+            // Use the same status code/retry policy as the Trace agent
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             _ if status.is_server_error() => RetryAction::Retry(
                 format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
             ),
