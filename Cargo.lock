@@ -1884,7 +1884,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "strum_macros 0.23.1",
+ "strum_macros 0.24.0",
  "thiserror",
  "tracing 0.1.31",
  "value",
@@ -7137,11 +7137,11 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.23.1"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
+checksum = "6878079b17446e4d3eba6192bb0a2950d5b14f0ed8424b852310e5a94345d0ef"
 dependencies = [
- "heck 0.3.3",
+ "heck 0.4.0",
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "rustversion",
@@ -7372,9 +7372,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemallocator"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c14a5a604eb8715bc5785018a37d00739b180bcf609916ddf4393d33d49ccdf"
+checksum = "a5b7bcecfafe4998587d636f9ae9d55eb9d0499877b88757767c346875067098"
 dependencies = [
  "libc",
  "tikv-jemalloc-sys",
@@ -8436,7 +8436,7 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "strum 0.24.0",
- "strum_macros 0.23.1",
+ "strum_macros 0.24.0",
  "syslog",
  "syslog_loose",
  "tempfile",
