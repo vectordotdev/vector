@@ -23,15 +23,6 @@ impl InternalEvent for LokiEventsProcessed {
 }
 
 #[derive(Debug)]
-struct LokiUniqueStream;
-
-impl InternalEvent for LokiUniqueStream {
-    fn emit_metrics(&self) {
-        counter!("streams_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct LokiOutOfOrderEventDropped;
 
 impl InternalEvent for LokiOutOfOrderEventDropped {

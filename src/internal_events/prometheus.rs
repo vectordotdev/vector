@@ -196,32 +196,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug)]
-struct PrometheusNoNameError;
-
-impl InternalEvent for PrometheusNoNameError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Could not decode timeseries.",
-            error = "Decoded timeseries is missing the __name__ field.",
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", 1,
-            "error" => "Decoded timeseries is missing the __name__ field.",
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct PrometheusServerRequestComplete {
     pub status_code: StatusCode,
 }
