@@ -47,7 +47,12 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
-        let opts = Opts::get_matches();
+        let opts = Opts::get_matches().map_err(|error| {
+            // Printing to stdout/err can itself fail; ignore it.
+            let _ = error.print();
+            exitcode::USAGE
+        })?;
+
         Self::prepare_from_opts(opts)
     }
 

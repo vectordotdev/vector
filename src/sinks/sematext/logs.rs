@@ -9,7 +9,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::EventArray,
     sinks::{
-        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        elasticsearch::{ElasticsearchConfig, ElasticsearchEncoder},
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
             RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
@@ -30,7 +30,7 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -67,7 +67,7 @@ impl SinkConfig for SematextLogsConfig {
             }
         };
 
-        let (sink, healthcheck) = ElasticSearchConfig {
+        let (sink, healthcheck) = ElasticsearchConfig {
             endpoint,
             compression: Compression::None,
             doc_type: Some(

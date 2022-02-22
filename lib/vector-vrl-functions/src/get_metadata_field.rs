@@ -1,4 +1,4 @@
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetMetadataField;
