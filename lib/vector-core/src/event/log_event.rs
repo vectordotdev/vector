@@ -81,7 +81,7 @@ impl LogEvent {
         (
             Arc::try_unwrap(self.fields)
                 .expect("already cloned")
-                .into_map()
+                .into_object()
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
@@ -163,7 +163,7 @@ impl LogEvent {
     {
         if from_key != to_key {
             if let Some(val) = Arc::make_mut(&mut self.fields)
-                .as_map_mut()
+                .as_object_mut_unwrap()
                 .remove(from_key.as_ref())
             {
                 self.insert_flat(to_key, val);

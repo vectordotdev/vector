@@ -38,7 +38,7 @@ components: sources: kafka: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		auto_offset_reset: {
 			common:      false
 			description: """

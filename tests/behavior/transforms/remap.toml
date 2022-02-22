@@ -1188,7 +1188,7 @@
         .map == { "foo": { "string": "bar" } } &&
         .array == [{ "string": "foo" }] &&
         .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
-        .regex == { "regex": ".*" } &&
+        .regex == { "regex": r'.*' } &&
         .null == null
       '''
 

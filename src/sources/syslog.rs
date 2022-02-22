@@ -175,6 +175,10 @@ impl SourceConfig for SyslogConfig {
             Mode::Unix { .. } => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]

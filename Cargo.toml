@@ -163,7 +163,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 reqwest = { version = "0.11", optional = true }
 
 # Tower
-tower = { version = "0.4.10", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
@@ -188,8 +188,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.30", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.29", default-features = false, optional = true }
+async-graphql = { version = "3.0.31", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.31", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -201,7 +201,7 @@ tui = { version = "0.17.0", optional = true, default-features = false, features 
 # Datadog Pipelines
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 datadog-filter = { path = "lib/datadog/filter" }
-sha2 = { version = "0.10.1", optional = true }
+sha2 = { version = "0.10.2", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
@@ -274,7 +274,7 @@ percent-encoding = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
-rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }

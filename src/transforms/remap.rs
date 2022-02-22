@@ -53,7 +53,11 @@ impl RemapConfig {
         &self,
         enrichment_tables: enrichment::TableRegistry,
         merged_schema_definition: schema::Definition,
-    ) -> Result<(vrl::Program, vrl::state::Compiler)> {
+    ) -> Result<(
+        vrl::Program,
+        Vec<Box<dyn vrl::Function>>,
+        vrl::state::Compiler,
+    )> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -83,7 +87,7 @@ impl RemapConfig {
                     .to_string()
                     .into()
             })
-            .map(|program| (program, state))
+            .map(|program| (program, functions, state))
     }
 }
 
@@ -106,7 +110,7 @@ impl TransformConfig for RemapConfig {
     }
 
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        // We need to compile the VRL program in order to know the schema definition outpuf of this
+        // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         //
@@ -117,7 +121,7 @@ impl TransformConfig for RemapConfig {
                 merged_definition.clone(),
             )
             .ok()
-            .and_then(|(_, state)| state.target_kind().cloned())
+            .and_then(|(_, _, state)| state.target_kind().cloned())
             .and_then(Kind::into_object)
             .map(Into::into)
             .unwrap_or_else(schema::Definition::empty);
@@ -176,7 +180,8 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, _) = config.compile_vrl_program(
+        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
+        let (program, functions, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;

@@ -181,6 +181,10 @@ impl SourceConfig for PostgresqlMetricsConfig {
     fn source_type(&self) -> &'static str {
         "postgresql_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]

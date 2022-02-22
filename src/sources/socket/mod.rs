@@ -201,6 +201,10 @@ impl SourceConfig for SocketConfig {
             Mode::UnixStream(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -616,6 +620,7 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
+                acknowledgements: false,
                 schema_ids: HashMap::default(),
             })
             .await

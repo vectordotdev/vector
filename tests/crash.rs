@@ -206,6 +206,10 @@ impl SourceConfig for ErrorSourceConfig {
     fn source_type(&self) -> &'static str {
         "tcp"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[tokio::test]
@@ -266,6 +270,10 @@ impl SourceConfig for PanicSourceConfig {
 
     fn source_type(&self) -> &'static str {
         "tcp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

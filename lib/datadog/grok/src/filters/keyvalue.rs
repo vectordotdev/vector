@@ -145,7 +145,7 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                     let lookup: LookupBuf = Lookup::from_str(&k)
                         .unwrap_or_else(|_| Lookup::from(&k))
                         .into();
-                    result.insert(&lookup, v).unwrap_or_else(
+                    result.target_insert(&lookup, v).unwrap_or_else(
                         |error| warn!(message = "Error updating field value", field = %lookup, %error)
                     );
                 }
