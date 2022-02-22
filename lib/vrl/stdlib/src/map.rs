@@ -259,9 +259,9 @@ impl Expression for MapFn {
             Value::Object(_) => Value::Object(BTreeMap::default()),
             _ => unreachable!("Should be type checked by the compiler"),
         };
-        let mut map = |_: &Context, output: Value, result: Value| -> Result<Value> {
+        let mut map = |_: &Context, output: Value, result: &mut Value| -> Result<()> {
             match result {
-                Value::Object(mut map) => match output {
+                Value::Object(ref mut map) => match output {
                     Value::Array(mut array) => {
                         let value = match array.pop() {
                             Some(value) => Ok(value),
@@ -277,13 +277,13 @@ impl Expression for MapFn {
                         }?;
 
                         map.insert(key, value);
-                        Ok(Value::Object(map))
+                        Ok(())
                     }
                     _ => Err(Error::ObjectNonArray.to_string().into()),
                 },
-                Value::Array(mut array) => {
+                Value::Array(ref mut array) => {
                     array.push(output);
-                    Ok(Value::Array(array))
+                    Ok(())
                 }
                 _ => unreachable!(),
             }

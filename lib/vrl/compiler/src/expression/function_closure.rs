@@ -24,7 +24,7 @@ impl FunctionClosure {
         &self,
         ctx: &mut Context,
         value: Value,
-        mut func: impl FnMut(&Context, Value, Value) -> Result<Value, ExpressionError>,
+        mut func: impl FnMut(&Context, Value, &mut Value) -> Result<(), ExpressionError>,
         recursive: bool,
         mut result: Value,
     ) -> Result<Value, ExpressionError> {
@@ -50,7 +50,7 @@ impl FunctionClosure {
 
                     let output = self.block.resolve(ctx)?;
 
-                    result = func(ctx, output, result)?;
+                    func(ctx, output, &mut result)?;
 
                     let state = ctx.state_mut();
                     state.remove_variable(&key_ident);
@@ -79,7 +79,7 @@ impl FunctionClosure {
 
                     let output = self.block.resolve(ctx)?;
 
-                    result = func(ctx, output, result)?;
+                    func(ctx, output, &mut result)?;
 
                     let state = ctx.state_mut();
                     state.remove_variable(&index_ident);
