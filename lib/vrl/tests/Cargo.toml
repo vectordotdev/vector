@@ -10,7 +10,7 @@ enrichment = { path = "../../enrichment" }
 parser = { package = "vrl-parser", path = "../parser" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vector_common = { path = "../../vector-common", default-features = false }
-vrl = { path = "../core" }
+vrl = { path = "../vrl" }
 
 ansi_term = "0.12"
 chrono = "0.4"

@@ -8667,6 +8667,7 @@ dependencies = [
  "thiserror",
  "vector_common",
  "vrl-compiler",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -8712,8 +8713,18 @@ dependencies = [
  "tracing 0.1.31",
  "value",
  "vector_common",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
+]
+
+[[package]]
+name = "vrl-core"
+version = "0.1.0"
+dependencies = [
+ "lookup",
+ "value",
+ "vrl-diagnostic",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ rustyline = { version = "9", default-features = false, optional = true }
 serde_json = "1"
 thiserror = "1"
 vector_common = { path = "../../vector-common", default-features = false }
-vrl = { path = "../core" }
+vrl = { path = "../vrl" }
 webbrowser = { version = "0.6", default-features = false, optional = true }
 
 [dependencies.stdlib]

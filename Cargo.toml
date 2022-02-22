@@ -90,6 +90,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vrl/vrl",
   "lib/vector-vrl-functions",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
@@ -205,7 +206,7 @@ hex = { version = "0.4.3", optional = true }
 sha2 = { version = "0.10.2", optional = true }
 
 # VRL Lang
-vrl = { path = "lib/vrl/core" }
+vrl = { path = "lib/vrl/vrl" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # Lookup
