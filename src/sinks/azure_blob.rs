@@ -88,7 +88,7 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

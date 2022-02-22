@@ -136,7 +136,7 @@ impl SinkConfig for NewRelicConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

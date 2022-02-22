@@ -112,7 +112,7 @@ impl SinkConfig for StackdriverConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

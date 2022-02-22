@@ -113,7 +113,7 @@ impl SinkConfig for NewRelicLogsConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
