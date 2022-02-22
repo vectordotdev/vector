@@ -260,11 +260,13 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
-        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
-        for output in transform.inner.outputs() {
+        let mut schema_ids = HashMap::new();
+        let merged_definition = schema::merged_definition(&transform.inputs, config);
+
+        for output in transform.inner.outputs(&merged_definition) {
             let definition = match output.log_schema_definition {
                 Some(definition) => definition,
-                None => schema::merged_definition(&transform.inputs, config),
+                None => merged_definition.clone(),
             };
 
             let schema_id = schema_registry
@@ -286,7 +288,7 @@ pub async fn build_pieces(
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(),
+            outputs: transform.inner.outputs(&merged_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
 

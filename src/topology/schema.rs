@@ -83,18 +83,24 @@ fn inner_merged_definition(
         // change anything in the schema from its inputs, in which case we need to recursively get
         // the schemas of the transform inputs.
         } else if let Some(transform) = config.transforms.get(key) {
+            let merged_definition = merged_definition(&transform.inputs, config);
+
             // After getting the transform matching to the given input, we need to further narrow
             // the actual output of the transform feeding into this input, and then get the
             // definition belonging to that output.
-            let maybe_transform_definition = transform.inner.outputs().iter().find_map(|output| {
-                if output.port == input.port {
-                    // For transforms, a `None` schema definition is equal to "pass-through merged
-                    // input schemas".
-                    output.log_schema_definition.clone()
-                } else {
-                    None
-                }
-            });
+            let maybe_transform_definition = transform
+                .inner
+                .outputs(&merged_definition)
+                .iter()
+                .find_map(|output| {
+                    if output.port == input.port {
+                        // For transforms, a `None` schema definition is equal to "pass-through merged
+                        // input schemas".
+                        output.log_schema_definition.clone()
+                    } else {
+                        None
+                    }
+                });
 
             let transform_definition = match maybe_transform_definition {
                 Some(transform_definition) => transform_definition,
@@ -110,4 +116,182 @@ fn inner_merged_definition(
     cache.insert(inputs.to_vec(), definition.clone());
 
     definition
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use indexmap::IndexMap;
+    use serde::{Deserialize, Serialize};
+    use value::Kind;
+    use vector_core::{
+        config::{DataType, Input, Output},
+        source::Source,
+        transform::{Transform, TransformConfig, TransformContext},
+    };
+
+    use crate::config::{SourceConfig, SourceContext, SourceOuter, TransformOuter};
+
+    use super::*;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct MockComponent {
+        #[serde(skip)]
+        outputs: Vec<Output>,
+    }
+
+    #[async_trait::async_trait]
+    #[typetag::serde(name = "mock_source")]
+    impl SourceConfig for MockComponent {
+        async fn build(&self, _: SourceContext) -> crate::Result<Source> {
+            unimplemented!()
+        }
+
+        fn outputs(&self) -> Vec<Output> {
+            self.outputs.clone()
+        }
+
+        fn source_type(&self) -> &'static str {
+            unimplemented!()
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
+    }
+
+    #[async_trait::async_trait]
+    #[typetag::serde(name = "mock_transform")]
+    impl TransformConfig for MockComponent {
+        async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+            unimplemented!()
+        }
+
+        fn outputs(&self, _: &Definition) -> Vec<Output> {
+            self.outputs.clone()
+        }
+
+        fn transform_type(&self) -> &'static str {
+            unimplemented!()
+        }
+
+        fn input(&self) -> Input {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn test_merged_definition() {
+        struct TestCase {
+            inputs: Vec<(&'static str, Option<String>)>,
+            sources: IndexMap<&'static str, Vec<Output>>,
+            transforms: IndexMap<&'static str, Vec<Output>>,
+            want: Definition,
+        }
+
+        for (
+            title,
+            TestCase {
+                inputs,
+                sources,
+                transforms,
+                want,
+            },
+        ) in HashMap::from([
+            (
+                "no inputs",
+                TestCase {
+                    inputs: vec![],
+                    sources: IndexMap::default(),
+                    transforms: IndexMap::default(),
+                    want: Definition::empty(),
+                },
+            ),
+            (
+                "single input, source with empty schema",
+                TestCase {
+                    inputs: vec![("foo", None)],
+                    sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
+                    transforms: IndexMap::default(),
+                    want: Definition::empty(),
+                },
+            ),
+            (
+                "single input, source with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None)],
+                    sources: IndexMap::from([(
+                        "source-foo",
+                        vec![Output::default(DataType::all()).with_schema_definition(
+                            Definition::empty().required_field(
+                                "foo",
+                                Kind::integer().or_bytes(),
+                                Some("foo bar"),
+                            ),
+                        )],
+                    )]),
+                    transforms: IndexMap::default(),
+                    want: Definition::empty().required_field(
+                        "foo",
+                        Kind::integer().or_bytes(),
+                        Some("foo bar"),
+                    ),
+                },
+            ),
+            (
+                "multiple inputs, sources with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None), ("source-bar", None)],
+                    sources: IndexMap::from([
+                        (
+                            "source-foo",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "foo",
+                                    Kind::integer().or_bytes(),
+                                    Some("foo bar"),
+                                ),
+                            )],
+                        ),
+                        (
+                            "source-bar",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "foo",
+                                    Kind::timestamp(),
+                                    Some("baz qux"),
+                                ),
+                            )],
+                        ),
+                    ]),
+                    transforms: IndexMap::default(),
+                    want: Definition::empty()
+                        .required_field("foo", Kind::integer().or_bytes(), Some("foo bar"))
+                        .required_field("foo", Kind::timestamp(), Some("baz qux")),
+                },
+            ),
+        ]) {
+            let mut config = topology::Config::default();
+            config.sources = sources
+                .into_iter()
+                .map(|(key, outputs)| (key.into(), SourceOuter::new(MockComponent { outputs })))
+                .collect::<IndexMap<_, _>>();
+            config.transforms = transforms
+                .into_iter()
+                .map(|(key, outputs)| (key.into(), TransformOuter::new(MockComponent { outputs })))
+                .collect::<IndexMap<_, _>>();
+
+            let inputs = inputs
+                .into_iter()
+                .map(|(key, port)| OutputId {
+                    component: key.into(),
+                    port,
+                })
+                .collect::<Vec<_>>();
+
+            let got = merged_definition(&inputs, &config);
+            assert_eq!(got, want, "{}", title);
+        }
+    }
 }
