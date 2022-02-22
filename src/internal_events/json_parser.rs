@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
@@ -18,7 +18,7 @@ impl<'a> InternalEvent for JsonParserError<'a> {
             field = %self.field,
             value = %self.value,
             error = "invalid_json",
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             drop_invalid = self.drop_invalid,
             internal_log_rate_secs = 30,
@@ -29,7 +29,7 @@ impl<'a> InternalEvent for JsonParserError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => "invalid_json",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
@@ -37,7 +37,7 @@ impl<'a> InternalEvent for JsonParserError<'a> {
             counter!(
                 "component_discarded_events_total", 1,
                 "error" => "invalid_json",
-                "error_type" => "parser_failed",
+                "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
                 "field" => self.field.to_string(),
             );

@@ -75,7 +75,7 @@ cli: {
 		}
 	}
 
-	#OptionType: "string" | "integer" | "enum"
+	#OptionType: "string" | "integer" | "enum" | "list"
 
 	name:     !=""
 	flags:    #Flags
@@ -261,11 +261,17 @@ cli: {
 
 		"tap": {
 			description: """
-				Observe output events from source or transform components. Events are sampled
-				at a specified interval.
+				Observe events flowing into components (transforms, sinks) and
+				out of components (sources, transforms). Events are sampled at
+				a specified interval.
 				"""
 
-			flags: _default_flags
+			flags: _default_flags & {
+				"quiet": {
+					_short:      "q"
+					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
+				}
+			}
 
 			options: {
 				"interval": {
@@ -291,9 +297,18 @@ cli: {
 					type:        "enum"
 					default:     "json"
 					enum: {
-						json: "Output events as JSON"
-						yaml: "Output events as YAML"
+						json:   "Output events as JSON"
+						yaml:   "Output events as YAML"
+						logfmt: "Output events as logfmt"
 					}
+				}
+				"inputs-of": {
+					description: "Components (transforms, sinks) to observe for their inputs (comma-separated; accepts glob patterns)"
+					type:        "list"
+				}
+				"outputs-of": {
+					description: "Components (sources, transforms) to observe for their inputs (comma-separated; accepts glob patterns)"
+					type:        "list"
 				}
 			}
 
@@ -301,7 +316,11 @@ cli: {
 				components: {
 					type: "list"
 					description: """
-						Components to observe (comma-separated; accepts glob patterns).
+						Components (sources, transforms) to observe for their
+						outputs (comma-separated; accepts glob patterns). The
+						default value is `*` only if no other patterns are specified
+						(i.e. via `--outputs-of` or `--inputs-of`); otherwise the
+						default value is empty.
 						"""
 					default: "*"
 				}

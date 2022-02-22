@@ -1,34 +1,13 @@
 use metrics::counter;
-#[cfg(feature = "sources-aws_s3")]
 use rusoto_core::RusotoError;
-#[cfg(feature = "sources-aws_s3")]
 use rusoto_sqs::{
     BatchResultErrorEntry, DeleteMessageBatchError, DeleteMessageBatchRequestEntry,
     DeleteMessageBatchResultEntry, ReceiveMessageError,
 };
 use vector_core::internal_event::InternalEvent;
 
-#[cfg(feature = "sources-aws_s3")]
 use crate::internal_events::prelude::{error_stage, error_type};
-
-#[cfg(feature = "sources-aws_s3")]
 use crate::sources::aws_s3::sqs::ProcessingError;
-
-#[derive(Debug)]
-pub struct AwsSqsEventSent<'a> {
-    pub byte_size: usize,
-    pub message_id: Option<&'a String>,
-}
-
-impl InternalEvent for AwsSqsEventSent<'_> {
-    fn emit_logs(&self) {
-        trace!(message = "Event sent.", message_id = ?self.message_id);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
 
 #[derive(Debug)]
 pub struct SqsS3EventsReceived {
@@ -56,13 +35,11 @@ impl InternalEvent for SqsS3EventsReceived {
     }
 }
 
-#[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageReceiveError<'a> {
     pub error: &'a RusotoError<ReceiveMessageError>,
 }
 
-#[cfg(feature = "sources-aws_s3")]
 impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
     fn emit_logs(&self) {
         error!(
@@ -117,14 +94,12 @@ impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
     }
 }
 
-#[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageProcessingError<'a> {
     pub message_id: &'a str,
     pub error: &'a ProcessingError,
 }
 
-#[cfg(feature = "sources-aws_s3")]
 impl<'a> InternalEvent for SqsMessageProcessingError<'a> {
     fn emit_logs(&self) {
         error!(
@@ -149,13 +124,11 @@ impl<'a> InternalEvent for SqsMessageProcessingError<'a> {
     }
 }
 
-#[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageDeleteSucceeded {
     pub message_ids: Vec<DeleteMessageBatchResultEntry>,
 }
 
-#[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeleteSucceeded {
     fn emit_logs(&self) {
         trace!(message = "Deleted SQS message(s).",
@@ -173,13 +146,11 @@ impl InternalEvent for SqsMessageDeleteSucceeded {
     }
 }
 
-#[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageDeletePartialError {
     pub entries: Vec<BatchResultErrorEntry>,
 }
 
-#[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeletePartialError {
     fn emit_logs(&self) {
         error!(
@@ -206,14 +177,12 @@ impl InternalEvent for SqsMessageDeletePartialError {
     }
 }
 
-#[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageDeleteBatchError {
     pub entries: Vec<DeleteMessageBatchRequestEntry>,
     pub error: RusotoError<DeleteMessageBatchError>,
 }
 
-#[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeleteBatchError {
     fn emit_logs(&self) {
         error!(

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, time::Instant};
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -65,7 +65,7 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
             endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::PROCESSING,
-            error_type = "parse_failed",
+            error_type = error_type::PARSER_FAILED,
         );
         debug!(
             message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
@@ -80,7 +80,7 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }
@@ -109,7 +109,7 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error" => self.code.to_string(),
-            "error_type" => "http_error",
+            "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }
@@ -128,7 +128,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::RECEIVING,
-            error_type = "http_error",
+            error_type = error_type::REQUEST_FAILED,
         );
     }
 
@@ -138,7 +138,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error" => self.error.to_string(),
-            "error_type" => "http_error",
+            "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }

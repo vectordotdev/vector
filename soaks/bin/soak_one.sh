@@ -14,7 +14,7 @@ display_usage() {
     echo "Options:"
     echo "  --help: display this information"
     echo "  --soak: the experiment to run"
-    echo "  --local-image: whether to use a local vector image or remote, local if true"
+    echo "  --build-image: build the soak image if needed, default true"
     echo "  --variant: the variation of test in play, either 'baseline' or 'comparison'"
     echo "  --tag: the tag this test covers"
     echo "  --capture-dir: the directory in which to write captures"
@@ -25,8 +25,7 @@ display_usage() {
     echo ""
 }
 
-
-USE_LOCAL_IMAGE="true"
+BUILD_IMAGE="true"
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -47,8 +46,8 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
-      --local-image)
-          USE_LOCAL_IMAGE=$2
+      --build-image)
+          BUILD_IMAGE=$2
           shift # past argument
           shift # past value
           ;;
@@ -91,15 +90,17 @@ done
 
 pushd "${__dir}"
 
+
 IMAGE="vector:${TAG}"
-if [ "${USE_LOCAL_IMAGE}" = "true" ]; then
-    echo "Building images locally..."
+if [[ "$(docker images -q "$IMAGE" 2> /dev/null)" == "" ]]; then
+  if [ "${BUILD_IMAGE}" = "true" ]; then
+    echo "Image $IMAGE doesn't exist, building"
 
     ./build_container.sh "${TAG}" "${IMAGE}"
-else
-    REMOTE_IMAGE="ghcr.io/vectordotdev/vector/soak-vector:${TAG}"
-    docker pull "${REMOTE_IMAGE}"
-    docker image tag "${REMOTE_IMAGE}" "${IMAGE}"
+  else
+    echo "Image $IMAGE doesn't exist and --build-image was false"
+    exit 1
+  fi
 fi
 
 ./run_experiment.sh --capture-dir "${CAPTURE_DIR}" \

@@ -71,6 +71,7 @@ fn default_config_paths() -> Vec<PathBuf> {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 struct HooksConfig {
     init: Option<String>,
     process: String,
