@@ -139,7 +139,7 @@ impl Expression for SetFn {
         };
 
         let mut value = self.value.resolve(ctx)?;
-        value.insert(&path, self.data.resolve(ctx)?)?;
+        value.target_insert(&path, self.data.resolve(ctx)?)?;
 
         Ok(value)
     }

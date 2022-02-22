@@ -10,8 +10,10 @@ pub mod merge;
 pub mod nest;
 pub mod remove;
 
+use crate::Value;
 pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index, Unknown};
+use std::collections::BTreeMap;
 
 /// The type (kind) of a given value.
 ///
@@ -95,5 +97,40 @@ impl std::fmt::Display for Kind {
         last.fmt(f)?;
 
         Ok(())
+    }
+}
+
+impl From<&Value> for Kind {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Bytes(_) => Self::bytes(),
+            Value::Integer(_) => Self::integer(),
+            Value::Float(_) => Self::float(),
+            Value::Boolean(_) => Self::boolean(),
+            Value::Timestamp(_) => Self::timestamp(),
+            Value::Regex(_) => Self::regex(),
+            Value::Null => Self::null(),
+
+            Value::Object(object) => Self::object(
+                object
+                    .iter()
+                    .map(|(k, v)| (k.clone().into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+
+            Value::Array(array) => Self::array(
+                array
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i.into(), v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+        }
+    }
+}
+
+impl From<Value> for Kind {
+    fn from(value: Value) -> Self {
+        (&value).into()
     }
 }

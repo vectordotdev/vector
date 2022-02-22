@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -22,7 +22,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         error!(
             message = %msg,
             error = %self.error,
-            error_type = "render_error",
+            error_type = error_type::TEMPLATE_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
@@ -32,7 +32,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "render_error",
+            "error_type" => error_type::TEMPLATE_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -42,7 +42,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             counter!(
                 "component_discarded_events_total", 1,
                 "error" => self.error.to_string(),
-                "error_type" => "render_error",
+                "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated

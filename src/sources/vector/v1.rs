@@ -256,6 +256,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
                 schema_definitions: HashMap::default(),
             })
             .await
@@ -294,6 +295,7 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
                 schema_definitions: HashMap::default(),
             })
             .await

@@ -105,6 +105,10 @@ impl SourceConfig for DnstapConfig {
     fn source_type(&self) -> &'static str {
         "dnstap"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]

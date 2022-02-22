@@ -130,19 +130,18 @@ impl SourceConfig for DatadogAgentConfig {
             metrics_schema_definition,
         );
         let listener = tls.bind(&self.address).await?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
-        let log_service = source.clone().event_service(
-            acknowledgements.enabled(),
-            cx.out.clone(),
-            self.multiple_outputs,
-        );
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let log_service =
+            source
+                .clone()
+                .event_service(acknowledgements, cx.out.clone(), self.multiple_outputs);
         let series_v1_service = source.clone().series_v1_service(
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out.clone(),
             self.multiple_outputs,
         );
         let sketches_service = source.clone().sketches_service(
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out.clone(),
             self.multiple_outputs,
         );
@@ -221,6 +220,10 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
