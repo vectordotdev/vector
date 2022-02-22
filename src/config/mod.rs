@@ -519,14 +519,6 @@ pub struct TransformOuter<T> {
 }
 
 impl<T> TransformOuter<T> {
-    #[cfg(test)]
-    pub(crate) fn new(transform: impl TransformConfig + 'static) -> Self {
-        Self {
-            inputs: vec![],
-            inner: Box::new(transform),
-        }
-    }
-
     fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
         let inputs = self.inputs.iter().map(f).collect();
         self.with_inputs(inputs)

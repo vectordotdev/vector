@@ -12,7 +12,6 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
-    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -45,7 +44,7 @@ impl TransformConfig for AggregateConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 

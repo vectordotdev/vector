@@ -16,7 +16,6 @@ use crate::{
         LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
         ParserMissingFieldError,
     },
-    schema,
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -137,7 +136,7 @@ impl TransformConfig for LogToMetricConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
