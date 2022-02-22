@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -13,7 +13,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
             message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             error = ?self.error,
             error_code = "parsing_cloudwatch_logs",
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         )
@@ -23,7 +23,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "parsing_cloudwatch_logs",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -54,13 +54,13 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "message_too_long",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error_code" => "message_too_long",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
@@ -77,7 +77,7 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
             message = "Error when encoding event.",
             error = %self.error,
             error_code = "failed_encoding_event",
-            error_type = "encoder_failed",
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -87,13 +87,13 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_encoding_event",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error_code" => "failed_encoding_event",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }

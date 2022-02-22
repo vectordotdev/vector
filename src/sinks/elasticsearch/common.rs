@@ -12,8 +12,8 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            encoder::ElasticSearchEncoder, finish_signer, ElasticSearchAuth,
-            ElasticSearchCommonMode, ElasticSearchConfig, ParseError,
+            encoder::ElasticsearchEncoder, finish_signer, ElasticsearchAuth,
+            ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
         },
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
@@ -26,13 +26,13 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct ElasticSearchCommon {
+pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
     pub authorization: Option<Auth>,
     pub credentials: Option<rusoto::AwsCredentialsProvider>,
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
-    pub mode: ElasticSearchCommonMode,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub mode: ElasticsearchCommonMode,
     pub doc_type: String,
     pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
@@ -43,8 +43,8 @@ pub struct ElasticSearchCommon {
     pub metric_to_log: MetricToLog,
 }
 
-impl ElasticSearchCommon {
-    pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
+impl ElasticsearchCommon {
+    pub fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.endpoint);
         let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
@@ -58,7 +58,7 @@ impl ElasticSearchCommon {
         }
 
         let authorization = match &config.auth {
-            Some(ElasticSearchAuth::Basic { user, password }) => Some(Auth::Basic {
+            Some(ElasticsearchAuth::Basic { user, password }) => Some(Auth::Basic {
                 user: user.clone(),
                 password: password.clone(),
             }),
@@ -74,8 +74,8 @@ impl ElasticSearchCommon {
         };
 
         let credentials = match &config.auth {
-            Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
+            Some(ElasticsearchAuth::Basic { .. }) | None => None,
+            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
         };
 
         let compression = config.compression;

@@ -5,8 +5,8 @@ use crate::{
     event::{EventFinalizers, Finalizable},
     sinks::{
         elasticsearch::{
-            encoder::{ElasticSearchEncoder, ProcessedEvent},
-            service::ElasticSearchRequest,
+            encoder::{ElasticsearchEncoder, ProcessedEvent},
+            service::ElasticsearchRequest,
         },
         util::{encoding::EncodingConfigFixed, Compression, RequestBuilder},
     },
@@ -14,7 +14,7 @@ use crate::{
 
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
-    pub encoder: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoder: EncodingConfigFixed<ElasticsearchEncoder>,
 }
 
 pub struct Metadata {
@@ -26,9 +26,9 @@ pub struct Metadata {
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     type Metadata = Metadata;
     type Events = Vec<ProcessedEvent>;
-    type Encoder = EncodingConfigFixed<ElasticSearchEncoder>;
+    type Encoder = EncodingConfigFixed<ElasticsearchEncoder>;
     type Payload = Bytes;
-    type Request = ElasticSearchRequest;
+    type Request = ElasticsearchRequest;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
@@ -55,7 +55,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Bytes) -> Self::Request {
-        ElasticSearchRequest {
+        ElasticsearchRequest {
             payload,
             finalizers: metadata.finalizers,
             batch_size: metadata.batch_size,

@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
 
 use vector_core::{internal_event::InternalEvent, update_counter};
@@ -41,7 +41,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             message = "Unable to update consumer offset.",
             error = %self.error,
             error_code = "kafka_offset_update",
-            error_type = "reader_failed",
+            error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -50,7 +50,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "kafka_offset_update",
-            "error_type" => "reader_failed",
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated
@@ -68,8 +68,8 @@ impl InternalEvent for KafkaReadError {
         error!(
             message = "Failed to read message.",
             error = %self.error,
-            error_code = "failed_reading_message",
-            error_type = "reader_failed",
+            error_code = "reading_message",
+            error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
         );
     }
@@ -77,8 +77,8 @@ impl InternalEvent for KafkaReadError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "failed_reading_message",
-            "error_type" => "reader_failed",
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -136,7 +136,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
             error_code = "failed_extracing_header",
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             header_field = self.header_field,
         );
@@ -146,7 +146,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_extracing_field",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
