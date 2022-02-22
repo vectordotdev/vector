@@ -7014,9 +7014,9 @@ checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
 
 [[package]]
 name = "strum"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
+checksum = "e96acfc1b70604b8b2f1ffa4c57e59176c7dbb05d556c71ecd2f5498a1dee7f8"
 
 [[package]]
 name = "strum_macros"
@@ -8330,7 +8330,7 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt",
- "strum 0.23.0",
+ "strum 0.24.0",
  "strum_macros 0.23.1",
  "syslog",
  "syslog_loose",
