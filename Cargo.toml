@@ -289,7 +289,7 @@ socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.26", default-features = false }
-strum = { version = "0.23", default-features = false }
+strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
