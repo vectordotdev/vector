@@ -10,7 +10,6 @@ use crate::{
     },
     event::Event,
     internal_events::RouteEventDiscarded,
-    schema,
     transforms::Transform,
 };
 
@@ -89,7 +88,7 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         self.route
             .keys()
             .map(|output_name| Output::from((output_name, DataType::all())))
@@ -116,8 +115,8 @@ impl TransformConfig for RouteCompatConfig {
         self.0.input()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn transform_type(&self) -> &'static str {

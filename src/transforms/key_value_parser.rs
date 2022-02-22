@@ -10,7 +10,6 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{KeyValueParserError, ParserMissingFieldError, ParserTargetExistsError},
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -86,7 +85,7 @@ impl TransformConfig for KeyValueConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

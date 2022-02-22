@@ -11,7 +11,6 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
-    schema,
     template::Template,
     transforms::{TaskTransform, Transform},
 };
@@ -42,7 +41,7 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
