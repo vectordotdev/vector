@@ -133,7 +133,7 @@ impl SinkConfig for GcsSinkConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

@@ -145,7 +145,7 @@ impl SinkConfig for RedisSinkConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
