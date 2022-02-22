@@ -149,6 +149,10 @@ impl SourceConfig for MongoDbMetricsConfig {
     fn source_type(&self) -> &'static str {
         "mongodb_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl MongoDbMetrics {

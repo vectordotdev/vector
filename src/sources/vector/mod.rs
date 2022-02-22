@@ -88,6 +88,10 @@ impl SourceConfig for VectorConfig {
             VectorConfig::V2(v2) => v2.config.resources(),
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

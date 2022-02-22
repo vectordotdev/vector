@@ -1,6 +1,6 @@
 // ## skip check-events ##
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
@@ -111,7 +111,7 @@ impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
         error!(
             message = "Error in communication with Docker daemon.",
             error = ?self.error,
-            error_type = "connection_failed",
+            error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
             internal_log_rate_secs = 10
@@ -122,7 +122,7 @@ impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "connection_failed",
+            "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -141,7 +141,7 @@ impl<'a> InternalEvent for DockerLogsContainerMetadataFetchError<'a> {
         error!(
             message = "Failed to fetch container metadata.",
             error = ?self.error,
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
             internal_log_rate_secs = 10
@@ -152,7 +152,7 @@ impl<'a> InternalEvent for DockerLogsContainerMetadataFetchError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
@@ -172,7 +172,7 @@ impl<'a> InternalEvent for DockerLogsTimestampParseError<'a> {
         error!(
             message = "Failed to parse timestamp as RFC3339 timestamp.",
             error = ?self.error,
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             container_id = ?self.container_id,
             internal_log_rate_secs = 10
@@ -183,7 +183,7 @@ impl<'a> InternalEvent for DockerLogsTimestampParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "container_id" => self.container_id.to_owned(),
         );
@@ -206,7 +206,7 @@ impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
                 logging driver. Please enable one of these logging drivers
                 to get logs from the Docker daemon."#,
             error = ?self.error,
-            error_type = "configuration_failed",
+            error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
         );
@@ -216,7 +216,7 @@ impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "configuration_failed",
+            "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
