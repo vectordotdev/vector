@@ -1,7 +1,6 @@
-// ## skip check-events ##
-
 use std::time::Instant;
 
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;
@@ -68,8 +67,8 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             message = "MongoDb request error.",
             endpoint = %self.endpoint,
             error = ?self.error,
-            error_type = "request_failed",
-            stage = "receiving",
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
         );
     }
 
@@ -77,8 +76,8 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
-            "stage" => "receiving",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("request_errors_total", 1);
@@ -96,8 +95,8 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             message = "BSON document parse error.",
             endpoint = %self.endpoint,
             error = ?self.error,
-            error_type = "parser_failed",
-            stage = "receiving",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
         );
     }
 
@@ -105,8 +104,8 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parser_failed",
-            "stage" => "receiving",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated

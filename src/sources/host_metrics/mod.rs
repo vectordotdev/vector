@@ -115,6 +115,10 @@ impl SourceConfig for HostMetricsConfig {
     fn source_type(&self) -> &'static str {
         "host_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl HostMetricsConfig {

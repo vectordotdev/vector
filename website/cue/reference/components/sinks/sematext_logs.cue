@@ -13,7 +13,6 @@ components: sinks: sematext_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

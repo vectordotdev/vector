@@ -202,6 +202,10 @@ impl SourceConfig for SimpleHttpConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn add_path(events: &mut [Event], key: &str, path: &str) {

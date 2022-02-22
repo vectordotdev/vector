@@ -21,12 +21,12 @@ use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
-    internal_events::aws_s3::source::{
-        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
-        SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored, SqsS3EventsReceived,
+    internal_events::{
+        BytesReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
+        SqsS3EventsReceived, StreamClosedError,
     },
-    internal_events::{BytesReceived, StreamClosedError},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -187,14 +187,14 @@ impl Ingestor {
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
     ) -> Result<(), ()> {
-        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
-                acknowledgements.enabled(),
+                acknowledgements,
             );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());

@@ -13,7 +13,6 @@ components: sinks: nats: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

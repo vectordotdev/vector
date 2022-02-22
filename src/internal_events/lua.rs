@@ -13,6 +13,8 @@ impl InternalEvent for LuaGcTriggered {
     }
 }
 
+pub const SCRIPT_FAILED: &str = "script_failed";
+
 #[derive(Debug)]
 pub struct LuaScriptError {
     pub error: mlua::Error,
@@ -23,7 +25,7 @@ impl InternalEvent for LuaScriptError {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = "script_failed",
+            error_type = SCRIPT_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
@@ -33,13 +35,13 @@ impl InternalEvent for LuaScriptError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "script_failed",
+            "error_type" => SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "script_failed",
+            "error_type" => SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -57,7 +59,7 @@ impl InternalEvent for LuaBuildError {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = "script_failed",
+            error_type = SCRIPT_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
@@ -67,13 +69,13 @@ impl InternalEvent for LuaBuildError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "script_failed",
+            "error_type" => SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "script_failed",
+            "error_type" => SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

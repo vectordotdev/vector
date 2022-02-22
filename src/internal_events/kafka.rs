@@ -30,6 +30,8 @@ impl InternalEvent for KafkaEventsReceived {
     }
 }
 
+const KAFKA_OFFSET_UPDATE: &str = "kafka_offset_update";
+
 #[derive(Debug)]
 pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
@@ -40,7 +42,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
         error!(
             message = "Unable to update consumer offset.",
             error = %self.error,
-            error_type = "kafka_offset_update",
+            error_type = KAFKA_OFFSET_UPDATE,
             stage = error_stage::SENDING,
         );
     }
@@ -49,13 +51,15 @@ impl InternalEvent for KafkaOffsetUpdateError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "kafka_offset_update",
+            "error_type" => KAFKA_OFFSET_UPDATE,
             "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("consumer_offset_updates_failed_total", 1);
     }
 }
+
+const KAFKA_READ: &str = "kafka_read";
 
 #[derive(Debug)]
 pub struct KafkaReadError {
@@ -67,7 +71,7 @@ impl InternalEvent for KafkaReadError {
         error!(
             message = "Failed to read message.",
             error = %self.error,
-            error_type = "kafka_read",
+            error_type = KAFKA_READ,
             stage = error_stage::RECEIVING,
         );
     }
@@ -76,7 +80,7 @@ impl InternalEvent for KafkaReadError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "kafka_read",
+            "error_type" => KAFKA_READ,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated

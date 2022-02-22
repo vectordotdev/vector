@@ -6,7 +6,6 @@ use lookup::LookupBuf;
 use std::{error::Error, fmt};
 use vector_common::TimeZone;
 
-use crate::prelude::VrlValueKind;
 use crate::{state, Context, Program, Target, Value};
 
 pub type RuntimeResult = Result<Value, Terminate>;
@@ -74,7 +73,7 @@ impl Runtime {
         //
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
-        match target.get(&self.root_lookup) {
+        match target.target_get(&self.root_lookup) {
             Ok(Some(Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(

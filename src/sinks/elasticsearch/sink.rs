@@ -11,8 +11,8 @@ use crate::{
         elasticsearch::{
             encoder::ProcessedEvent,
             request_builder::ElasticsearchRequestBuilder,
-            service::{ElasticSearchRequest, ElasticSearchResponse},
-            BulkAction, ElasticSearchCommonMode,
+            service::{ElasticsearchRequest, ElasticsearchResponse},
+            BulkAction, ElasticsearchCommonMode,
         },
         util::{Compression, SinkBuilderExt, StreamSink},
     },
@@ -37,18 +37,18 @@ impl ByteSizeOf for BatchedEvents {
     }
 }
 
-pub struct ElasticSearchSink {
+pub struct ElasticsearchSink {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
-    pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
+    pub service: BoxService<ElasticsearchRequest, ElasticsearchResponse, Error>,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
-    pub mode: ElasticSearchCommonMode,
+    pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
 }
 
-impl ElasticSearchSink {
+impl ElasticsearchSink {
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -84,7 +84,7 @@ impl ElasticSearchSink {
 
 pub fn process_log(
     mut log: LogEvent,
-    mode: &ElasticSearchCommonMode,
+    mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
@@ -109,7 +109,7 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink<Event> for ElasticSearchSink {
+impl StreamSink<Event> for ElasticsearchSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
