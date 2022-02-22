@@ -13,7 +13,10 @@ components: sinks: datadog_archives: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: {
+			capable: true
+			default: true
+		}
 		healthcheck: enabled: true
 		send: {
 			batch: {

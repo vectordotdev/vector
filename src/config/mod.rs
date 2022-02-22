@@ -124,7 +124,7 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        if self.global.acknowledgements.enabled() {
+        if self.global.acknowledgements.enabled(false) {
             for (name, sink) in &self.sinks {
                 if sink.inner.acknowledgements().is_none() {
                     warn!(
@@ -143,7 +143,7 @@ impl Config {
                     .acknowledgements()
                     .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
-                    .enabled()
+                    .enabled(sink.inner.default_acknowledgements())
             })
             .flat_map(|(name, sink)| {
                 sink.inputs

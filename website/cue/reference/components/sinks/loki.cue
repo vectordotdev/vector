@@ -13,7 +13,7 @@ components: sinks: loki: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

@@ -148,8 +148,8 @@ impl AcknowledgementsConfig {
         Self { enabled }
     }
 
-    pub fn enabled(&self) -> bool {
-        self.enabled.unwrap_or(false)
+    pub fn enabled(&self, default: bool) -> bool {
+        self.enabled.unwrap_or(default)
     }
 }
 

@@ -6,7 +6,7 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
-		if features.acknowledgements {
+		if features.acknowledgements.capable {
 			acknowledgements: {
 				common: true
 				description: """
@@ -19,7 +19,7 @@ components: sinks: [Name=string]: {
 						description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
 						warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
 						required: false
-						type: bool: default: false
+						type: bool: default: features.acknowledgements.default
 					}
 				}
 			}

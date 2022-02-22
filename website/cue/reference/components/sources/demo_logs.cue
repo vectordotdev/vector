@@ -19,7 +19,7 @@ components: sources: demo_logs: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

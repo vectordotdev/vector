@@ -15,7 +15,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		multiline: enabled: false
 		receive: {
 			from: {

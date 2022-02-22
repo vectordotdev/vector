@@ -102,7 +102,7 @@ impl SourceContext {
     }
 
     pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
-        if config.enabled() {
+        if config.enabled(false) {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
                 component_name = self.key.id(),
@@ -112,7 +112,7 @@ impl SourceContext {
         config
             .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
-            .enabled()
+            .enabled(false)
     }
 }
 

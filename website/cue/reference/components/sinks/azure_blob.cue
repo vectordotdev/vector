@@ -13,7 +13,10 @@ components: sinks: azure_blob: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: {
+			capable: true
+			default: true
+		}
 		healthcheck: enabled: true
 		send: {
 			batch: {

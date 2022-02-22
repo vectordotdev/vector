@@ -46,7 +46,7 @@ components: sources: docker_logs: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

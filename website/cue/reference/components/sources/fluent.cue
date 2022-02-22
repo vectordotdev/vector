@@ -15,7 +15,7 @@ components: sources: fluent: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		receive: {
 			from: {
 				service: services.fluent

@@ -13,7 +13,7 @@ components: sinks: http: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

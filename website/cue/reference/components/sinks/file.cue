@@ -14,7 +14,7 @@ components: sinks: file: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		healthcheck: enabled: true
 		send: {
 			compression: {

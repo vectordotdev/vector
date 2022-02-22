@@ -13,7 +13,10 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	features: {
-		acknowledgements: true
+		acknowledgements: {
+			capable: true
+			default: true
+		}
 		healthcheck: enabled: true
 		send: {
 			batch: {

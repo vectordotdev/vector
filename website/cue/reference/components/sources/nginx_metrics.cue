@@ -13,7 +13,7 @@ components: sources: nginx_metrics: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

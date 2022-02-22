@@ -710,6 +710,10 @@ impl SinkConfig for DatadogArchivesSinkConfig {
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
         Some(&self.acknowledgements)
     }
+
+    fn default_acknowledgements(&self) -> bool {
+        true
+    }
 }
 
 // Make a header pair from a key-value string pair

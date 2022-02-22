@@ -107,6 +107,10 @@ impl SinkConfig for S3SinkConfig {
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
         Some(&self.acknowledgements)
     }
+
+    fn default_acknowledgements(&self) -> bool {
+        true
+    }
 }
 
 impl S3SinkConfig {

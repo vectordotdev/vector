@@ -97,6 +97,10 @@ impl SinkConfig for AzureBlobSinkConfig {
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
         Some(&self.acknowledgements)
     }
+
+    fn default_acknowledgements(&self) -> bool {
+        true
+    }
 }
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =

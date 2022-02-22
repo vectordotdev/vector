@@ -27,11 +27,11 @@
   {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
   {{ end }}
 
-  {{ if eq $features.acknowledgements true }}
+  {{ if eq $features.acknowledgements.capable true }}
   {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
   {{ end }}
 
-  {{ if eq $features.acknowledgements false }}
+  {{ if eq $features.acknowledgements.capable false }}
   {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "no" "color" "yellow" "inline" true) }}
   {{ end }}
 

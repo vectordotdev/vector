@@ -4,7 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		collect: {
 			checkpoint: enabled: false
 			from: components._nats.features.collect.from

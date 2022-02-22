@@ -4,7 +4,7 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		multiline: enabled: true
 		collect: {
 			tls: enabled:        false

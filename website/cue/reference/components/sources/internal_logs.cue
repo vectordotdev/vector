@@ -14,7 +14,7 @@ components: sources: internal_logs: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		collect: {
 			checkpoint: enabled: false
 			from: service: {

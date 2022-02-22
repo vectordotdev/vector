@@ -165,7 +165,7 @@ components: {
 		let Args = _args
 
 		if Args.kind == "source" {
-			acknowledgements: bool
+			acknowledgements: #FeaturesAcknowledgements
 			collect?:         #FeaturesCollect
 			generate?:        #FeaturesGenerate
 			multiline:        #FeaturesMultiline
@@ -208,7 +208,10 @@ components: {
 		descriptions: [Name=string]: string
 	}
 
-	#FeaturesAcknowledgements: bool
+	#FeaturesAcknowledgements: {
+		capable: bool
+		default: bool | *false
+	}
 
 	#FeaturesAggregate: {
 	}

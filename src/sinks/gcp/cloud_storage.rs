@@ -144,6 +144,10 @@ impl SinkConfig for GcsSinkConfig {
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
         Some(&self.acknowledgements)
     }
+
+    fn default_acknowledgements(&self) -> bool {
+        true
+    }
 }
 
 impl GcsSinkConfig {

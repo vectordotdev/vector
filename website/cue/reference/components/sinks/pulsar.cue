@@ -13,7 +13,7 @@ components: sinks: pulsar: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: capable: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

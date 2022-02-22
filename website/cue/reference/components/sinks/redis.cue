@@ -11,7 +11,7 @@ components: sinks: redis: {
 		stateful: false
 	}
 	features: {
-		acknowledgements: true
+		acknowledgements: capable: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

@@ -145,6 +145,10 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig>;
+
+    fn default_acknowledgements(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
