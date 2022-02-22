@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -14,7 +14,7 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
         error!(
             message = "Invalid metric received; dropping event.",
             error_code = "invalid_metric",
-            error_type = "encoder_failed",
+            error_type =  error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             value = ?self.metric.value(),
             kind = ?self.metric.kind(),
@@ -26,7 +26,7 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
         counter!(
             "processing_errors_total", 1,
             "error_code" => "invalid_metric",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
@@ -43,7 +43,7 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
             message = "Failed to encode event; dropping event.",
             error = %self.error,
             error_code = "sematext_metrics_encoding_failed",
-            error_type = "encoder_failed",
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -53,7 +53,7 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
         counter!(
             "component_errors_total", 1,
             "error_code" => "sematext_metrics_encoding_failed",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

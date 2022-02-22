@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -39,7 +39,7 @@ where
             message = "Unable to connect.",
             error = %self.error,
             error_code = "failed_connecting",
-            error_type = "writer_failed",
+            error_type = error_type::WRITER_FAILED,
             // this event is only used in sinks
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10,
@@ -50,7 +50,7 @@ where
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_connecting",
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated
@@ -97,7 +97,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     message = "Connection error.",
                     error = %self.error,
                     error_code = "connection_failed",
-                    error_type = "writer_failed",
+                    error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
                     internal_log_rate_secs = 10,
                 );
@@ -127,7 +127,7 @@ impl InternalEvent for TcpSocketError {
             message = "TCP socket error.",
             error = %self.error,
             error_code = "socket_failed",
-            error_type = "writer_failed",
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10,
         );
@@ -137,7 +137,7 @@ impl InternalEvent for TcpSocketError {
         counter!(
             "connection_errors_total", 1,
             "error_code" => "socket_failed",
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
             "mode" => "tcp",
         );
@@ -155,7 +155,7 @@ impl InternalEvent for TcpSendAckError {
             message = "Error writing acknowledgement, dropping connection.",
             error = %self.error,
             error_code = "ack_failed",
-            error_type = "writer_failed",
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10,
         );
@@ -165,7 +165,7 @@ impl InternalEvent for TcpSendAckError {
         counter!(
             "connection_errors_total", 1,
             "error_code" => "ack_failed",
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
             "mode" => "tcp",
         );

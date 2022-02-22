@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -32,8 +32,8 @@ impl<E: std::fmt::Display> InternalEvent for RedisSendEventError<E> {
         error!(
             message = "Failed to send message.",
             error = %self.error,
-            error_code = "redis_sending_failed",
-            error_type = "writer_failed",
+            error_code = "redis_sending",
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
         );
@@ -42,8 +42,8 @@ impl<E: std::fmt::Display> InternalEvent for RedisSendEventError<E> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "redis_sending_failed",
-            "error_type" => "writer_failed",
+            "error_code" => "redis_sending",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated

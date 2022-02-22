@@ -45,7 +45,7 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
         error!(
             message = %format!("Encoded event is too long: {} > {}", self.size, self.max_size),
             error_code = "message_too_long",
-            error_type = "encoder_failed",
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
     }

@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, http_error_code};
+use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::counter;
 use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
@@ -12,8 +12,8 @@ impl InternalEvent for AzureBlobErrorResponse {
     fn emit_logs(&self) {
         error!(
             message = "HTTP error response",
-            error_code = %format!("http_response_{}", http_error_code(self.code.as_u16())),
-            error_type = "request_failed",
+            error_code = %http_error_code(self.code.as_u16()),
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -21,8 +21,8 @@ impl InternalEvent for AzureBlobErrorResponse {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => format!("http_response_{}", http_error_code(self.code.as_u16())),
-            "error_type" => "request_failed",
+            "error_code" => http_error_code(self.code.as_u16()),
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated
@@ -40,8 +40,8 @@ impl InternalEvent for AzureBlobHttpError {
         error!(
             message = "Error processing request.",
             error = %self.error,
-            error_code = "error_processing_request",
-            error_type = "request_failed",
+            error_code = "processing_request",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10
         );
@@ -50,8 +50,8 @@ impl InternalEvent for AzureBlobHttpError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "error_processing_request",
-            "error_type" => "request_failed",
+            "error_code" => "processing_request",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated

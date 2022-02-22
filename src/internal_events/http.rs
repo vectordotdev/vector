@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::prelude::{error_stage, http_error_code};
+use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -84,7 +84,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             message = "Received bad request.",
             error = %self.message,
             error_code = %self.error_code(),
-            error_type = "failed_request",
+            error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
             internal_log_rate_secs = 10,
@@ -95,7 +95,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => self.error_code(),
-            "error_type" => "failed_request",
+            "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -111,7 +111,7 @@ impl InternalEvent for HttpEventMissingMessageError {
         error!(
             message = "Event missing the message key; dropping event.",
             error_code = "missing_event_key",
-            error_type = "failed_encoding",
+            error_type = error_type::ENCODER_FAILED,
             error_stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
@@ -121,13 +121,13 @@ impl InternalEvent for HttpEventMissingMessageError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "missing_event_key",
-            "error_type" => "failed_encoding",
+            "error_type" => error_type::ENCODER_FAILED,
             "error_stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error_code" => "missing_event_key",
-            "error_type" => "failed_encoding",
+            "error_type" => error_type::ENCODER_FAILED,
             "error_stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -162,7 +162,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             message = "Failed decompressing payload.",
             error = %self.error,
             error_code = "failed_decompressing_payload",
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             encoding = %self.encoding,
             internal_log_rate_secs = 10
@@ -173,7 +173,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_decompressing_payload",
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated

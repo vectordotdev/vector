@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
@@ -53,7 +53,7 @@ impl<'a> InternalEvent for FileIoError<'a> {
             message = %self.message,
             error = %self.error,
             error_code = %self.code,
-            error_type = "io_failed",
+            error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -62,7 +62,7 @@ impl<'a> InternalEvent for FileIoError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => self.code.to_string(),
-            "error_type" => "io_failed",
+            "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
         );
     }
@@ -78,7 +78,7 @@ impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
         error!(
             message = "Failed expiring a file.",
             error = %self.error,
-            error_type = "writer_failed",
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -87,7 +87,7 @@ impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
     }

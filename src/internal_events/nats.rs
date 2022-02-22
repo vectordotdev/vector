@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -56,8 +56,8 @@ impl InternalEvent for NatsEventSendError {
         error!(
             message = "Failed to send message.",
             error = %self.error,
-            error_code = "failed_sending_event",
-            error_type = "writer_failed",
+            error_code = "sending_event",
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -66,7 +66,7 @@ impl InternalEvent for NatsEventSendError {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_sending_event",
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated

@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -15,7 +15,7 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
         error!(
             message = "Invalid metric received; dropping event.",
             error_code = "invalid_metric",
-            error_type = "encoder_failed",
+            error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             value = ?self.value,
             kind = ?self.kind,
@@ -27,7 +27,7 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
         counter!(
             "processing_errors_total", 1,
             "error_code" => "invalid_metric",
-            "error_type" => "encoder_failed",
+            "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
