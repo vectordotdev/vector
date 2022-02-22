@@ -24,7 +24,7 @@ serde_json = "1"
 tracing-subscriber = { version = "0.3.9", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.4.1" }
+tikv-jemallocator = { version = "0.4.3" }
 
 [features]
 default = []
