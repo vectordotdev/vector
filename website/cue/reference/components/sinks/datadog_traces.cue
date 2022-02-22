@@ -22,9 +22,9 @@ components: sinks: datadog_traces: {
 				algorithms: ["none", "gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: enabled:    false
-			proxy: enabled:       true
-			request: enabled:     true
+			encoding: enabled: false
+			proxy: enabled:    true
+			request: enabled:  true
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -53,13 +53,13 @@ components: sinks: datadog_traces: {
 	support: sinks._datadog.support
 
 	configuration: {
-		default_api_key:  sinks._datadog.configuration.api_key
-		endpoint:         sinks._datadog.configuration.endpoint
-		site:             sinks._datadog.configuration.site
+		default_api_key: sinks._datadog.configuration.api_key
+		endpoint:        sinks._datadog.configuration.endpoint
+		site:            sinks._datadog.configuration.site
 	}
 
 	input: {
-		logs: false
+		logs:    false
 		metrics: null
 	}
 
