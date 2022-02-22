@@ -106,6 +106,14 @@ impl LogEvent {
         util::log::get(self.as_map(), key.as_ref())
     }
 
+    #[instrument(level = "trace", skip(self, meaning), fields(meaning = %meaning.as_ref()))]
+    pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.fields.get_by_path(path))
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())

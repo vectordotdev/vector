@@ -1,8 +1,10 @@
 use bytes::{BufMut, BytesMut};
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
+use value::Kind;
 
-use crate::event::Event;
+use crate::{event::Event, schema};
 
 /// Config used to build a `JsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -17,6 +19,13 @@ impl JsonSerializerConfig {
     /// Build the `JsonSerializer` from this configuration.
     pub const fn build(&self) -> JsonSerializer {
         JsonSerializer
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        // Technically we can serialize any type of `Value` to JSON, even "non-JSON" types such as
+        // `timestamp`, but it's not a lossless serialization. Should we allow it in the schema?
+        schema::Requirement::empty().require_field(&LookupBuf::root(), Kind::json())
     }
 }
 
