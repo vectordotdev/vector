@@ -111,7 +111,7 @@ value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl_"] }
+vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
@@ -337,7 +337,7 @@ tempfile = "3.3.0"
 tokio = { version = "1.17.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl_", "test"] }
+vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
 wiremock = "0.5.10"
 quickcheck = "1.0.3"
