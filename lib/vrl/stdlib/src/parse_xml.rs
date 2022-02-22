@@ -49,7 +49,9 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
+        _state: &state::Compiler,
+        _ctx: &mut FunctionCompileContext,
+        mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 

@@ -55,7 +55,9 @@ impl Function for IpCidrContains {
 
     fn compile(
         &self,
-        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
+        _state: &state::Compiler,
+        _ctx: &mut FunctionCompileContext,
+        mut arguments: ArgumentList,
     ) -> Compiled {
         let cidr = arguments.required("cidr");
         let value = arguments.required("value");
