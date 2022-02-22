@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
@@ -55,7 +55,7 @@ impl InternalEvent for ExecFailedError<'_> {
             message = "Unable to exec.",
             command = %self.command,
             error = ?self.error,
-            error_type = "command_failed",
+            error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
         );
     }
@@ -65,7 +65,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "command_failed",
+            "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
@@ -73,7 +73,7 @@ impl InternalEvent for ExecFailedError<'_> {
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "command_failed",
+            "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
     }
@@ -93,7 +93,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             command = %self.command,
             elapsed_seconds = %self.elapsed_seconds,
             error = %self.error,
-            error_type = "timed_out",
+            error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
         );
     }
@@ -103,15 +103,15 @@ impl InternalEvent for ExecTimeoutError<'_> {
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "timed_out",
-            "stage" => "receiving",
+            "error_type" => error_type::TIMED_OUT,
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
             "error" => self.error.to_string(),
-            "error_type" => "timed_out",
+            "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
         );
     }
