@@ -3,8 +3,8 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct WindowsServiceStart<'a> {
-    already_started: bool,
-    name: &'a str,
+    pub(crate) already_started: bool,
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceStart<'a> {
@@ -26,7 +26,7 @@ impl<'a> InternalEvent for WindowsServiceStart<'a> {
 #[derive(Debug)]
 pub(crate) struct WindowsServiceStop<'a> {
     pub(crate) already_stopped: bool,
-    name: &'a str,
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceStop<'a> {
@@ -47,7 +47,7 @@ impl<'a> InternalEvent for WindowsServiceStop<'a> {
 
 #[derive(Debug)]
 pub(crate) struct WindowsServiceRestart<'a> {
-    name: &'a str,
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceRestart<'a> {
@@ -65,7 +65,7 @@ impl<'a> InternalEvent for WindowsServiceRestart<'a> {
 
 #[derive(Debug)]
 pub(crate) struct WindowsServiceInstall<'a> {
-    name: &'a str,
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceInstall<'a> {
