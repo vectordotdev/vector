@@ -7,7 +7,7 @@ pr_numbers: []
 release: "0.22.0"
 hide_on_release_notes: true
 badges:
-  type: breaking change
+type: breaking change
 ---
 
 Vector's 0.22.0 release includes **breaking changes**:
@@ -22,12 +22,11 @@ We cover them below to help you upgrade quickly:
 
 #### The `vector vrl` timezone flag `-tz` is now `-z` {#vector-vrl-timezone}
 
-We upgraded the Vector CLI to use [Clap v3](https://crates.io/crates/clap), a
-popular Rust crate.
+We upgraded the Vector CLI to use [Clap v3](https://crates.io/crates/clap), a popular Rust crate.
 
-A breaking change in Clap v3 is that shortened CLI flags now use the `char`
-type, meaning they are restricted to single characters.
+A breaking change in Clap v3 is that CLI flags using 'short form' options now use the `char` type, meaning
+they are restricted to single characters.
 
-As a consequence, the shortened form of our `vector vrl --timezone` flag
-(previously `--tz`) has been updated to the more succinct `-z`.
+As a consequence, the shortened form of our `vector vrl --timezone` flag (previously `--tz`) has been
+updated to just `-z`.
 

@@ -29,14 +29,14 @@ pub struct Opts {
     component_id_patterns: Vec<String>,
 
     /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
-    #[structopt(use_delimiter(true), long)]
+    #[clap(use_value_delimiter(true), long)]
     outputs_of: Vec<String>,
 
     /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
-    #[structopt(use_delimiter(true), long)]
+    #[clap(use_value_delimiter(true), long)]
     inputs_of: Vec<String>,
 
     /// Quiet output includes only events
-    #[structopt(short, long)]
+    #[clap(short, long)]
     quiet: bool,
 }
