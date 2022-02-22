@@ -1,3 +1,4 @@
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -42,6 +43,8 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
     }
 }
 
+const ANNOTATION_FAILED: &str = "annotation_failed";
+
 #[derive(Debug)]
 pub struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
@@ -51,9 +54,9 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to annotate event with pod metadata.",
-            error_type = "event_annotation",
+            error_type = ANNOTATION_FAILED,
             event = ?self.event,
-            stage = "processing",
+            stage = error_stage::PROCESSING,
         );
     }
 
@@ -61,15 +64,15 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
         counter!(
             "component_errors_total", 1,
             "error" => "Failed to annotate event with pod metadata.",
-            "error_type" => "event_annotation",
-            "stage" => "processing",
+            "error_type" => ANNOTATION_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_annotation_failures_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventNamespaceAnnotationError<'a> {
+pub(crate) struct KubernetesLogsEventNamespaceAnnotationError<'a> {
     pub event: &'a Event,
 }
 
@@ -77,9 +80,9 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to annotate event with namespace metadata.",
-            error_type = "event_annotation",
+            error_type = ANNOTATION_FAILED,
             event = ?self.event,
-            stage = "processing",
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -88,8 +91,8 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
         counter!(
             "component_errors_total", 1,
             "error" => "Failed to annotate event with namespace metadata.",
-            "error_type" => "event_annotation",
-            "stage" => "processing",
+            "error_type" => ANNOTATION_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_namespace_annotation_failures_total", 1);
     }
@@ -123,8 +126,8 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
         warn!(
             message = "Failed to parse log line in docker format.",
             error = %self.error,
-            error_type = "parser",
-            stage = "processing",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -133,12 +136,14 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parser",
-            "stage" => "processing",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_docker_format_parse_failures_total", 1);
     }
 }
+
+const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
 #[derive(Debug)]
 pub struct KubernetesLifecycleError<E> {
@@ -153,8 +158,8 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
         error!(
             message = self.message,
             error = %self.error,
-            error_type = "kubernetes_lifecycle",
-            stage = "processing",
+            error_type = KUBERNETES_LIFECYCLE,
+            stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
     }
@@ -163,8 +168,8 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "kubernetes_lifecycle",
-            "stage" => "processing",
+            "error_type" => KUBERNETES_LIFECYCLE,
+            "stage" => error_stage::PROCESSING,
         );
     }
 }

@@ -38,8 +38,8 @@ choice for transforming data in Vector:
   ensure that your VRL code is sound, meaning no dead code, no unhandled errors,
   and no type mismatches.
 
-In cases where VRL doesn't fit your use case, Vector also offers two [runtime
-transforms](#runtime-transforms) that offer a bit more flexibility than VRL but
+In cases where VRL doesn't fit your use case, Vector also offers a [Lua runtime
+transform](#lua-runtime-transform) that offer a bit more flexibility than VRL but
 also come with downsides (listed below) that should always be borne in mind.
 
 ## Transforming data using VRL
@@ -173,7 +173,7 @@ recommend checking out the following documentation:
 * [VRL expressions][docs.vrl.expressions], which describes things VRL's syntax
   and type system in great detail
 
-## Runtime transforms
+## Lua runtime transform
 
 If VRL doesn't cover your use case—and that should happen rarely—Vector also
 offers a [`lua`][docs.lua] **runtime transform** that you can use instead of

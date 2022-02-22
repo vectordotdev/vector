@@ -1,9 +1,8 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
-lazy_static! {
-    static ref VALID_FIELD: Regex = Regex::new("^[0-9]*[a-zA-Z_][0-9a-zA-Z_]*$").unwrap();
-}
+static VALID_FIELD: Lazy<Regex> =
+    Lazy::new(|| Regex::new("^[0-9]*[a-zA-Z_][0-9a-zA-Z_]*$").unwrap());
 
 /// A valid fieldname can contain alphanumeric characters and an underscore.
 /// It may start with a number, but has to consist of more than just a number.

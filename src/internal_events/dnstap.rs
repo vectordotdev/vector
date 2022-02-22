@@ -1,3 +1,4 @@
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -25,7 +26,7 @@ impl InternalEvent for DnstapEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct DnstapParseError<'a> {
+pub(crate) struct DnstapParseError<'a> {
     pub error: &'a str,
 }
 
@@ -34,8 +35,8 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
         error!(
             message = "Error occurred while parsing dnstap data.",
             error = ?self.error,
-            error_type = "parse_failed",
-            stage = "processing",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
     }
@@ -43,9 +44,9 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => "processing",
+            "stage" => error_stage::PROCESSING,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
+            "error_type" => error_type::PARSER_FAILED,
         );
         // deprecated
         counter!("parse_errors_total", 1);

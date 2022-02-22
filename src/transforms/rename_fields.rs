@@ -3,10 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
+    schema,
     serde::Fields,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -48,11 +50,11 @@ impl TransformConfig for RenameFieldsConfig {
         )?))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

@@ -8,9 +8,10 @@ use snafu::Snafu;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    internal_events::{TemplateRenderingFailed, ThrottleEventDiscarded},
+    internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
+    schema,
     template::Template,
     transforms::{TaskTransform, Transform},
 };
@@ -37,11 +38,11 @@ impl TransformConfig for ThrottleConfig {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -55,7 +56,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     clock: C,
 }
 
@@ -133,7 +134,7 @@ where
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
-                                                    emit!(&TemplateRenderingFailed {
+                                                    emit!(&TemplateRenderingError {
                                                         error,
                                                         field: Some("key_field"),
                                                         drop_event: false,

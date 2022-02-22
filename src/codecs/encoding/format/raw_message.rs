@@ -1,4 +1,3 @@
-use super::{BoxedSerializer, SerializerConfig};
 use crate::{config::log_schema, event::Event};
 
 use bytes::{BufMut, BytesMut};
@@ -14,12 +13,10 @@ impl RawMessageSerializerConfig {
     pub const fn new() -> Self {
         Self
     }
-}
 
-#[typetag::serde(name = "text")]
-impl SerializerConfig for RawMessageSerializerConfig {
-    fn build(&self) -> crate::Result<BoxedSerializer> {
-        Ok(Box::new(RawMessageSerializer))
+    /// Build the `RawMessageSerializer` from this configuration.
+    pub const fn build(&self) -> RawMessageSerializer {
+        RawMessageSerializer
     }
 }
 
@@ -41,8 +38,9 @@ impl Encoder<Event> for RawMessageSerializer {
         let bytes = match event {
             Event::Log(log) => log
                 .get(log_schema().message_key())
-                .map(|value| value.as_bytes()),
+                .map(|value| value.coerce_to_bytes()),
             Event::Metric(_) => None,
+            Event::Trace(_) => None,
         };
 
         if let Some(bytes) = bytes {

@@ -8,8 +8,9 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -59,11 +60,11 @@ impl TransformConfig for MergeConfig {
         Ok(Transform::event_task(Merge::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

@@ -58,9 +58,9 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         (Value::Timestamp(this), Value::Timestamp(other)) => this.eq(other),
         (Value::Null, Value::Null) => true,
         // Non-trivial.
-        (Value::Float(this), Value::Float(other)) => f64_eq(*this, *other),
+        (Value::Float(this), Value::Float(other)) => f64_eq(this.into_inner(), other.into_inner()),
         (Value::Array(this), Value::Array(other)) => array_eq(this, other),
-        (Value::Map(this), Value::Map(other)) => map_eq(this, other),
+        (Value::Object(this), Value::Object(other)) => map_eq(this, other),
         // Type mismatch.
         _ => false,
     }
@@ -121,13 +121,14 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
     match value {
         // Trivial.
         Value::Bytes(val) => val.hash(hasher),
+        Value::Regex(val) => val.as_bytes_slice().hash(hasher),
         Value::Boolean(val) => val.hash(hasher),
         Value::Integer(val) => val.hash(hasher),
         Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
-        Value::Float(val) => hash_f64(hasher, *val),
+        Value::Float(val) => hash_f64(hasher, val.into_inner()),
         Value::Array(val) => hash_array(hasher, val),
-        Value::Map(val) => hash_map(hasher, val),
+        Value::Object(val) => hash_map(hasher, val),
         Value::Null => hash_null(hasher),
     }
 }

@@ -72,12 +72,23 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
+    ByteSizeOf + EventCount + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
+    T: ByteSizeOf + EventCount + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
 {
+}
+
+pub trait EventCount {
+    fn event_count(&self) -> usize;
+}
+
+#[cfg(test)]
+impl EventCount for u64 {
+    fn event_count(&self) -> usize {
+        1
+    }
 }

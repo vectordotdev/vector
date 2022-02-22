@@ -7,11 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -86,11 +87,11 @@ impl TransformConfig for DedupeConfig {
         Ok(Transform::event_task(Dedupe::new(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -138,9 +139,10 @@ const fn type_id_for_value(val: &Value) -> TypeId {
         Value::Integer(_) => 2,
         Value::Float(_) => 3,
         Value::Boolean(_) => 4,
-        Value::Map(_) => 5,
+        Value::Object(_) => 5,
         Value::Array(_) => 6,
         Value::Null => 7,
+        Value::Regex(_) => 8,
     }
 }
 
@@ -174,7 +176,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
                 if let Some(value) = event.as_log().get(&field_name) {
-                    entry.push(Some((type_id_for_value(value), value.as_bytes())));
+                    entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {
                     entry.push(None);
                 }
@@ -186,7 +188,11 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
-                    entry.push((field_name, type_id_for_value(value), value.as_bytes()));
+                    entry.push((
+                        field_name,
+                        type_id_for_value(value),
+                        value.coerce_to_bytes(),
+                    ));
                 }
             }
 

@@ -24,7 +24,9 @@ fn merge_with_value(
     Ok(())
 }
 
-pub fn load_file(path: &Path) -> Result<Option<(String, toml::Value, Vec<String>)>, Vec<String>> {
+pub(self) fn load_file(
+    path: &Path,
+) -> Result<Option<(String, toml::Value, Vec<String>)>, Vec<String>> {
     if let (Ok(name), Some(file), Ok(format)) = (
         component_name(path),
         open_file(path),

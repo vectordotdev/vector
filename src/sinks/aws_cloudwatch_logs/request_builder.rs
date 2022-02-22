@@ -5,7 +5,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use super::{CloudwatchLogsError, TemplateRenderingFailed};
+use super::{CloudwatchLogsError, TemplateRenderingError};
 use crate::{
     config::LogSchema,
     event::{Event, Value},
@@ -24,7 +24,7 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 #[derive(Clone)]
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
-    pub message: String,
+    pub(super) message: String,
     pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
@@ -51,7 +51,7 @@ impl CloudwatchRequestBuilder {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("group"),
                     drop_event: true,
@@ -63,7 +63,7 @@ impl CloudwatchRequestBuilder {
         let stream = match self.stream_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("stream"),
                     drop_event: true,

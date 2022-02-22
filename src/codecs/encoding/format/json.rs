@@ -2,7 +2,6 @@ use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
-use super::{BoxedSerializer, SerializerConfig};
 use crate::event::Event;
 
 /// Config used to build a `JsonSerializer`.
@@ -14,12 +13,10 @@ impl JsonSerializerConfig {
     pub const fn new() -> Self {
         Self
     }
-}
 
-#[typetag::serde(name = "json")]
-impl SerializerConfig for JsonSerializerConfig {
-    fn build(&self) -> crate::Result<BoxedSerializer> {
-        Ok(Box::new(JsonSerializer))
+    /// Build the `JsonSerializer` from this configuration.
+    pub const fn build(&self) -> JsonSerializer {
+        JsonSerializer
     }
 }
 
@@ -42,6 +39,7 @@ impl Encoder<Event> for JsonSerializer {
         match event {
             Event::Log(log) => serde_json::to_writer(writer, &log),
             Event::Metric(metric) => serde_json::to_writer(writer, &metric),
+            Event::Trace(trace) => serde_json::to_writer(writer, &trace),
         }
         .map_err(Into::into)
     }

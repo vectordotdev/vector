@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use indexmap::{IndexMap, IndexSet};
 
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
+use super::{
+    builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
+};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -92,10 +94,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let tests = tests
         .into_iter()
         .map(|test| test.resolve_outputs(&graph))
-        .collect();
+        .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
-        let config = Config {
+        let mut config = Config {
             global,
             #[cfg(feature = "api")]
             api,
@@ -110,6 +112,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             expansions,
         };
+
+        config.propagate_acknowledgements();
 
         let warnings = validation::warnings(&config);
 
@@ -149,7 +153,7 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-pub fn expand_globs(config: &mut ConfigBuilder) {
+pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .iter()
@@ -160,10 +164,13 @@ pub fn expand_globs(config: &mut ConfigBuilder) {
             })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            t.inner
+                .outputs(&schema::Definition::empty())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
@@ -225,7 +232,7 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
             TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
@@ -254,7 +261,11 @@ mod test {
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
         }
     }
 
@@ -269,12 +280,12 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::all()
         }
 
-        fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+        fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -289,8 +300,8 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::all()
         }
     }
 

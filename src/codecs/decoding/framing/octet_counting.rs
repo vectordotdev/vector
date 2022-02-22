@@ -4,7 +4,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 
-use super::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::BoxedFramingError;
 
 /// Config used to build a `OctetCountingDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -13,7 +13,19 @@ pub struct OctetCountingDecoderConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    octet_counting: OctetCountingDecoderOptions,
+    /// Options for the octet counting decoder.
+    pub octet_counting: OctetCountingDecoderOptions,
+}
+
+impl OctetCountingDecoderConfig {
+    /// Build the `OctetCountingDecoder` from this configuration.
+    pub fn build(&self) -> OctetCountingDecoder {
+        if let Some(max_length) = self.octet_counting.max_length {
+            OctetCountingDecoder::new_with_max_length(max_length)
+        } else {
+            OctetCountingDecoder::new()
+        }
+    }
 }
 
 /// Options for building a `OctetCountingDecoder`.
@@ -22,19 +34,6 @@ pub struct OctetCountingDecoderConfig {
 pub struct OctetCountingDecoderOptions {
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
-}
-
-#[typetag::serde(name = "octet_counting")]
-impl FramingConfig for OctetCountingDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        if let Some(max_length) = self.octet_counting.max_length {
-            Ok(Box::new(OctetCountingDecoder::new_with_max_length(
-                max_length,
-            )))
-        } else {
-            Ok(Box::new(OctetCountingDecoder::new()))
-        }
-    }
 }
 
 /// Codec using the `Octet Counting` format as specified in

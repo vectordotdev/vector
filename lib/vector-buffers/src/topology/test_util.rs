@@ -62,15 +62,20 @@ pub async fn build_buffer(
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
             let (overflow_sender, overflow_receiver) =
-                TopologyBuilder::memory_v2(capacity, overflow_mode, handle.clone()).await;
-            let (mut base_sender, mut base_receiver) =
-                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow, handle.clone()).await;
+                TopologyBuilder::standalone_memory_test(capacity, overflow_mode, handle.clone())
+                    .await;
+            let (mut base_sender, mut base_receiver) = TopologyBuilder::standalone_memory_test(
+                capacity,
+                WhenFull::Overflow,
+                handle.clone(),
+            )
+            .await;
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => TopologyBuilder::memory_v2(capacity, m, handle.clone()).await,
+        m => TopologyBuilder::standalone_memory_test(capacity, m, handle.clone()).await,
     };
 
     (tx, rx, handle)

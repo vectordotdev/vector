@@ -53,7 +53,12 @@ impl Expression for Object {
         // fallible.
         let fallible = type_defs.values().any(TypeDef::is_fallible);
 
-        TypeDef::new().object(type_defs).with_fallibility(fallible)
+        let collection = type_defs
+            .into_iter()
+            .map(|(field, type_def)| (field.into(), type_def.into()))
+            .collect::<BTreeMap<_, _>>();
+
+        TypeDef::object(collection).with_fallibility(fallible)
     }
 
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {

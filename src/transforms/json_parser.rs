@@ -3,10 +3,12 @@ use serde_json::Value;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
-    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
+    internal_events::{JsonParserError, ParserTargetExistsError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -35,11 +37,11 @@ impl TransformConfig for JsonParserConfig {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -84,10 +86,10 @@ impl FunctionTransform for JsonParser {
 
         let parsed = value
             .and_then(|value| {
-                let to_parse = value.as_bytes();
+                let to_parse = value.coerce_to_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(&JsonParserFailedParse {
+                        emit!(&JsonParserError {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -110,7 +112,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&JsonParserTargetExists { target_field })
+                        emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);
@@ -198,7 +200,7 @@ mod test {
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
-    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    // This is a regression test, see: https://github.com/vectordotdev/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
         let mut parser = JsonParser::from(JsonParserConfig {
@@ -547,7 +549,7 @@ mod test {
         let event = event.as_log();
 
         match event.get("message") {
-            Some(crate::event::Value::Map(_)) => (),
+            Some(crate::event::Value::Object(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
         assert_eq!(event["message.greeting"], "hello".into());

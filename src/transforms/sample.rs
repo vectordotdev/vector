@@ -3,10 +3,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::SampleEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -51,11 +53,11 @@ impl TransformConfig for SampleConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -75,12 +77,12 @@ impl TransformConfig for SampleCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -92,12 +94,12 @@ impl TransformConfig for SampleCompatConfig {
 pub struct Sample {
     rate: u64,
     key_field: Option<String>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     count: u64,
 }
 
 impl Sample {
-    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Box<dyn Condition>>) -> Self {
+    pub const fn new(rate: u64, key_field: Option<String>, exclude: Option<Condition>) -> Self {
         Self {
             rate,
             key_field,
@@ -154,7 +156,7 @@ mod tests {
         transforms::test::transform_one,
     };
 
-    fn condition_contains(key: &str, needle: &str) -> Box<dyn Condition> {
+    fn condition_contains(key: &str, needle: &str) -> Condition {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
         }

@@ -1,13 +1,15 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{DataType, Output},
+    config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -36,11 +38,11 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Log
+    pub fn input(&self) -> Input {
+        Input::log()
     }
 
-    pub fn outputs(&self) -> Vec<Output> {
+    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -201,8 +203,10 @@ impl mlua::UserData for LuaEvent {
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
-                    Some(mlua::Value::Number(number)) => {
-                        this.inner.as_mut_log().insert(key, Value::Float(number));
+                    Some(mlua::Value::Number(number)) if !number.is_nan() => {
+                        this.inner
+                            .as_mut_log()
+                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
@@ -227,7 +231,7 @@ impl mlua::UserData for LuaEvent {
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
             if let Some(value) = this.inner.as_log().get(key) {
-                let string = lua.create_string(&value.as_bytes())?;
+                let string = lua.create_string(&value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {
                 Ok(None)
@@ -248,7 +252,9 @@ impl mlua::UserData for LuaEvent {
                     let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
                     match key.clone().and_then(|k| event.inner.as_log().get(k)) {
-                        Some(value) => Ok((key, Some(lua.create_string(&value.as_bytes())?))),
+                        Some(value) => {
+                            Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
+                        }
                         None => Ok((None, None)),
                     }
                 })?;
@@ -396,7 +402,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::from(3.14159));
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{Block, Expr, Literal, Predicate, Resolved},
     vm::OpCode,
@@ -48,7 +49,7 @@ impl Expression for IfStatement {
 
         match &self.alternative {
             None => type_def,
-            Some(alternative) => type_def.merge(alternative.type_def(state)),
+            Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
         }
     }
 

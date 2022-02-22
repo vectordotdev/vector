@@ -5,10 +5,12 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
+    schema,
     transforms::Transform,
 };
 
@@ -16,7 +18,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Route {
-    conditions: IndexMap<String, Box<dyn Condition>>,
+    conditions: IndexMap<String, Condition>,
 }
 
 impl Route {
@@ -83,14 +85,14 @@ impl TransformConfig for RouteConfig {
         Ok(Transform::synchronous(route))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .map(|output_name| Output::from((output_name, DataType::all())))
             .collect()
     }
 
@@ -110,12 +112,12 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -214,7 +216,7 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );
@@ -249,7 +251,7 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );

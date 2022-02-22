@@ -1,11 +1,12 @@
 mod request_limiter;
 
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
+use vector_core::ByteSizeOf;
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -26,7 +27,8 @@ use crate::{
     config::{AcknowledgementsConfig, Resource, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
+        TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -108,7 +110,7 @@ where
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
+    fn handle_events(&self, _events: &mut [Event], _host: Bytes) {}
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
@@ -123,7 +125,7 @@ where
         acknowledgements: AcknowledgementsConfig,
         max_connections: Option<u32>,
     ) -> crate::Result<crate::sources::Source> {
-        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
 
         let listenfd = ListenFd::from_env();
 
@@ -203,7 +205,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled(),
+                                acknowledgements,
                                 request_limiter,
                             );
 
@@ -296,13 +298,20 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok((frames, byte_size))) => {
+                    Some(Ok((frames, _byte_size))) => {
                         let _num_frames = frames.len();
                         let acker = source.build_acker(&frames);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
 
                         let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+                        let count = events.len();
+
+                        emit!(&SocketEventsReceived {
+                            mode: SocketMode::Tcp,
+                            byte_size: events.size_of(),
+                            count,
+                        });
 
                         if let Some(permit) = &mut permit {
                             // Note that this is intentionally not the "number of events in a single request", but rather
@@ -311,14 +320,14 @@ async fn handle_stream<T>(
                             permit.decoding_finished(events.len());
                         }
 
-
                         if let Some(batch) = batch {
                             for event in &mut events {
                                 event.add_batch_notifier(Arc::clone(&batch));
                             }
                         }
-                        source.handle_events(&mut events, host.clone(), byte_size);
-                        match out.send_all(&mut stream::iter(events)).await {
+
+                        source.handle_events(&mut events, host.clone());
+                        match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,
@@ -348,8 +357,8 @@ async fn handle_stream<T>(
                                     break;
                                 }
                             }
-                            Err(_) => {
-                                warn!("Failed to send event.");
+                            Err(error) => {
+                                emit!(&StreamClosedError { error, count });
                                 break;
                             }
                         }

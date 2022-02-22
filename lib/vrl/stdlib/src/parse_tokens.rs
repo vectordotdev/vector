@@ -62,9 +62,7 @@ impl Expression for ParseTokensFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().array_mapped::<(), Kind>(map! {
-            (): Kind::Bytes
-        })
+        TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }
 
@@ -87,9 +85,7 @@ mod tests {
                             "11881".into(),
 
                     ]),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! {
-                (): Kind::Bytes
-            }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
     ];
 }

@@ -2,16 +2,16 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-use super::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::BoxedFramingError;
 
 /// Config used to build a `LengthDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct LengthDelimitedDecoderConfig;
 
-#[typetag::serde(name = "length_delimited")]
-impl FramingConfig for LengthDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(LengthDelimitedDecoder::new()))
+impl LengthDelimitedDecoderConfig {
+    /// Build the `LengthDelimitedDecoder` from this configuration.
+    pub fn build(&self) -> LengthDelimitedDecoder {
+        LengthDelimitedDecoder::new()
     }
 }
 

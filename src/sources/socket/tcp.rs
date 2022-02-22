@@ -11,7 +11,6 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
@@ -36,10 +35,10 @@ pub struct TcpConfig {
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
     #[getset(get = "pub", set = "pub")]
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     pub connection_limit: Option<u32>,
 }
 
@@ -48,7 +47,7 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: Option<usize>,
@@ -56,8 +55,8 @@ impl TcpConfig {
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Box<dyn DeserializerConfig>,
+        framing: Option<FramingConfig>,
+        decoding: DeserializerConfig,
         connection_limit: Option<u32>,
     ) -> Self {
         Self {
@@ -112,13 +111,7 @@ impl TcpSource for RawTcpSource {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
-        emit!(&SocketEventsReceived {
-            mode: SocketMode::Tcp,
-            byte_size,
-            count: events.len()
-        });
-
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         let now = Utc::now();
 
         for event in events {

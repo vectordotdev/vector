@@ -32,10 +32,10 @@ pub struct AwsSqsConfig {
 
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    pub framing: Box<dyn FramingConfig>,
+    pub framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -45,8 +45,8 @@ pub struct AwsSqsConfig {
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let client = self.build_client(&cx).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(
             SqsSource {
@@ -55,7 +55,7 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: acknowledgements.enabled(),
+                acknowledgements,
             }
             .run(cx.out, cx.shutdown),
         ))
@@ -68,12 +68,16 @@ impl SourceConfig for AwsSqsConfig {
     fn source_type(&self) -> &'static str {
         "aws_sqs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         let mut config_builder = aws_sdk_sqs::config::Builder::new()
-            .credentials_provider(self.auth.credentials_provider().await);
+            .credentials_provider(self.auth.credentials_provider().await?);
 
         if let Some(endpoint_override) = self.region.endpoint()? {
             config_builder = config_builder.endpoint_resolver(endpoint_override);

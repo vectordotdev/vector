@@ -6,16 +6,24 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        NewlineDelimitedDecoder,
+    },
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{
+        BytesReceived, EventsReceived, StatsdInvalidRecordError, StatsdSocketError,
+        StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -140,25 +148,35 @@ impl SourceConfig for StatsdConfig {
             Self::Unix(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsdDeserializer;
+pub(crate) struct StatsdDeserializer;
 
-impl Deserializer for StatsdDeserializer {
+impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        emit!(&BytesReceived {
+            protocol: "udp",
+            byte_size: bytes.len(),
+        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(&StatsdEventReceived {
-                    byte_size: bytes.len()
+                let event = Event::Metric(metric);
+                emit!(&EventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
                 });
-                Ok(smallvec![Event::Metric(metric)])
+                Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecord {
+                emit!(&StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -190,18 +208,16 @@ async fn statsd_udp(
     );
 
     let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
             Ok(((events, _byte_size), _sock)) => {
-                for metric in events {
-                    if let Err(error) = out.send(metric).await {
-                        error!(message = "Error sending metric.", %error);
-                        break;
-                    }
+                let count = events.len();
+                if let Err(error) = out.send_batch(events).await {
+                    emit!(&StreamClosedError { error, count });
                 }
             }
             Err(error) => {
@@ -224,8 +240,8 @@ impl TcpSource for StatsdTcpSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(NewlineDelimitedDecoder::new()),
-            Box::new(StatsdDeserializer),
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )
     }
 

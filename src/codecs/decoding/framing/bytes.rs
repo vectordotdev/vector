@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-use super::{BoxedFramer, BoxedFramingError, FramingConfig};
+use super::BoxedFramingError;
 
 /// Config used to build a `BytesDecoderConfig`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -13,12 +13,10 @@ impl BytesDecoderConfig {
     pub const fn new() -> Self {
         Self
     }
-}
 
-#[typetag::serde(name = "bytes")]
-impl FramingConfig for BytesDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(BytesDecoder::new()))
+    /// Build the `ByteDecoder` from this configuration.
+    pub const fn build(&self) -> BytesDecoder {
+        BytesDecoder::new()
     }
 }
 

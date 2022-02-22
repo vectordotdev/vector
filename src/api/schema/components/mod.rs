@@ -3,13 +3,12 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
+use once_cell::sync::Lazy;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
 };
-
-use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use lazy_static::lazy_static;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
@@ -20,7 +19,7 @@ use crate::{
         relay, sort,
     },
     config::{ComponentKey, Config},
-    filter_check,
+    filter_check, schema,
 };
 
 #[derive(Debug, Clone, Interface)]
@@ -221,12 +220,11 @@ enum ComponentChanged {
     Removed(Component),
 }
 
-lazy_static! {
-    static ref COMPONENT_CHANGED: tokio::sync::broadcast::Sender<ComponentChanged> = {
+static COMPONENT_CHANGED: Lazy<tokio::sync::broadcast::Sender<ComponentChanged>> =
+    Lazy::new(|| {
         let (tx, _) = tokio::sync::broadcast::channel(10);
         tx
-    };
-}
+    });
 
 #[derive(Debug, Default)]
 pub struct ComponentsSubscription;
@@ -285,7 +283,7 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs()
+                    .outputs(&schema::Definition::empty())
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

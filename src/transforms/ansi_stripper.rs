@@ -2,10 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
-    internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
+    internal_events::{
+        AnsiStripperError, AnsiStripperFieldInvalidError, AnsiStripperFieldMissingError,
+    },
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -38,11 +42,11 @@ impl TransformConfig for AnsiStripperConfig {
         Ok(Transform::function(AnsiStripper { field }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -52,7 +56,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct AnsiStripper {
+pub(self) struct AnsiStripper {
     field: String,
 }
 
@@ -61,17 +65,17 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(&AnsiStripperFieldMissing { field: &self.field }),
+            None => emit!(&AnsiStripperFieldMissingError { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(&AnsiStripperFailed {
+                    Err(error) => emit!(&AnsiStripperError {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(&AnsiStripperFieldInvalid { field: &self.field }),
+            _ => emit!(&AnsiStripperFieldInvalidError { field: &self.field }),
         }
 
         output.push(event);

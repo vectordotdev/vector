@@ -5,11 +5,10 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
+use regex::Regex;
+use value::ValueRegex;
 
-use crate::{
-    expression::Resolved, value::Regex, vm::OpCode, Context, Expression, Span, State, TypeDef,
-    Value,
-};
+use crate::{expression::Resolved, vm::OpCode, Context, Expression, Span, State, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -17,7 +16,7 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(Regex),
+    Regex(ValueRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
@@ -76,13 +75,13 @@ impl Expression for Literal {
         use Literal::*;
 
         let type_def = match self {
-            String(_) => TypeDef::new().bytes(),
-            Integer(_) => TypeDef::new().integer(),
-            Float(_) => TypeDef::new().float(),
-            Boolean(_) => TypeDef::new().boolean(),
-            Regex(_) => TypeDef::new().regex(),
-            Timestamp(_) => TypeDef::new().timestamp(),
-            Null => TypeDef::new().null(),
+            String(_) => TypeDef::bytes(),
+            Integer(_) => TypeDef::integer(),
+            Float(_) => TypeDef::float(),
+            Boolean(_) => TypeDef::boolean(),
+            Regex(_) => TypeDef::regex(),
+            Timestamp(_) => TypeDef::timestamp(),
+            Null => TypeDef::null(),
         };
 
         type_def.infallible()
@@ -232,13 +231,13 @@ impl From<bool> for Literal {
 
 impl From<Regex> for Literal {
     fn from(regex: Regex) -> Self {
-        Literal::Regex(regex)
+        Literal::Regex(ValueRegex::new(regex))
     }
 }
 
-impl From<regex::Regex> for Literal {
-    fn from(regex: regex::Regex) -> Self {
-        Literal::Regex(regex.into())
+impl From<ValueRegex> for Literal {
+    fn from(regex: ValueRegex) -> Self {
+        Literal::Regex(regex)
     }
 }
 
@@ -388,12 +387,12 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| expr!("foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         integer {
             expr: |_| expr!(12),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
     ];
 }

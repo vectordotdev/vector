@@ -2,6 +2,7 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
+use super::prelude::{error_stage, error_type};
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -49,7 +50,7 @@ impl InternalEvent for PrometheusEventsReceived {
 #[derive(Debug)]
 pub struct PrometheusRequestCompleted {
     pub start: Instant,
-    pub end: Instant,
+    pub(crate) end: Instant,
 }
 
 impl InternalEvent for PrometheusRequestCompleted {
@@ -78,8 +79,8 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             message = "Parsing error.",
             url = %self.url,
             error = ?self.error,
-            error_type = "parse_failed",
-            stage = "processing",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
         debug!(
@@ -93,8 +94,8 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
-            "stage" => "processing",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
         );
         // deprecated
@@ -114,9 +115,9 @@ impl InternalEvent for PrometheusHttpResponseError {
             message = "HTTP error response.",
             url = %self.url,
             code = %self.code,
-            stage = "receiving",
+            stage = error_stage::RECEIVING,
             error = self.code.canonical_reason().unwrap_or("unknown status code"),
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             internal_log_rate_secs = 10,
         );
     }
@@ -127,8 +128,8 @@ impl InternalEvent for PrometheusHttpResponseError {
             "code" => self.code.to_string(),
             "url" => self.url.to_string(),
             "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
-            "error_type" => "request_failed",
-            "stage" => "receiving",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("http_error_response_total", 1);
@@ -147,8 +148,8 @@ impl InternalEvent for PrometheusHttpError {
             message = "HTTP request processing error.",
             url = %self.url,
             error = ?self.error,
-            error_type = "request_failed",
-            stage = "receiving",
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
             internal_log_rate_secs = 10,
         );
     }
@@ -158,8 +159,8 @@ impl InternalEvent for PrometheusHttpError {
             "component_errors_total", 1,
             "url" => self.url.to_string(),
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
-            "stage" => "receiving",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("http_request_errors_total", 1);
@@ -176,8 +177,8 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         error!(
             message = "Could not decode request body.",
             error = ?self.error,
-            error_type = "parse_failed",
-            stage = "processing",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
     }
@@ -186,8 +187,8 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parse_failed",
-            "stage" => "processing",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("parse_errors_total", 1);
@@ -202,8 +203,8 @@ impl InternalEvent for PrometheusNoNameError {
         error!(
             message = "Could not decode timeseries.",
             error = "Decoded timeseries is missing the __name__ field.",
-            error_type = "parse_failed",
-            stage = "processing",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
     }
@@ -212,8 +213,8 @@ impl InternalEvent for PrometheusNoNameError {
         counter!(
             "component_errors_total", 1,
             "error" => "Decoded timeseries is missing the __name__ field.",
-            "error_type" => "parse_failed",
-            "stage" => "processing",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         // deprecated
         counter!("parse_errors_total", 1);

@@ -3,22 +3,48 @@ use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use value::Kind;
 
-use super::{BoxedDeserializer, Deserializer, DeserializerConfig};
+use super::Deserializer;
 use crate::{
     config::log_schema,
     event::{Event, Value},
     internal_events::SyslogConvertUtf8Error,
+    schema,
 };
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct SyslogDeserializerConfig;
 
-#[typetag::serde(name = "syslog")]
-impl DeserializerConfig for SyslogDeserializerConfig {
-    fn build(&self) -> crate::Result<BoxedDeserializer> {
-        Ok(Box::new(SyslogDeserializer))
+impl SyslogDeserializerConfig {
+    /// Build the `SyslogDeserializer` from this configuration.
+    pub const fn build(&self) -> SyslogDeserializer {
+        SyslogDeserializer
+    }
+
+    /// The schema produced by the deserializer.
+    pub fn schema_definition(&self) -> schema::Definition {
+        schema::Definition::empty()
+            // The `message` field is always defined. If parsing fails, the entire body becomes the
+            // message.
+            .required_field(log_schema().message_key(), Kind::bytes(), Some("message"))
+            // All other fields are optional.
+            .optional_field(
+                log_schema().timestamp_key(),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .optional_field("hostname", Kind::bytes(), None)
+            .optional_field("severity", Kind::bytes(), Some("severity"))
+            .optional_field("facility", Kind::bytes(), None)
+            .optional_field("version", Kind::integer(), None)
+            .optional_field("appname", Kind::bytes(), None)
+            .optional_field("msgid", Kind::bytes(), None)
+            .optional_field("procid", Kind::integer().or_bytes(), None)
+            // "structured data" in a syslog message can be stored in any field, but will always be
+            // a string.
+            .unknown_fields(Kind::bytes())
     }
 }
 
@@ -34,7 +60,7 @@ impl Deserializer for SyslogDeserializer {
             error
         })?;
         let line = line.trim();
-        let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
+        let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
         let mut event = Event::from(parsed.msg);
 
         insert_fields_from_syslog(&mut event, parsed);

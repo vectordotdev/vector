@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
+#[cfg(all(test, feature = "vector-unit-test-tests"))]
 mod tests;
 mod unit_test_components;
 
@@ -9,6 +9,7 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
+    schema,
     topology::{
         self,
         builder::{self, Pieces},
@@ -16,6 +17,7 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+use ordered_float::NotNan;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -165,7 +167,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs()
+                    .outputs(&schema::Definition::empty())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -342,7 +344,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
     );
-    let test = test.resolve_outputs(&transform_only_graph);
+    let test = test.resolve_outputs(&transform_only_graph)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -401,6 +403,11 @@ async fn build_unit_test(
             .collect::<Vec<_>>();
     }
 
+    if let Some(sink) = get_loose_end_outputs_sink(&config_builder) {
+        config_builder
+            .sinks
+            .insert(ComponentKey::from(Uuid::new_v4().to_string()), sink);
+    }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
@@ -411,6 +418,58 @@ async fn build_unit_test(
         pieces,
         test_result_rxs,
     })
+}
+
+/// Near the end of building a unit test, it's possible that we've included a
+/// transform(s) with multiple outputs where at least one of its output is
+/// consumed but its other outputs are left unconsumed.
+///
+/// To avoid warning logs that occur when building such topologies, we construct
+/// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
+fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
+    let mut config = config.clone();
+    let _ = expand_macros(&mut config);
+    let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
+        transform
+            .inner
+            .outputs(&schema::Definition::empty())
+            .iter()
+            .map(|output| {
+                if let Some(port) = &output.port {
+                    OutputId::from((key, port.clone())).to_string()
+                } else {
+                    key.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let mut loose_end_outputs = Vec::new();
+    for id in transform_ids {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&id))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&id))
+        {
+            loose_end_outputs.push(id);
+        }
+    }
+
+    if loose_end_outputs.is_empty() {
+        None
+    } else {
+        let noop_sink = UnitTestSinkConfig {
+            test_name: "".to_string(),
+            transform_id: "".to_string(),
+            result_tx: Arc::new(Mutex::new(None)),
+            check: UnitTestSinkCheck::NoOp,
+        };
+        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+    }
 }
 
 fn build_and_validate_inputs(
@@ -454,8 +513,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs: IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
+) -> Result<IndexMap<OutputId, Vec<Vec<Condition>>>, Vec<String>> {
+    let mut outputs: IndexMap<OutputId, Vec<Vec<Condition>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -503,7 +562,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
                         TestInputValue::Boolean(b) => Value::from(*b),
                         TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(*f),
+                        TestInputValue::Float(f) => Value::from(
+                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
+                        ),
                     };
                     event.as_mut_log().insert(path.to_owned(), value);
                 }

@@ -5,11 +5,12 @@ use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
-    internal_events::MetricToLogFailedSerialize,
+    internal_events::MetricToLogSerializeError,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -45,11 +46,11 @@ impl TransformConfig for MetricToLogConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -83,7 +84,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(&MetricToLogFailedSerialize { error }))
+            .map_err(|error| emit!(&MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -98,7 +99,7 @@ impl MetricToLog {
                         .remove(&self.timestamp_key)
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
-                                .convert(value.into_bytes())
+                                .convert(value.coerce_to_bytes())
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));

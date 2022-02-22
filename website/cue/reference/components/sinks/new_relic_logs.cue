@@ -6,14 +6,13 @@ components: sinks: new_relic_logs: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
 		stateful: false
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -58,7 +57,11 @@ components: sinks: new_relic_logs: {
 
 	support: {
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				This transform has been deprecated. Please use the [`new_relic` sink](\(urls.vector_new_relic_sink)) instead.
+				""",
+		]
 		notices: []
 	}
 

@@ -32,9 +32,9 @@ use super::util::{
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         azure_common::{
             self,
@@ -93,7 +93,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }
@@ -692,8 +692,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Ok(sink_and_healthcheck)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {

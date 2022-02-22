@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-use super::{BoxedFramer, BoxedFramingError, CharacterDelimitedDecoder, FramingConfig};
+use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -11,7 +11,8 @@ pub struct NewlineDelimitedDecoderConfig {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    newline_delimited: NewlineDelimitedDecoderOptions,
+    /// Options for the newline delimited decoder.
+    pub newline_delimited: NewlineDelimitedDecoderOptions,
 }
 
 /// Options for building a `NewlineDelimitedDecoder`.
@@ -46,17 +47,13 @@ impl NewlineDelimitedDecoderConfig {
             newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
         }
     }
-}
 
-#[typetag::serde(name = "newline_delimited")]
-impl FramingConfig for NewlineDelimitedDecoderConfig {
-    fn build(&self) -> crate::Result<BoxedFramer> {
+    /// Build the `NewlineDelimitedDecoder` from this configuration.
+    pub const fn build(&self) -> NewlineDelimitedDecoder {
         if let Some(max_length) = self.newline_delimited.max_length {
-            Ok(Box::new(NewlineDelimitedDecoder::new_with_max_length(
-                max_length,
-            )))
+            NewlineDelimitedDecoder::new_with_max_length(max_length)
         } else {
-            Ok(Box::new(NewlineDelimitedDecoder::new()))
+            NewlineDelimitedDecoder::new()
         }
     }
 }

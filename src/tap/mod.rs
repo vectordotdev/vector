@@ -16,15 +16,27 @@ pub struct Opts {
     #[structopt(short, long)]
     url: Option<Url>,
 
-    /// Maximum number of log events to sample each interval
+    /// Maximum number of events to sample each interval
     #[structopt(default_value = "100", short = "l", long)]
     limit: u32,
 
-    /// Encoding format for logs printed to screen
-    #[structopt(default_value = "json", possible_values = &["json", "yaml"], short = "f", long)]
+    /// Encoding format for events printed to screen
+    #[structopt(default_value = "json", possible_values = &["json", "yaml", "logfmt"], short = "f", long)]
     format: TapEncodingFormat,
 
-    /// Components IDs to observe (comma-separated; accepts glob patterns)
-    #[structopt(default_value = "*", use_delimiter(true))]
+    /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true))]
     component_id_patterns: Vec<String>,
+
+    /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true), long)]
+    outputs_of: Vec<String>,
+
+    /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
+    #[structopt(use_delimiter(true), long)]
+    inputs_of: Vec<String>,
+
+    /// Quiet output includes only events
+    #[structopt(short, long)]
+    quiet: bool,
 }

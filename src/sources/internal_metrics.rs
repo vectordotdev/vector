@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -103,6 +103,10 @@ impl SourceConfig for InternalMetricsConfig {
     fn source_type(&self) -> &'static str {
         "internal_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
@@ -126,7 +130,7 @@ async fn run(
         let byte_size = metrics.size_of();
         emit!(&EventsReceived { count, byte_size });
 
-        let mut stream = stream::iter(metrics).map(|mut metric| {
+        let batch = metrics.into_iter().map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
             // if an explicit namespace is provided to this source.
             if namespace.is_some() {
@@ -149,10 +153,10 @@ async fn run(
             if let Some(pid_key) = pid_key {
                 metric.insert_tag(pid_key.to_owned(), pid.clone());
             }
-            metric.into()
+            metric
         });
 
-        if let Err(error) = out.send_all(&mut stream).await {
+        if let Err(error) = out.send_batch(batch).await {
             emit!(&StreamClosedError { error, count });
             return Err(());
         }
@@ -259,7 +263,7 @@ mod tests {
 
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await

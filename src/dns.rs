@@ -12,7 +12,7 @@ use tower::Service;
 pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 
 #[derive(Debug, Clone, Copy)]
-pub struct Resolver;
+pub(super) struct Resolver;
 
 impl Resolver {
     pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {

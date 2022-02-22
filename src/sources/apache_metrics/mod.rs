@@ -17,10 +17,7 @@ use crate::{
     config::{
         self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
     },
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
@@ -95,6 +92,10 @@ impl SourceConfig for ApacheMetricsConfig {
 
     fn source_type(&self) -> &'static str {
         "apache_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -225,41 +226,35 @@ fn apache_metrics(
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
-                                Some(stream::iter(metrics).map(Event::Metric))
+                                Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
                                 emit!(&ApacheMetricsResponseError {
                                     code: header.status,
                                     endpoint: &sanitized_url,
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 1.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 1.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
                                 emit!(&ApacheMetricsHttpError {
                                     error,
                                     endpoint: &sanitized_url
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 0.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 0.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                         })
                     })
@@ -268,7 +263,7 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
@@ -371,7 +366,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -434,7 +429,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -468,7 +463,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);

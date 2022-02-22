@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
@@ -6,6 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -20,11 +22,12 @@ use vrl::Vm;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, Output, TransformConfig, TransformContext,
+        log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
+    schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
     Result,
 };
@@ -45,6 +48,48 @@ pub struct RemapConfig {
     pub reroute_dropped: bool,
 }
 
+impl RemapConfig {
+    fn compile_vrl_program(
+        &self,
+        enrichment_tables: enrichment::TableRegistry,
+    ) -> Result<(
+        vrl::Program,
+        Vec<Box<dyn vrl::Function>>,
+        vrl::state::Compiler,
+    )> {
+        let source = match (&self.source, &self.file) {
+            (Some(source), None) => source.to_owned(),
+            (None, Some(path)) => {
+                let mut buffer = String::new();
+
+                File::open(path)
+                    .with_context(|_| FileOpenFailedSnafu { path })?
+                    .read_to_string(&mut buffer)
+                    .with_context(|_| FileReadFailedSnafu { path })?;
+
+                buffer
+            }
+            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
+        };
+
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
+
+        let mut state = vrl::state::Compiler::new();
+        state.set_external_context(Some(Box::new(enrichment_tables)));
+
+        vrl::compile_with_state(&source, &functions, &mut state)
+            .map_err(|diagnostics| {
+                Formatter::new(&source, diagnostics)
+                    .colored()
+                    .to_string()
+                    .into()
+            })
+            .map(|program| (program, functions, state))
+    }
+}
+
 inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
@@ -59,18 +104,48 @@ impl TransformConfig for RemapConfig {
         Ok(Transform::synchronous(remap))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // We need to compile the VRL program in order to know the schema definition output of this
+        // transform. We ignore any compilation errors, as those are caught by the transform build
+        // step.
+        //
+        // TODO: Keep track of semantic meaning for fields.
+        let default_definition = self
+            .compile_vrl_program(enrichment::TableRegistry::default())
+            .ok()
+            .and_then(|(_, _, state)| state.target_kind().cloned())
+            .and_then(Kind::into_object)
+            .map(Into::into)
+            .unwrap_or_else(schema::Definition::empty);
+
+        // When a message is dropped and re-routed, we keep the original event, but also annotate
+        // it with additional metadata.
+        let dropped_definition = merged_definition.clone().required_field(
+            log_schema().metadata_key(),
+            Kind::object(BTreeMap::from([
+                ("reason".into(), Kind::bytes()),
+                ("message".into(), Kind::bytes()),
+                ("component_id".into(), Kind::bytes()),
+                ("component_type".into(), Kind::bytes()),
+                ("component_kind".into(), Kind::bytes()),
+            ])),
+            Some("metadata"),
+        );
+
+        let default_output =
+            Output::default(DataType::all()).with_schema_definition(default_definition);
+
         if self.reroute_dropped {
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                default_output,
+                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
             ]
         } else {
-            vec![Output::default(DataType::Any)]
+            vec![default_output]
         }
     }
 
@@ -95,40 +170,31 @@ pub struct Remap {
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
+    default_schema_id: schema::Id,
+    dropped_schema_id: schema::Id,
 }
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let source = match (&config.source, &config.file) {
-            (Some(source), None) => source.to_owned(),
-            (None, Some(path)) => {
-                let mut buffer = String::new();
-
-                File::open(path)
-                    .with_context(|_| FileOpenFailedSnafu { path })?
-                    .read_to_string(&mut buffer)
-                    .with_context(|_| FileReadFailedSnafu { path })?;
-
-                buffer
-            }
-            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
-        };
-
-        let mut functions = vrl_stdlib::all();
-        functions.append(&mut enrichment::vrl_functions());
-        functions.append(&mut vector_vrl_functions::vrl_functions());
-
-        let program = vrl::compile(
-            &source,
-            &functions,
-            Some(Box::new(context.enrichment_tables.clone())),
-        )
-        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
+        let (program, functions, _) =
+            config.compile_vrl_program(context.enrichment_tables.clone())?;
 
         let runtime = Runtime::default();
 
         #[cfg(feature = "vrl-vm")]
         let vm = Arc::new(runtime.compile(functions, &program)?);
+
+        let default_schema_id = *context
+            .schema_ids
+            .get(&None)
+            .expect("default schema required");
+
+        let dropped_schema_id = *context
+            .schema_ids
+            .get(&Some(DROPPED.to_owned()))
+            .or_else(|| context.schema_ids.get(&None))
+            .expect("dropped schema required");
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -140,6 +206,8 @@ impl Remap {
             reroute_dropped: config.reroute_dropped,
             #[cfg(feature = "vrl-vm")]
             vm,
+            default_schema_id,
+            dropped_schema_id,
         })
     }
 
@@ -150,7 +218,7 @@ impl Remap {
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
+            Event::Log(ref mut log) | Event::Trace(ref mut log) => {
                 let message = error
                     .notes()
                     .iter()
@@ -212,6 +280,8 @@ impl Clone for Remap {
             reroute_dropped: self.reroute_dropped,
             #[cfg(feature = "vrl-vm")]
             vm: Arc::clone(&self.vm),
+            default_schema_id: self.default_schema_id,
+            dropped_schema_id: self.dropped_schema_id,
         }
     }
 }
@@ -244,38 +314,53 @@ impl SyncTransform for Remap {
         match result {
             Ok(_) => {
                 for event in target.into_events() {
-                    output.push(event)
+                    push_default(event, output, self.default_schema_id);
                 }
             }
-            Err(Terminate::Abort(error)) => {
-                emit!(&RemapMappingAbort {
-                    event_dropped: self.drop_on_abort,
-                });
+            Err(reason) => {
+                let (reason, error, drop) = match reason {
+                    Terminate::Abort(error) => {
+                        emit!(&RemapMappingAbort {
+                            event_dropped: self.drop_on_abort,
+                        });
 
-                if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
+                        ("abort", error, self.drop_on_abort)
+                    }
+                    Terminate::Error(error) => {
+                        emit!(&RemapMappingError {
+                            error: error.to_string(),
+                            event_dropped: self.drop_on_error,
+                        });
+
+                        ("error", error, self.drop_on_error)
+                    }
+                };
+
+                if !drop {
+                    let event = original_event.expect("event will be set");
+
+                    push_default(event, output, self.default_schema_id);
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
-                    self.annotate_dropped(&mut event, "abort", error);
-                    output.push_named(DROPPED, event)
-                }
-            }
-            Err(Terminate::Error(error)) => {
-                emit!(&RemapMappingError {
-                    error: error.to_string(),
-                    event_dropped: self.drop_on_error,
-                });
 
-                if !self.drop_on_error {
-                    output.push(original_event.expect("event will be set"))
-                } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
-                    self.annotate_dropped(&mut event, "error", error);
-                    output.push_named(DROPPED, event)
+                    self.annotate_dropped(&mut event, reason, error);
+                    push_dropped(event, output, self.dropped_schema_id);
                 }
             }
         }
     }
+}
+
+#[inline]
+fn push_default(mut event: Event, output: &mut TransformOutputsBuf, schema_id: schema::Id) {
+    event.metadata_mut().set_schema_id(schema_id);
+    output.push(event)
+}
+
+#[inline]
+fn push_dropped(mut event: Event, output: &mut TransformOutputsBuf, schema_id: schema::Id) {
+    event.metadata_mut().set_schema_id(schema_id);
+    output.push_named(DROPPED, event)
 }
 
 #[derive(Debug, Snafu)]
@@ -291,10 +376,14 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        num::NonZeroU16,
+    };
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
+    use vector_core::event::EventMetadata;
 
     use super::*;
     use crate::{
@@ -303,9 +392,22 @@ mod tests {
             metric::{MetricKind, MetricValue},
             LogEvent, Metric, Value,
         },
+        schema,
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         transforms::OutputBuffer,
     };
+
+    const TEST_DEFAULT_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+    const TEST_DROPPED_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(2) };
+
+    fn remap(config: RemapConfig) -> Result<Remap> {
+        let schema_ids = HashMap::from([
+            (None, TEST_DEFAULT_SCHEMA_ID.into()),
+            (Some(DROPPED.to_owned()), TEST_DROPPED_SCHEMA_ID.into()),
+        ]);
+
+        Remap::new(config, &TransformContext::new_test(schema_ids))
+    }
 
     #[test]
     fn generate_config() {
@@ -320,9 +422,7 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config, &Default::default())
-            .unwrap_err()
-            .to_string();
+        let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
@@ -337,9 +437,7 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config, &Default::default())
-            .unwrap_err()
-            .to_string();
+        let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
@@ -360,7 +458,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
         assert!(tform.runtime().is_empty());
 
         let event1 = {
@@ -368,22 +466,26 @@ mod tests {
             event1.insert("sentinel", "bar");
             Event::from(event1)
         };
-        let metadata1 = event1.metadata().clone();
         let result1 = transform_one(&mut tform, event1).unwrap();
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
-        assert_eq!(result1.metadata(), &metadata1);
+        assert_eq!(
+            result1.metadata().schema_id(),
+            TEST_DEFAULT_SCHEMA_ID.into()
+        );
         assert!(tform.runtime().is_empty());
 
         let event2 = {
             let event2 = LogEvent::from("event2");
             Event::from(event2)
         };
-        let metadata2 = event2.metadata().clone();
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
-        assert_eq!(result2.metadata(), &metadata2);
+        assert_eq!(
+            result2.metadata().schema_id(),
+            TEST_DEFAULT_SCHEMA_ID.into()
+        );
         assert!(tform.runtime().is_empty());
     }
 
@@ -394,7 +496,6 @@ mod tests {
             event.insert("copy_from", "buz");
             Event::from(event)
         };
-        let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
             source: Some(
@@ -410,15 +511,15 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
-
+        let mut tform = remap(conf).unwrap();
         let result = transform_one(&mut tform, event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
-        assert_eq!(result.metadata(), &metadata);
+
+        assert_eq!(result.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
     }
 
     #[test]
@@ -431,7 +532,6 @@ mod tests {
             );
             Event::from(event)
         };
-        let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
             source: Some(
@@ -446,7 +546,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         let out = collect_outputs(&mut tform, event);
         assert_eq!(2, out.primary.len());
@@ -454,10 +554,11 @@ mod tests {
 
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "foo");
-        assert_eq!(r.metadata(), &metadata);
+        assert_eq!(r.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "bar");
-        assert_eq!(r.metadata(), &metadata);
+
+        assert_eq!(r.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
     }
 
     #[test]
@@ -480,7 +581,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -509,7 +610,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -533,7 +634,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -562,7 +663,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -591,7 +692,7 @@ mod tests {
             drop_on_abort: true,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -619,7 +720,7 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        let mut tform = remap(conf).unwrap();
 
         let result = transform_one(&mut tform, metric).unwrap();
         assert_eq!(
@@ -629,7 +730,7 @@ mod tests {
                     "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
-                    metadata,
+                    metadata.with_schema_id(TEST_DEFAULT_SCHEMA_ID.into()),
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some({
@@ -698,8 +799,13 @@ mod tests {
             reroute_dropped: true,
             ..Default::default()
         };
+        let schema_ids = HashMap::from([
+            (None, TEST_DEFAULT_SCHEMA_ID.into()),
+            (Some(DROPPED.to_owned()), TEST_DROPPED_SCHEMA_ID.into()),
+        ]);
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
+            schema_ids,
             ..Default::default()
         };
         let mut tform = Remap::new(conf, &context).unwrap();
@@ -738,7 +844,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "message": "function call error for \"string\" at (160:175): expected string, got integer",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -752,10 +858,11 @@ mod tests {
         pretty_assertions::assert_eq!(
             output,
             Event::Metric(
-                Metric::new(
+                Metric::new_with_metadata(
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
+                    EventMetadata::default().with_schema_id(TEST_DEFAULT_SCHEMA_ID.into()),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
@@ -770,10 +877,11 @@ mod tests {
         pretty_assertions::assert_eq!(
             output,
             Event::Metric(
-                Metric::new(
+                Metric::new_with_metadata(
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
+                    EventMetadata::default().with_schema_id(TEST_DROPPED_SCHEMA_ID.into()),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
@@ -791,10 +899,11 @@ mod tests {
         pretty_assertions::assert_eq!(
             output,
             Event::Metric(
-                Metric::new(
+                Metric::new_with_metadata(
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
+                    EventMetadata::default().with_schema_id(TEST_DROPPED_SCHEMA_ID.into()),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
@@ -938,7 +1047,18 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(vec![Output::default(DataType::Any)], conf.outputs());
+        let schema_definition = schema::Definition::empty()
+            .required_field("foo", Kind::bytes(), None)
+            .required_field(
+                "tags",
+                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                None,
+            );
+
+        assert_eq!(
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
+            conf.outputs(&schema::Definition::empty()),
+        );
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
@@ -1002,8 +1122,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );
@@ -1029,8 +1149,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                Output::default(DataType::Any),
-                Output::from((DROPPED, DataType::Any)),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ],
             1,
         );

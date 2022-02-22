@@ -12,7 +12,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use vector_core::ByteSizeOf;
@@ -21,9 +21,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     docker::{docker, DockerTlsConfig},
-    event::{
-        self, merge_state::LogEventMergeState, Event, LogEvent, PathComponent, PathIter, Value,
-    },
+    event::{self, merge_state::LogEventMergeState, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
         BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -43,15 +41,13 @@ const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly regconized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
-lazy_static! {
-    static ref STDERR: Bytes = "stderr".into();
-    static ref STDOUT: Bytes = "stdout".into();
-    static ref CONSOLE: Bytes = "console".into();
-}
+static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
+static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
+static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct DockerLogsConfig {
+pub(super) struct DockerLogsConfig {
     #[serde(default = "host_key")]
     host_key: String,
     docker_host: Option<String>,
@@ -170,6 +166,10 @@ impl SourceConfig for DockerLogsConfig {
     fn source_type(&self) -> &'static str {
         "docker_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -193,6 +193,10 @@ impl SourceConfig for DockerCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "docker"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -617,7 +621,7 @@ impl EventStreamBuilder {
             .filter_map(|v| ready(v.unwrap()))
             .take_until(self.shutdown.clone());
 
-        let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
+        let events_stream: Box<dyn Stream<Item = LogEvent> + Unpin + Send> =
             if let Some(ref line_agg_config) = core.line_agg_config {
                 Box::new(line_agg_adapter(
                     events_stream,
@@ -632,7 +636,7 @@ impl EventStreamBuilder {
         let result = {
             let mut stream =
                 events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
-            self.out.send_all(&mut stream).await.map_err(|error| {
+            self.out.send_stream(&mut stream).await.map_err(|error| {
                 let (count, _) = stream.size_hint();
                 emit!(&StreamClosedError { error, count });
             })
@@ -659,9 +663,9 @@ impl EventStreamBuilder {
     }
 }
 
-fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> Event {
+fn add_hostname(mut event: LogEvent, host_key: &str, hostname: &Option<String>) -> LogEvent {
     if let Some(hostname) = hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
+        event.insert(host_key, hostname.clone());
     }
 
     event
@@ -784,7 +788,7 @@ impl ContainerLogInfo {
         partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
-    ) -> Option<Event> {
+    ) -> Option<LogEvent> {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
@@ -953,15 +957,13 @@ impl ContainerLogInfo {
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
-        let event = Event::Log(log_event);
-
         emit!(&DockerLogsEventsReceived {
-            byte_size: event.size_of(),
+            byte_size: log_event.size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
         });
 
-        Some(event)
+        Some(log_event)
     }
 }
 
@@ -997,12 +999,10 @@ impl ContainerMetadata {
 }
 
 fn line_agg_adapter(
-    inner: impl Stream<Item = Event> + Unpin,
+    inner: impl Stream<Item = LogEvent> + Unpin,
     logic: line_agg::Logic<Bytes, LogEvent>,
-) -> impl Stream<Item = Event> {
-    let line_agg_in = inner.map(|event| {
-        let mut log_event = event.into_log();
-
+) -> impl Stream<Item = LogEvent> {
+    let line_agg_in = inner.map(|mut log_event| {
         let message_value = log_event
             .remove(log_schema().message_key())
             .expect("message must exist in the event");
@@ -1010,14 +1010,14 @@ fn line_agg_adapter(
             .get(&*STREAM)
             .expect("stream must exist in the event");
 
-        let stream = stream_value.as_bytes();
-        let message = message_value.into_bytes();
+        let stream = stream_value.coerce_to_bytes();
+        let message = message_value.coerce_to_bytes();
         (stream, message, log_event)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(|(_, message, mut log_event)| {
         log_event.insert(log_schema().message_key(), message);
-        Event::Log(log_event)
+        log_event
     })
 }
 
@@ -1059,6 +1059,7 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        event::Event,
         source_sender::ReceiverStream,
         test_util::{collect_n, collect_ready, trace_init},
         SourceSender,
@@ -1080,7 +1081,7 @@ mod integration_tests {
         let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await
@@ -1595,7 +1596,7 @@ mod integration_tests {
         assert!(log
             .get("label")
             .unwrap()
-            .as_map()
+            .as_object()
             .unwrap()
             .get(label)
             .is_some());

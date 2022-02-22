@@ -36,7 +36,7 @@ impl Error for EncodingError {
 ///
 /// Returns an `EncodingError` if the input contains non-`String` map keys.
 pub fn to_string<V: Serialize>(
-    input: BTreeMap<String, V>,
+    input: &BTreeMap<String, V>,
     fields_order: &[String],
     key_value_delimiter: &str,
     field_delimiter: &str,
@@ -82,12 +82,12 @@ pub fn to_string<V: Serialize>(
 }
 
 fn flatten<'a>(
-    input: impl IntoIterator<Item = (String, impl Serialize)> + 'a,
+    input: impl IntoIterator<Item = (&'a String, impl Serialize)> + 'a,
     separator: char,
 ) -> Result<BTreeMap<String, Data>, EncodingError> {
     let mut map = BTreeMap::new();
     for (key, value) in input {
-        value.serialize(KeyValueSerializer::new(key, separator, &mut map))?;
+        value.serialize(KeyValueSerializer::new(key.clone(), separator, &mut map))?;
     }
     Ok(map)
 }
@@ -537,7 +537,7 @@ mod tests {
     fn single_element() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "lvl" => "info"
                 },
                 &[],
@@ -554,7 +554,7 @@ mod tests {
     fn multiple_elements() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "lvl" => "info",
                     "log_id" => 12345
                 },
@@ -572,7 +572,7 @@ mod tests {
     fn string_with_spaces() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "lvl" => "info",
                     "msg" => "This is a log message"
                 },
@@ -590,7 +590,7 @@ mod tests {
     fn flatten_boolean() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "beta" => true,
                     "prod" => false,
                     "lvl" => "info",
@@ -610,7 +610,7 @@ mod tests {
     fn dont_flatten_boolean() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "beta" => true,
                     "prod" => false,
                     "lvl" => "info",
@@ -630,7 +630,7 @@ mod tests {
     fn other_delimiters() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "tag_a" => "val_a",
                     "tag_b" => "val_b",
                     "tag_c" => true,
@@ -649,7 +649,7 @@ mod tests {
     fn string_with_characters_to_escape() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "lvl" => "info",
                     "msg" => r#"payload: {"code": 200}\n"#,
                     "another_field" => "some\nfield\\and things",
@@ -669,7 +669,7 @@ mod tests {
     fn nested_fields() {
         assert_eq!(
                 &to_string::<Value>(
-                    btreemap! {
+                    &btreemap! {
                         "log" => json!({
                             "file": {
                                 "path": "encode_key_value.rs"
@@ -699,7 +699,7 @@ mod tests {
     fn fields_ordering() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "lvl" => "info",
                     "msg" => "This is a log message",
                     "log_id" => 12345,
@@ -718,7 +718,7 @@ mod tests {
     fn nested_fields_ordering() {
         assert_eq!(
             &to_string::<Value>(
-                btreemap! {
+                &btreemap! {
                     "log" => json!({
                         "file": {
                             "path": "encode_key_value.rs"
@@ -749,7 +749,7 @@ mod tests {
         struct IntegerMap(BTreeMap<i32, String>);
 
         assert!(&to_string::<IntegerMap>(
-            btreemap! {
+            &btreemap! {
                 "inner_map" => IntegerMap(btreemap!{
                     0 => "Hello",
                     1 => "World"
