@@ -1,0 +1,12 @@
+[package]
+name = "vector_config"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+serde_with = "1.12"
+schemars = "0.8"

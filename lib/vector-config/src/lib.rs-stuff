@@ -1,0 +1,92 @@
+use std::time::Duration;
+
+pub enum Shape {
+    Scalar(Scalar),
+    List,
+    Map,
+    Custom,
+}
+
+pub enum Scalar {
+    Unsigned(UnsignedInteger)
+}
+
+pub struct UnsignedInteger {
+	theoretical_upper_bound: u128,
+	effective_lower_bound: u128,
+	effective_upper_bound: u128,
+}
+
+pub struct Metadata {}
+
+impl Metadata {
+    fn empty() -> Self {
+        Self {}
+    }
+}
+pub struct Field {}
+
+impl Field {
+    fn with_description(
+        name: &'static str,
+        desc: &'static str,
+        shape: Shape,
+        metadata: Metadata,
+        fields: Option<Vec<Field>>,
+    ) -> Self {
+        Self {}
+    }
+}
+
+pub trait Configurable: Sized {
+    /// Gets the human-readable description of this value, if any.
+    ///
+    /// For standard types, this will be `None`.  Commonly, custom types would implement this
+    /// directly, while fields using standard types would provide a field-specific description that
+    /// would be used instead of the default descrption.
+    fn description(&self) -> Option<&'static str>;
+
+    /// Gets the shape of this value.
+    fn shape(&self) -> Shape;
+
+    /// Gets the metadata for this value.
+    fn metadata(&self) -> Metadata;
+
+	/// The fields for this value, if any.
+    fn fields(&self) -> Option<Vec<Field>>;
+}
+
+struct SinkConfig {
+    url: String,
+    batch: BatchConfig,
+}
+
+struct BatchConfig {
+    max_events: Option<u32>,
+    max_bytes: Option<u32>,
+    max_timeout: Option<Duration>,
+}
+
+impl Configurable for BatchConfig {
+    fn description(&self) -> Option<&'static str> {
+        Some("controls batching behavior i.e. maximum batch size, the maximum time before a batch is flushed, etc")
+    }
+
+    fn shape(&self) -> Shape {
+        Shape::Map
+    }
+
+    fn metadata(&self) -> Metadata {
+        Metadata::empty()
+    }
+
+    fn fields(&self) -> Option<Vec<Field>> {
+        Some(vec![Field::with_description(
+            "max_events",
+            "maximum number of events per batch",
+            Shape::Scalar(Scalar::U32),
+            Metadata::empty(),
+            None,
+        )])
+    }
+}
