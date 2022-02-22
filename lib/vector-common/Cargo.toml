@@ -9,7 +9,6 @@ publish = false
 default = [
   "aws_cloudwatch_logs_subscription",
   "btreemap",
-  "byte_size_of",
   "conversion",
   "tokenize",
   "encoding"
@@ -25,6 +24,8 @@ btreemap = []
 byte_size_of = ["bytes", "chrono"]
 
 conversion = [
+  "bytes",
+  "chrono",
   "snafu",
 ]
 
