@@ -168,11 +168,11 @@ tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
 serde = { version = "1.0.136", default-features = false, features = ["derive"] }
+serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.79", default-features = false, features = ["raw_value"] }
-serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.12.0", default-features = false, features = ["macros"] }
-serde-toml-merge = { version = "0.3.0", default-features = false }
+serde_yaml = { version = "0.8.23", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.0.0", default-features = false, optional = true }
@@ -199,10 +199,10 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.17.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 datadog-filter = { path = "lib/datadog/filter" }
-sha2 = { version = "0.10.2", optional = true }
+datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 hex = { version = "0.4.3", optional = true }
+sha2 = { version = "0.10.2", optional = true }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
@@ -214,6 +214,7 @@ lookup = { path = "lib/lookup" }
 # External libs
 arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
+async-nats = { version = "0.10.1", default-features = false, optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bitmask-enum = { version = "1.1.3", default-features = false }
@@ -223,9 +224,11 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.5", default-features = false }
-csv = { version = "1.1", optional = true }
+clap = { version = "3.1.0", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
+csv = { version = "1.1", optional = true }
 dashmap = { version = "5.1.0", default-features = false }
+data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
@@ -240,16 +243,13 @@ governor = { version = "0.4.1", default-features = false, features = ["dashmap",
 grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
-# depending on fork for bumped nix dependency
-# https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.17", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-infer = { version = "0.7.0", default-features = false, optional = true}
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
+infer = { version = "0.7.0", default-features = false, optional = true}
 indoc = { version = "1.0.4", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
@@ -259,10 +259,7 @@ lru = { version = "0.7.2", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
 memchr = { version = "2.4", default-features = false, optional = true }
-# make sure to update the external docs when the Lua version changes
-mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
-async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
@@ -288,7 +285,6 @@ snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-structopt = { version = "0.3.26", default-features = false }
 strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.23", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
@@ -296,15 +292,21 @@ syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
-typetag = { version = "0.1.8", default-features = false }
+tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
+trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 twox-hash = { version = "1.6.2", default-features = false }
+typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false, optional = true }
-tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
-data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
-trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
+
+# depending on fork for bumped nix dependency
+# https://github.com/heim-rs/heim/pull/360
+heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
+
+# make sure to update the external docs when the Lua version changes
+mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -324,27 +326,27 @@ tonic-build = { version = "0.6", default-features = false, features = ["transpor
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = "2.0.4"
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.119"
 libz-sys = "1.1.3"
+lookup = { path = "lib/lookup", features = ["arbitrary"] }
 matches = "0.1.9"
 pretty_assertions = "1.1.0"
-reqwest = { version = "0.11.9", features = ["json"] }
 proptest = "1.0"
+quickcheck = "1.0.3"
+reqwest = { version = "0.11.9", features = ["json"] }
 tempfile = "3.3.0"
 tokio = { version = "1.17.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
+value = { path = "lib/value", features = ["test"] }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
 wiremock = "0.5.10"
-quickcheck = "1.0.3"
-lookup = { path = "lib/lookup", features = ["arbitrary"] }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
-value = { path = "lib/value", features = ["test"] }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
