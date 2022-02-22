@@ -947,7 +947,7 @@ fn test_config_outputs() {
     struct TestCase {
         decoding: DeserializerConfig,
         multiple_outputs: bool,
-        want: HashMap<Option<&'static str>, schema::Definition>,
+        want: HashMap<Option<&'static str>, Option<schema::Definition>>,
     }
 
     for (
@@ -965,14 +965,16 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .required_field("status", Kind::bytes(), Some("severity"))
-                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                        .required_field("hostname", Kind::bytes(), Some("host"))
-                        .required_field("service", Kind::bytes(), None)
-                        .required_field("ddsource", Kind::bytes(), None)
-                        .required_field("ddtags", Kind::bytes(), None),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), None)
+                            .required_field("ddsource", Kind::bytes(), None)
+                            .required_field("ddtags", Kind::bytes(), None),
+                    ),
                 )]),
             },
         ),
@@ -983,14 +985,16 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .required_field("status", Kind::bytes(), Some("severity"))
-                        .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                        .required_field("hostname", Kind::bytes(), Some("host"))
-                        .required_field("service", Kind::bytes(), None)
-                        .required_field("ddsource", Kind::bytes(), None)
-                        .required_field("ddtags", Kind::bytes(), None),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), None)
+                            .required_field("ddsource", Kind::bytes(), None)
+                            .required_field("ddtags", Kind::bytes(), None),
+                    ),
                 )]),
             },
         ),
@@ -1002,16 +1006,18 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field("message", Kind::bytes(), Some("message"))
+                                .required_field("status", Kind::bytes(), Some("severity"))
+                                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                                .required_field("hostname", Kind::bytes(), Some("host"))
+                                .required_field("service", Kind::bytes(), None)
+                                .required_field("ddsource", Kind::bytes(), None)
+                                .required_field("ddtags", Kind::bytes(), None),
+                        ),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
+                    (Some(METRICS), None),
                 ]),
             },
         ),
@@ -1022,9 +1028,15 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
-                        .unknown_fields(Kind::json()),
+                    Some(
+                        schema::Definition::empty()
+                            .required_field(
+                                "timestamp",
+                                Kind::json().or_timestamp(),
+                                Some("timestamp"),
+                            )
+                            .unknown_fields(Kind::json()),
+                    ),
                 )]),
             },
         ),
@@ -1036,15 +1048,17 @@ fn test_config_outputs() {
                 want: HashMap::from([
                     (
                         Some(LOGS),
-                        schema::Definition::empty()
-                            .required_field(
-                                "timestamp",
-                                Kind::json().or_timestamp(),
-                                Some("timestamp"),
-                            )
-                            .unknown_fields(Kind::json()),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field(
+                                    "timestamp",
+                                    Kind::json().or_timestamp(),
+                                    Some("timestamp"),
+                                )
+                                .unknown_fields(Kind::json()),
+                        ),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
+                    (Some(METRICS), None),
                 ]),
             },
         ),
@@ -1056,29 +1070,7 @@ fn test_config_outputs() {
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
-                    schema::Definition::empty()
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                        .optional_field("hostname", Kind::bytes(), None)
-                        .optional_field("severity", Kind::bytes(), Some("severity"))
-                        .optional_field("facility", Kind::bytes(), None)
-                        .optional_field("version", Kind::integer(), None)
-                        .optional_field("appname", Kind::bytes(), None)
-                        .optional_field("msgid", Kind::bytes(), None)
-                        .optional_field("procid", Kind::integer().or_bytes(), None)
-                        .unknown_fields(Kind::bytes()),
-                )]),
-            },
-        ),
-        #[cfg(feature = "sources-syslog")]
-        (
-            "syslog / multiple output",
-            TestCase {
-                decoding: DeserializerConfig::Syslog,
-                multiple_outputs: true,
-                want: HashMap::from([
-                    (
-                        Some(LOGS),
+                    Some(
                         schema::Definition::empty()
                             .required_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1091,7 +1083,33 @@ fn test_config_outputs() {
                             .optional_field("procid", Kind::integer().or_bytes(), None)
                             .unknown_fields(Kind::bytes()),
                     ),
-                    (Some(METRICS), schema::Definition::empty()),
+                )]),
+            },
+        ),
+        #[cfg(feature = "sources-syslog")]
+        (
+            "syslog / multiple output",
+            TestCase {
+                decoding: DeserializerConfig::Syslog,
+                multiple_outputs: true,
+                want: HashMap::from([
+                    (
+                        Some(LOGS),
+                        Some(
+                            schema::Definition::empty()
+                                .required_field("message", Kind::bytes(), Some("message"))
+                                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                                .optional_field("hostname", Kind::bytes(), None)
+                                .optional_field("severity", Kind::bytes(), Some("severity"))
+                                .optional_field("facility", Kind::bytes(), None)
+                                .optional_field("version", Kind::integer(), None)
+                                .optional_field("appname", Kind::bytes(), None)
+                                .optional_field("msgid", Kind::bytes(), None)
+                                .optional_field("procid", Kind::integer().or_bytes(), None)
+                                .unknown_fields(Kind::bytes()),
+                        ),
+                    ),
+                    (Some(METRICS), None),
                 ]),
             },
         ),

@@ -115,6 +115,10 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
     fn source_type(&self) -> &'static str {
         "aws_ecs_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn aws_ecs_metrics(

@@ -272,7 +272,7 @@ impl Target {
             External(path) => {
                 let _ = ctx
                     .target_mut()
-                    .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
+                    .target_insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
             }
         }
     }

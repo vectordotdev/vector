@@ -17,7 +17,7 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
+        elasticsearch::{ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
         util::{
             encoding::{EncodingConfig, StandardEncodings},
             BatchConfig, Compression, TowerRequestConfig,
@@ -81,8 +81,8 @@ async fn firehose_put_records() {
     sleep(Duration::from_secs(5)).await;
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
-    let config = ElasticSearchConfig {
-        auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
@@ -90,7 +90,7 @@ async fn firehose_put_records() {
         }),
         ..Default::default()
     };
-    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
 
     let client = reqwest::Client::builder()
         .build()

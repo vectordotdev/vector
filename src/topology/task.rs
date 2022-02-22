@@ -14,7 +14,7 @@ use vector_core::{
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
-pub enum TaskOutput {
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
@@ -24,7 +24,7 @@ pub enum TaskOutput {
 
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
     key: ComponentKey,
@@ -42,10 +42,6 @@ impl Task {
             key,
             typetag: typetag.into(),
         }
-    }
-
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
     }
 
     pub fn id(&self) -> &str {

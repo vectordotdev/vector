@@ -87,6 +87,10 @@ impl SourceConfig for NatsSourceConfig {
     fn source_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSourceConfig {

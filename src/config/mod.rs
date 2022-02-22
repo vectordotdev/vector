@@ -20,6 +20,7 @@ use crate::{
     conditions,
     event::Metric,
     schema,
+    serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
@@ -112,6 +113,64 @@ pub struct Config {
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
 }
 
+impl Config {
+    pub fn builder() -> builder::ConfigBuilder {
+        Default::default()
+    }
+
+    /// Expand a logical component id (i.e. from the config file) into the ids of the
+    /// components it was expanded to as part of the macro process. Does not check that the
+    /// identifier is otherwise valid.
+    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
+        self.expansions
+            .get(identifier)
+            .cloned()
+            .unwrap_or_else(|| vec![identifier.clone()])
+    }
+
+    pub fn propagate_acknowledgements(&mut self) {
+        let inputs: Vec<_> = self
+            .sinks
+            .iter()
+            .filter(|(_, sink)| {
+                sink.acknowledgements
+                    .merge_default(&self.global.acknowledgements)
+                    .enabled()
+            })
+            .flat_map(|(name, sink)| {
+                sink.inputs
+                    .iter()
+                    .map(|input| (name.clone(), input.clone()))
+            })
+            .collect();
+        self.propagate_acks_rec(inputs);
+    }
+
+    fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
+        for (sink, input) in sink_inputs {
+            let component = &input.component;
+            if let Some(source) = self.sources.get_mut(component) {
+                if source.inner.can_acknowledge() {
+                    source.sink_acknowledgements = true;
+                } else {
+                    warn!(
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Data loss could occur.",
+                        source = component.id(),
+                        sink = sink.id(),
+                    );
+                }
+            } else if let Some(transform) = self.transforms.get(component) {
+                let inputs = transform
+                    .inputs
+                    .iter()
+                    .map(|input| (sink.clone(), input.clone()))
+                    .collect();
+                self.propagate_acks_rec(inputs);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(default)]
 pub struct HealthcheckOptions {
@@ -165,6 +224,8 @@ pub struct SourceOuter {
     pub proxy: ProxyConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
+    #[serde(default, skip)]
+    pub sink_acknowledgements: bool,
 }
 
 impl SourceOuter {
@@ -172,6 +233,7 @@ impl SourceOuter {
         Self {
             inner: Box::new(source),
             proxy: Default::default(),
+            sink_acknowledgements: false,
         }
     }
 }
@@ -189,6 +251,8 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
+
+    fn can_acknowledge(&self) -> bool;
 }
 
 pub struct SourceContext {
@@ -197,6 +261,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
+    pub acknowledgements: bool,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
@@ -220,6 +285,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
+                acknowledgements: false,
                 schema_ids: HashMap::default(),
             },
             shutdown,
@@ -237,8 +303,23 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
+            acknowledgements: false,
             schema_ids: schema_ids.unwrap_or_default(),
         }
+    }
+
+    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
+        if config.enabled() {
+            warn!(
+                message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
+                component_name = self.key.id(),
+            );
+        }
+
+        config
+            .merge_default(&self.globals.acknowledgements)
+            .merge_default(&self.acknowledgements.into())
+            .enabled()
     }
 }
 
@@ -269,6 +350,13 @@ pub struct SinkOuter<T> {
 
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "bool_or_struct",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl<T> SinkOuter<T> {
@@ -280,6 +368,7 @@ impl<T> SinkOuter<T> {
             healthcheck_uri: None,
             inner,
             proxy: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -331,6 +420,7 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            acknowledgements: self.acknowledgements,
         }
     }
 }
@@ -766,22 +856,6 @@ pub struct TestOutput<T = OutputId> {
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
-impl Config {
-    pub fn builder() -> builder::ConfigBuilder {
-        Default::default()
-    }
-
-    /// Expand a logical component id (i.e. from the config file) into the ids of the
-    /// components it was expanded to as part of the macro process. Does not check that the
-    /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
-        self.expansions
-            .get(identifier)
-            .cloned()
-            .unwrap_or_else(|| vec![identifier.clone()])
-    }
-}
-
 #[cfg(all(
     test,
     feature = "sources-file",
@@ -1113,6 +1187,58 @@ mod test {
         .unwrap();
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
+
+    #[test]
+    fn propagates_acknowledgement_settings() {
+        // The topology:
+        // in1 => out1
+        // in2 => out2 (acks enabled)
+        // in3 => parse3 => out3 (acks enabled)
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+                [sources.in1]
+                    type = "file"
+                [sources.in2]
+                    type = "file"
+                [sources.in3]
+                    type = "file"
+                [transforms.parse3]
+                    type = "json_parser"
+                    inputs = ["in3"]
+                [sinks.out1]
+                    type = "console"
+                    inputs = ["in1"]
+                    encoding = "json"
+                [sinks.out2]
+                    type = "console"
+                    inputs = ["in2"]
+                    encoding = "json"
+                    acknowledgements = true
+                [sinks.out3]
+                    type = "console"
+                    inputs = ["parse3"]
+                    encoding = "json"
+                    acknowledgements.enabled = true
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        for source in config.sources.values() {
+            assert!(
+                !source.sink_acknowledgements,
+                "Source `sink_acknowledgements` should be `false` before propagation"
+            );
+        }
+
+        let config = config.build().unwrap();
+
+        let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
+        assert!(!get("in1").sink_acknowledgements);
+        assert!(get("in2").sink_acknowledgements);
+        assert!(get("in3").sink_acknowledgements);
     }
 }
 

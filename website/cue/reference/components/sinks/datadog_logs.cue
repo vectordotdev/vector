@@ -6,7 +6,6 @@ components: sinks: datadog_logs: {
 	classes: sinks._datadog.classes
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {
