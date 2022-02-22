@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use indexmap::{IndexMap, IndexSet};
 
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
+use super::{
+    builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
+};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -162,10 +164,13 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
             })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            t.inner
+                .outputs(&schema::Definition::empty())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
@@ -279,7 +284,7 @@ mod test {
             Input::all()
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
     }
