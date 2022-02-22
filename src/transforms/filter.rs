@@ -68,11 +68,17 @@ impl TransformConfig for FilterConfig {
 pub struct Filter {
     #[derivative(Debug = "ignore")]
     condition: Condition,
+    emissions_deferred: u16,
+    emission_limit: u16,
 }
 
 impl Filter {
     pub const fn new(condition: Condition) -> Self {
-        Self { condition }
+        Self {
+            condition,
+            emissions_deferred: 0,
+            emission_limit: 4096,
+        }
     }
 }
 
@@ -81,7 +87,16 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(&FilterEventDiscarded);
+            // TODO without consulting the passage of time it's possible that a
+            // slow-poke could never see this metric.
+            if self.emissions_deferred >= self.emission_limit {
+                emit!(&FilterEventDiscarded {
+                    total: self.emissions_deferred as u64,
+                });
+                self.emissions_deferred = 0;
+            } else {
+                self.emissions_deferred += 1;
+            }
         }
     }
 }
@@ -102,9 +117,7 @@ mod test {
 
     #[test]
     fn passes_metadata() {
-        let mut filter = Filter {
-            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
-        };
+        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
         let event = Event::from("message");
         let metadata = event.metadata().clone();
         let result = transform_one(&mut filter, event).unwrap();
