@@ -24,8 +24,8 @@ impl<'a> InternalEvent for WindowsServiceStart<'a> {
 }
 
 #[derive(Debug)]
-pub(super) struct WindowsServiceStop<'a> {
-    pub(super) already_stopped: bool,
+pub(crate) struct WindowsServiceStop<'a> {
+    pub(crate) already_stopped: bool,
     name: &'a str,
 }
 
@@ -46,7 +46,7 @@ impl<'a> InternalEvent for WindowsServiceStop<'a> {
 }
 
 #[derive(Debug)]
-pub(super) struct WindowsServiceRestart<'a> {
+pub(crate) struct WindowsServiceRestart<'a> {
     name: &'a str,
 }
 
@@ -64,7 +64,7 @@ impl<'a> InternalEvent for WindowsServiceRestart<'a> {
 }
 
 #[derive(Debug)]
-pub(super) struct WindowsServiceInstall<'a> {
+pub(crate) struct WindowsServiceInstall<'a> {
     name: &'a str,
 }
 
@@ -82,7 +82,7 @@ impl<'a> InternalEvent for WindowsServiceInstall<'a> {
 }
 
 #[derive(Debug)]
-pub(self) struct WindowsServiceUninstall<'a> {
+pub(crate) struct WindowsServiceUninstall<'a> {
     pub(crate) name: &'a str,
 }
 
@@ -100,8 +100,8 @@ impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
 }
 
 #[derive(Debug)]
-pub(super) struct WindowsServiceDoesNotExist<'a> {
-    pub(super) name: &'a str,
+pub(crate) struct WindowsServiceDoesNotExist<'a> {
+    pub(crate) name: &'a str,
 }
 
 impl<'a> InternalEvent for WindowsServiceDoesNotExist<'a> {
