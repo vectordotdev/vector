@@ -89,7 +89,9 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
+        _state: &state::Compiler,
+        _ctx: &mut FunctionCompileContext,
+        mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let path = arguments.required("path");

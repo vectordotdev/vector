@@ -44,7 +44,9 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: &state::Compiler, _ctx: &mut FunctionCompileContext, mut arguments: ArgumentList,
+        _state: &state::Compiler,
+        _ctx: &mut FunctionCompileContext,
+        mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
 
