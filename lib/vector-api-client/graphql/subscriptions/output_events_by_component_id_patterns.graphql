@@ -13,6 +13,10 @@ subscription OutputEventsByComponentIdPatternsSubscription(
             timestamp
             string(encoding: $encoding)
         }
+        ... on Trace {
+            componentId
+            string(encoding: $encoding)
+        }
         ... on EventNotification {
             pattern
             notification

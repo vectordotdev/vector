@@ -266,7 +266,12 @@ cli: {
 				a specified interval.
 				"""
 
-			flags: _default_flags
+			flags: _default_flags & {
+				"quiet": {
+					_short:      "q"
+					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
+				}
+			}
 
 			options: {
 				"interval": {

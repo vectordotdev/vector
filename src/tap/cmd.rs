@@ -1,6 +1,16 @@
 use tokio_stream::StreamExt;
 use url::Url;
-use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
+use vector_api_client::{
+    connect_subscription_client,
+    gql::{
+        output_events_by_component_id_patterns_subscription::{
+            EventNotificationType,
+            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
+        },
+        TapSubscriptionExt,
+    },
+    Client,
+};
 
 use crate::{
     config,
@@ -70,20 +80,33 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         let stream = res.stream();
     };
 
-    // Loop over the returned results, printing out log events.
-    // NOTE: This will currently ignore notifications. A later `--verbose` option is planned
-    // to include these.
-    // TODO: https://github.com/vectordotdev/vector/issues/6870
+    // Loop over the returned results, printing out tap events.
     loop {
         tokio::select! {
             biased;
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
-                    for event_string in d.output_events_by_component_id_patterns.iter().filter_map(|ev| ev.as_string()) {
-                        #[allow(clippy::print_stdout)]
-                        {
-                            println!("{}", event_string);
+                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                        match tap_event {
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
+                                println!("{}", ev.string);
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
+                                println!("{}", ev.string);
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
+                                println!("{}", ev.string);
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
+                                if !opts.quiet {
+                                    match ev.notification {
+                                        EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
+                                        EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
+                                        EventNotificationType::Other(_) => {},
+                                    }
+                                }
+                            },
                         }
                     }
                 }

@@ -35,4 +35,8 @@ pub struct Opts {
     /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
     #[structopt(use_delimiter(true), long)]
     inputs_of: Vec<String>,
+
+    /// Quiet output includes only events
+    #[structopt(short, long)]
+    quiet: bool,
 }
