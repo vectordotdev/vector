@@ -24,9 +24,6 @@ jobs:
   cancel-previous:
     runs-on: ubuntu-20.04
     timeout-minutes: 3
-    if: |
-      github.ref != 'refs/heads/master' &&
-      ${{ github.actor != 'dependabot[bot]' }}
     steps:
       - uses: styfle/cancel-workflow-action@0.9.1
         with:
@@ -35,7 +32,6 @@ jobs:
 
   compute-soak-meta:
     name: Compute metadata for soaks
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
@@ -110,7 +106,6 @@ jobs:
 
   compute-test-plan:
     name: Compute soak test plan
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs: [compute-soak-meta]
     outputs:
@@ -146,7 +141,6 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
@@ -163,13 +157,6 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v1.13.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
@@ -178,7 +165,7 @@ jobs:
             latest=false
             prefix=
             suffix=
-          images: ghcr.io/${{ github.repository }}/soak-vector
+          images: vector
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
@@ -187,13 +174,18 @@ jobs:
           context: baseline-vector/
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
-          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=docker,dest=/tmp/baseline-image.tar
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: baseline-image
+          path: /tmp/baseline-image.tar
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
@@ -210,13 +202,6 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v1.13.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
@@ -225,22 +210,27 @@ jobs:
             latest=false
             prefix=
             suffix=
-          images: ghcr.io/${{ github.repository }}/soak-vector
+          images: vector
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
 
-      - name: Build and push 'soak-vector' image
+      - name: Build 'soak-vector' image
         uses: docker/build-push-action@v2.9.0
         with:
           context: comparison-vector/
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
-          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=docker,dest=/tmp/comparison-image.tar
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: comparison-image
+          path: /tmp/comparison-image.tar
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
@@ -251,12 +241,22 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
+      - name: Download baseline image
+        uses: actions/download-artifact@v2
+        with:
+          name: baseline-image
+          path: /tmp
+
+      - name: Load baseline image
+        run: |
+          docker load --input /tmp/baseline-image.tar
+
       - name: Run baseline experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --local-image "false" \
+                                  --build-image "false" \
                                   --variant "baseline" \
                                   --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
@@ -278,7 +278,6 @@ jobs:
 
   detect-erratic-baseline:
     name: Erratic detection - baseline
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -318,7 +317,6 @@ jobs:
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
@@ -329,12 +327,22 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
+      - name: Download comparison image
+        uses: actions/download-artifact@v2
+        with:
+          name: comparison-image
+          path: /tmp
+
+      - name: Load comparison image
+        run: |
+          docker load --input /tmp/comparison-image.tar
+
       - name: Run comparison experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --local-image "false" \
+                                  --build-image "false" \
                                   --variant "comparison" \
                                   --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
@@ -356,7 +364,6 @@ jobs:
 
   detect-erratic-comparison:
     name: Erratic detection - comparison
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -396,7 +403,6 @@ jobs:
 
   analyze-results:
     name: Soak analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -452,7 +458,6 @@ jobs:
 
   detect-regressions:
     name: Regression analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
@@ -491,7 +496,6 @@ jobs:
 
   plot-analysis:
     name: Plot analysis
-    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
