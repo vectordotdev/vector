@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
@@ -19,7 +20,10 @@ use crate::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
-    internal_events::{StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{
+        BytesReceived, EventsReceived, StatsdInvalidRecordError, StatsdSocketError,
+        StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -155,13 +159,24 @@ pub(crate) struct StatsdDeserializer;
 
 impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        emit!(&BytesReceived {
+            protocol: "udp",
+            byte_size: bytes.len(),
+        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
-            Ok(metric) => Ok(smallvec![Event::Metric(metric)]),
+            Ok(metric) => {
+                let event = Event::Metric(metric);
+                emit!(&EventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
+                });
+                Ok(smallvec![event])
+            }
             Err(error) => {
-                emit!(&StatsdInvalidRecord {
+                emit!(&StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -200,11 +215,9 @@ async fn statsd_udp(
     while let Some(frame) = stream.next().await {
         match frame {
             Ok(((events, _byte_size), _sock)) => {
-                for metric in events {
-                    if let Err(error) = out.send(metric).await {
-                        error!(message = "Error sending metric.", %error);
-                        break;
-                    }
+                let count = events.len();
+                if let Err(error) = out.send_batch(events).await {
+                    emit!(&StreamClosedError { error, count });
                 }
             }
             Err(error) => {

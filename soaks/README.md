@@ -34,7 +34,7 @@ support programs in a minikube and some glue code to observe vector in
 operation. Consider this command:
 
 ```shell
-> ./soaks/soak.sh --local-image --soak datadog_agent_remap_datadog_logs --baseline a32c7fd09978f76a3f1bd360c3a8d07a49538b70 --comparison be8ceafbf994d06f505bdd9fb392b00e0ba661f2
+> ./soaks/soak.sh --soak datadog_agent_remap_datadog_logs --baseline a32c7fd09978f76a3f1bd360c3a8d07a49538b70 --comparison be8ceafbf994d06f505bdd9fb392b00e0ba661f2
 ```
 
 Here we run the soak test `datadog_agent_remap_datadog_logs` comparing vector at
