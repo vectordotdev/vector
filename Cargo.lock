@@ -8515,6 +8515,7 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-tracing-context",
  "metrics-util",
+ "num-traits",
  "once_cell",
  "parking_lot 0.12.0",
  "pin-project 1.0.10",

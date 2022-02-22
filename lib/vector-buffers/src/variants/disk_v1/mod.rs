@@ -34,6 +34,7 @@ use tokio::time::Instant;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
+        acks::OrderedAcknowledgements,
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
     },
@@ -348,13 +349,12 @@ pub fn build<T: Bufferable>(
         blocked_write_tasks,
         read_offset: head,
         compacted_offset: 0,
-        acked: 0,
         delete_offset: head,
         current_size,
         ack_counter,
         max_uncompacted_size,
         uncompacted_size: 0,
-        unacked_keys: VecDeque::new(),
+        record_acks: OrderedAcknowledgements::from_acked(head),
         buffer: VecDeque::new(),
         last_compaction: Instant::now(),
         last_flush: Instant::now(),

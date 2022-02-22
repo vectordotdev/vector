@@ -24,7 +24,11 @@ use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::Instant};
 
 use super::Key;
-use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
+use crate::{
+    buffer_usage_data::BufferUsageHandle,
+    topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
+    Bufferable,
+};
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
@@ -34,42 +38,6 @@ const MIN_UNCOMPACTED_SIZE: u64 = 4 * 1024 * 1024;
 
 /// How often we flush deletes to the database.
 pub const FLUSH_INTERVAL: Duration = Duration::from_millis(250);
-
-/// Event count for a logical read.
-///
-/// As we track all reads, whether or not they can be successfully decoded, we need to track
-/// undecodable reads such that we know that we have to do extra work to correctly figure out how
-/// many events they represented.  This is required to ensure our acknowledgement accounting is
-/// accurate so we can correctly delete only truly acknowledged (or undecodable) records.
-#[derive(Clone, Debug)]
-enum ItemEventCount {
-    /// An undecodable item has no known event count until a read which occurs after it is processed,
-    /// allowing the offsets to be calculated.
-    Unknown,
-
-    /// A successful read that has a known event count.
-    Known(usize),
-}
-
-/// A deletion marker for a read that has not yet been fully acknowledged.
-///
-/// Used to provide in-order deletion of reads by carrying enough information to figure out when
-/// we've fully acknowledged all events that compromise a given logical read from the buffer.
-#[derive(Clone, Debug)]
-pub struct PendingDelete {
-    key: usize,
-    item_event_count: ItemEventCount,
-    item_bytes: usize,
-}
-
-/// A deletion marker for a read that is fully acknowledged and can be deleted.
-#[derive(Clone, Debug)]
-struct EligibleDelete {
-    key: usize,
-    item_event_count: usize,
-    item_bytes: usize,
-    acks_to_consume: Option<usize>,
-}
 
 /// The reader side of N to 1 channel through leveldb.
 ///
@@ -93,9 +61,6 @@ pub struct Reader<T> {
     pub(crate) compacted_offset: usize,
     /// First not deleted key
     pub(crate) delete_offset: usize,
-    /// Number of acked events that haven't been deleted from
-    /// database. Used for batching deletes.
-    pub(crate) acked: usize,
     /// Reader is notified by Writers through this Waker.
     /// Shared with Writers.
     pub(crate) write_notifier: Arc<AtomicWaker>,
@@ -111,7 +76,7 @@ pub struct Reader<T> {
     /// Size of deleted, not compacted, events in bytes.
     pub(crate) uncompacted_size: u64,
     /// Keys of unacked events.
-    pub(crate) unacked_keys: VecDeque<PendingDelete>,
+    pub(crate) record_acks: OrderedAcknowledgements<usize, usize>,
     /// Buffer for internal use.
     pub(crate) buffer: VecDeque<(Key, Vec<u8>)>,
     /// Limit on uncompacted_size after which we trigger compaction.
@@ -195,17 +160,13 @@ where
             trace!(?key, item_bytes, "Got record decode attempt.");
             match decode_result {
                 Ok(item) => {
-                    this.track_unacked_read(
-                        key.0,
-                        ItemEventCount::Known(item.event_count()),
-                        item_bytes,
-                    );
+                    this.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
                     Poll::Ready(Some(item))
                 }
                 Err(error) => {
                     error!(%error, "Error deserializing event.");
 
-                    this.track_unacked_read(key.0, ItemEventCount::Unknown, item_bytes);
+                    this.track_unacked_read(key.0, None, item_bytes);
                     Pin::new(this).poll_next(cx)
                 }
             }
@@ -255,111 +216,30 @@ impl<T> Reader<T> {
     /// Once all items of a read have been acknowledged, it will become eligible to be deleted.
     /// Additionally, reads which failed to decode will become eligible for deletion as soon as the
     /// next read occurs.
-    fn track_unacked_read(
-        &mut self,
-        key: usize,
-        item_event_count: ItemEventCount,
-        item_bytes: usize,
-    ) {
-        // We handle two possible scenarios here: a successful read, or an undecodable read.
-        //
-        // When a read is successful, we know its actual size in terms of event count and bytes, but
-        // with an undecodable read, we only know the size in bytes.  As such, we defer the logic of
-        // updating metrics until we have enough data to figure out, for any given key, how many
-        // items it represented.. which potentially means that we don't fully update the buffer
-        // metrics when our last read was undecodable and we haven't yet had a successful read.
-
-        self.read_offset = match item_event_count {
+    fn track_unacked_read(&mut self, key: usize, event_count: Option<usize>, item_bytes: usize) {
+        self.read_offset = match event_count {
             // We adjust our read offset to be 1 ahead of this key, because we grab records in a
             // "get the next N records that come after key K", so we only need the offset to be
             // right ahead of this key... regardless of whether or not there _is_ something valid at
             // K+1 or the next key is actually K+7, etc.
-            ItemEventCount::Unknown => key + 1,
+            None => key + 1,
             // Adjust our read offset based on the items within the read, as we rely on
             // the keys to track the number of _effective_ items (sum of "event count" from each item)
             // in the buffer using simple arithmetic between the first and last keys in the buffer.
-            ItemEventCount::Known(len) => key + len,
+            Some(len) => key + len,
         };
 
-        trace!(key, item_len = ?item_event_count, item_bytes, read_offset = self.read_offset,
-            "Tracking unacknowledged read.");
-
         // Now store a pending delete marker that will eventually be drained in our `try_flush` routine.
-        self.unacked_keys.push_back(PendingDelete {
-            key,
-            item_event_count,
-            item_bytes,
-        });
-    }
-
-    /// Gets the next unacknowledged key which now qualifies for deletion.
-    ///
-    /// An unacknowledged key qualifies for deletion when the acknowledged offset of events is at or
-    /// past the key plus the number of events within the item.
-    ///
-    /// For unacknowledged keys with an unknown event count (items that failed to decode), another
-    /// unacknowledged key must be present after it in order to calculate the key offsets and
-    /// determine the item length.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    fn get_next_eligible_delete(&mut self) -> Option<EligibleDelete> {
-        let acked_offset = self.delete_offset + self.acked;
-
-        trace!(
-            delete_offset = self.delete_offset,
-            acked = self.acked,
-            pending_deletes = self.unacked_keys.len(),
-            "Searching for eligible delete."
-        );
-
-        let maybe_marker =
-            self.unacked_keys
-                .front()
-                .cloned()
-                .and_then(|marker| match marker.item_event_count {
-                    // If the acked offset is ahead of this key, plus its length, it's been fully
-                    // acknowledged and we can consume and yield the marker.
-                    ItemEventCount::Known(len) => {
-                        if marker.key + len <= acked_offset {
-                            Some(EligibleDelete {
-                                key: marker.key,
-                                item_event_count: len,
-                                item_bytes: marker.item_bytes,
-                                acks_to_consume: Some(len),
-                            })
-                        } else {
-                            None
-                        }
-                    }
-                    // We don't yet know what the item event count is for this key, so we speculatively
-                    // peek at the next unacked key, and if one exists, we can determine the item event
-                    // count simply by taking the difference between the keys themselves.
-                    //
-                    // You may also notice that we do no sort of check here about our acknowledged
-                    // offset, etc.  That is because this key generated no items that will ever be
-                    // acknowledged, so we know we can simply delete this key without breaking anything
-                    // else.  We just needed to wait for another read to figure out how many items it
-                    // accounted for in the buffer.
-                    ItemEventCount::Unknown => self.unacked_keys.get(1).map(|next_marker| {
-                        let len = next_marker.key - marker.key;
-
-                        // Because we're artificially driving this deletion, there are no
-                        // acknowledgements to actually consume for it.  Doing so would mess up the
-                        // balance between `self.delete_offset`/`self.acked`.
-                        EligibleDelete {
-                            key: marker.key,
-                            item_event_count: len,
-                            item_bytes: marker.item_bytes,
-                            acks_to_consume: None,
-                        }
-                    }),
-                });
-
-        // If we actually got an eligible marker, properly remove it from `self.unacked_keys`.
-        if maybe_marker.is_some() {
-            let _ = self.unacked_keys.pop_front();
+        if let Err(me) = self
+            .record_acks
+            .add_marker(key, event_count, Some(item_bytes))
+        {
+            match me {
+                MarkerError::MonotonicityViolation => {
+                    panic!("record ID monotonicity violation detected; this is a serious bug")
+                }
+            }
         }
-
-        maybe_marker
     }
 
     /// Attempt to flush any pending deletes to the database.
@@ -383,10 +263,9 @@ impl<T> Reader<T> {
         debug!("Running flush.");
 
         // Consume any pending acknowledgements.
-        let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
-        if num_to_delete > 0 {
-            debug!("Consumed {} acknowledgements.", num_to_delete);
-            self.acked += num_to_delete;
+        let pending_acks = self.ack_counter.swap(0, Ordering::Relaxed);
+        if pending_acks > 0 {
+            self.record_acks.add_acknowledgements(pending_acks);
         }
 
         // See if any pending deletes actually qualify for deletion, and if so, capture them and
@@ -395,13 +274,13 @@ impl<T> Reader<T> {
         let mut total_keys = 0;
         let mut total_items_len = 0;
         let mut total_item_bytes = 0;
-        while let Some(eligible_delete) = self.get_next_eligible_delete() {
-            let EligibleDelete {
-                key,
-                item_event_count,
-                item_bytes,
-                acks_to_consume,
-            } = eligible_delete;
+        while let Some(marker) = self.record_acks.get_next_eligible_marker() {
+            let EligibleMarker { id: key, len, data } = marker;
+
+            let event_count = match len {
+                EligibleMarkerLength::Known(len) | EligibleMarkerLength::Assumed(len) => len,
+            };
+            let item_bytes = data.unwrap_or(0);
 
             // Add this key to our delete batch.
             delete_batch.delete(Key(key));
@@ -411,13 +290,10 @@ impl<T> Reader<T> {
             // We adjust the delete offset/remaining acks here so that the next call to
             // `get_next_eligible_delete` has updated offsets so we can optimally drain as many
             // eligible deletes as possible in one go.
-            self.delete_offset = key.wrapping_add(item_event_count);
-            if let Some(amount) = acks_to_consume {
-                self.acked -= amount;
-            }
+            self.delete_offset = key.wrapping_add(event_count);
 
             total_keys += 1;
-            total_items_len += item_event_count;
+            total_items_len += event_count;
             total_item_bytes += item_bytes;
         }
 

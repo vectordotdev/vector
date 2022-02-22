@@ -217,18 +217,32 @@ async fn acking_multi_event_advances_delete_offset_incremental() {
 async fn acking_when_undecodable_records_present() {
     let _a = install_tracing_helpers();
 
-    let poisoned_event = PoisonPillMultiEventRecord::poisoned();
-    let poisoned_event_count = poisoned_event.event_count();
+    // We use a special message type, `PoisonPillMultiEventRecord`, which acts like a normal
+    // multi-event record until you specify a special value for the event count which activates the
+    // poison pill functionality.
+    //
+    // This lets us allow all records to be written to the buffer, but ensure that some of them will
+    // fail to decode, which drives the logic that does deferred acknowledgements, gap/lost record
+    // detection, etc.
+    let poisoned_record = PoisonPillMultiEventRecord::poisoned();
+    let poisoned_event_count = poisoned_record.event_count();
+    let valid_record = PoisonPillMultiEventRecord(13);
+    let valid_event_count = valid_record.event_count();
     let cases = vec![
-        // The set of input records, expected valid read count, and delete offset after reads.
-        (vec![poisoned_event.clone()], 0, 0),
+        // A single poisoned record cannot be read, and without a follow up record, its event count
+        // can also not be determined.
+        (vec![poisoned_record.clone()], 0, 0),
+        // A poisoned record that is followed by a valid record will ensure we can at least detect
+        // how many events the poisoned record represented, even if we cannot read it and decode it.
         (
-            vec![poisoned_event.clone(), PoisonPillMultiEventRecord(13)],
+            vec![poisoned_record.clone(), valid_record.clone()],
             1,
-            poisoned_event_count + 13,
+            poisoned_event_count + valid_event_count,
         ),
+        // We can also detect the event count of a poisoned record when it's followed by another
+        // poisoned record, although neither of them will be able to be decoded and returned.
         (
-            vec![poisoned_event.clone(), poisoned_event.clone()],
+            vec![poisoned_record.clone(), poisoned_record.clone()],
             0,
             poisoned_event_count,
         ),

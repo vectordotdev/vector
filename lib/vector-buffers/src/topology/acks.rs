@@ -1,20 +1,23 @@
 use std::{collections::VecDeque, fmt};
 
+use num_traits::{Bounded, CheckedAdd, CheckedSub, Unsigned, WrappingAdd, WrappingSub};
+
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum PendingMarkerLength {
-    Known(u64),
-    Assumed(u64),
+enum PendingMarkerLength<N> {
+    Known(N),
+    Assumed(N),
     Unknown,
 }
 
-struct PendingMarker<D> {
-    id: u64,
-    len: PendingMarkerLength,
+struct PendingMarker<N, D> {
+    id: N,
+    len: PendingMarkerLength<N>,
     data: Option<D>,
 }
 
-impl<D> fmt::Debug for PendingMarker<D>
+impl<N, D> fmt::Debug for PendingMarker<N, D>
 where
+    N: fmt::Debug,
     D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -28,18 +31,18 @@ where
 
 /// The length of an eligible marker.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EligibleMarkerLength {
+pub enum EligibleMarkerLength<N> {
     /// The marker's length was declared upfront when added.
-    Known(u64),
+    Known(N),
 
     /// The marker's length was calculated based on imperfect information, and so while it should
     /// accurately represent a correct range that covers any gaps in the marker range, it may or may
     /// not represent one true marker, or possibly multiple markers.
-    Assumed(u64),
+    Assumed(N),
 }
 
-impl EligibleMarkerLength {
-    fn len(&self) -> u64 {
+impl<N: Copy> EligibleMarkerLength<N> {
+    fn len(&self) -> N {
         match self {
             EligibleMarkerLength::Known(len) | EligibleMarkerLength::Assumed(len) => *len,
         }
@@ -47,20 +50,24 @@ impl EligibleMarkerLength {
 }
 
 /// A marker that has been fully acknowledged.
-pub struct EligibleMarker<D> {
-    pub id: u64,
-    pub len: EligibleMarkerLength,
+pub struct EligibleMarker<N, D> {
+    pub id: N,
+    pub len: EligibleMarkerLength<N>,
     pub data: Option<D>,
 }
 
-impl<D> PartialEq for EligibleMarker<D> {
+impl<N, D> PartialEq for EligibleMarker<N, D>
+where
+    N: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.len == other.len
     }
 }
 
-impl<D> fmt::Debug for EligibleMarker<D>
+impl<N, D> fmt::Debug for EligibleMarker<N, D>
 where
+    N: fmt::Debug,
     D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -93,7 +100,7 @@ pub enum MarkerError {
 }
 
 /// Result of comparing a potential pending marker ID with the expected next pending marker ID.
-pub enum MarkerOffset {
+pub enum MarkerOffset<N> {
     /// The given marker ID is aligned with the next expected marker ID.
     Aligned,
 
@@ -105,7 +112,7 @@ pub enum MarkerOffset {
     ///
     /// The next expected marker ID, and the amount (gap) that the given marker ID and the next
     /// expected marker ID differ, are provided.
-    Gap(u64, u64),
+    Gap(N, N),
 
     /// The given marker ID may or may not be aligned.
     ///
@@ -114,7 +121,7 @@ pub enum MarkerOffset {
     /// pending marker should end.
     ///
     /// The last pending marker ID is provided.
-    NotEnoughInformation(u64),
+    NotEnoughInformation(N),
 
     /// The given marker ID is behind the next expected marker ID.
     ///
@@ -170,16 +177,28 @@ pub enum MarkerOffset {
 /// the number of events that were lost when the next marker is added, as marker IDs represent the
 /// start of a record, and so simple arithmetic can determine the number of events that have
 /// theoretically been lost.
-pub struct OrderedAcknowledgements<D> {
-    unclaimed_acks: u64,
-    acked_marker_id: u64,
-    pending_markers: VecDeque<PendingMarker<D>>,
+pub struct OrderedAcknowledgements<N, D> {
+    unclaimed_acks: N,
+    acked_marker_id: N,
+    pending_markers: VecDeque<PendingMarker<N, D>>,
 }
 
-impl<D> OrderedAcknowledgements<D> {
-    pub fn from_acked(acked_marker_id: u64) -> Self {
+impl<N, D> OrderedAcknowledgements<N, D>
+where
+    N: fmt::Display
+        + Bounded
+        + CheckedAdd
+        + CheckedSub
+        + Copy
+        + PartialEq
+        + PartialOrd
+        + Unsigned
+        + WrappingAdd
+        + WrappingSub,
+{
+    pub fn from_acked(acked_marker_id: N) -> Self {
         Self {
-            unclaimed_acks: 0,
+            unclaimed_acks: N::min_value(),
             acked_marker_id,
             pending_markers: VecDeque::new(),
         }
@@ -189,15 +208,15 @@ impl<D> OrderedAcknowledgements<D> {
     ///
     /// Acknowledgements should be given by the caller to update the acknowledgement state before
     /// trying to get any eligible markers.
-    pub fn add_acknowledgements(&mut self, amount: u64) {
+    pub fn add_acknowledgements(&mut self, amount: N) {
         self.unclaimed_acks = self
             .unclaimed_acks
-            .checked_add(amount)
-            .expect("having more than 2^64 unclaimed acks is definitely not right");
+            .checked_add(&amount)
+            .expect("overflowing unclaimed acknowledgements is a serious bug");
 
         trace!(
-            unclaimed_acks = self.unclaimed_acks,
-            added_acks = amount,
+            unclaimed_acks = %self.unclaimed_acks,
+            added_acks = %amount,
             "Added acknowledgements."
         );
     }
@@ -219,7 +238,7 @@ impl<D> OrderedAcknowledgements<D> {
     /// - if we have pending markers, and the last pending marker has an unknown length,
     ///   `MarkerOffset::NotEnoughInformation` is returned, as we require a fixed-size marker to
     ///   correctly calculate the next expected marker ID
-    fn get_marker_id_offset(&self, id: u64) -> MarkerOffset {
+    fn get_marker_id_offset(&self, id: N) -> MarkerOffset<N> {
         if self.pending_markers.is_empty() {
             // We have no pending markers, but our acknowledged ID offset should match the marker ID
             // being given here, otherwise it would imply that the markers were not contiguous.
@@ -234,7 +253,7 @@ impl<D> OrderedAcknowledgements<D> {
             if self.acked_marker_id != id {
                 return MarkerOffset::Gap(
                     self.acked_marker_id,
-                    id.wrapping_sub(self.acked_marker_id),
+                    id.wrapping_sub(&self.acked_marker_id),
                 );
             }
         } else {
@@ -250,13 +269,13 @@ impl<D> OrderedAcknowledgements<D> {
                 // If we know the length of the back item, then we know exactly what the ID for the
                 // next marker to follow it should be.  If this incoming marker doesn't match,
                 // something is wrong.
-                let expected_next = back.id.wrapping_add(len);
+                let expected_next = back.id.wrapping_add(&len);
                 if id != expected_next {
                     if expected_next < back.id && id < expected_next {
                         return MarkerOffset::MonotonicityViolation;
                     }
 
-                    return MarkerOffset::Gap(expected_next, id.wrapping_sub(expected_next));
+                    return MarkerOffset::Gap(expected_next, id.wrapping_sub(&expected_next));
                 }
             } else {
                 // Without a fixed-size marker, we cannot be sure whether this marker ID is aligned
@@ -298,8 +317,8 @@ impl<D> OrderedAcknowledgements<D> {
     /// expected marker ID, `Err(MarkerError::MonotonicityViolation)` is returned.
     pub fn add_marker(
         &mut self,
-        id: u64,
-        marker_len: Option<u64>,
+        id: N,
+        marker_len: Option<N>,
         data: Option<D>,
     ) -> Result<(), MarkerError> {
         // First, figure out where this given marker ID stands compared to our next expected marker
@@ -318,7 +337,7 @@ impl<D> OrderedAcknowledgements<D> {
             // calculate the length of that last pending marker, and in turn, we're going to adjust
             // its length before adding the new pending marker.
             MarkerOffset::NotEnoughInformation(last_marker_id) => {
-                let len = id.wrapping_sub(last_marker_id);
+                let len = id.wrapping_sub(&last_marker_id);
                 let last_marker = self
                     .pending_markers
                     .back_mut()
@@ -352,13 +371,13 @@ impl<D> OrderedAcknowledgements<D> {
     /// For pending markers with an unknown length, another pending marker must be present after it
     /// in order to calculate the ID offsets and determine the marker length.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub fn get_next_eligible_marker(&mut self) -> Option<EligibleMarker<D>> {
-        let effective_acked_marker_id = self.acked_marker_id.wrapping_add(self.unclaimed_acks);
+    pub fn get_next_eligible_marker(&mut self) -> Option<EligibleMarker<N, D>> {
+        let effective_acked_marker_id = self.acked_marker_id.wrapping_add(&self.unclaimed_acks);
 
         trace!(
-            acked_marker_id = self.acked_marker_id,
-            effective_acked_marker_id,
-            unclaimed_acks = self.unclaimed_acks,
+            acked_marker_id = %self.acked_marker_id,
+            %effective_acked_marker_id,
+            unclaimed_acks = %self.unclaimed_acks,
             pending_markers = self.pending_markers.len(),
             "Searching for eligible marker."
         );
@@ -375,7 +394,7 @@ impl<D> OrderedAcknowledgements<D> {
                     // an amount of unclaimed acks exists that is not enough for this marker but is
                     // enough to align the effective/required IDs.
                     PendingMarkerLength::Known(len) => {
-                        let required_acked_marker_id = marker.id.wrapping_add(len);
+                        let required_acked_marker_id = marker.id.wrapping_add(&len);
                         if required_acked_marker_id <= effective_acked_marker_id
                             && self.unclaimed_acks >= len
                         {
@@ -389,7 +408,7 @@ impl<D> OrderedAcknowledgements<D> {
                     // consume acknowledgements and so are immediately eligible once an assumed
                     // length can be determined.
                     PendingMarkerLength::Assumed(len) => {
-                        Some((EligibleMarkerLength::Assumed(len), 0))
+                        Some((EligibleMarkerLength::Assumed(len), N::min_value()))
                     }
                     // We don't yet know what the length is for this marker, so we're stuck waiting
                     // for another marker to be added before that can be determined.
@@ -408,14 +427,14 @@ impl<D> OrderedAcknowledgements<D> {
                     .pop_front()
                     .expect("pending markers cannot be empty");
 
-                if acks_to_claim > 0 {
+                if acks_to_claim > N::min_value() {
                     self.unclaimed_acks = self
                         .unclaimed_acks
-                        .checked_sub(acks_to_claim)
+                        .checked_sub(&acks_to_claim)
                         .expect("should not be able to claim more acks than are unclaimed");
                 }
 
-                self.acked_marker_id = id.wrapping_add(len.len());
+                self.acked_marker_id = id.wrapping_add(&len.len());
 
                 Some(EligibleMarker { id, len, data })
             }
@@ -424,8 +443,9 @@ impl<D> OrderedAcknowledgements<D> {
     }
 }
 
-impl<D> fmt::Debug for OrderedAcknowledgements<D>
+impl<N, D> fmt::Debug for OrderedAcknowledgements<N, D>
 where
+    N: fmt::Debug,
     D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -464,7 +484,7 @@ mod tests {
         // Number of unclaimed acknowledgements.
         Acknowledge(u64),
         AddMarker(Result<(), MarkerError>),
-        GetNextEligibleMarker(Option<EligibleMarker<()>>),
+        GetNextEligibleMarker(Option<EligibleMarker<u64, ()>>),
     }
 
     fn arb_ordered_acks_action() -> impl Strategy<Value = Action> {
@@ -475,7 +495,10 @@ mod tests {
         ]
     }
 
-    fn apply_action_sut(sut: &mut OrderedAcknowledgements<()>, action: Action) -> ActionResult {
+    fn apply_action_sut(
+        sut: &mut OrderedAcknowledgements<u64, ()>,
+        action: Action,
+    ) -> ActionResult {
         match action {
             Action::Acknowledge(amount) => {
                 sut.add_acknowledgements(amount);
@@ -687,7 +710,7 @@ mod tests {
     }
 
     fn run_test_case(name: &str, case: Vec<(Action, ActionResult)>) {
-        let mut sut = OrderedAcknowledgements::from_acked(0);
+        let mut sut = OrderedAcknowledgements::from_acked(0u64);
         for (action, expected_result) in case {
             let actual_result = apply_action_sut(&mut sut, action);
             assert_eq!(
@@ -703,7 +726,7 @@ mod tests {
     fn panic_when_unclaimed_acks_overflows() {
         let actions = vec![Action::Acknowledge(u64::MAX), Action::Acknowledge(1)];
 
-        let mut sut = OrderedAcknowledgements::<()>::from_acked(0);
+        let mut sut = OrderedAcknowledgements::<u64, ()>::from_acked(0);
         for action in actions {
             apply_action_sut(&mut sut, action);
         }
@@ -719,7 +742,7 @@ mod tests {
 
             let mut unclaimed_acks = 0;
             let mut marker_state = HashSet::new();
-            let mut marker_stack: VecDeque<(u64, PendingMarkerLength)> = VecDeque::new();
+            let mut marker_stack: VecDeque<(u64, PendingMarkerLength<u64>)> = VecDeque::new();
 
             for action in actions {
                 match action {

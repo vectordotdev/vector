@@ -345,8 +345,8 @@ pub struct Reader<T> {
     data_file_record_count: u64,
     data_file_marked_record_count: u64,
     ready_to_read: bool,
-    record_acks: OrderedAcknowledgements<u64>,
-    data_file_acks: OrderedAcknowledgements<(PathBuf, u64)>,
+    record_acks: OrderedAcknowledgements<u64, u64>,
+    data_file_acks: OrderedAcknowledgements<u64, (PathBuf, u64)>,
     _t: PhantomData<T>,
 }
 
