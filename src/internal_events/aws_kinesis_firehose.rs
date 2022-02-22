@@ -27,7 +27,6 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
 
 #[derive(Debug)]
 pub(crate) struct AwsKinesisFirehoseRequestError<'a> {
-    pub(crate) request_id: Option<&'a str>,
     pub(crate) code: hyper::StatusCode,
     pub(crate) error: &'a str,
 }
