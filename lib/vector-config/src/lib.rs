@@ -1,114 +1,141 @@
-use std::{time::Duration, marker::PhantomData};
+use std::time::Duration;
 
-use schemars::{JsonSchema, schema::{SchemaObject, InstanceType, SingleOrVec, NumberValidation, Schema}, gen::SchemaGenerator};
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use serde_with::{SerializeAs, DeserializeAs, DurationSeconds, formats::Strict};
+use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct AsSchema<T: ?Sized>(PhantomData<T>);
-
-impl<T: JsonSchema + ?Sized> AsSchema<T> {
-    pub fn serialize<S, I>(value: &I, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: SerializeAs<I>,
-        I: ?Sized,
-    {
-        T::serialize_as(value, serializer)
-    }
-
-    pub fn deserialize<'de, D, I>(deserializer: D) -> Result<I, D::Error>
-    where
-        T: DeserializeAs<'de, I>,
-        D: Deserializer<'de>,
-    {
-        T::deserialize_as(deserializer)
-    }
+/// The shape of the field.
+/// 
+/// This maps similiar to the concept of JSON's data types, where types are generalized and have
+/// generalized representations.  This allows us to provide general-but-relevant mappings to core
+/// types, such as integers and strings and so on, while providing escape hatches for customized
+/// types that may be encoded and decoded via "normal" types but otherwise have specific rules or
+/// requirements.
+pub enum Shape {
+    Scalar(Scalar),
+    List,
+    Map,
+    Custom,
 }
 
-impl<T: JsonSchema> JsonSchema for AsSchema<T> {
-    fn schema_name() -> String {
-        <T as JsonSchema>::schema_name()
-    }
-
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        <T as JsonSchema>::json_schema(gen)
-    }
+/// A scalar, or single value.
+/// 
+/// Generally refers to anything that stands on its own: integer, string, boolean, and so on.
+pub enum Scalar {
+    Unsigned(UnsignedInteger),
+    Duration,
 }
 
-struct DurationInSeconds;
-
-impl SerializeAs<Duration> for DurationInSeconds {
-    fn serialize_as<S>(value: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {  
-        DurationSeconds::<u64, Strict>::serialize_as(value, serializer)
-    }
+pub struct UnsignedInteger {
+	theoretical_upper_bound: u128,
+	effective_lower_bound: u128,
+	effective_upper_bound: u128,
 }
 
-impl<'de> DeserializeAs<'de, Duration> for DurationInSeconds {
-    fn deserialize_as<D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
-    {  
-        DurationSeconds::<u64, Strict>::deserialize_as(deserializer)
-    }
+pub enum Bounded {
+    Unsigned(u128, u128),
 }
 
-impl JsonSchema for DurationInSeconds {
-    fn schema_name() -> String {
-        String::from("duration")
-    }
+pub enum Metadata {
+    DefaultValue(Value),
+    Bounded(Bounded),
 
-    fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        Schema::Object(SchemaObject {
-			instance_type: Some(SingleOrVec::from(InstanceType::Number)),
-			number: Some(Box::new(NumberValidation { 
-				minimum: Some(1.0),
-				..Default::default()
-			})),
-			..Default::default()
-		})
+}
+
+pub struct Field {}
+
+impl Field {
+    fn with_description(
+        name: &'static str,
+        desc: &'static str,
+        shape: Shape,
+        metadata: Option<Metadata>,
+        fields: Option<Vec<Field>>,
+    ) -> Self {
+        Self {}
     }
 }
 
-/// Controls batching behavior.
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct BatchSettings {
-	#[schemars(range(min = 1))]
-	pub max_events: Option<u32>,
-	#[schemars(range(min = 1))]
-	pub max_bytes: Option<u32>,
-	#[serde(with = "AsSchema::<DurationInSeconds>")]
-	#[schemars(range(min = 1))]
-	pub max_timeout: Duration,
+pub trait Configurable: Sized {
+    /// Gets the human-readable description of this value, if any.
+    ///
+    /// For standard types, this will be `None`.  Commonly, custom types would implement this
+    /// directly, while fields using standard types would provide a field-specific description that
+    /// would be used instead of the default descrption.
+    fn description(&self) -> Option<&'static str>;
+
+    /// Gets the shape of this value.
+    fn shape(&self) -> Shape;
+
+    /// Gets the metadata for this value.
+    fn metadata(&self) -> Option<Vec<Metadata>>;
+
+	/// The fields for this value, if any.
+    fn fields(&self) -> Option<Vec<Field>>;
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct BasicSinkConfig {
-	/// The API endpoint to send requests to.
-	pub api_endpoint: String,
-	pub batch: BatchSettings,
-	/// How often to reload the API key from the configuration service.
-	#[serde(default = "default_api_key_reload_interval")]
-	#[serde(with = "AsSchema::<DurationInSeconds>")]
-	pub api_key_reload_interval: Duration,
+struct SinkConfig {
+    url: String,
+    batch: BatchConfig,
 }
 
-const fn default_api_key_reload_interval() -> Duration {
-	Duration::from_secs(30)
+#[derive(Serialize, Deserialize)]
+struct BatchConfig {
+    max_events: Option<u32>,
+    max_bytes: Option<u32>,
+    max_timeout: Option<Duration>,
 }
 
-#[cfg(test)]
-mod tests {
-    use schemars::schema_for;
+impl Configurable for BatchConfig {
+    fn description(&self) -> Option<&'static str> {
+        Some("controls batching behavior i.e. maximum batch size, the maximum time before a batch is flushed, etc")
+    }
 
-    use crate::BasicSinkConfig;
+    fn shape(&self) -> Shape {
+        Shape::Map
+    }
 
-	#[test]
-	fn output() {
-		let schema = schema_for!(BasicSinkConfig);
-		println!("{}", serde_json::to_string_pretty(&schema).unwrap());
-	}
+    fn metadata(&self) -> Option<Vec<Metadata>> {
+        let default = BatchConfig {
+            max_events: Some(1000),
+            max_bytes: Some(1048576),
+            max_timeout: Some(Duration::from_secs(60)),
+        };
+        let default = serde_json::to_value(default).expect("should not fail");
+
+        Some(vec![
+            Metadata::DefaultValue(default)
+        ])
+    }
+
+    fn fields(&self) -> Option<Vec<Field>> {
+        Some(vec![Field::with_description(
+            "max_events",
+            "maximum number of events per batch",
+            Shape::Scalar(Scalar::Unsigned(UnsignedInteger {
+                theoretical_upper_bound: u32::MAX.into(),
+                effective_lower_bound: u32::MIN.into(),
+                effective_upper_bound: u32::MAX.into(),
+            })),
+            None,
+            None,
+        ),
+        Field::with_description(
+            "max_bytes",
+            "maximum number of bytes per batch",
+            Shape::Scalar(Scalar::Unsigned(UnsignedInteger {
+                theoretical_upper_bound: u32::MAX.into(),
+                effective_lower_bound: u32::MIN.into(),
+                effective_upper_bound: u32::MAX.into(),
+            })),
+            None,
+            None,
+        ),
+        Field::with_description(
+            "max_timeout",
+            "maximum period of time a batch can exist before being forcibly flushed",
+            Shape::Scalar(Scalar::Duration),
+            None,
+            None,
+        )])
+    }
 }
