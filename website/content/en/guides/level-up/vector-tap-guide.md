@@ -84,8 +84,12 @@ ID.
 
 Try running `vector tap --inputs-of "out"`. The events should be the same
 as before, but you're now tapping the input events of the `blackhole` sink
-`out`. Note that tapping a component's input is effectively a shorthand for
+`out`.
+
+{{< info >}}
+Note that tapping a component's input is effectively a shorthand for
 tapping all the outputs that feed into that component.
+{{< /info >}}
 
 ### Customizing output
 
