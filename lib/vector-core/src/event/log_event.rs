@@ -126,7 +126,12 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.as_map(), key.as_ref())
+        let key = key.as_ref();
+        if let Ok(lookup) = Lookup::from_str(key) {
+            self.fields.as_ref().contains(lookup)
+        } else {
+            false
+        }
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]

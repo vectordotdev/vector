@@ -1,12 +1,10 @@
 mod all_fields;
-mod contains;
 mod insert;
 mod keys;
 mod path_iter;
 mod remove;
 
 pub use all_fields::all_fields;
-pub use contains::contains;
 pub use insert::{insert, insert_path};
 pub use keys::keys;
 pub use path_iter::{PathComponent, PathIter};
