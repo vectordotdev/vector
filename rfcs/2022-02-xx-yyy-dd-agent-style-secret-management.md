@@ -1,0 +1,118 @@
+# RFC <issue#> - 2022-02-xx - Datadog Agent style secret management
+
+The Datadog Agent has a straighforward secret resolution facility to avoid having sensitive information stored directly
+in its config, it relies on a user-provided external program that is run to retrieve sensitive value from a thirs party
+system. This RFC aims to propose a similar mechanism for Vector.
+
+## Context
+
+The [Datadog Agent documentation][dd-agent-secret-mgmt] provide all user-relevant information to use that feature. It
+covers the specification for the user-provided executable that loads/decrypts secrets along with the agent configuration
+and the syntax to retrieve encrypted config value.
+
+## Cross cutting concerns
+
+N/A
+
+## Scope
+
+### In scope
+
+- User shall be able to user the same kind of executable to load/decrypt secrets for Vector.
+- This new feature will have a deterministic behaviour when used in conjunction with templates.
+- Situations like topology reload and load/decryption failure will be accounted for.
+
+### Out of scope
+
+- Integration with other secret or distribution configuration like vault, however this RFC will account for that kind of
+  future extension
+
+## Pain
+
+- As of today secret like authentication tokens and passwords should be provided inside the topology configuration in
+  plain text and that may not be acceptable in some circumstances.
+- Decoupling secret management and key rotation from configuration management.
+
+## Proposal
+
+### User Experience
+
+- Use the same kind of API between Vector and a user-provided executable as the one between the Agent and the secret
+  retrieving executable.
+- A set of top level options like the ones the Datadog Agent [exposes][dd-agent-secret-knobs].
+- A convenient syntax for config option to indicate Vector that a secret should be retrieved for this option (Subject to
+  be changed but the Datadog Agent uses `ENC[secret_key]`)
+
+New top level options to be added: 
+```
+[secret_backend]
+path = "/path/to/the/command"
+argument = "--config foo=bar"
+timeout = 5 
+``` 
+
+### Implementation
+
+A secret backend that would lie in `./src/config/secret.rs` and would call the user provided executable for secrets,
+cache secrets to avoid calling the backend for the same key multiple time. It would read the configuration file once to
+get its config before further processing, ideally env var interpolating should be supported (this should not be a
+problem). In `./src/config/builder.rs`, `load_builder_from_paths` will still be returning a complete configuration with
+placeholders replaced by secrets. 
+
+The `ConfigBuilder` struct will get a new `secret_backend` field (type to something like `SecretBackend`), this means
+that `load_builder_from_paths` will then assert if this field is present before returning to the caller, and if it, the
+config will be reloaded with this `SecretBackend` passed to downstream callee and hook the secret interpolation around
+the same point as [the environment variable interpolation][env-var-hook] it would then query this `SecretBackend` for
+each `ENC[secret_key]`.
+
+The implementation should ease future extension and split the internal API queried by the interpolation logic and the
+secret provider that may see other implementation like: `executable` (the one documented in this RFC), `vault`,
+`k8s-config-map`, `aws secretsmanager`, etc.
+
+## Rationale
+
+- Some users just can't put sensitive information inside their configuration. 
+
+## Drawbacks
+
+- Integrating with other third party tools directly like Vault would provide better error management and avoid relying on a custom, user-provided binary.
+- This binary might have to be injected into container images which may be inconvenient, other options like using an external volume may be more acceptable but it would still involve a third party executable and all the associated risks.
+
+## Prior Art
+
+- The Datadog Agent has exactly the same feature, despite its simple approach it works reasonnably well, but it is
+  cannot easily support advanced secret management like certificate distribution/revocation, key rotation, etc.
+- Vault is the standard in the industry, and it comes with all kind of advanced features that cannot really supported
+  by the user-provided executable solution.
+
+## Alternatives
+
+- Integrate with other third party tools: Vault and CSP APIs for secret management to start with.
+- Use the env var interpolation as a secret backend and leverate [K8s ability to expose
+  secret][k8s-env-var-from-secrets] as environment variables, still this would be a good idea to document that as this is a convenient solution avoiding the need to inject a custom binary inside container images. Note that the Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
+
+Note: doing nothing is not really an alternative here, as plain text secret in config is a strong blocker for some
+users. 
+
+## Outstanding Questions
+
+- Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement (TBC).
+- Specific security constraints
+
+## Plan Of Attack
+
+- [ ] Implement the secret backend logic with the minimal set of options.
+- [ ] Document typical usecases.
+
+## Future Improvements
+
+- Support additional backend.
+- Embed/implement helpers like the [Agent][dd-agent-secret-helper].
+
+
+[dd-agent-secret-mgmt]: https://docs.datadoghq.com/agent/guide/secrets-management/
+[dd-agent-secret-knobs]: https://github.com/DataDog/datadog-agent/blob/abc8351/pkg/config/config.go#L356-L362
+[env-var-hook]: https://github.com/vectordotdev/vector/blob/ed0ca37/src/config/loading.rs#L414
+[k8s-env-var-from-secrets]: https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-environment-variables
+[dd-agent-with-k8s-secret]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#script-for-reading-from-multiple-secret-providers
+[dd-agent-secret-helper]: https://github.com/DataDog/datadog-agent/tree/331a3fc2c6f4f49f9bcc06c4f0675f6a8b65a523/cmd/secrets
