@@ -284,7 +284,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let got = merged_definition(&inputs, &config);
+            let got = merged_definition(&inputs, &config, &mut HashMap::default());
             assert_eq!(got, want, "{}", title);
         }
     }
