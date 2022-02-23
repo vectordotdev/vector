@@ -1653,9 +1653,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-queue"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b10ddc024425c88c2ad148c1b0fd53f4c6d38db9697c9f1588381212fa657c9"
+checksum = "4dd435b205a4842da59efd07628f921c096bc1cc0a156835b4fa0bcb9a19bcce"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
@@ -7816,8 +7816,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-fluent-assertions"
-version = "0.2.0"
-source = "git+https://github.com/vectordotdev/tracing-fluent-assertions?branch=bump-tracing-subscriber#0b32307299b832bfbcaf6026e2f53436b8b9abee"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
  "tracing 0.1.31",
  "tracing-core 0.1.22",
@@ -8521,6 +8522,7 @@ dependencies = [
  "clap 3.1.1",
  "crc32fast",
  "criterion",
+ "crossbeam-queue",
  "crossbeam-utils",
  "db-key",
  "dyn-clone",
@@ -8534,10 +8536,12 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-tracing-context",
  "metrics-util",
+ "num-traits",
  "once_cell",
  "parking_lot 0.12.0",
  "pin-project 1.0.10",
  "pretty_assertions",
+ "proptest",
  "quickcheck",
  "rand 0.8.5",
  "rkyv",
@@ -8549,7 +8553,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-test",
- "tokio-util 0.6.8",
+ "tokio-util 0.7.0",
  "tracing 0.1.31",
  "tracing-fluent-assertions",
  "tracing-subscriber",
