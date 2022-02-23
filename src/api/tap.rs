@@ -298,7 +298,7 @@ async fn tap_handler(
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
-                                    sinks.entry(output.output_id.component.clone()).or_insert_with(|| Vec::new()).push(
+                                    sinks.entry(output.output_id.component.clone()).or_insert(Vec::new()).push(
                                         shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str()))
                                     );
                                     // sinks
@@ -408,10 +408,18 @@ mod tests {
 
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
-        outputs.insert(id.clone(), control_tx);
+        outputs.insert(
+            TapOutput {
+                output_id: id.clone(),
+                component_kind: "source".to_string(),
+                component_type: "demo".to_string(),
+            },
+            control_tx,
+        );
         let tap_resource = TapResource {
             outputs,
             inputs: HashMap::new(),
+            removals: HashSet::new(),
         };
 
         let (watch_tx, watch_rx) = watch::channel(TapResource::default());
@@ -465,13 +473,13 @@ mod tests {
         // 3rd payload should be the metric event
         assert!(matches!(
             sink_rx.recv().await,
-            Some(TapPayload::Metric(returned_id, _)) if returned_id == id
+            Some(TapPayload::Metric(output, _)) if output.output_id == id
         ));
 
         // 4th payload should be the log event
         assert!(matches!(
             sink_rx.recv().await,
-            Some(TapPayload::Log(returned_id, _)) if returned_id == id
+            Some(TapPayload::Log(output, _)) if output.output_id == id
         ));
     }
 
