@@ -8615,8 +8615,6 @@ dependencies = [
  "noisy_float",
  "once_cell",
  "ordered-float",
- "pest",
- "pest_derive",
  "pin-project 1.0.10",
  "pretty_assertions",
  "proptest",
