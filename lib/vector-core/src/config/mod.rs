@@ -84,6 +84,12 @@ impl Input {
             log_schema_requirement: schema::Requirement::empty(),
         }
     }
+
+    /// Set the schema requirement for this input.
+    pub fn with_schema_requirement(mut self, schema_requirement: schema::Requirement) -> Self {
+        self.log_schema_requirement = schema_requirement;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

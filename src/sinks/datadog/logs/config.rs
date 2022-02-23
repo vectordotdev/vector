@@ -13,6 +13,7 @@ use super::{
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
+    schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
@@ -170,7 +171,11 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .require_meaning("message", Kind::bytes())
+            .require_meaning("timestamp", Kind::integer());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn sink_type(&self) -> &'static str {
