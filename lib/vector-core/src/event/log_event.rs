@@ -208,12 +208,17 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), false)
+        self.remove_prune(key, false)
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
+        let key = key.as_ref();
+        let lookup = Lookup::from_str(key).ok()?;
+        Arc::make_mut(&mut self.fields)
+            .remove(lookup, prune)
+            .ok()
+            .flatten()
     }
 
     #[instrument(level = "trace", skip(self))]
