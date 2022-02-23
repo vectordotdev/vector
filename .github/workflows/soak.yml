@@ -447,6 +447,12 @@ jobs:
           name: soak-analysis
           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
 
+      - name: Read analysis file
+        id: read-analysis
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
+
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
         continue-on-error: true
