@@ -238,8 +238,15 @@ itself.
 Under the hood, `vector tap` is powered by the [Vector API], specifically by the
 `outputEventsByComponentIdPatterns` subscription. If you'd like a more direct
 and programmatic way to examine events in your pipeline, consider interacting
-with the API directly. We also encourage contributions and suggestions for
-improving `vector tap`!
+with the API directly.
+
+{{< info >}}
+Note that as long as your Vector instance has its API enabled and exposed,
+`vector tap` will work! Simply use the `--url` option to specify a non-default
+API address. This allows you to troubleshoot remote Vector instances.
+{{< /info >}}
+
+We encourage contributions and suggestions for improving `vector tap`!
 
 [Vector API]: /docs/reference/api
 [Vector tap docs]: /docs/reference/cli/#tap
