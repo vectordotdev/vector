@@ -9,7 +9,6 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
-    schema,
     topology::{
         self,
         builder::{self, Pieces},
@@ -167,7 +166,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs()
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -432,7 +431,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty())
+            .outputs()
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

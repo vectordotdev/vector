@@ -1,7 +1,7 @@
 //! Utilities shared between both VRL functions.
 use std::collections::BTreeMap;
 
-use vrl_core::{
+use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
 };

@@ -10,7 +10,6 @@ use crate::{
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -50,7 +49,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

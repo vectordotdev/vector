@@ -19,7 +19,7 @@ use crate::{
         relay, sort,
     },
     config::{ComponentKey, Config},
-    filter_check, schema,
+    filter_check,
 };
 
 #[derive(Debug, Clone, Interface)]
@@ -283,7 +283,7 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs()
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

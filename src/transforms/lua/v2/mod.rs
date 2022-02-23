@@ -9,7 +9,6 @@ use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
-    schema,
     transforms::Transform,
 };
 
@@ -99,7 +98,7 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    pub fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
     }
 

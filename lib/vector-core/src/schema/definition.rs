@@ -29,7 +29,7 @@ pub struct Definition {
 }
 
 impl Definition {
-    /// Create an "empty" definition.
+    /// Create an "empty" output schema.
     ///
     /// This means no type information is known about the event.
     pub fn empty() -> Self {
@@ -178,16 +178,6 @@ impl Definition {
     /// Returns `true` if the provided field is marked as optional.
     fn is_optional_field(&self, path: &LookupBuf) -> bool {
         self.optional.contains(path)
-    }
-}
-
-impl From<Collection<Field>> for Definition {
-    fn from(collection: Collection<Field>) -> Self {
-        Self {
-            collection,
-            meaning: HashMap::default(),
-            optional: HashSet::default(),
-        }
     }
 }
 

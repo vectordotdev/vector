@@ -79,11 +79,7 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn input(&self) -> Input;
 
-    /// Returns a list of outputs to which this transform can deliver events.
-    ///
-    /// The provided `merged_definition` can be used by transforms to understand the expected shape
-    /// of events flowing through the transform.
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
+    fn outputs(&self) -> Vec<Output>;
 
     fn transform_type(&self) -> &'static str;
 

@@ -10,7 +10,6 @@ use crate::{
     },
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -56,7 +55,7 @@ impl TransformConfig for AddTagsConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 

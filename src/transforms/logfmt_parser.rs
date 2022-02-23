@@ -7,7 +7,6 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -49,7 +48,7 @@ impl TransformConfig for LogfmtConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

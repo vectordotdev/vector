@@ -9,7 +9,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
     Acker, Bufferable, WhenFull,
 };
 

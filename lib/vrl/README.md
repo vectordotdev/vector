@@ -16,6 +16,7 @@ Library | Purpose
 [`vrl-proptests`](proptests) | A collection of property-based tests for VRL parser
 [`vrl-stdlib`](stdlib) | The current standard library of VRL functions
 [`vrl-tests`](tests) |
+[`vrl`](vrl) | A fully packaged version of VRL, bundling together all internal components into a public interface
 
 [vector]: https://vector.dev
 [vrl]: https://vrl.dev

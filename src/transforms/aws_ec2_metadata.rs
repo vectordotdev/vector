@@ -26,7 +26,6 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
-    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -182,7 +181,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
