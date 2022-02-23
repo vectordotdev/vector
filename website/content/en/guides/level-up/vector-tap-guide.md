@@ -28,7 +28,7 @@ up your troubleshooting experience.
 
 To start, we'll reference the following base configuration, but feel free to
 substitute your own. Just note that the [Vector API] must be enabled for `vector
-tap` to work. See [under the hood](under-the-hood) for more details.
+tap` to work. See [under the hood](#under-the-hood) for more details.
 
 ```toml
 [api]
