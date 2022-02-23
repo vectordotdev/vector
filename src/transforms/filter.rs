@@ -89,16 +89,14 @@ impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
+        } else if self.last_emission.elapsed() >= self.emissions_max_delay {
+            emit!(&FilterEventDiscarded {
+                total: self.emissions_deferred,
+            });
+            self.emissions_deferred = 0;
+            self.last_emission = Instant::now();
         } else {
-            if self.last_emission.elapsed() >= self.emissions_max_delay {
-                emit!(&FilterEventDiscarded {
-                    total: self.emissions_deferred,
-                });
-                self.emissions_deferred = 0;
-                self.last_emission = Instant::now();
-            } else {
-                self.emissions_deferred += 1;
-            }
+            self.emissions_deferred += 1;
         }
     }
 }
