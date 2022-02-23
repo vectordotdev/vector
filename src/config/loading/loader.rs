@@ -156,12 +156,8 @@ pub(super) mod process {
             &self,
             path: &Path,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
-            if let (Ok(name), Some(file), Ok(format)) = (
-                component_name(path),
-                open_file(path),
-                Format::from_path(path),
-            ) {
-                self.load(file, format)
+            if let (Ok(name), Some(file)) = (component_name(path), open_file(path)) {
+                self.load(file, Format::from_path(path).unwrap_or(Format::Toml))
                     .map(|(value, warnings)| Some((name, value, warnings)))
             } else {
                 Ok(None)
