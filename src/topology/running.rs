@@ -509,11 +509,16 @@ impl RunningTopology {
                     )
                 })
                 .collect::<HashMap<_, _>>();
+            let mut removals = diff.sources.to_remove.clone();
+            removals.extend(diff.transforms.to_remove.iter().cloned());
             self.watch
                 .0
                 .send(TapResource {
                     outputs,
                     inputs: watch_inputs,
+                    // Note, only sources and transforms are relevant. Sinks do
+                    // not have outputs to tap.
+                    removals,
                 })
                 .expect("Couldn't broadcast config changes.");
         }

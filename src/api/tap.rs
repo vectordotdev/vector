@@ -217,7 +217,7 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks: HashMap<TapOutput, _> = HashMap::new();
+    let mut sinks: HashMap<ComponentKey, _> = HashMap::new();
 
     // Recording user-provided patterns for later use in sending notifications
     // (determining patterns which did not match)
@@ -239,7 +239,17 @@ async fn tap_handler(
                 let TapResource {
                     outputs,
                     inputs,
+                    removals,
                 } = watch_rx.borrow().clone();
+
+                // Remove tap sinks from components that have gone away/can no longer match.
+                let updated_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
+                sinks.retain(|key, _| {
+                    !removals.contains(key) && updated_keys.contains(key) || {
+                        debug!(message = "Removing component.", component_id = %key);
+                        false
+                    }
+                });
 
                 let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(Pattern::OutputPattern).collect::<HashSet<_>>();
 
@@ -288,8 +298,11 @@ async fn tap_handler(
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
-                                    sinks
-                                        .insert(output.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
+                                    sinks.entry(output.output_id.component.clone()).or_insert_with(|| Vec::new()).push(
+                                        shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str()))
+                                    );
+                                    // sinks
+                                    //     .insert(output.output_id.component.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
                                 }
                                 Err(error) => {
                                     error!(
@@ -315,14 +328,6 @@ async fn tap_handler(
                         }
                     }
                 }
-
-                // Remove components that have gone away.
-                sinks.retain(|output, _| {
-                    outputs.contains_key(output) || {
-                        debug!(message = "Removing component.", component_id = %output.output_id);
-                        false
-                    }
-                });
 
                 // Send notifications to the client. The # of notifications will always be
                 // exactly equal to the number of patterns, so we can pre-allocate capacity.

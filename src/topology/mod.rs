@@ -16,7 +16,7 @@ mod task;
 mod test;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
@@ -55,6 +55,8 @@ pub struct TapResource {
     pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Components removed on a reload (used to drop TapSinks)
+    pub removals: HashSet<ComponentKey>,
 }
 
 // Watcher types for topology changes.
