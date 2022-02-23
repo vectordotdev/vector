@@ -1,11 +1,6 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
-use super::{PathComponent, PathIter, Value};
-
-/// Inserts field value using a path specified using `a.b[1].c` notation.
-pub fn insert(fields: &mut BTreeMap<String, Value>, path: &str, value: Value) -> Option<Value> {
-    map_insert(fields, PathIter::new(path).peekable(), value)
-}
+use super::{PathComponent, Value};
 
 pub fn insert_path(
     fields: &mut BTreeMap<String, Value>,

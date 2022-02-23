@@ -140,7 +140,12 @@ impl LogEvent {
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+        let key = key.as_ref();
+        let lookup = Lookup::from_str(key).ok()?;
+        Arc::make_mut(&mut self.fields)
+            .insert(lookup, value)
+            .ok()
+            .flatten()
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
