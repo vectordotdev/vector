@@ -13,6 +13,7 @@ use crate::{
     },
     event::Event,
     internal_events::AwsCloudwatchLogsSubscriptionParserError,
+    schema,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -40,7 +41,7 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

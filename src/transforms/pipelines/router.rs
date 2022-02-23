@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
     event::Event,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -91,7 +92,7 @@ impl TransformConfig for EventRouterConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(self.filter.data_type())]
     }
 
@@ -118,7 +119,7 @@ impl TransformConfig for EventFilterConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(self.inner.data_type())]
     }
 
