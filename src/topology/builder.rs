@@ -46,7 +46,7 @@ use crate::{
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
-pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -55,7 +55,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(num_cpus::get)
 });
 
-pub async fn load_enrichment_tables<'a>(
+pub(self) async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
     diff: &'a ConfigDiff,
 ) -> (&'static enrichment::TableRegistry, Vec<String>) {
@@ -112,14 +112,13 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
-    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
-    pub tasks: HashMap<ComponentKey, Task>,
-    pub source_tasks: HashMap<ComponentKey, Task>,
-    pub healthchecks: HashMap<ComponentKey, Task>,
-    pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub enrichment_tables: enrichment::TableRegistry,
+    pub(super) inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
+    pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
+    pub(super) tasks: HashMap<ComponentKey, Task>,
+    pub(crate) source_tasks: HashMap<ComponentKey, Task>,
+    pub(super) healthchecks: HashMap<ComponentKey, Task>,
+    pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -473,7 +472,6 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)

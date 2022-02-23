@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::{
     http::HttpError,
     sinks::{
-        elasticsearch::service::ElasticSearchResponse,
+        elasticsearch::service::ElasticsearchResponse,
         util::retries::{RetryAction, RetryLogic},
     },
 };
@@ -45,17 +45,17 @@ struct EsErrorDetails {
 }
 
 #[derive(Clone)]
-pub struct ElasticSearchRetryLogic;
+pub struct ElasticsearchRetryLogic;
 
-impl RetryLogic for ElasticSearchRetryLogic {
+impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
-    type Response = ElasticSearchResponse;
+    type Response = ElasticsearchResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &ElasticSearchResponse) -> RetryAction {
+    fn should_retry_response(&self, response: &ElasticsearchResponse) -> RetryAction {
         let status = response.http_response.status();
 
         match status {
@@ -118,9 +118,9 @@ mod tests {
             .status(StatusCode::OK)
             .body(Bytes::from(json))
             .unwrap();
-        let logic = ElasticSearchRetryLogic;
+        let logic = ElasticsearchRetryLogic;
         assert!(matches!(
-            logic.should_retry_response(&ElasticSearchResponse {
+            logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Rejected,
                 batch_size: 1,
