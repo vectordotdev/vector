@@ -597,8 +597,8 @@ impl Runner {
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
-        // 128 is an arbitrary, smallish constant
-        const INLINE_BATCH_SIZE: usize = 128;
+        // 2048 is an arbitrary, smallish constant
+        const INLINE_BATCH_SIZE: usize = 2048;
 
         let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
 
@@ -625,9 +625,9 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
+        // 4096 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
         // try to balance out the increased overhead of spawning tasks
-        const CONCURRENT_BATCH_SIZE: usize = 1024;
+        const CONCURRENT_BATCH_SIZE: usize = 4096;
 
         let mut input_rx = self
             .input_rx
