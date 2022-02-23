@@ -73,14 +73,22 @@ pub enum TapNotification {
     NotMatched,
 }
 
+/// An output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: String,
+    pub component_type: String,
+}
+
 /// A tap payload contains events or notifications that alert users about the
 /// status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
-    Log(OutputId, LogEvent),
-    Metric(OutputId, Metric),
+    Log(TapOutput, LogEvent),
+    Metric(TapOutput, Metric),
     Notification(String, TapNotification),
-    Trace(OutputId, TraceEvent),
+    Trace(TapOutput, TraceEvent),
 }
 
 impl TapPayload {
@@ -96,15 +104,15 @@ impl TapPayload {
 }
 
 /// A `TapSink` is used as an output channel for a topology component, and receives
-/// `Event`s. 
+/// `Event`s.
 pub struct TapSink {
     tap_tx: TapSender,
-    output_id: OutputId,
+    output: TapOutput,
 }
 
 impl TapSink {
-    pub const fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
-        Self { tap_tx, output_id }
+    pub const fn new(tap_tx: TapSender, output: TapOutput) -> Self {
+        Self { tap_tx, output }
     }
 }
 
@@ -120,16 +128,16 @@ impl Sink<Event> for TapSink {
     /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
     fn start_send(self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
         let payload = match event {
-            Event::Log(log) => TapPayload::Log(self.output_id.clone(), log),
-            Event::Metric(metric) => TapPayload::Metric(self.output_id.clone(), metric),
-            Event::Trace(trace) => TapPayload::Trace(self.output_id.clone(), trace),
+            Event::Log(log) => TapPayload::Log(self.output.clone(), log),
+            Event::Metric(metric) => TapPayload::Metric(self.output.clone(), metric),
+            Event::Trace(trace) => TapPayload::Trace(self.output.clone(), trace),
         };
 
         if let Err(TrySendError::Closed(payload)) = self.tap_tx.try_send(payload) {
             debug!(
                 message = "Couldn't send event.",
                 payload = ?payload,
-                component_id = ?self.output_id,
+                component_id = ?self.output.output_id,
             );
         }
 
@@ -209,7 +217,7 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks: HashMap<OutputId, _> = HashMap::new();
+    let mut sinks: HashMap<TapOutput, _> = HashMap::new();
 
     // Recording user-provided patterns for later use in sending notifications
     // (determining patterns which did not match)
@@ -251,23 +259,23 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output_id,  control_tx) in outputs.iter() {
+                for (output, control_tx) in outputs.iter() {
                     match component_id_patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(&output_id.to_string()))
+                        .filter(|pattern| pattern.matches_glob(&output.output_id.to_string()))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                ?output_id, ?component_id_patterns, matched = ?found
+                                ?output.output_id, ?component_id_patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), output_id.clone());
+                            let sink = TapSink::new(tx.clone(), output.clone());
 
                             // Attempt to connect the sink.
                             match control_tx
@@ -275,19 +283,19 @@ async fn tap_handler(
                             {
                                 Ok(_) => {
                                     debug!(
-                                        message = "Sink connected.", ?sink_id, ?output_id,
+                                        message = "Sink connected.", ?sink_id, ?output.output_id,
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(output_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
+                                        .insert(output.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
                                 }
                                 Err(error) => {
                                     error!(
                                         message = "Couldn't connect sink.",
                                         ?error,
-                                        ?output_id,
+                                        ?output.output_id,
                                         ?sink_id,
                                     );
                                 }
@@ -302,16 +310,16 @@ async fn tap_handler(
                         }
                         _ => {
                             debug!(
-                                message="Component not matched.", ?output_id, ?component_id_patterns
+                                message="Component not matched.", ?output.output_id, ?component_id_patterns
                             );
                         }
                     }
                 }
 
                 // Remove components that have gone away.
-                sinks.retain(|id, _| {
-                    outputs.contains_key(id) || {
-                        debug!(message = "Removing component.", component_id = %id);
+                sinks.retain(|output, _| {
+                    outputs.contains_key(output) || {
+                        debug!(message = "Removing component.", component_id = %output.output_id);
                         false
                     }
                 });

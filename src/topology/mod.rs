@@ -30,6 +30,7 @@ use vector_buffers::{
 };
 
 use crate::{
+    api::tap::TapOutput,
     config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::Event,
     topology::{
@@ -51,7 +52,7 @@ type BuiltBuffer = (
 #[derive(Debug, Default, Clone)]
 pub struct TapResource {
     // Outputs and their corresponding Fanout control
-    pub outputs: HashMap<OutputId, fanout::ControlChannel>,
+    pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
 }

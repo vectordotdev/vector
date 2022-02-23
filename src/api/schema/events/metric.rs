@@ -7,19 +7,19 @@ use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
-    config::OutputId,
+    api::tap::TapOutput,
     event::{self},
 };
 
 #[derive(Debug, Clone)]
 pub struct Metric {
-    output_id: OutputId,
+    output: TapOutput,
     event: event::Metric,
 }
 
 impl Metric {
-    pub const fn new(output_id: OutputId, event: event::Metric) -> Self {
-        Self { output_id, event }
+    pub const fn new(output: TapOutput, event: event::Metric) -> Self {
+        Self { output, event }
     }
 }
 
@@ -63,7 +63,7 @@ impl MetricTag {
 impl Metric {
     /// Id of the component associated with the metric event
     async fn component_id(&self) -> &str {
-        self.output_id.component.id()
+        self.output.output_id.component.id()
     }
 
     /// Metric timestamp
