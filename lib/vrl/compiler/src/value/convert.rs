@@ -152,8 +152,8 @@ impl VrlValueConvert for Value {
     }
 }
 
-/// Conversts from an Expr into a Value. This is only possible if the expression represents
-/// static values, Literals and Containers containing Literals.
+/// Converts from an Expr into a Value. This is only possible if the expression represents
+/// static values - Literals and Containers containing Literals.
 impl TryFrom<Expr> for Value {
     type Error = crate::function::Error;
 
