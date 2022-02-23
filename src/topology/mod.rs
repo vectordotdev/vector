@@ -30,7 +30,6 @@ use vector_buffers::{
 };
 
 use crate::{
-    api::tap::TapOutput,
     config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::Event,
     topology::{
@@ -46,6 +45,14 @@ type BuiltBuffer = (
     Arc<Mutex<Option<BufferReceiver<Event>>>>,
     Acker,
 );
+
+/// A tappable output consisting of an output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: &'static str,
+    pub component_type: String,
+}
 
 /// Resources used by the `tap` API to monitor component inputs and outputs,
 /// updated alongside the topology

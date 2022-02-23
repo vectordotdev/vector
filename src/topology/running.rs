@@ -15,7 +15,6 @@ use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
 
 use crate::{
-    api::tap::TapOutput,
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -30,7 +29,7 @@ use crate::{
     trigger::DisabledTrigger,
 };
 
-use super::TapResource;
+use super::{TapOutput, TapResource};
 
 #[allow(dead_code)]
 pub struct RunningTopology {

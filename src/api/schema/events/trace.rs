@@ -3,8 +3,8 @@ use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
-    api::tap::TapOutput,
     event::{self, Value},
+    topology::TapOutput,
 };
 
 #[derive(Debug, Clone)]

@@ -16,9 +16,9 @@ use vector_core::event::Metric;
 
 use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
 use crate::{
-    config::{ComponentKey, OutputId},
+    config::ComponentKey,
     event::{Event, LogEvent, TraceEvent},
-    topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
+    topology::{fanout, fanout::ControlChannel, TapOutput, TapResource, WatchRx},
 };
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
@@ -71,14 +71,6 @@ impl GlobMatcher<&str> for Pattern {
 pub enum TapNotification {
     Matched,
     NotMatched,
-}
-
-/// An output ID and associated metadata
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct TapOutput {
-    pub output_id: OutputId,
-    pub component_kind: &'static str,
-    pub component_type: String,
 }
 
 /// A tap payload contains events or notifications that alert users about the
@@ -365,7 +357,7 @@ async fn tap_handler(
 ))]
 mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};
-    use crate::config::Config;
+    use crate::config::{Config, OutputId};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::SinkExt;
     use tokio::sync::watch;
