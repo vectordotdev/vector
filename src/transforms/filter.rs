@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -68,16 +69,18 @@ impl TransformConfig for FilterConfig {
 pub struct Filter {
     #[derivative(Debug = "ignore")]
     condition: Condition,
-    emissions_deferred: u16,
-    emission_limit: u16,
+    last_emission: Instant,
+    emissions_max_delay: Duration,
+    emissions_deferred: u64,
 }
 
 impl Filter {
-    pub const fn new(condition: Condition) -> Self {
+    pub fn new(condition: Condition) -> Self {
         Self {
             condition,
+            last_emission: Instant::now(),
+            emissions_max_delay: Duration::new(2, 0),
             emissions_deferred: 0,
-            emission_limit: 4096,
         }
     }
 }
@@ -87,13 +90,12 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            // TODO without consulting the passage of time it's possible that a
-            // slow-poke could never see this metric.
-            if self.emissions_deferred >= self.emission_limit {
+            if self.last_emission.elapsed() >= self.emissions_max_delay {
                 emit!(&FilterEventDiscarded {
-                    total: self.emissions_deferred as u64,
+                    total: self.emissions_deferred,
                 });
                 self.emissions_deferred = 0;
+                self.last_emission = Instant::now();
             } else {
                 self.emissions_deferred += 1;
             }
