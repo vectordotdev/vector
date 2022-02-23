@@ -510,7 +510,7 @@ fn build_predicates(
 //------------------------------------------------------------------------------
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct CheckFieldsConfig {
+pub(crate) struct CheckFieldsConfig {
     #[serde(flatten, default)]
     predicates: IndexMap<String, CheckFieldsPredicateArg>,
 }
