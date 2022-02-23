@@ -310,6 +310,8 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::io::BufRead;
+
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
@@ -322,11 +324,15 @@ mod integration_tests {
         event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
-        test_util::{
-            collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
-        },
+        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
         SourceSender,
     };
+
+    fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
+        trace!(message = "Reading zst file.", path = %path.as_ref().display());
+        let mut file = File::open(path).unwrap();
+        file.lines().collect()
+    }
 
     #[tokio::test]
     async fn s3_process_message() {
@@ -408,7 +414,7 @@ mod integration_tests {
 
         trace_init();
 
-        let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
+        let logs = lines_from_plaintext("tests/data/multipart-zst.log");
 
         let buffer = {
             let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
