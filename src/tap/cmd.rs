@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+
+use colored::{ColoredString, Colorize};
 use tokio_stream::StreamExt;
 use url::Url;
 use vector_api_client::{
@@ -7,7 +10,7 @@ use vector_api_client::{
             EventNotificationType,
             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         },
-        TapSubscriptionExt,
+        TapEncodingFormat, TapSubscriptionExt,
     },
     Client,
 };
@@ -71,7 +74,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     let res = subscription_client.output_events_by_component_id_patterns_subscription(
         outputs_patterns,
         opts.inputs_of.clone(),
-        opts.format,
+        opts.format.clone(),
         opts.limit as i64,
         opts.interval as i64,
     );
@@ -79,6 +82,8 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     tokio::pin! {
         let stream = res.stream();
     };
+
+    let formatter = EventFormatter::new(opts.format.clone());
 
     // Loop over the returned results, printing out tap events.
     loop {
@@ -90,13 +95,13 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                     for tap_event in d.output_events_by_component_id_patterns.iter() {
                         match tap_event {
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if !opts.quiet {
@@ -115,4 +120,45 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     }
 
     exitcode::OK
+}
+
+struct EventFormatter {
+    format: TapEncodingFormat,
+    component_id_label: ColoredString,
+}
+
+impl EventFormatter {
+    fn new(format: TapEncodingFormat) -> Self {
+        Self {
+            format,
+            component_id_label: "component_id".green(),
+        }
+    }
+
+    fn format(&self, component_id: &str, event: &str) -> String {
+        match self.format {
+            TapEncodingFormat::Json => format!(
+                r#"{{"{}":"{}","event":{}}}"#,
+                self.component_id_label,
+                component_id.green(),
+                event
+            ),
+            TapEncodingFormat::Yaml => {
+                let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
+                value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
+                format!(
+                    "{}{}: {}\n",
+                    serde_yaml::to_string(&value).unwrap(),
+                    self.component_id_label,
+                    component_id.green()
+                )
+            }
+            TapEncodingFormat::Logfmt => format!(
+                "{}={} {}",
+                self.component_id_label,
+                component_id.green(),
+                event
+            ),
+        }
+    }
 }
