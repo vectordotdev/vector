@@ -6,7 +6,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use vector_buffers::{EventCount};
+use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;

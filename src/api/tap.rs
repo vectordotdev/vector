@@ -17,7 +17,7 @@ use vector_core::event::Metric;
 use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
 use crate::{
     config::{ComponentKey, OutputId},
-    event::{Event, EventArray, EventContainer, LogEvent},
+    event::{Event, EventArray, EventContainer, LogEvent, TraceEvent},
     topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
 };
 
@@ -348,7 +348,7 @@ async fn tap_handler(
 
 #[cfg(all(
     test,
-    feature = "sinks-blackhole"
+    feature = "sinks-blackhole",
     feature = "sources-demo_logs",
     feature = "transforms-log_to_metric",
     feature = "transforms-remap",
