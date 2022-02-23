@@ -73,8 +73,8 @@ pub enum TapNotification {
     NotMatched,
 }
 
-/// A tap payload can either contain a log/metric event or a notification that's intended
-/// to be communicated back to the client to alert them about the status of the tap request.
+/// A tap payload contains events or notifications that alert users about the
+/// status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
     Log(OutputId, LogEvent),
@@ -96,7 +96,7 @@ impl TapPayload {
 }
 
 /// A `TapSink` is used as an output channel for a topology component, and receives
-/// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
+/// `Event`s. 
 pub struct TapSink {
     tap_tx: TapSender,
     output_id: OutputId,
