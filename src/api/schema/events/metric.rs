@@ -73,7 +73,7 @@ impl Metric {
 
     /// Kind of component associated with the metric event
     async fn component_kind(&self) -> &str {
-        self.output.component_kind.as_ref()
+        self.output.component_kind
     }
 
     /// Metric timestamp

@@ -77,7 +77,7 @@ pub enum TapNotification {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct TapOutput {
     pub output_id: OutputId,
-    pub component_kind: String,
+    pub component_kind: &'static str,
     pub component_type: String,
 }
 
@@ -298,11 +298,9 @@ async fn tap_handler(
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
-                                    sinks.entry(output.output_id.component.clone()).or_insert(Vec::new()).push(
+                                    sinks.entry(output.output_id.component.clone()).or_insert_with(Vec::new).push(
                                         shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str()))
                                     );
-                                    // sinks
-                                    //     .insert(output.output_id.component.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
                                 }
                                 Err(error) => {
                                     error!(
@@ -411,7 +409,7 @@ mod tests {
         outputs.insert(
             TapOutput {
                 output_id: id.clone(),
-                component_kind: "source".to_string(),
+                component_kind: "source",
                 component_type: "demo".to_string(),
             },
             control_tx,

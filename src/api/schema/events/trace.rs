@@ -34,7 +34,7 @@ impl Trace {
 
     /// Kind of component associated with the trace event
     async fn component_kind(&self) -> &str {
-        self.output.component_kind.as_ref()
+        self.output.component_kind
     }
 
     /// Trace event as an encoded string format

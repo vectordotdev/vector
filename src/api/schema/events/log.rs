@@ -43,7 +43,7 @@ impl Log {
 
     /// Kind of component associated with the log event
     async fn component_kind(&self) -> &str {
-        self.output.component_kind.as_ref()
+        self.output.component_kind
     }
 
     /// Log message

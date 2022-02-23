@@ -500,7 +500,7 @@ impl RunningTopology {
                             (
                                 TapOutput {
                                     output_id,
-                                    component_kind: component_kind.to_string(),
+                                    component_kind,
                                     component_type: component_type.clone(),
                                 },
                                 control_tx,
