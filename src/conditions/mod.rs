@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{config::component::ComponentDescription, event::Event};
 
-pub mod check_fields;
+mod check_fields;
 pub mod datadog_search;
 pub(crate) mod is_log;
 pub mod is_metric;
