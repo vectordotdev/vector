@@ -22,7 +22,7 @@ use crate::{
     aws::rusoto::AwsCredentialsProvider,
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
-    internal_events::ElasticSearchResponseError,
+    internal_events::ElasticsearchResponseError,
     sinks::util::{
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
@@ -235,7 +235,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            emit!(&ElasticSearchResponseError {
+            emit!(&ElasticsearchResponseError {
                 response,
                 message: "Response containerd errors.",
             });
@@ -244,13 +244,13 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
-        emit!(&ElasticSearchResponseError {
+        emit!(&ElasticsearchResponseError {
             response,
             message: "Response wasn't successful.",
         });
         EventStatus::Errored
     } else {
-        emit!(&ElasticSearchResponseError {
+        emit!(&ElasticsearchResponseError {
             response,
             message: "Response failed.",
         });

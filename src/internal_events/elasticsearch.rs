@@ -20,18 +20,18 @@ impl InternalEvent for ElasticsearchEventEncoded {
 }
 
 #[derive(Debug)]
-pub struct ElasticSearchResponseError<'a> {
+pub struct ElasticsearchResponseError<'a> {
     pub response: &'a Response<bytes::Bytes>,
     pub message: &'static str,
 }
 
-impl<'a> ElasticSearchResponseError<'a> {
+impl<'a> ElasticsearchResponseError<'a> {
     fn error_code(&self) -> String {
         http_error_code(self.response.status().as_u16())
     }
 }
 
-impl<'a> InternalEvent for ElasticSearchResponseError<'a> {
+impl<'a> InternalEvent for ElasticsearchResponseError<'a> {
     fn emit_logs(&self) {
         error!(
             message = %self.message,
