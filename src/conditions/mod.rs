@@ -10,7 +10,6 @@ pub mod not;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
-pub(super) use check_fields::CheckFieldsConfig;
 
 #[derive(Debug, Clone)]
 pub enum Condition {
