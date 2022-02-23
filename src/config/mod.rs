@@ -129,13 +129,13 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        let errors:Vec<_> = self
+        let errors: Vec<_> = self
             .sinks
             .iter()
-            .filter_map(|(name,sink)| {
+            .filter_map(|(name, sink)| {
                 (sink.acknowledgements.enabled() && !sink.inner.can_acknowledge()).then(|| {
                     format!(
-                        "Sink `{}` has acknowledgements enabled but does not support them. Silent data loss could occur.",
+                        "Sink `{}` has acknowledgements enabled but does not support them.",
                         name,
                     )
                 })
@@ -881,7 +881,7 @@ pub struct TestOutput<T = OutputId> {
     feature = "sinks-console",
     feature = "transforms-json_parser"
 ))]
-mod test {
+mod tests {
     use std::path::PathBuf;
 
     use indoc::indoc;
@@ -1207,9 +1207,21 @@ mod test {
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-file",
+    feature = "sinks-file",
+    feature = "transforms-json_parser"
+))]
+mod acknowledgements_tests {
+    use indoc::indoc;
+
+    use super::*;
 
     #[test]
-    fn propagates_acknowledgement_settings() {
+    fn propagates_settings() {
         // The topology:
         // in1 => out1
         // in2 => out2 (acks enabled)
@@ -1227,18 +1239,21 @@ mod test {
                     type = "json_parser"
                     inputs = ["in3"]
                 [sinks.out1]
-                    type = "console"
+                    type = "file"
                     inputs = ["in1"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out1"
                 [sinks.out2]
-                    type = "console"
+                    type = "file"
                     inputs = ["in2"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
-                    type = "console"
+                    type = "file"
                     inputs = ["parse3"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
             Format::Toml,
