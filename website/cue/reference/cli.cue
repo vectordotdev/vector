@@ -273,7 +273,7 @@ cli: {
 				}
 				"meta": {
 					_short:      "m"
-					description: "Event output includes the associated component_id as metadata"
+					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
 				}
 			}
 
