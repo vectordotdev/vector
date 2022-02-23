@@ -106,7 +106,7 @@ file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value" }
+value = { path = "lib/value", optional = true }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
@@ -140,7 +140,6 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
-rusoto_es = { version = "0.47.0", optional = true }
 rusoto_firehose = { version = "0.47.0", optional = true }
 rusoto_kinesis = { version = "0.47.0", optional = true }
 rusoto_logs = { version = "0.47.0", optional = true }
@@ -168,7 +167,7 @@ serde = { version = "1.0.136", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.79", default-features = false, features = ["raw_value"] }
-serde_with = { version = "1.12.0", default-features = false, features = ["macros"] }
+serde_with = { version = "1.12.0", default-features = false, features = ["macros"], optional = true }
 serde_yaml = { version = "0.8.23", default-features = false }
 
 # Messagepack
@@ -205,8 +204,8 @@ vrl = { path = "lib/vrl/vrl" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
-arc-swap = { version = "1.5", default-features = false }
-async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
+arc-swap = { version = "1.5", default-features = false, optional = true }
+async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
@@ -224,9 +223,9 @@ dyn-clone = { version = "1.0.4", default-features = false }
 encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.21", default-features = false }
+flate2 = { version = "1.0.21", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.21", default-features = false }
-getset = { version = "0.1.2", default-features = false }
+getset = { version = "0.1.2", default-features = false, optional = true }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
@@ -239,7 +238,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 infer = { version = "0.7.0", default-features = false, optional = true}
-indoc = { version = "1.0.4", default-features = false }
+indoc = { version = "1.0.4", default-features = false, optional = true }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
@@ -275,8 +274,8 @@ snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-strum = { version = "0.24", default-features = false }
-strum_macros = { version = "0.24", default-features = false }
+strum = { version = "0.24", default-features = false, optional = true }
+strum_macros = { version = "0.24", default-features = false, optional = true }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
@@ -421,7 +420,7 @@ enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Codecs
-codecs = ["smallvec", "memchr"]
+codecs = ["value", "smallvec", "memchr"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -468,8 +467,8 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "zstd"]
 sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs", "aws-smithy-client"]
-sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs"]
-sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
+sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs", "value"]
+sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build", "getset"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
@@ -562,7 +561,7 @@ transforms-add_tags = []
 transforms-aggregate = []
 transforms-ansi_stripper = []
 transforms-aws_cloudwatch_logs_subscription_parser= []
-transforms-aws_ec2_metadata = ["evmap"]
+transforms-aws_ec2_metadata = ["arc-swap"]
 transforms-coercer = []
 transforms-compound = []
 transforms-concat = []
@@ -648,7 +647,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
+sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3", "async-compression"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
@@ -661,11 +660,11 @@ sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = []
-sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
+sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "indoc"]
 sinks-honeycomb = []
 sinks-http = []
-sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
-sinks-influxdb = []
+sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log", "indoc"]
+sinks-influxdb = ["indoc"]
 sinks-kafka = ["rdkafka", "zstd"]
 sinks-logdna = []
 sinks-loki = []
@@ -673,7 +672,7 @@ sinks-nats = ["nats"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["syslog"]
-sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
+sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls", "serde_with"]
 sinks-pulsar = ["avro-rs", "pulsar"]
 sinks-redis = ["redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
@@ -681,7 +680,7 @@ sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
-sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
+sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build", "getset"]
 
 # Datadog integration
 datadog-pipelines = [
@@ -745,7 +744,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["rusoto_es", "sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]

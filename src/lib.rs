@@ -28,16 +28,18 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 // Criterion is properly a dev-dependency but can't be optional there, but dings
 // the unused_crate_dependencies lint unless we're compiling with bench flags on.
-#[cfg(any(feature = "benches",
-          feature = "dnstap-benches",
-          feature = "language-benches",
-          feature = "statistic-benches",
-          feature = "merics-benches",
-          feature = "remap-benches",
-          feature = "transform-benches",
-          feature = "codecs-benches",
-          feature = "loki-benches",
-          feature = "enrichment-tables-benches"))]
+#[cfg(any(
+    feature = "benches",
+    feature = "dnstap-benches",
+    feature = "language-benches",
+    feature = "statistic-benches",
+    feature = "merics-benches",
+    feature = "remap-benches",
+    feature = "transform-benches",
+    feature = "codecs-benches",
+    feature = "loki-benches",
+    feature = "enrichment-tables-benches"
+))]
 use criterion as _;
 
 #[macro_use]
