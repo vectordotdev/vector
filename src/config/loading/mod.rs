@@ -167,8 +167,13 @@ where
 
     for config_path in config_paths {
         match config_path {
-            ConfigPath::File(path, _) => {
-                match loader.load_from_file(path) {
+            ConfigPath::File(path, format_hint) => {
+                match loader.load_from_file(
+                    path,
+                    format_hint
+                        .or_else(move || Format::from_path(&path).ok())
+                        .unwrap_or_default(),
+                ) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };

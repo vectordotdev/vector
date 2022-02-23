@@ -104,10 +104,16 @@ pub(super) mod process {
             }
 
             for entry in files {
+                // If the file doesn't contain a known extension, skip it.
+                let format = match Format::from_path(&entry) {
+                    Ok(format) => format,
+                    _ => continue,
+                };
+
                 let loaded = if recurse {
-                    self.load_file_recursive(&entry)
+                    self.load_file_recursive(&entry, format)
                 } else {
-                    self.load_file(&entry)
+                    self.load_file(&entry, format)
                 };
 
                 match loaded {
@@ -155,9 +161,10 @@ pub(super) mod process {
         fn load_file(
             &self,
             path: &Path,
+            format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
             if let (Ok(name), Some(file)) = (component_name(path), open_file(path)) {
-                self.load(file, Format::from_path(path).unwrap_or(Format::Toml))
+                self.load(file, format)
                     .map(|(value, warnings)| Some((name, value, warnings)))
             } else {
                 Ok(None)
@@ -169,8 +176,9 @@ pub(super) mod process {
         fn load_file_recursive(
             &self,
             path: &Path,
+            format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
-            if let Some((name, mut table, mut warnings)) = self.load_file(path)? {
+            if let Some((name, mut table, mut warnings)) = self.load_file(path, format)? {
                 if let Some(subdir) = path.parent().map(|p| p.join(&name)) {
                     if subdir.is_dir() && subdir.exists() {
                         warnings.extend(self.load_dir_into(&subdir, &mut table, true)?);
@@ -212,8 +220,8 @@ where
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
-    fn load_from_file(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
-        if let Ok(Some((_, table, warnings))) = self.load_file(path) {
+    fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
+        if let Ok(Some((_, table, warnings))) = self.load_file(path, format) {
             self.merge(table, None)?;
             Ok(warnings)
         } else {
