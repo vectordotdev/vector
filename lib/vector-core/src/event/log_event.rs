@@ -10,6 +10,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
+use lookup::Lookup;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -103,7 +104,9 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.as_map(), key.as_ref())
+        let key = key.as_ref();
+        let lookup = Lookup::from_str(key).ok()?;
+        self.fields.as_ref().get(lookup).ok().flatten()
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
