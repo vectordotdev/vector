@@ -828,6 +828,7 @@ remap-benches = ["criterion", "transforms-add_fields", "transforms-coercer", "tr
 transform-benches = ["criterion", "transforms-filter", "transforms-dedupe", "transforms-reduce"]
 codecs-benches = ["criterion", "codecs"]
 loki-benches = ["criterion", "sinks-loki"]
+enrichment-tables-benches = ["criterion", "enrichment-tables-file"]
 
 [[bench]]
 name = "default"
@@ -852,7 +853,7 @@ required-features = ["remap-benches"]
 name = "enrichment_tables_file"
 harness = false
 test = true
-required-features = ["criterion", "enrichment-tables-file"]
+required-features = ["enrichment-tables-benches"]
 
 [[bench]]
 name = "languages"
