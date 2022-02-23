@@ -116,7 +116,12 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.as_map_mut(), key.as_ref())
+        let key = key.as_ref();
+        let lookup = Lookup::from_str(key).ok()?;
+        Arc::make_mut(&mut self.fields)
+            .get_mut(lookup)
+            .ok()
+            .flatten()
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
