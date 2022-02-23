@@ -5,7 +5,6 @@ use super::expander::ExpanderConfig;
 use crate::{
     conditions::{not::NotConfig, AnyCondition},
     config::{ExpandType, Input, Output, TransformConfig, TransformContext},
-    schema,
     transforms::{filter::FilterConfig, Transform},
 };
 
@@ -65,8 +64,8 @@ impl TransformConfig for PipelineFilterConfig {
         self.inner.input()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.inner.outputs(merged_definition)
+    fn outputs(&self) -> Vec<Output> {
+        self.inner.outputs()
     }
 
     fn transform_type(&self) -> &'static str {

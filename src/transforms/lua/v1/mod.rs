@@ -9,7 +9,6 @@ use crate::{
     config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
-    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -42,7 +41,7 @@ impl LuaConfig {
         Input::log()
     }
 
-    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    pub fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
@@ -7,7 +6,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -48,48 +46,6 @@ pub struct RemapConfig {
     pub reroute_dropped: bool,
 }
 
-impl RemapConfig {
-    fn compile_vrl_program(
-        &self,
-        enrichment_tables: enrichment::TableRegistry,
-    ) -> Result<(
-        vrl::Program,
-        Vec<Box<dyn vrl::Function>>,
-        vrl::state::Compiler,
-    )> {
-        let source = match (&self.source, &self.file) {
-            (Some(source), None) => source.to_owned(),
-            (None, Some(path)) => {
-                let mut buffer = String::new();
-
-                File::open(path)
-                    .with_context(|_| FileOpenFailedSnafu { path })?
-                    .read_to_string(&mut buffer)
-                    .with_context(|_| FileReadFailedSnafu { path })?;
-
-                buffer
-            }
-            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
-        };
-
-        let mut functions = vrl_stdlib::all();
-        functions.append(&mut enrichment::vrl_functions());
-        functions.append(&mut vector_vrl_functions::vrl_functions());
-
-        let mut state = vrl::state::Compiler::new();
-        state.set_external_context(Some(Box::new(enrichment_tables)));
-
-        vrl::compile_with_state(&source, &functions, &mut state)
-            .map_err(|diagnostics| {
-                Formatter::new(&source, diagnostics)
-                    .colored()
-                    .to_string()
-                    .into()
-            })
-            .map(|program| (program, functions, state))
-    }
-}
-
 inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
@@ -108,44 +64,14 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        // We need to compile the VRL program in order to know the schema definition output of this
-        // transform. We ignore any compilation errors, as those are caught by the transform build
-        // step.
-        //
-        // TODO: Keep track of semantic meaning for fields.
-        let default_definition = self
-            .compile_vrl_program(enrichment::TableRegistry::default())
-            .ok()
-            .and_then(|(_, _, state)| state.target_kind().cloned())
-            .and_then(Kind::into_object)
-            .map(Into::into)
-            .unwrap_or_else(schema::Definition::empty);
-
-        // When a message is dropped and re-routed, we keep the original event, but also annotate
-        // it with additional metadata.
-        let dropped_definition = merged_definition.clone().required_field(
-            log_schema().metadata_key(),
-            Kind::object(BTreeMap::from([
-                ("reason".into(), Kind::bytes()),
-                ("message".into(), Kind::bytes()),
-                ("component_id".into(), Kind::bytes()),
-                ("component_type".into(), Kind::bytes()),
-                ("component_kind".into(), Kind::bytes()),
-            ])),
-            Some("metadata"),
-        );
-
-        let default_output =
-            Output::default(DataType::all()).with_schema_definition(default_definition);
-
+    fn outputs(&self) -> Vec<Output> {
         if self.reroute_dropped {
             vec![
-                default_output,
-                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
+                Output::default(DataType::all()),
+                Output::from((DROPPED, DataType::all())),
             ]
         } else {
-            vec![default_output]
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -176,9 +102,31 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
-        let (program, functions, _) =
-            config.compile_vrl_program(context.enrichment_tables.clone())?;
+        let source = match (&config.source, &config.file) {
+            (Some(source), None) => source.to_owned(),
+            (None, Some(path)) => {
+                let mut buffer = String::new();
+
+                File::open(path)
+                    .with_context(|_| FileOpenFailedSnafu { path })?
+                    .read_to_string(&mut buffer)
+                    .with_context(|_| FileReadFailedSnafu { path })?;
+
+                buffer
+            }
+            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
+        };
+
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
+
+        let program = vrl::compile(
+            &source,
+            &functions,
+            Some(Box::new(context.enrichment_tables.clone())),
+        )
+        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         let runtime = Runtime::default();
 
@@ -392,7 +340,6 @@ mod tests {
             metric::{MetricKind, MetricValue},
             LogEvent, Metric, Value,
         },
-        schema,
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         transforms::OutputBuffer,
     };
@@ -1047,18 +994,7 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::empty()
-            .required_field("foo", Kind::bytes(), None)
-            .required_field(
-                "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
-                None,
-            );
-
-        assert_eq!(
-            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
-            conf.outputs(&schema::Definition::empty()),
-        );
+        assert_eq!(vec![Output::default(DataType::all())], conf.outputs());
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use super::{builder::ConfigBuilder, schema, ComponentKey, Config, OutputId, Resource};
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -159,7 +159,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        let outputs = transform.inner.outputs(&schema::Definition::empty());
+        let outputs = transform.inner.outputs();
         if outputs
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
@@ -198,7 +198,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty())
+            .outputs()
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

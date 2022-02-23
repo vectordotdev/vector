@@ -8,7 +8,6 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -56,7 +55,7 @@ impl TransformConfig for TokenizerConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

@@ -6,9 +6,8 @@ use std::{
 
 use futures::{ready, Sink};
 use pin_project::pin_project;
-use tokio::sync::mpsc::Sender;
 
-use super::poll_sender::PollSender;
+use super::limited_queue::LimitedSender;
 use crate::{buffer_usage_data::BufferUsageHandle, Bufferable, WhenFull};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -43,8 +42,8 @@ dyn_clone::clone_trait_object!(<T, E> CloneableSink<T, E>);
 /// Adapter for papering over various sender backends by providing a [`Sink`] interface.
 #[pin_project(project = ProjectedSenderAdapter)]
 pub enum SenderAdapter<T> {
-    /// A sender that uses a Tokio MPSC channel.
-    Channel(PollSender<T>),
+    /// A sender that uses an in-memory channel.
+    Channel(LimitedSender<T>),
 
     /// A sender that provides its own [`Sink`] implementation.
     Opaque(Pin<Box<dyn CloneableSink<T, ()>>>),
@@ -54,8 +53,8 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub fn channel(tx: Sender<T>) -> Self {
-        SenderAdapter::Channel(PollSender::new(tx))
+    pub fn channel(tx: LimitedSender<T>) -> Self {
+        SenderAdapter::Channel(tx)
     }
 
     pub fn opaque<S>(inner: S) -> Self
@@ -67,7 +66,7 @@ where
 
     pub fn capacity(&self) -> Option<usize> {
         match self {
-            Self::Channel(tx) => tx.get_ref().map(Sender::capacity),
+            Self::Channel(tx) => Some(tx.available_capacity()),
             Self::Opaque(_) => None,
         }
     }
@@ -99,7 +98,7 @@ where
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => tx.poll_reserve(cx).map_err(|_| ()),
+            ProjectedSenderAdapter::Channel(tx) => tx.poll_ready(cx).map_err(|_| ()),
             ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_ready(cx),
         }
     }
@@ -113,20 +112,14 @@ where
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.project() {
-            // There's nothing to actually flush when using `PollSender<T>`.
-            ProjectedSenderAdapter::Channel(_) => Poll::Ready(Ok(())),
+            ProjectedSenderAdapter::Channel(tx) => tx.poll_flush(cx).map_err(|_| ()),
             ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_flush(cx),
         }
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => {
-                if !tx.is_closed() {
-                    tx.close();
-                }
-                Poll::Ready(Ok(()))
-            }
+            ProjectedSenderAdapter::Channel(tx) => tx.poll_close(cx).map_err(|_| ()),
             ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_close(cx),
         }
     }
@@ -262,19 +255,6 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
                 // We need to drop the next item.  We have to wait until the caller hands it over to
                 // us in order to drop it, though, so we pretend we're ready and mark ourselves to
                 // drop the next item when `start_send` is called.
-                //
-                // One "gotcha" here is that the base sender is still trying to reserve a sending
-                // slot for us, so technically it could complete between now and when we get to
-                // `start_send` and actually drop the item.
-                //
-                // Based on the current behavior of `PollSender<T>`, the best thing we can do here
-                // is to simply to drop the item and not abort the send, since that will leave
-                // `PollSender<T>` armed for the next time we call `poll_reserve`.  Since buffers
-                // are SPSC, there's no risk in trying up a sender slot.
-                //
-                // TODO: In the future, `PollSender<T>::start_send` may be tweaked to attempt a
-                // call to `Sender<T>::try_send` as a last ditch effort when `PollSender<T>` has not
-                // yet reserved the sending slot.  We could take advantage of this ourselves.
                 WhenFull::DropNewest => (Poll::Ready(Ok(())), SendState::DropNext),
                 // We're supposed to overflow.  Quickly check to make sure we even have an overflow
                 // sender configured, and then figure out if the overflow sender can actually accept
@@ -302,7 +282,10 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let this = self.project();
-        let item_size = this.instrumentation.as_ref().map(|_| item.size_of());
+        let item_sizing = this
+            .instrumentation
+            .as_ref()
+            .map(|_| (item.event_count(), item.size_of()));
 
         match mem::replace(this.state, SendState::Idle) {
             // Sender isn't ready at all.
@@ -312,7 +295,9 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
             // We've been instructed to drop the next item.
             SendState::DropNext => {
                 if let Some(instrumentation) = this.instrumentation.as_ref() {
-                    instrumentation.try_increment_dropped_event_count(1);
+                    if let Some((item_count, _)) = item_sizing {
+                        instrumentation.try_increment_dropped_event_count(item_count as u64);
+                    }
                 }
                 Ok(())
             }
@@ -322,13 +307,20 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
                 if result.is_ok() {
                     *this.base_flush = true;
 
-                    if let Some(item_size) = item_size {
+                    // NOTE: This is potentially a smol lie because we haven't yet actually accepted
+                    // the item yet in some cases, due to needing to buffer it temporarily to ensure
+                    // we have room for it, since `poll_ready` gives us no way to know the item size
+                    // ahead of time.
+                    if let Some((item_count, item_size)) = item_sizing {
                         // Only update our instrumentation if _we_ got the item, not the overflow.
                         let handle = this
                             .instrumentation
                             .as_ref()
                             .expect("item_size can't be present without instrumentation");
-                        handle.increment_received_event_count_and_byte_size(1, item_size as u64);
+                        handle.increment_received_event_count_and_byte_size(
+                            item_count as u64,
+                            item_size as u64,
+                        );
                     }
                 }
                 result

@@ -7,7 +7,7 @@ use crate::{
     buffer_usage_data::BufferUsageHandle,
     encoding::FixedEncodable,
     topology::channel::{BufferReceiver, BufferSender},
-    Bufferable, WhenFull,
+    Bufferable, EventCount, WhenFull,
 };
 
 // Silly implementation of `Encodable` to fulfill `Bufferable` for our test buffer code.
@@ -33,6 +33,12 @@ impl FixedEncodable for u64 {
         } else {
             Err(BasicError("need 8 bytes minimum".to_string()))
         }
+    }
+}
+
+impl EventCount for u64 {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 

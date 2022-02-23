@@ -13,7 +13,6 @@ use crate::{
     },
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
-    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -74,7 +73,7 @@ impl TransformConfig for GrokParserConfig {
         Input::log()
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
