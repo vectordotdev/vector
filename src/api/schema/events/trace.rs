@@ -20,11 +20,21 @@ impl Trace {
 }
 
 #[Object]
-/// Trace event with fields for querying log data
+/// Trace event with fields for querying trace data
 impl Trace {
-    /// Id of the component associated with the Trace event
+    /// Id of the component associated with the trace event
     async fn component_id(&self) -> &str {
         self.output.output_id.component.id()
+    }
+
+    /// Type of component associated with the trace event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the trace event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind.as_ref()
     }
 
     /// Trace event as an encoded string format

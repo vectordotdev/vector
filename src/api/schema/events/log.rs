@@ -36,6 +36,16 @@ impl Log {
         self.output.output_id.component.id()
     }
 
+    /// Type of component associated with the log event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the log event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind.as_ref()
+    }
+
     /// Log message
     async fn message(&self) -> Option<String> {
         self.get_message()

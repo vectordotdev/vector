@@ -66,6 +66,16 @@ impl Metric {
         self.output.output_id.component.id()
     }
 
+    /// Type of component associated with the metric event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the metric event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind.as_ref()
+    }
+
     /// Metric timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
         self.event.data().timestamp().as_ref()
