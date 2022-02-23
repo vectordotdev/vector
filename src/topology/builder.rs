@@ -49,10 +49,11 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
 pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
-    crate::app::WORKER_THREADS
-        .get()
-        .map(std::num::NonZeroUsize::get)
-        .unwrap_or_else(num_cpus::get)
+//    crate::app::WORKER_THREADS
+  //      .get()
+    //    .map(std::num::NonZeroUsize::get)
+      //  .unwrap_or_else(num_cpus::get)
+2048
 });
 
 pub(self) async fn load_enrichment_tables<'a>(
