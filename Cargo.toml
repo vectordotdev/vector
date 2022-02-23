@@ -80,7 +80,6 @@ members = [
   "lib/prometheus-parser",
   "lib/tracing-limit",
   "lib/vector-api-client",
-  "lib/lookup",
   "lib/value",
   "lib/vrl/cli",
   "lib/vrl/compiler",
@@ -136,7 +135,6 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features 
 # Metrics
 metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
-metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 
 # AWS - Rusoto
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
@@ -161,11 +159,9 @@ aws-smithy-client = { version = "0.38.0", optional = true }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, optional = true }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, optional = true }
-reqwest = { version = "0.11", optional = true }
 
 # Tower
 tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
-tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
 serde = { version = "1.0.136", default-features = false, features = ["derive"] }
@@ -181,7 +177,6 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 
 # Prost
 prost = { version = "0.9", default-features = false, features = ["std"]  }
-prost-types = { version = "0.9", default-features = false }
 
 # GCP
 goauth = { version = "0.11.1", default-features = false, optional = true }
@@ -209,15 +204,11 @@ sha2 = { version = "0.10.2", optional = true }
 vrl = { path = "lib/vrl/vrl" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
-# Lookup
-lookup = { path = "lib/lookup" }
-
 # External libs
 arc-swap = { version = "1.5", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
-bitmask-enum = { version = "1.1.3", default-features = false }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
@@ -227,8 +218,6 @@ cidr-utils = { version = "0.5.5", default-features = false }
 clap = { version = "3.1.2", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
-dashmap = { version = "5.1.0", default-features = false }
-data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
@@ -295,7 +284,6 @@ tokio-postgres = { version = "0.7.4", default-features = false, features = ["run
 toml = { version = "0.5.8", default-features = false }
 tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
-twox-hash = { version = "1.6.2", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"] }
@@ -308,6 +296,10 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", 
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+
+# Criterion is properly a dev-dependency but can't be optional there, but dings
+# the unused_crate_dependencies lint unless we're compiling with bench flags on.
+criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"], optional = true}
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -326,27 +318,21 @@ tonic-build = { version = "0.6", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.1"
-assert_cmd = "2.0.4"
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
-criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.119"
-libz-sys = "1.1.3"
-lookup = { path = "lib/lookup", features = ["arbitrary"] }
-matches = "0.1.9"
 pretty_assertions = "1.1.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
-reqwest = { version = "0.11.9", features = ["json"] }
+reqwest = "0.11"
 tempfile = "3.3.0"
 tokio = { version = "1.17.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-walkdir = "2.3.2"
 wiremock = "0.5.10"
 
 [patch.crates-io]
@@ -363,7 +349,7 @@ default = ["api", "api-client", "enrichment-tables", "rdkafka-plain", "sinks", "
 default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 default-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-api-client = ["api", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-vrl-cli = ["api", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
@@ -375,16 +361,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datado
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -397,10 +383,9 @@ sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator"]
 # These are **very** useful on Cross compilations!
-vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
+vendor-all = ["vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
 vendor-openssl = ["openssl/vendored"]
-vendor-libz = ["libz-sys/static"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -484,7 +469,7 @@ sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", 
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "zstd"]
 sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs", "aws-smithy-client"]
 sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs"]
-sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
+sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
@@ -665,7 +650,7 @@ sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
-sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs", "reqwest"]
+sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
@@ -817,6 +802,7 @@ vector-unit-test-tests = [
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = [
+  "criterion",
   "sinks-file",
   "sinks-http",
   "sinks-socket",
@@ -833,16 +819,15 @@ benches = [
   "transforms-sample",
   "transforms-split",
 ]
-dnstap-benches = ["sources-dnstap"]
-language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap"]
+dnstap-benches = ["criterion", "sources-dnstap"]
+language-benches = ["criterion", "sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
-statistic-benches = []
-metrics-benches = ["sinks-socket", "sources-socket"]
-remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
-transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
-codecs-benches = ["codecs"]
-loki-benches = ["sinks-loki"]
-vrl-vm = []
+statistic-benches = ["criterion"]
+metrics-benches = ["criterion", "sinks-socket", "sources-socket"]
+remap-benches = ["criterion", "transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
+transform-benches = ["criterion", "transforms-filter", "transforms-dedupe", "transforms-reduce"]
+codecs-benches = ["criterion", "codecs"]
+loki-benches = ["criterion", "sinks-loki"]
 
 [[bench]]
 name = "default"
@@ -867,7 +852,7 @@ required-features = ["remap-benches"]
 name = "enrichment_tables_file"
 harness = false
 test = true
-required-features = ["enrichment-tables-file"]
+required-features = ["criterion", "enrichment-tables-file"]
 
 [[bench]]
 name = "languages"
