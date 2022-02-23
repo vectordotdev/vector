@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
 use tokio_stream::StreamExt;
@@ -74,7 +74,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     let res = subscription_client.output_events_by_component_id_patterns_subscription(
         outputs_patterns,
         opts.inputs_of.clone(),
-        opts.format.clone(),
+        opts.format,
         opts.limit as i64,
         opts.interval as i64,
     );
@@ -83,7 +83,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         let stream = res.stream();
     };
 
-    let formatter = EventFormatter::new(opts.format.clone());
+    let formatter = EventFormatter::new(opts.meta, opts.format);
 
     // Loop over the returned results, printing out tap events.
     loop {
@@ -95,13 +95,13 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
                     for tap_event in d.output_events_by_component_id_patterns.iter() {
                         match tap_event {
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()))
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if !opts.quiet {
@@ -123,42 +123,53 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
 }
 
 struct EventFormatter {
+    meta: bool,
     format: TapEncodingFormat,
     component_id_label: ColoredString,
 }
 
 impl EventFormatter {
-    fn new(format: TapEncodingFormat) -> Self {
+    fn new(meta: bool, format: TapEncodingFormat) -> Self {
         Self {
+            meta,
             format,
             component_id_label: "component_id".green(),
         }
     }
 
-    fn format(&self, component_id: &str, event: &str) -> String {
-        match self.format {
-            TapEncodingFormat::Json => format!(
-                r#"{{"{}":"{}","event":{}}}"#,
-                self.component_id_label,
-                component_id.green(),
-                event
-            ),
-            TapEncodingFormat::Yaml => {
-                let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
-                value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
-                format!(
-                    "{}{}: {}\n",
-                    serde_yaml::to_string(&value).unwrap(),
+    fn format<'a>(&self, component_id: &str, event: &'a str) -> Cow<'a, str> {
+        if self.meta {
+            match self.format {
+                TapEncodingFormat::Json => format!(
+                    r#"{{"{}":"{}","event":{}}}"#,
                     self.component_id_label,
-                    component_id.green()
+                    component_id.green(),
+                    event
                 )
+                .into(),
+                TapEncodingFormat::Yaml => {
+                    let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
+                    value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
+                    // We format to include component_id rather than include it
+                    // in the map to correctly preserve color formatting
+                    format!(
+                        "{}{}: {}\n",
+                        serde_yaml::to_string(&value).unwrap(),
+                        self.component_id_label,
+                        component_id.green()
+                    )
+                    .into()
+                }
+                TapEncodingFormat::Logfmt => format!(
+                    "{}={} {}",
+                    self.component_id_label,
+                    component_id.green(),
+                    event
+                )
+                .into(),
             }
-            TapEncodingFormat::Logfmt => format!(
-                "{}={} {}",
-                self.component_id_label,
-                component_id.green(),
-                event
-            ),
+        } else {
+            event.into()
         }
     }
 }
