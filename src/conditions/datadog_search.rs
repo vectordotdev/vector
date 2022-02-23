@@ -13,7 +13,7 @@ use vector_core::event::{Event, LogEvent, Value};
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
-pub struct DatadogSearchConfig {
+pub(crate) struct DatadogSearchConfig {
     pub source: String,
 }
 
