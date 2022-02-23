@@ -77,7 +77,7 @@ pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
 
 dyn_clone::clone_trait_object!(ConditionConfig);
 
-pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
+type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
 
