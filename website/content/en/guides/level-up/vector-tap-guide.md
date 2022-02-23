@@ -50,7 +50,7 @@ inputs = ["in*"]
 Run Vector with this configuration and watch the configuration for changes.
 
 ```console
-vector --config {config} -w
+vector --config path/to/config.toml -w
 ```
 
 Now run `vector tap`! You should see start seeing a stream of
