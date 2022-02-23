@@ -1,16 +1,16 @@
 use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigPath};
 use crate::cli::handle_config_errors;
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt, Debug, Clone)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug, Clone)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Pretty print JSON
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pretty: bool,
 
     /// Include default values where missing from config
-    #[structopt(short, long)]
+    #[clap(short, long)]
     include_defaults: bool,
 }
 
