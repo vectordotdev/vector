@@ -40,7 +40,6 @@ where
             error = %self.error,
             error_code = "failed_connecting",
             error_type = error_type::WRITER_FAILED,
-            // this event is only used in sinks
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10,
         );
