@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
+use crate::expression::{Container, Variant};
 use crate::value::{Error, Kind};
 use crate::{expression::Expr, Expression};
 use bytes::Bytes;
@@ -146,6 +147,37 @@ impl VrlValueConvert for Value {
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::timestamp(),
+            }),
+        }
+    }
+}
+
+impl TryFrom<Expr> for Value {
+    type Error = crate::function::Error;
+
+    fn try_from(expr: Expr) -> Result<Self, Self::Error> {
+        match expr {
+            Expr::Literal(literal) => Ok(literal.to_value()),
+            Expr::Container(Container {
+                variant: Variant::Object(object),
+            }) => Ok(Value::Object(
+                object
+                    .iter()
+                    .map(|(key, value)| Ok((key.clone(), value.clone().try_into()?)))
+                    .collect::<Result<_, _>>()?,
+            )),
+            Expr::Container(Container {
+                variant: Variant::Array(array),
+            }) => Ok(Value::Array(
+                array
+                    .iter()
+                    .map(|value| value.clone().try_into())
+                    .collect::<Result<_, _>>()?,
+            )),
+            expr => Err(crate::function::Error::UnexpectedExpression {
+                keyword: "thing",
+                expected: "literal",
+                expr,
             }),
         }
     }
