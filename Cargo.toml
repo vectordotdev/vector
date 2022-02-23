@@ -247,7 +247,7 @@ headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.17", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
-hyper-openssl = { version = "0.9.1", default-features = false }
+hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 infer = { version = "0.7.0", default-features = false, optional = true}
