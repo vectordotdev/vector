@@ -41,7 +41,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum size of a batch, in bytes, before it is flushed."
 								required:    false
 								type: uint: {
-									default: features.send.batch.max_bytes
+									default: features.send.batch.max_bytes | *null
 									unit:    "bytes"
 								}
 							}
@@ -50,7 +50,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum size of a batch, in events, before it is flushed."
 								required:    false
 								type: uint: {
-									default: features.send.batch.max_events
+									default: features.send.batch.max_events | *null
 									unit:    "events"
 								}
 							}
