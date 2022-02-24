@@ -6,6 +6,22 @@ require 'find'
 # These members/tags are common to multiple events
 BYTE_SIZE_COUNT = ['byte_size', 'count']
 
+# SUFFIX => [MESSAGE, COUNTERS, REQUIRED_MEMBERS, ADDITIONAL_TAGS]
+EVENT_CLASSES = {
+  'BytesReceived' => [
+    'Bytes received.', ['received_bytes'], ['byte_size'], ['protocol']
+  ],
+  'EventsReceived' => [
+    'Events received.', ['received_events', 'received_event_bytes'], BYTE_SIZE_COUNT, []
+  ],
+  'EventsSent' => [
+    'Events sent.', ['sent_events', 'sent_event_bytes'], BYTE_SIZE_COUNT, []
+  ],
+  'BytesSent' => [
+    'Bytes sent.', ['sent_bytes'], ['byte_size'], ['protocol']
+  ],
+}
+
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
   arr.append(item)
@@ -38,30 +54,22 @@ class Event
   def valid?
     @reports.clear
 
-    # Check BytesReceived events (for sources)
-    if @name.end_with? 'BytesReceived'
-      members_must_include(['byte_size'])
-      counters_must_include('component_received_bytes_total', ['protocol'] + @members - ['byte_size'])
-    end
-
-    # Check EventsReceived events (common)
-    if @name.end_with? 'EventsReceived'
-      members_must_include(BYTE_SIZE_COUNT)
-      counters_must_include('component_received_events_total', @members - BYTE_SIZE_COUNT)
-      counters_must_include('component_received_event_bytes_total', @members - BYTE_SIZE_COUNT)
-    end
-
-    # Check EventsSent events (common)
-    if @name.end_with? 'EventsSent'
-      members_must_include(BYTE_SIZE_COUNT)
-      counters_must_include('component_sent_events_total', @members - BYTE_SIZE_COUNT)
-      counters_must_include('component_sent_event_bytes_total', @members - BYTE_SIZE_COUNT)
-    end
-
-    # Check BytesSent events (for sinks)
-    if @name.end_with? 'BytesSent'
-      members_must_include(['byte_size'])
-      counters_must_include('component_sent_bytes_total', ['protocol'] + @members - ['byte_size'])
+    EVENT_CLASSES.each do |suffix, (required_message, counters, required_members, additional_tags)|
+      if @name.end_with? suffix
+        @logs.each do |type, message, parameters|
+          if type != 'trace'
+            @reports.append('Log type MUST be \"trace!\".')
+          end
+          if message != required_message
+            @reports.append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
+          end
+        end
+        members_must_include(required_members)
+        counters.each do |counter|
+          counter = "component_#{counter}_total"
+          counters_must_include(counter, additional_tags + @members - BYTE_SIZE_COUNT)
+        end
+      end
     end
 
     has_errors = @logs.one? { |type, _, _| type == 'error' }
@@ -92,14 +100,6 @@ class Event
       @reports.append(report)
     end
 
-    def generic_must_contain(array, names, prefix, suffix)
-      names.each do |name|
-        unless array.include? name
-          @reports.append("#{prefix} MUST #{suffix} \"#{name}\".")
-        end
-      end
-    end
-
     def counters_must_include(name, required_tags)
       unless @counters.include? name
         @reports.append("This event MUST increment counter \"#{name}\".")
@@ -114,7 +114,11 @@ class Event
     end
 
     def members_must_include(names)
-      generic_must_contain(@members, names, 'This event', 'have a member named')
+      names.each do |name|
+        unless @members.include? name
+          @reports.append("This event MUST have a member named \"#{name}\".")
+        end
+      end
     end
 end
 
