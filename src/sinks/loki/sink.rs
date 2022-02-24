@@ -22,8 +22,8 @@ use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingError,
+        LokiEventUnlabeledError, LokiEventsProcessed, LokiOutOfOrderEventDroppedError,
+        LokiOutOfOrderEventRewrittenError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -223,7 +223,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
+            emit!(&LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -258,11 +258,11 @@ impl RecordFilter {
             if record.event.timestamp < *latest {
                 match self.out_of_order_action {
                     OutOfOrderAction::Drop => {
-                        emit!(&LokiOutOfOrderEventDropped);
+                        emit!(&LokiOutOfOrderEventDroppedError);
                         None
                     }
                     OutOfOrderAction::RewriteTimestamp => {
-                        emit!(&LokiOutOfOrderEventRewritten);
+                        emit!(&LokiOutOfOrderEventRewrittenError);
                         record.event.timestamp = *latest;
                         Some(record)
                     }
