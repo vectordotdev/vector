@@ -12,7 +12,8 @@ and the syntax to retrieve encrypted config value.
 
 ## Cross cutting concerns
 
-N/A
+- The ongoing [configuration schema work][vector-config-schema-work].
+- `vector config` and related Vector enterprise work.
 
 ## Scope
 
@@ -37,8 +38,8 @@ N/A
 
 ### User Experience
 
-- Use the same kind of API between Vector and a user-provided executable as the one between the Agent and the secret
-  retrieving executable.
+- Use the same kind of API between Vector and a user-provided executable as the [one between the Agent and the secret
+  retrieving executable][dd-secret-backend-exec-api].
 - A set of top level options like the ones the Datadog Agent [exposes][dd-agent-secret-knobs].
 - A convenient syntax for config option to indicate Vector that a secret should be retrieved for this option (Subject to
   be changed but the Datadog Agent uses `ENC[secret_key]`)
@@ -51,6 +52,9 @@ path = "/path/to/the/command"
 argument = "--config foo=bar"
 timeout = 5
 ```
+
+Overall the behaviour for corner cases should follow what's in place for environmment variable interpolation as this is
+a very close feature.
 
 ### Implementation
 
@@ -97,8 +101,12 @@ users.
 
 ## Outstanding Questions
 
-- Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement (TBC).
-- Specific security constraints
+- Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement in many
+  situations.
+- Secret syntax in config, the Datadog Agent uses ENC[secret_key], whereas an URL scheme like `secret://<backend>/<key>`
+  may be a more extensible and futur proof scheme. It would easily provide a convenient user facing syntax if multiple
+  backen are required in the future.
+- Specific security constraints that may have been missed.
 
 ## Plan Of Attack
 
@@ -117,3 +125,5 @@ users.
 [k8s-env-var-from-secrets]: https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-environment-variables
 [dd-agent-with-k8s-secret]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#script-for-reading-from-multiple-secret-providers
 [dd-agent-secret-helper]: https://github.com/DataDog/datadog-agent/tree/331a3fc2c6f4f49f9bcc06c4f0675f6a8b65a523/cmd/secrets
+[vector-config-schema-work]: https://github.com/vectordotdev/vector/issues/9115
+[dd-secret-backend-exec-api]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#the-executable-api
