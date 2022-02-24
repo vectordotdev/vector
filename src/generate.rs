@@ -4,10 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use structopt::StructOpt;
 use toml::{map::Map, Value};
 use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
@@ -16,11 +16,11 @@ use crate::config::{
     TransformDescription,
 };
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Whether to skip the generation of global fields.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     fragment: bool,
 
     /// Generate expression, e.g. 'stdin/json_parser,add_fields/console'
@@ -55,7 +55,7 @@ pub struct Opts {
     expression: String,
 
     /// Generate config as a file
-    #[structopt(long, parse(from_os_str))]
+    #[clap(long, parse(from_os_str))]
     file: Option<PathBuf>,
 }
 

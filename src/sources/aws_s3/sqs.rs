@@ -21,12 +21,12 @@ use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
-    internal_events::aws_s3::source::{
-        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
-        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
-        SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored, SqsS3EventsReceived,
+    internal_events::{
+        BytesReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
+        SqsS3EventsReceived, StreamClosedError,
     },
-    internal_events::{BytesReceived, StreamClosedError},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     SourceSender,

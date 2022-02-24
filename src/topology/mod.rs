@@ -46,13 +46,19 @@ type BuiltBuffer = (
     Acker,
 );
 
-type Outputs = HashMap<OutputId, fanout::ControlChannel>;
+/// Resources used by the `tap` API to monitor component inputs and outputs,
+/// updated alongside the topology
+#[derive(Debug, Default, Clone)]
+pub struct TapResource {
+    // Outputs and their corresponding Fanout control
+    pub outputs: HashMap<OutputId, fanout::ControlChannel>,
+    // Components (transforms, sinks) and their corresponding inputs
+    pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+}
 
-// Watcher types for topology changes. These are currently specific to receiving
-// `Outputs`. This could be expanded in the future to send an enum of types if,
-// for example, this included a new 'Inputs' type.
-type WatchTx = watch::Sender<Outputs>;
-pub(super) type WatchRx = watch::Receiver<Outputs>;
+// Watcher types for topology changes.
+type WatchTx = watch::Sender<TapResource>;
+pub type WatchRx = watch::Receiver<TapResource>;
 
 pub async fn start_validated(
     config: Config,

@@ -7,4 +7,4 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl-core = { package = "vrl", path = "../vrl/core" }
+vrl = { package = "vrl", path = "../vrl/vrl" }

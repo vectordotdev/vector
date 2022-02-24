@@ -442,6 +442,10 @@ jobs:
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+      - uses: actions/upload-artifact@v2
+        with:
+          name: soak-analysis
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis
@@ -451,6 +455,7 @@ jobs:
 
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
+        continue-on-error: true
         with:
           issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
           edit-mode: replace

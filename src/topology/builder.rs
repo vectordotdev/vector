@@ -254,17 +254,25 @@ pub async fn build_pieces(
         source_tasks.insert(key.clone(), server);
     }
 
+    let mut definition_cache = HashMap::default();
+
     // Build transforms
     for (key, transform) in config
         .transforms
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
-        let mut schema_ids = HashMap::with_capacity(transform.inner.outputs().len());
-        for output in transform.inner.outputs() {
+        let mut schema_ids = HashMap::new();
+        let merged_definition = if config.schema.enabled {
+            schema::merged_definition(&transform.inputs, config, &mut definition_cache)
+        } else {
+            schema::Definition::empty()
+        };
+
+        for output in transform.inner.outputs(&merged_definition) {
             let definition = match output.log_schema_definition {
                 Some(definition) => definition,
-                None => schema::merged_definition(&transform.inputs, config),
+                None => merged_definition.clone(),
             };
 
             let schema_id = schema_registry
@@ -279,6 +287,7 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
             schema_ids,
+            merged_schema_definition: merged_definition.clone(),
         };
 
         let node = TransformNode {
@@ -286,7 +295,7 @@ pub async fn build_pieces(
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(),
+            outputs: transform.inner.outputs(&merged_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
 

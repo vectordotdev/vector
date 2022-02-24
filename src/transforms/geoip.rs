@@ -9,6 +9,7 @@ use crate::{
     },
     event::Event,
     internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -78,7 +79,7 @@ impl TransformConfig for GeoipConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
