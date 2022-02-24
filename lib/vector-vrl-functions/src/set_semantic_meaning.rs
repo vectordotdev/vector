@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use lookup::LookupBuf;
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 pub struct MeaningList(pub BTreeMap<String, LookupBuf>);
 
