@@ -1,6 +1,5 @@
 mod all_fields;
 mod contains;
-mod get_mut;
 mod insert;
 mod keys;
 mod path_iter;
@@ -8,7 +7,6 @@ mod remove;
 
 pub use all_fields::all_fields;
 pub use contains::contains;
-pub use get_mut::get_mut;
 pub use insert::{insert, insert_path};
 pub use keys::keys;
 pub use path_iter::{PathComponent, PathIter};

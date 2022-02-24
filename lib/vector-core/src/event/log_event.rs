@@ -113,7 +113,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.as_map_mut(), key.as_ref())
+        Arc::make_mut(&mut self.fields).get_mut2(key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -195,12 +195,12 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), false)
+        self.remove_prune(key, false)
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
+        util::log::remove(Arc::make_mut(&mut self.fields), key.as_ref(), prune)
     }
 
     #[instrument(level = "trace", skip(self))]

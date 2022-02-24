@@ -891,6 +891,32 @@ impl Value {
         }
     }
 
+    /// Get a mutable borrow of the value by path
+    pub fn get_mut2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        let mut value = self;
+        let mut path_iter = path.segment_iter();
+        loop {
+            match (path_iter.next(), value) {
+                (None, value) => return Some(value),
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get_mut(key) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
+                },
+                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
+                    match array.get_mut(index as usize) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                _ => return None,
+            }
+        }
+    }
+
     /// Determine if the lookup is contained within the value.
     ///
     /// ```rust
