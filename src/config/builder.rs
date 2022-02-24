@@ -105,8 +105,8 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
-            #[cfg(feature = "datadog-pipelines")]
             schema,
+            #[cfg(feature = "datadog-pipelines")]
             datadog,
             healthchecks,
             enrichment_tables,
