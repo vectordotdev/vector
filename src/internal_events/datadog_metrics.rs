@@ -4,7 +4,8 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DatadogMetricsEncodingError {
-    pub error: &'static str,
+    pub message: &'static str,
+    pub error_code: &'static str,
     pub dropped_events: u64,
 }
 
@@ -12,8 +13,8 @@ impl InternalEvent for DatadogMetricsEncodingError {
     fn emit_logs(&self) {
         error!(
             message = "Failed to encode Datadog metrics.",
-            error = %self.error,
-            error_code = "failed_encoding_datadog_metrics",
+            error = %self.message,
+            error_code = %self.error_code,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
@@ -22,7 +23,7 @@ impl InternalEvent for DatadogMetricsEncodingError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "failed_encoding_datadog_metrics",
+            "error_code" => self.error_code,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
