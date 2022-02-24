@@ -29,7 +29,12 @@ impl InternalEvent for DatadogMetricsEncodingError {
         );
 
         if self.dropped_events > 0 {
-            counter!("component_discarded_events_total", self.dropped_events);
+            counter!(
+                "component_discarded_events_total", self.dropped_events,
+                "error_code" => self.error_code,
+                "error_type" => error_type::ENCODER_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 }
