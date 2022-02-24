@@ -44,7 +44,8 @@ N/A
   be changed but the Datadog Agent uses `ENC[secret_key]`)
 
 New top level options to be added:
-```
+
+```toml
 [secret_backend]
 path = "/path/to/the/command"
 argument = "--config foo=bar"
