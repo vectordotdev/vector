@@ -1,10 +1,6 @@
 use std::collections::BTreeMap;
 
-use lookup::LookupBuf;
-use value::{
-    kind::{Collection, Field, Unknown},
-    Kind,
-};
+use value::Kind;
 
 /// The input schema for a given component.
 ///
@@ -12,7 +8,7 @@ use value::{
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// Semantic meaning required to exists for a given event.
+    /// Semantic meaning required to exist for a given event.
     meaning: BTreeMap<&'static str, Kind>,
 }
 
@@ -22,7 +18,6 @@ impl Requirement {
     /// An empty schema is the most "open" schema, in that there are no restrictions.
     pub fn empty() -> Self {
         Self {
-            collection: Collection::any(),
             meaning: BTreeMap::default(),
         }
     }
@@ -33,9 +28,7 @@ impl Requirement {
     /// 2. The unknown fields are set to "any".
     /// 3. There are no required meanings defined.
     pub fn is_empty(&self) -> bool {
-        self.collection.known().is_empty()
-            && self.collection.unknown().map_or(false, Unknown::is_any)
-            && self.meaning.is_empty()
+        self.meaning.is_empty()
     }
 
     /// Add a restriction to the schema.
