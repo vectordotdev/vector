@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use structopt::StructOpt;
+use clap::Parser;
 use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
@@ -14,29 +14,29 @@ use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 use super::repl;
 use super::Error;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "VRL", about = "Vector Remap Language CLI")]
+#[derive(Parser, Debug)]
+#[clap(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
     /// The VRL program to execute. The program ".foo = true", for example, sets the event object's
     /// `foo` field to `true`.
-    #[structopt(name = "PROGRAM")]
+    #[clap(name = "PROGRAM")]
     program: Option<String>,
 
     /// The file containing the event object(s) to handle. JSON events should be one per line..
-    #[structopt(short, long = "input", parse(from_os_str))]
+    #[clap(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
     /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
-    #[structopt(short, long = "program", conflicts_with("program"), parse(from_os_str))]
+    #[clap(short, long = "program", conflicts_with("PROGRAM"), parse(from_os_str))]
     program_file: Option<PathBuf>,
 
     /// Print the (modified) event object instead of the result of the final expression. Setting
     /// this flag is equivalent to using `.` as the final expression.
-    #[structopt(short = "o", long)]
+    #[clap(short = 'o', long)]
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[structopt(short = "tz", long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
 }
 

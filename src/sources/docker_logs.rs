@@ -480,7 +480,13 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(&DockerLogsCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => {
+                            emit!(&DockerLogsCommunicationError {
+                                error,
+                                container_id: None,
+                            });
+                            return;
+                        },
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");

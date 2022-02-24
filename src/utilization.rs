@@ -14,7 +14,7 @@ use tokio_stream::wrappers::IntervalStream;
 use crate::stats;
 
 #[pin_project]
-pub struct Utilization<S> {
+pub(crate) struct Utilization<S> {
     timer: Timer,
     intervals: IntervalStream,
     inner: S,
@@ -26,7 +26,7 @@ impl<S> Utilization<S> {
     /// This can't be constant because destructors can't be run in a const context, and we're
     /// discarding `IntervalStream`/`Timer` when we call this.
     #[allow(clippy::missing_const_for_fn)]
-    pub fn into_inner(self) -> S {
+    pub(crate) fn into_inner(self) -> S {
         self.inner
     }
 }
@@ -73,7 +73,7 @@ where
 /// and the rest of the time it is doing useful work. This is more true for
 /// sinks than transforms, which can be blocked by downstream components, but
 /// with knowledge of the config the data is still useful.
-pub fn wrap<S>(inner: S) -> Utilization<S> {
+pub(crate) fn wrap<S>(inner: S) -> Utilization<S> {
     Utilization {
         timer: Timer::new(),
         intervals: IntervalStream::new(interval(Duration::from_secs(5))),
@@ -98,7 +98,7 @@ pub(super) struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
@@ -109,7 +109,7 @@ impl Timer {
     }
 
     /// Begin a new span representing time spent waiting
-    pub fn start_wait(&mut self) {
+    pub(crate) fn start_wait(&mut self) {
         if !self.waiting {
             self.end_span();
             self.waiting = true;
@@ -117,7 +117,7 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub fn stop_wait(&mut self) -> Instant {
+    pub(crate) fn stop_wait(&mut self) -> Instant {
         if self.waiting {
             let now = self.end_span();
             self.waiting = false;
@@ -130,7 +130,7 @@ impl Timer {
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    pub fn report(&mut self) {
+    pub(crate) fn report(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.

@@ -7,6 +7,14 @@ use vector_common::btreemap;
 use super::*;
 use crate::config::log_schema;
 
+fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
+    value.encode(buffer).expect("encoding should not fail");
+}
+
+fn decode_value<T: Encodable, B: Buf + Clone>(buffer: B) -> T {
+    T::decode(T::get_metadata(), buffer).expect("decoding should not fail")
+}
+
 #[test]
 fn event_encodable_metadata_stable_while_leveldb_disk_buffer_still_present() {
     // REVIEWERS: Be aware, if this is being removed or changed, the only acceptable context is
@@ -48,8 +56,7 @@ fn event_can_go_from_raw_prost_to_encodable_and_vice_versa() {
         .expect("event should not fail to encode");
 
     let first_decode_buf = first_encode_buf.freeze();
-    let first_decoded_event = Event::decode(Event::get_metadata(), first_decode_buf)
-        .expect("event should not fail to decode");
+    let first_decoded_event = decode_value::<Event, _>(first_decode_buf);
 
     assert_eq!(event, first_decoded_event);
 
@@ -57,9 +64,7 @@ fn event_can_go_from_raw_prost_to_encodable_and_vice_versa() {
     let second_event = event.clone();
 
     let mut second_encode_buf = BytesMut::with_capacity(4096);
-    second_event
-        .encode(&mut second_encode_buf)
-        .expect("event should not fail to encode");
+    encode_value(second_event, &mut second_encode_buf);
 
     let second_decode_buf = second_encode_buf.freeze();
     let second_decoded_event: Event = proto::EventWrapper::decode(second_decode_buf)
@@ -76,16 +81,11 @@ fn serde_no_size_loss() {
         let expected = event.clone();
 
         let mut buffer = BytesMut::with_capacity(64);
-        {
-            let res = Event::encode(event, &mut buffer);
-            assert!(res.is_ok());
-        }
-        {
-            let res = Event::decode(Event::get_metadata(), buffer);
-            let actual: Event = res.unwrap();
+        encode_value(event, &mut buffer);
 
-            assert_eq!(actual.size_of(), expected.size_of());
-        }
+        let actual = decode_value::<Event, _>(buffer);
+        assert_eq!(actual.size_of(), expected.size_of());
+
         TestResult::passed()
     }
 
@@ -104,21 +104,18 @@ fn back_and_forth_through_bytes() {
         let expected = event.clone();
 
         let mut buffer = BytesMut::with_capacity(64);
-        {
-            let res = Event::encode(event, &mut buffer);
-            assert!(res.is_ok());
-        }
-        {
-            let res = Event::decode(Event::get_metadata(), buffer);
-            let actual: Event = res.unwrap();
-            // While Event does implement PartialEq we prefer to use PartialOrd
-            // instead. This is done because Event is populated with a number
-            // f64 instances, meaning two Event instances might differ by less
-            // than f64::EPSILON -- and are equal enough -- but are not
-            // partially equal.
-            assert!(!(expected > actual));
-            assert!(!(expected < actual));
-        }
+        encode_value(event, &mut buffer);
+
+        let actual = decode_value::<Event, _>(buffer);
+
+        // While Event does implement PartialEq we prefer to use PartialOrd
+        // instead. This is done because Event is populated with a number
+        // f64 instances, meaning two Event instances might differ by less
+        // than f64::EPSILON -- and are equal enough -- but are not
+        // partially equal.
+        assert!(!(expected > actual));
+        assert!(!(expected < actual));
+
         TestResult::passed()
     }
 
