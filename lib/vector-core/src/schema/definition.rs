@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use lookup::LookupBuf;
 use value::{
-    kind::{merge, nest, Collection, Field, Unknown},
+    kind::{insert, merge, nest, Collection, Field, Unknown},
     Kind,
 };
 
@@ -188,6 +188,30 @@ impl From<Collection<Field>> for Definition {
             meaning: HashMap::default(),
             optional: HashSet::default(),
         }
+    }
+}
+
+impl From<Definition> for Kind {
+    fn from(definition: Definition) -> Self {
+        let mut kind: Self = definition.collection.into();
+
+        for optional in &definition.optional {
+            kind.insert_at_path(
+                &optional.to_lookup(),
+                Kind::null(),
+                insert::Strategy {
+                    inner_conflict: insert::InnerConflict::Reject,
+                    leaf_conflict: insert::LeafConflict::Merge(merge::Strategy {
+                        depth: merge::Depth::Deep,
+                        indices: merge::Indices::Keep,
+                    }),
+                    coalesced_path: insert::CoalescedPath::Reject,
+                },
+            )
+            .expect("api contract guarantees infallible operation");
+        }
+
+        kind
     }
 }
 
