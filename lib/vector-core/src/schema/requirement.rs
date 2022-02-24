@@ -12,13 +12,6 @@ use value::{
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// The collection of fields and their types required to be present in the event.
-    ///
-    /// While this can be used to define *exact* requirements on schema fields, it is primarily
-    /// intended for sinks that want to add a type requirement to _all_ fields in the event (e.g.
-    /// JSON encoding).
-    collection: Collection<Field>,
-
     /// Semantic meaning required to exists for a given event.
     meaning: BTreeMap<&'static str, Kind>,
 }
@@ -48,23 +41,6 @@ impl Requirement {
     /// Add a restriction to the schema.
     pub fn require_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
         self.meaning.insert(meaning, kind);
-        self
-    }
-
-    /// Set a hard requirement for an event field.
-    ///
-    /// # Panics
-    ///
-    /// Non-root fields are not supported at this time.
-    pub fn require_field(mut self, path: &LookupBuf, kind: Kind) -> Self {
-        // There is no reason why we can't support this, but there's no need yet, and it might
-        // actually be something we want to actively discourage, so this panic serves as a reminder
-        // that we probably want a brief discussion before enabling support for this.
-        if !path.is_root() {
-            panic!("requiring exact field kind is currently unsupported")
-        }
-
-        self.collection.set_unknown(kind);
         self
     }
 }
