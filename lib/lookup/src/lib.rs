@@ -9,6 +9,7 @@ pub use lookup_view::{Field, Lookup, Segment};
 
 mod error;
 mod field;
+mod lookup2;
 mod lookup_buf;
 mod lookup_view;
 pub mod parser;
