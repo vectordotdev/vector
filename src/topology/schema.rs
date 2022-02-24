@@ -26,13 +26,7 @@ use crate::{config::OutputId, topology};
 ///
 /// Finally, The merged definition (named `Definition 1 & 2`), and `Definition 4` are merged
 /// together to produce the new `Definition` returned by this method.
-pub(super) fn merged_definition(inputs: &[OutputId], config: &topology::Config) -> Definition {
-    let mut cache = HashMap::default();
-
-    inner_merged_definition(inputs, config, &mut cache)
-}
-
-fn inner_merged_definition(
+pub(super) fn merged_definition(
     inputs: &[OutputId],
     config: &topology::Config,
     cache: &mut HashMap<Vec<OutputId>, Definition>,
@@ -83,7 +77,7 @@ fn inner_merged_definition(
         // change anything in the schema from its inputs, in which case we need to recursively get
         // the schemas of the transform inputs.
         } else if let Some(transform) = config.transforms.get(key) {
-            let merged_definition = merged_definition(&transform.inputs, config);
+            let merged_definition = merged_definition(&transform.inputs, config, cache);
 
             // After getting the transform matching to the given input, we need to further narrow
             // the actual output of the transform feeding into this input, and then get the
@@ -106,7 +100,7 @@ fn inner_merged_definition(
                 Some(transform_definition) => transform_definition,
                 // If we get no match, we need to recursively call this method for the inputs of
                 // the given transform.
-                None => inner_merged_definition(&transform.inputs, config, cache),
+                None => merged_definition,
             };
 
             definition = definition.merge(transform_definition);
@@ -290,7 +284,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let got = merged_definition(&inputs, &config);
+            let got = merged_definition(&inputs, &config, &mut HashMap::default());
             assert_eq!(got, want, "{}", title);
         }
     }

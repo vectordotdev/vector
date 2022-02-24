@@ -48,6 +48,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         global,
         #[cfg(feature = "api")]
         api,
+        schema,
         #[cfg(feature = "datadog-pipelines")]
         datadog,
         healthchecks,
@@ -101,6 +102,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             version,

@@ -8,7 +8,7 @@ use super::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{
     buffer_usage_data::{BufferUsage, BufferUsageHandle},
     topology::channel::{BufferReceiver, BufferSender},
-    variant::MemoryBuffer,
+    variants::MemoryBuffer,
     Acker, Bufferable, WhenFull,
 };
 
@@ -283,7 +283,7 @@ mod tests {
     use super::TopologyBuilder;
     use crate::{
         topology::{builder::TopologyError, test_util::assert_current_send_capacity},
-        variant::MemoryBuffer,
+        variants::MemoryBuffer,
         WhenFull,
     };
 

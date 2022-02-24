@@ -14,6 +14,7 @@ use vector_core::{
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum TaskOutput {
     Source,
     Transform,
