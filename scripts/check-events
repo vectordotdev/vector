@@ -12,6 +12,10 @@ def hash_array_add(hash, key, item)
   hash[key] = arr
 end
 
+def is_constant?(name)
+  name.start_with? '"' and name.end_with? '"' or name.match? /^(.+::)[A-Z0-9_]$/
+end
+
 # A class to hold error reports and common functionality
 class Event
   attr_accessor :path
@@ -78,6 +82,25 @@ class Event
         ['error', 'stage'].each do |parameter|
           unless parameters.include? parameter
             @reports.append("Error log MUST include parameter \"#{parameter}\".")
+          end
+        end
+      end
+    end
+
+    @counters.each do |name, tags|
+      # Make sure defined tags to counters are constants
+      tags.each do |tag, value|
+        if tag == 'stage'
+          if !value.start_with? 'error_stage::'
+            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
+          end
+        elsif tag == 'error_type'
+          if !value.start_with? 'error_type::'
+            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
+          end
+        elsif tag == 'error_code'
+          if !is_constant?(value)
+            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be a constant.")
           end
         end
       end
@@ -161,7 +184,7 @@ Find.find('.') do |path|
       text.scan(/^(\s*)impl(?:<.+?>)? InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) do |_space, event_name, block|
         # Scan for counter names and tags
         block.scan(/ counter!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |name, tags|
-          tags = tags.scan(/"([^"]+)" => /).map { |tag,| tag }
+          tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
           $all_events[event_name].add_counter(name, tags)
         end
 
