@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, http_error_code};
+use super::prelude::{error_stage, error_type, http_error_code};
 use http::Response;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -36,7 +36,7 @@ impl<'a> InternalEvent for ElasticsearchResponseError<'a> {
         error!(
             message = %self.message,
             error_code = %self.error_code(),
-            error_type = "failed_request",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
             response = ?self.response,
         );
@@ -46,7 +46,7 @@ impl<'a> InternalEvent for ElasticsearchResponseError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => self.error_code(),
-            "error_type" => "failed_request",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
     }
