@@ -153,7 +153,10 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
+            // TODO: REVERT THIS - THIS IS FOR TESTING ONLY
+            // let max_requests = num_cpus::get();
+            let max_requests = 1;
+            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, max_requests);
 
             listener
                 .accept_stream_limited(max_connections)
@@ -289,6 +292,9 @@ async fn handle_stream<T>(
             else => break,
         };
 
+        let timeout = tokio::time::sleep(Duration::from_millis(10));
+        tokio::pin!(timeout);
+
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
@@ -296,6 +302,11 @@ async fn handle_stream<T>(
                     break;
                 }
             },
+            _ = &mut timeout => {
+                // This connection is currently holding a permit, but has not received data for some time. Release
+                // the permit to let another connection try
+                continue;
+            }
             res = reader.next() => {
                 match res {
                     Some(Ok((frames, _byte_size))) => {
