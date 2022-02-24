@@ -190,7 +190,7 @@ components: {
 		if Args.kind == "sink" {
 			// `buffer` describes how the component buffers data.
 			buffer: {
-				enabled: bool | string
+				enabled: true
 			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.

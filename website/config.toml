@@ -312,3 +312,16 @@ weight = 1
 name = "Privacy policy"
 url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 2
+
+[security]
+  enableInlineShortcodes = false
+  [security.exec]
+    allow = ['^babel$', '^dart-sass-embedded$', '^go$', '^npx$', '^postcss$']
+    osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
+
+  [security.funcs]
+    getenv = ['^HUGO_']
+
+  [security.http]
+    methods = ['(?i)GET|POST']
+    urls = ['.*']

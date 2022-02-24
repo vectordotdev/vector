@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -33,15 +34,15 @@ impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
             Some(endpoint) => error!(
                 message,
                 error = %self.error,
-                error_type = "request_error",
-                stage = "receiving",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
                 endpoint = %endpoint,
             ),
             None => error!(
                 message,
                 error = %self.error,
-                error_type = "request_error",
-                stage = "receiving",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
             ),
         }
     }
@@ -50,8 +51,8 @@ impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "request_error",
-            "stage" => "receiving",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("request_errors_total", 1);

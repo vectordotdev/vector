@@ -19,7 +19,6 @@ pub use vector_core::{
 use crate::{
     conditions,
     event::Metric,
-    schema,
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
@@ -41,6 +40,7 @@ mod id;
 mod loading;
 pub mod provider;
 mod recursive;
+mod schema;
 mod unit_test;
 mod validation;
 mod vars;
@@ -100,6 +100,7 @@ impl ConfigPath {
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub schema: schema::Options,
     pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
     pub datadog: Option<datadog::Options>,
@@ -519,6 +520,14 @@ pub struct TransformOuter<T> {
 }
 
 impl<T> TransformOuter<T> {
+    #[cfg(test)]
+    pub(crate) fn new(transform: impl TransformConfig + 'static) -> Self {
+        Self {
+            inputs: vec![],
+            inner: Box::new(transform),
+        }
+    }
+
     fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
         let inputs = self.inputs.iter().map(f).collect();
         self.with_inputs(inputs)

@@ -6,6 +6,7 @@ use crate::{
         DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
+    schema,
     transforms::Transform,
 };
 
@@ -66,7 +67,7 @@ impl TransformConfig for CompoundConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 

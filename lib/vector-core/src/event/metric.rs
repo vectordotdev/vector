@@ -13,7 +13,7 @@ use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 #[cfg(feature = "vrl")]
-use vrl_core::prelude::VrlValueConvert;
+use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
@@ -128,10 +128,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<vrl_core::Value> for MetricKind {
+impl TryFrom<vrl_lib::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_lib::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -145,7 +145,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for vrl_core::Value {
+impl From<MetricKind> for vrl_lib::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -470,7 +470,7 @@ pub fn zip_quantiles(
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for vrl_core::Value {
+impl From<MetricValue> for vrl_lib::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -525,7 +525,7 @@ impl ByteSizeOf for MetricSketch {
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for vrl_core::Value {
+impl From<MetricSketch> for vrl_lib::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }

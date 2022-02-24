@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -25,7 +25,7 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
         error!(
             message = "AWS EC2 metadata refresh failed.",
             error = %self.error,
-            error_type = "request_failed",
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
         );
     }
@@ -34,7 +34,7 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "request_failed",
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

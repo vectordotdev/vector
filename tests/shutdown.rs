@@ -555,7 +555,7 @@ fn timely_reload_shutdown() {
     );
 
     let mut cmd = vector_with(path.clone(), next_addr(), false);
-    cmd.arg("-w true");
+    cmd.arg("-w");
 
     test_timely_shutdown_with_sub(cmd, |vector| {
         overwrite_file(
