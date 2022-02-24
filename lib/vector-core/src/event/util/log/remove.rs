@@ -1,14 +1,14 @@
 use lookup::lookup2::{BorrowedSegment, Path};
 use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 
-use super::{PathComponent, PathIter, Value};
+use super::Value;
 
 /// Removes field value specified by the given path and return its value.
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
 pub fn remove<'a>(value: &mut Value, path: impl Path<'a>, prune: bool) -> Option<Value> {
-    let mut path_iter = path.segment_iter().peekable();
+    let path_iter = path.segment_iter().peekable();
     remove_rec(value, path_iter, prune).map(|(value, _)| value)
 }
 
@@ -17,7 +17,7 @@ pub fn remove<'a>(value: &mut Value, path: impl Path<'a>, prune: bool) -> Option
 /// type of `Value`.
 fn remove_rec<'a>(
     value: &mut Value,
-    mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
+    path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     prune: bool,
 ) -> Option<(Value, bool)> {
     match value {
