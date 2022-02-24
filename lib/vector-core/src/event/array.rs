@@ -219,6 +219,7 @@ impl EventDataEq for EventArray {
         match (self, other) {
             (Self::Logs(a), Self::Logs(b)) => a.event_data_eq(b),
             (Self::Metrics(a), Self::Metrics(b)) => a.event_data_eq(b),
+            (Self::Traces(a), Self::Traces(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
