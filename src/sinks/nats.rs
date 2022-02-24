@@ -86,15 +86,15 @@ impl SinkConfig for NatsSinkConfig {
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
+    fn to_nats_options(&self) -> nats::asynk::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
+    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
         self.to_nats_options()
             .connect(&self.url)
             .map_err(|e| e.into())
@@ -135,9 +135,9 @@ impl NatsSink {
     }
 }
 
-impl From<NatsOptions> for async_nats::Options {
+impl From<NatsOptions> for nats::asynk::Options {
     fn from(options: NatsOptions) -> Self {
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&options.connection_name)
             .reconnect_buffer_size(0)
     }
@@ -154,7 +154,7 @@ impl From<&NatsSinkConfig> for NatsOptions {
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.into();
+        let nats_options: nats::asynk::Options = self.options.into();
 
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
