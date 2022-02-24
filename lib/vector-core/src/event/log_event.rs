@@ -103,7 +103,7 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.as_map(), key.as_ref())
+        self.fields.get2(key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]

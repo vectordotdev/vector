@@ -1,6 +1,5 @@
 mod all_fields;
 mod contains;
-mod get;
 mod get_mut;
 mod insert;
 mod keys;
@@ -9,7 +8,6 @@ mod remove;
 
 pub use all_fields::all_fields;
 pub use contains::contains;
-pub use get::{get, get_value, get_value2};
 pub use get_mut::get_mut;
 pub use insert::{insert, insert_path};
 pub use keys::keys;

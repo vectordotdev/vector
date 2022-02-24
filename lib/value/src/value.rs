@@ -27,6 +27,7 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use error::ValueError;
+use lookup::lookup2::{BorrowedSegment, Path};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
 use std::result::Result as StdResult;
@@ -765,6 +766,32 @@ impl Value {
             ) => {
                 trace!("Mismatched primitive field while trying to use segment.");
                 Ok(None)
+            }
+        }
+    }
+
+    /// Returns a reference to a field value specified by a path iter.
+    pub fn get2<'a>(&self, path: impl Path<'a>) -> Option<&Value> {
+        let mut value = self;
+        let mut path_iter = path.segment_iter();
+        loop {
+            match (path_iter.next(), value) {
+                (None, _) => return Some(value),
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get(key) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
+                },
+                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
+                    match array.get(index as usize) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                _ => return None,
             }
         }
     }

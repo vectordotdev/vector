@@ -23,7 +23,6 @@ pub trait Path<'a> {
     fn segment_iter(&self) -> Self::Iter;
 }
 
-// TODO: can probably just implement this for &str
 impl<'a> Path<'a> for JitPath<'a> {
     type Iter = JitLookup<'a>;
 
@@ -43,6 +42,14 @@ impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
         self.as_slice().iter().cloned()
         // unimplemented!()
         // self.iter().cloned()
+    }
+}
+
+impl<'a> Path<'a> for &'a str {
+    type Iter = JitLookup<'a>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        JitPath::new(self).segment_iter()
     }
 }
 
