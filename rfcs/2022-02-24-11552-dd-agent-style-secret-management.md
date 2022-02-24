@@ -43,13 +43,13 @@ N/A
 - A convenient syntax for config option to indicate Vector that a secret should be retrieved for this option (Subject to
   be changed but the Datadog Agent uses `ENC[secret_key]`)
 
-New top level options to be added: 
+New top level options to be added:
 ```
 [secret_backend]
 path = "/path/to/the/command"
 argument = "--config foo=bar"
-timeout = 5 
-``` 
+timeout = 5
+```
 
 ### Implementation
 
@@ -57,7 +57,7 @@ A secret backend that would lie in `./src/config/secret.rs` and would call the u
 cache secrets to avoid calling the backend for the same key multiple time. It would read the configuration file once to
 get its config before further processing, ideally env var interpolating should be supported (this should not be a
 problem). In `./src/config/builder.rs`, `load_builder_from_paths` will still be returning a complete configuration with
-placeholders replaced by secrets. 
+placeholders replaced by secrets.
 
 The `ConfigBuilder` struct will get a new `secret_backend` field (type to something like `SecretBackend`), this means
 that `load_builder_from_paths` will then assert if this field is present before returning to the caller, and if it, the
@@ -71,7 +71,7 @@ secret provider that may see other implementation like: `executable` (the one do
 
 ## Rationale
 
-- Some users just can't put sensitive information inside their configuration. 
+- Some users just can't put sensitive information inside their configuration.
 
 ## Drawbacks
 
@@ -92,7 +92,7 @@ secret provider that may see other implementation like: `executable` (the one do
   secret][k8s-env-var-from-secrets] as environment variables, still this would be a good idea to document that as this is a convenient solution avoiding the need to inject a custom binary inside container images. Note that the Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
 
 Note: doing nothing is not really an alternative here, as plain text secret in config is a strong blocker for some
-users. 
+users.
 
 ## Outstanding Questions
 
