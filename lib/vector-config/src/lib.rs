@@ -1,4 +1,4 @@
-use std::{time::Duration, stream::Stream};
+use std::{time::Duration, stream::Stream, collections::HashMap};
 
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
@@ -10,63 +10,83 @@ use serde_json::Value;
 /// types, such as integers and strings and so on, while providing escape hatches for customized
 /// types that may be encoded and decoded via "normal" types but otherwise have specific rules or
 /// requirements.
+/// 
+/// Additionally, the shape of a field can encode some basic properties about the field to which it
+/// is attached.  For example, numbers can be bounded on or the lower or upper end, while strings
+/// could define a minimum length, or even an allowed pattern via regular expressions.
+/// 
+/// In this way, they describe a more complete shape of the field than simply the data type alone.
 pub enum Shape {
     Boolean,
-    String,
-    Number,
-    Array,
-    Map,
+    String(StringShape),
+    Number(NumberShape),
+    Array(ArrayShape),
+    Map(MapShape),
+    Composite(Vec<Shape>),
 }
 
-pub enum Bounded {
+pub struct StringShape {
+    minimum_length: Option<usize>,
+    maximum_length: Option<usize>,
+    allowed_pattern: Option<&'static str>,
+}
+
+pub enum NumberShape {
     Unsigned {
         theoretical_upper_bound: u128,
 	    effective_lower_bound: u128,
 	    effective_upper_bound: u128,
+    },
+    Signed {
+        theoretical_upper_bound: i128,
+	    effective_lower_bound: i128,
+	    effective_upper_bound: i128,
+    },
+    FloatingPoint {
+        theoretical_upper_bound: f64,
+	    effective_lower_bound: f64,
+	    effective_upper_bound: f64,
     }
 }
 
-pub enum TypedMetadata<T: Clone> {
-    DefaultValue(T),
-    Bounded(Bounded),
+pub struct ArrayShape {
+    element_shape: Shape,
+    minimum_length: Option<usize>,
+    maximum_length: Option<usize>,
 }
 
-pub enum Metadata {
-    DefaultValue(Value),
-    Bounded(Bounded),
+pub enum MapShape {
+    Fixed(HashMap<String, Shape>),
+    Dynamic(Shape),
 }
 
 pub struct Field {
     name: &'static str,
     description: &'static str,
     shape: Shape,
-    metadata: Vec<Metadata>,
     fields: Vec<Field>,
+    metadata: HashMap<String, String>,
+    default: Option<Value>,
 }
 
 impl Field {
-    fn new<T: Configurable + Clone>(
+    fn new<'de, T: Configurable<'de> + Clone>(
         name: &'static str,
         description: &'static str,
         shape: Shape,
-        metadata: Option<Vec<TypedMetadata<T>>>,
     ) -> Self {
-        let (metadata, fields) = match shape {
-            Shape::Boolean | Shape::Number | Shape::String | Shape::Array => (vec![], vec![]),
-            Shape::Map => (vec![], vec![]),
-        };
-
         Self {
             name,
             description,
             shape,
-            metadata,
-            fields,
+            fields: Vec::new(),
+            metadata: HashMap::new(),
+            default: None,
         }
     }
 }
 
-pub trait Configurable: Sized 
+pub trait Configurable<'de>: Serialize + Deserialize<'de> + Sized 
 where
     Self: Clone,
 {
@@ -81,10 +101,10 @@ where
     fn shape() -> Shape;
 
     /// Gets the metadata for this value.
-    fn metadata() -> Option<Vec<TypedMetadata<Self>>>;
+    fn metadata() -> Option<HashMap<String, String>>;
 
 	/// The fields for this value, if any.
-    fn fields(overrides: Option<Vec<TypedMetadata<Self>>>) -> Option<Vec<Field>>;
+    fn fields() -> Option<Vec<Field>>;
 }
 #[derive(Serialize, Deserialize, Clone)]
 struct SinkConfig {
@@ -93,7 +113,7 @@ struct SinkConfig {
     batch: BatchConfig,
 }
 
-impl Configurable for SinkConfig {
+impl<'de> Configurable<'de> for SinkConfig {
     fn description() -> Option<&'static str> {
         Some("config for the XYZ sink")
     }
@@ -101,6 +121,9 @@ impl Configurable for SinkConfig {
     fn shape() -> Shape {
         Shape::Map
     }
+
+    // TODO: bring back typedmetadata, i think it's a much cleaner solution to shoving in generic
+    // typed data that we need for field generation and generic metadata K/V pairs
 
     fn metadata() -> Option<Vec<TypedMetadata<Self>>> {
         Some(vec![
