@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
@@ -7,6 +8,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
+use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -43,6 +45,49 @@ pub struct RemapConfig {
     pub use_vm: bool,
 }
 
+impl RemapConfig {
+    fn compile_vrl_program(
+        &self,
+        enrichment_tables: enrichment::TableRegistry,
+        merged_schema_definition: schema::Definition,
+    ) -> Result<(
+        vrl::Program,
+        Vec<Box<dyn vrl::Function>>,
+        vrl::state::Compiler,
+    )> {
+        let source = match (&self.source, &self.file) {
+            (Some(source), None) => source.to_owned(),
+            (None, Some(path)) => {
+                let mut buffer = String::new();
+
+                File::open(path)
+                    .with_context(|_| FileOpenFailedSnafu { path })?
+                    .read_to_string(&mut buffer)
+                    .with_context(|_| FileReadFailedSnafu { path })?;
+
+                buffer
+            }
+            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
+        };
+
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
+
+        let mut state = vrl::state::Compiler::new_with_kind(merged_schema_definition.into());
+        state.set_external_context(Some(Box::new(enrichment_tables)));
+
+        vrl::compile_with_state(&source, &functions, &mut state)
+            .map_err(|diagnostics| {
+                Formatter::new(&source, diagnostics)
+                    .colored()
+                    .to_string()
+                    .into()
+            })
+            .map(|program| (program, functions, state))
+    }
+}
+
 inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
@@ -61,14 +106,47 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        // We need to compile the VRL program in order to know the schema definition output of this
+        // transform. We ignore any compilation errors, as those are caught by the transform build
+        // step.
+        //
+        // TODO: Keep track of semantic meaning for fields.
+        let default_definition = self
+            .compile_vrl_program(
+                enrichment::TableRegistry::default(),
+                merged_definition.clone(),
+            )
+            .ok()
+            .and_then(|(_, _, state)| state.target_kind().cloned())
+            .and_then(Kind::into_object)
+            .map(Into::into)
+            .unwrap_or_else(schema::Definition::empty);
+
+        // When a message is dropped and re-routed, we keep the original event, but also annotate
+        // it with additional metadata.
+        let dropped_definition = merged_definition.clone().required_field(
+            log_schema().metadata_key(),
+            Kind::object(BTreeMap::from([
+                ("reason".into(), Kind::bytes()),
+                ("message".into(), Kind::bytes()),
+                ("component_id".into(), Kind::bytes()),
+                ("component_type".into(), Kind::bytes()),
+                ("component_kind".into(), Kind::bytes()),
+            ])),
+            Some("metadata"),
+        );
+
+        let default_output =
+            Output::default(DataType::all()).with_schema_definition(default_definition);
+
         if self.reroute_dropped {
             vec![
-                Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                default_output,
+                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
             ]
         } else {
-            vec![Output::default(DataType::all())]
+            vec![default_output]
         }
     }
 
@@ -97,31 +175,11 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let source = match (&config.source, &config.file) {
-            (Some(source), None) => source.to_owned(),
-            (None, Some(path)) => {
-                let mut buffer = String::new();
-
-                File::open(path)
-                    .with_context(|_| FileOpenFailedSnafu { path })?
-                    .read_to_string(&mut buffer)
-                    .with_context(|_| FileReadFailedSnafu { path })?;
-
-                buffer
-            }
-            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
-        };
-
-        let mut functions = vrl_stdlib::all();
-        functions.append(&mut enrichment::vrl_functions());
-        functions.append(&mut vector_vrl_functions::vrl_functions());
-
-        let program = vrl::compile(
-            &source,
-            &functions,
-            Some(Box::new(context.enrichment_tables.clone())),
-        )
-        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
+        let (program, functions, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
 
         let runtime = Runtime::default();
 
@@ -335,6 +393,7 @@ mod tests {
             metric::{MetricKind, MetricValue},
             LogEvent, Metric, Value,
         },
+        schema,
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         transforms::OutputBuffer,
     };
@@ -731,7 +790,7 @@ mod tests {
                 }} else {{
                     # logs
                     .foo = "bar"
-                    if string!(.hello) == "goodbye" {{
+                    if string(.hello) == "goodbye" {{
                       abort
                     }}
                 }}
@@ -748,6 +807,11 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_ids,
+            merged_schema_definition: schema::Definition::empty().required_field(
+                "hello",
+                Kind::bytes(),
+                None,
+            ),
             ..Default::default()
         };
         let mut tform = Remap::new(conf, &context).unwrap();
@@ -786,7 +850,7 @@ mod tests {
             serde_json::json!({
                 "dropped": {
                     "reason": "error",
-                    "message": "function call error for \"string\" at (160:175): expected string, got integer",
+                    "message": "function call error for \"string\" at (160:174): expected string, got integer",
                     "component_id": "remapper",
                     "component_type": "remap",
                     "component_kind": "transform",
@@ -989,7 +1053,18 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(vec![Output::default(DataType::all())], conf.outputs());
+        let schema_definition = schema::Definition::empty()
+            .required_field("foo", Kind::bytes(), None)
+            .required_field(
+                "tags",
+                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                None,
+            );
+
+        assert_eq!(
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
+            conf.outputs(&schema::Definition::empty()),
+        );
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),

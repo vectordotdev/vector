@@ -9,6 +9,7 @@ use crate::{
     },
     event::Event,
     internal_events::FilterEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -51,7 +52,7 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
