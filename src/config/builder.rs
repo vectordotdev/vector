@@ -11,7 +11,7 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
     HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
     TransformOuter,
 };
@@ -24,6 +24,8 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[serde(default)]
+    pub schema: schema::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
     pub datadog: Option<datadog::Options>,
@@ -75,6 +77,7 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             healthchecks,
@@ -103,6 +106,7 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api,
             #[cfg(feature = "datadog-pipelines")]
+            schema,
             datadog,
             healthchecks,
             enrichment_tables,
