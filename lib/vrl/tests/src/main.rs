@@ -12,6 +12,7 @@ use clap::Parser;
 use glob::glob;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
+use vrl::VrlRuntime;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 use vrl_tests::{docs, Test};
 
@@ -43,8 +44,8 @@ pub struct Cmd {
     timezone: Option<String>,
 
     /// Should we use the VM to evaluate the VRL
-    #[clap(short, long = "use_vm")]
-    use_vm: bool,
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
 }
 
 impl Cmd {
@@ -154,7 +155,14 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = run_vrl(runtime, functions, program, &mut test, timezone, cmd.use_vm);
+                let result = run_vrl(
+                    runtime,
+                    functions,
+                    program,
+                    &mut test,
+                    timezone,
+                    cmd.runtime,
+                );
 
                 match result {
                     Ok(got) => {
@@ -318,13 +326,14 @@ fn run_vrl(
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,
-    use_vm: bool,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, Terminate> {
-    if use_vm {
-        let vm = runtime.compile(functions, &program).unwrap();
-        runtime.run_vm(&vm, &mut test.object, &timezone)
-    } else {
-        runtime.resolve(&mut test.object, &program, &timezone)
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime.compile(functions, &program).unwrap();
+            runtime.run_vm(&vm, &mut test.object, &timezone)
+        }
+        VrlRuntime::Ast => runtime.resolve(&mut test.object, &program, &timezone),
     }
 }
 

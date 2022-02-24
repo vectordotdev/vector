@@ -13,7 +13,7 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value, VrlRuntime};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -41,7 +41,7 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, use_vm: bool) {
+pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -106,7 +106,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, use_vm: bool) {
                     command,
                     &mut compiler_state,
                     timezone,
-                    use_vm,
+                    vrl_runtime,
                 );
 
                 let string = match result {
@@ -138,7 +138,7 @@ fn resolve(
     program: &str,
     state: &mut state::Compiler,
     timezone: &TimeZone,
-    use_vm: bool,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
     let mut empty = value!({});
     let object = match object {
@@ -151,7 +151,7 @@ fn resolve(
         Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
     };
 
-    execute(runtime, program, object, timezone, use_vm)
+    execute(runtime, program, object, timezone, vrl_runtime)
 }
 
 fn execute(
@@ -159,17 +159,18 @@ fn execute(
     program: vrl::Program,
     object: &mut dyn Target,
     timezone: &TimeZone,
-    use_vm: bool,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
-    if use_vm {
-        let vm = runtime.compile(stdlib::all(), &program)?;
-        runtime
-            .run_vm(&vm, object, timezone)
-            .map_err(|err| err.to_string())
-    } else {
-        runtime
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime.compile(stdlib::all(), &program)?;
+            runtime
+                .run_vm(&vm, object, timezone)
+                .map_err(|err| err.to_string())
+        }
+        VrlRuntime::Ast => runtime
             .resolve(object, &program, timezone)
-            .map_err(|err| err.to_string())
+            .map_err(|err| err.to_string()),
     }
 }
 
@@ -280,7 +281,7 @@ impl Validator for Repl {
             ctx.input(),
             &mut compiler_state,
             &timezone,
-            false,
+            VrlRuntime::Ast,
         ) {
             Err(error) => {
                 // TODO: Ideally we'd used typed errors for this, but

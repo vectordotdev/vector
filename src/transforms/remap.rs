@@ -13,7 +13,7 @@ use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
-    Program, Runtime, Terminate, Vm,
+    Program, Runtime, Terminate, Vm, VrlRuntime,
 };
 
 use crate::{
@@ -42,7 +42,8 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
-    pub use_vm: bool,
+    #[serde(default)]
+    pub runtime: VrlRuntime,
 }
 
 impl RemapConfig {
@@ -183,10 +184,9 @@ impl Remap {
 
         let runtime = Runtime::default();
 
-        let vm = if config.use_vm {
-            Some(Arc::new(runtime.compile(functions, &program)?))
-        } else {
-            None
+        let vm = match config.runtime {
+            VrlRuntime::Vm => Some(Arc::new(runtime.compile(functions, &program)?)),
+            VrlRuntime::Ast => None,
         };
 
         let default_schema_id = *context

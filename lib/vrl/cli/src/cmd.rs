@@ -8,7 +8,7 @@ use std::{
 
 use clap::Parser;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value, VrlRuntime};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -40,8 +40,8 @@ pub struct Opts {
     timezone: Option<String>,
 
     /// Should we use the VM to evaluate the VRL
-    #[clap(short, long = "use_vm")]
-    use_vm: bool,
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
 }
 
 impl Opts {
@@ -109,7 +109,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             default_objects()
         };
 
-        repl(repl_objects, &tz, opts.use_vm)
+        repl(repl_objects, &tz, opts.runtime)
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
@@ -126,7 +126,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 &tz,
                 runtime,
                 stdlib::all(),
-                opts.use_vm,
+                opts.runtime,
             )
             .map(|v| {
                 if opts.print_object {
@@ -149,8 +149,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
 }
 
 #[cfg(feature = "repl")]
-fn repl(objects: Vec<Value>, timezone: &TimeZone, use_vm: bool) -> Result<(), Error> {
-    repl::run(objects, timezone, use_vm);
+fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
+    repl::run(objects, timezone, vrl_runtime);
     Ok(())
 }
 
@@ -165,17 +165,18 @@ fn execute(
     timezone: &TimeZone,
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
-    use_vm: bool,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, Error> {
-    if dbg!(use_vm) {
-        let vm = runtime.compile(functions, program).unwrap();
-        runtime
-            .run_vm(&vm, object, timezone)
-            .map_err(Error::Runtime)
-    } else {
-        runtime
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime.compile(functions, program).unwrap();
+            runtime
+                .run_vm(&vm, object, timezone)
+                .map_err(Error::Runtime)
+        }
+        VrlRuntime::Ast => runtime
             .resolve(object, program, timezone)
-            .map_err(Error::Runtime)
+            .map_err(Error::Runtime),
     }
 }
 

@@ -21,7 +21,7 @@ lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
 regex = "1"
-serde = "1"
+serde = { version = "1", default-features = false, features = ["derive"] }
 thiserror = "1"
 tracing = "0.1"
 serde_json = { version = "1", default-features = false, features = ["std"] }
