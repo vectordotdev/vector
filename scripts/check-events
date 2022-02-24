@@ -124,12 +124,16 @@ error_count = 0
 
 # Scan sources and build internal structures
 Find.find('.') do |path|
+  if path.start_with? './'
+    path = path[2..]
+  end
+
   if path.end_with? '.rs'
     text = File.read(path)
 
     # Check log message texts for correct formatting. See below for the
     # full regex
-    if (path.start_with? 'src/')
+    if path.start_with? 'src/'
       text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) do
         |type, has_message_prefix, message|
         reports = []
@@ -143,7 +147,7 @@ Find.find('.') do |path|
       end
     end
 
-    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match?(/## skip check-events ##/i)
+    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match? /## skip check-events ##/i
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
