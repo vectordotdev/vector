@@ -107,11 +107,17 @@ pub struct FunctionCompileContext {
 }
 
 impl FunctionCompileContext {
-    pub fn new(span: Span, external_context: AnyMap) -> Self {
+    pub fn new(span: Span) -> Self {
         Self {
             span,
-            external_context,
+            external_context: AnyMap::new(),
         }
+    }
+
+    /// Add an external context to the compile context.
+    pub fn with_external_context(mut self, context: AnyMap) -> Self {
+        self.external_context = context;
+        self
     }
 
     /// Span information for the function call.
