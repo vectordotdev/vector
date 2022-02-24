@@ -36,12 +36,18 @@ impl RequestBuilderError {
     /// dropped as a result.
     pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
         match self {
-            Self::FailedToBuild { error_type } => ("Failed to build the request builder.", error_type, 0),
+            Self::FailedToBuild { error_type } => {
+                ("Failed to build the request builder.", error_type, 0)
+            }
             Self::FailedToEncode {
                 reason,
                 dropped_events,
             } => ("Encoding of a metric failed.", reason, dropped_events),
-            Self::FailedToSplit { dropped_events } => ("A split payload was still too big to encode/compress withing size limits.", "split_failed", dropped_events),
+            Self::FailedToSplit { dropped_events } => (
+                "A split payload was still too big to encode/compress withing size limits.",
+                "split_failed",
+                dropped_events,
+            ),
             Self::Unexpected {
                 error_type,
                 dropped_events,
