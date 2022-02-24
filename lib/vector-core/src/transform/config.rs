@@ -37,6 +37,13 @@ pub struct TransformContext {
     /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
     pub schema_ids: HashMap<Option<String>, schema::Id>,
+
+    /// The schema definition created by merging all inputs of the transform.
+    ///
+    /// This information can be used by transforms that behave differently based on schema
+    /// information, such as the `remap` transform, which passes this information along to the VRL
+    /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
+    pub merged_schema_definition: schema::Definition,
 }
 
 impl Default for TransformContext {
@@ -47,6 +54,7 @@ impl Default for TransformContext {
             #[cfg(feature = "vrl")]
             enrichment_tables: Default::default(),
             schema_ids: HashMap::from([(None, schema::Id::empty())]),
+            merged_schema_definition: schema::Definition::empty(),
         }
     }
 }

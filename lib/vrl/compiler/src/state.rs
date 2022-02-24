@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap};
 
 use value::Kind;
 
-use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
+use crate::{expression::assignment, parser::ast::Ident, Value};
 
 /// The state held by the compiler.
 ///
@@ -41,11 +41,11 @@ impl Compiler {
         Default::default()
     }
 
-    /// Creates a new compiler that starts with an initial given typedef.
-    pub fn new_with_type_def(type_def: TypeDef) -> Self {
+    /// Creates a new compiler that starts with an initial given [`Kind`].
+    pub fn new_with_kind(kind: Kind) -> Self {
         Self {
             target: Some(assignment::Details {
-                type_def,
+                type_def: kind.into(),
                 value: None,
             }),
             ..Default::default()
