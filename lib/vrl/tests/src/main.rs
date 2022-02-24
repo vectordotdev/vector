@@ -41,6 +41,10 @@ pub struct Cmd {
 
     #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "use_vm")]
+    use_vm: bool,
 }
 
 impl Cmd {
@@ -150,7 +154,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = run_vrl(runtime, functions, program, &mut test, timezone);
+                let result = run_vrl(runtime, functions, program, &mut test, timezone, cmd.use_vm);
 
                 match result {
                     Ok(got) => {
@@ -308,27 +312,20 @@ fn main() {
     print_result(failed_count)
 }
 
-#[cfg(feature = "vrl-vm")]
 fn run_vrl(
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,
+    use_vm: bool,
 ) -> Result<Value, Terminate> {
-    let vm = runtime.compile(functions, &program).unwrap();
-    runtime.run_vm(&vm, &mut test.object, &timezone)
-}
-
-#[cfg(not(feature = "vrl-vm"))]
-fn run_vrl(
-    mut runtime: Runtime,
-    _functions: Vec<Box<dyn vrl::Function>>,
-    program: vrl::Program,
-    test: &mut Test,
-    timezone: TimeZone,
-) -> Result<Value, Terminate> {
-    runtime.resolve(&mut test.object, &program, &timezone)
+    if use_vm {
+        let vm = runtime.compile(functions, &program).unwrap();
+        runtime.run_vm(&vm, &mut test.object, &timezone)
+    } else {
+        runtime.resolve(&mut test.object, &program, &timezone)
+    }
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {

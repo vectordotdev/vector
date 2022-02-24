@@ -6,17 +6,13 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::sync::Arc;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
-    Program, Runtime, Terminate,
+    Program, Runtime, Terminate, Vm,
 };
-
-#[cfg(feature = "vrl-vm")]
-use std::sync::Arc;
-#[cfg(feature = "vrl-vm")]
-use vrl::Vm;
 
 use crate::{
     config::{
@@ -44,6 +40,7 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
+    pub use_vm: bool,
 }
 
 inventory::submit! {
@@ -89,9 +86,7 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
-
-    #[cfg(feature = "vrl-vm")]
-    vm: Arc<Vm>,
+    vm: Option<Arc<Vm>>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -130,8 +125,11 @@ impl Remap {
 
         let runtime = Runtime::default();
 
-        #[cfg(feature = "vrl-vm")]
-        let vm = Arc::new(runtime.compile(functions, &program)?);
+        let vm = if config.use_vm {
+            Some(Arc::new(runtime.compile(functions, &program)?))
+        } else {
+            None
+        };
 
         let default_schema_id = *context
             .schema_ids
@@ -152,7 +150,6 @@ impl Remap {
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            #[cfg(feature = "vrl-vm")]
             vm,
             default_schema_id,
             dropped_schema_id,
@@ -203,16 +200,15 @@ impl Remap {
         }
     }
 
-    #[cfg(feature = "vrl-vm")]
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
-        self.runtime.run_vm(&self.vm, target, &self.timezone)
-    }
-
-    #[cfg(not(feature = "vrl-vm"))]
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
-        let result = self.runtime.resolve(target, &self.program, &self.timezone);
-        self.runtime.clear();
-        result
+        match &self.vm {
+            Some(vm) => self.runtime.run_vm(&vm, target, &self.timezone),
+            None => {
+                let result = self.runtime.resolve(target, &self.program, &self.timezone);
+                self.runtime.clear();
+                result
+            }
+        }
     }
 }
 
@@ -226,8 +222,7 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
-            #[cfg(feature = "vrl-vm")]
-            vm: Arc::clone(&self.vm),
+            vm: self.vm.clone(),
             default_schema_id: self.default_schema_id,
             dropped_schema_id: self.dropped_schema_id,
         }

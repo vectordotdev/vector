@@ -38,6 +38,10 @@ pub struct Opts {
     /// The timezone used to parse dates.
     #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "use_vm")]
+    use_vm: bool,
 }
 
 impl Opts {
@@ -105,7 +109,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             default_objects()
         };
 
-        repl(repl_objects, &tz)
+        repl(repl_objects, &tz, opts.use_vm)
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
@@ -116,7 +120,15 @@ fn run(opts: &Opts) -> Result<(), Error> {
         for mut object in objects {
             let state = state::Runtime::default();
             let runtime = Runtime::new(state);
-            let result = execute(&mut object, &program, &tz, runtime, stdlib::all()).map(|v| {
+            let result = execute(
+                &mut object,
+                &program,
+                &tz,
+                runtime,
+                stdlib::all(),
+                opts.use_vm,
+            )
+            .map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -137,8 +149,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
 }
 
 #[cfg(feature = "repl")]
-fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
-    repl::run(objects, timezone);
+fn repl(objects: Vec<Value>, timezone: &TimeZone, use_vm: bool) -> Result<(), Error> {
+    repl::run(objects, timezone, use_vm);
     Ok(())
 }
 
@@ -147,31 +159,24 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
-#[cfg(not(feature = "vrl-vm"))]
-fn execute(
-    object: &mut impl Target,
-    program: &Program,
-    timezone: &TimeZone,
-    mut runtime: Runtime,
-    _functions: Vec<Box<dyn vrl::Function>>,
-) -> Result<Value, Error> {
-    runtime
-        .resolve(object, program, timezone)
-        .map_err(Error::Runtime)
-}
-
-#[cfg(feature = "vrl-vm")]
 fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
+    use_vm: bool,
 ) -> Result<Value, Error> {
-    let vm = runtime.compile(functions, program).unwrap();
-    runtime
-        .run_vm(&vm, object, timezone)
-        .map_err(Error::Runtime)
+    if dbg!(use_vm) {
+        let vm = runtime.compile(functions, program).unwrap();
+        runtime
+            .run_vm(&vm, object, timezone)
+            .map_err(Error::Runtime)
+    } else {
+        runtime
+            .resolve(object, program, timezone)
+            .map_err(Error::Runtime)
+    }
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {
