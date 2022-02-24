@@ -57,6 +57,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
+            // removing to_string() causes an issue with lifetimes
+            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
