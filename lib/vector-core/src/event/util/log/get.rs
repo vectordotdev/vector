@@ -1,3 +1,4 @@
+use lookup::lookup2::{BorrowedSegment, Path};
 use std::collections::BTreeMap;
 
 use super::{PathComponent, PathIter, Value};
@@ -38,6 +39,37 @@ where
             _ => return None,
         }
     }
+}
+
+/// Returns a reference to a field value specified by a path iter.
+pub fn get_value2<'a>(mut value: &Value, path: impl Path<'a>) -> Option<&Value> {
+    let mut path_iter = path.segment_iter();
+    loop {
+        match (path_iter.next(), value) {
+            (None, _) => return Some(value),
+            (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get(key) {
+                None => return None,
+                Some(nested_value) => {
+                    value = nested_value;
+                }
+            },
+            (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
+                match array.get(index as usize) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
+                }
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn get_value2_inner<'a>(
+    mut value: &Value,
+    mut path_iter: impl Iterator<Item = BorrowedSegment<'a>>,
+) -> Option<&Value> {
 }
 
 #[cfg(test)]

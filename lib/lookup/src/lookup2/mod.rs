@@ -2,6 +2,8 @@
 //     segments: Vec<OwnedSegment>,
 // }
 
+use std::iter::Cloned;
+use std::slice::Iter;
 use std::str::CharIndices;
 
 pub struct JitPath<'a> {
@@ -14,16 +16,33 @@ impl JitPath<'_> {
     }
 }
 
+/// A path is simply the data describing how to look up a value
+pub trait Path<'a> {
+    type Iter: Iterator<Item = BorrowedSegment<'a>>;
+
+    fn segment_iter(&self) -> Self::Iter;
+}
+
 // TODO: can probably just implement this for &str
 impl<'a> Path<'a> for JitPath<'a> {
     type Iter = JitLookup<'a>;
 
-    fn iter(&self) -> Self::Iter {
+    fn segment_iter(&self) -> Self::Iter {
         JitLookup {
             path: &self.path,
             chars: self.path.char_indices(),
             state: JitState::Start,
         }
+    }
+}
+
+impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.as_slice().iter().cloned()
+        // unimplemented!()
+        // self.iter().cloned()
     }
 }
 
@@ -155,13 +174,6 @@ impl<'a> Iterator for JitLookup<'a> {
     }
 }
 
-/// A path is simply the data describing how to look up a value
-pub trait Path<'a> {
-    type Iter: Iterator<Item = BorrowedSegment<'a>>;
-
-    fn iter(&self) -> Self::Iter;
-}
-
 // /// This tracks the current position in a path during a lookup. This should
 // /// be very cheap to create and update. This is essentially an iterator over `BorrowedSegment`.
 // pub trait Lookup2 {
@@ -188,7 +200,7 @@ pub trait Path<'a> {
 //     Index(isize),
 // }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BorrowedSegment<'a> {
     Field(&'a str),
     Index(isize),
@@ -264,7 +276,7 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let segments: Vec<_> = JitPath::new(path).iter().collect();
+            let segments: Vec<_> = JitPath::new(path).segment_iter().collect();
             assert_eq!(segments, expected)
         }
     }
