@@ -284,6 +284,7 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
             schema_ids,
+            merged_schema_definition: merged_definition.clone(),
         };
 
         let node = TransformNode {

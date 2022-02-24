@@ -510,7 +510,7 @@ mod tests {
             ),
         ];
 
-        let compiler = state::Compiler::new_with_type_def(TypeDef::object(btreemap! {
+        let compiler = state::Compiler::new_with_kind(Kind::object(btreemap! {
             "hostname" => Kind::bytes(),
             "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
                 Field::from("message") => Kind::bytes(),
