@@ -8,8 +8,8 @@ use std::str::FromStr;
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
+use clap::Parser;
 use glob::glob;
-use structopt::StructOpt;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
@@ -19,27 +19,27 @@ use vrl_tests::{docs, Test};
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
+#[derive(Parser, Debug)]
+#[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pattern: Option<String>,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     fail_early: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     verbose: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     no_diff: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     logging: bool,
 
-    #[structopt(short = "tz", long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
 }
 
@@ -68,7 +68,7 @@ fn should_run(name: &str, pat: &Option<String>) -> bool {
 }
 
 fn main() {
-    let cmd = Cmd::from_args();
+    let cmd = Cmd::parse();
 
     if cmd.logging {
         tracing_subscriber::fmt::init();
