@@ -106,7 +106,7 @@ using `--interval` and the maximum number of events to sample per interval with
 `--limit`.
 
 Try running `vector tap --quiet --format logfmt`. You'll now see no
-notifications and logfmt events.
+notifications and events encoded as logfmt.
 
 ```console
 ...
@@ -193,25 +193,29 @@ type = "blackhole"
 inputs = ["picky.dropped"]
 ```
 
-Running this configuration, we want to see our favorite ice cream flavors appear
-in `stdout`. Strangely, we see nothing. It doesn't look like events are ever
-reaching their destination. We can verify this by examing the inputs of the
-`store` sink with `vector tap --inputs-of "store"`: indeed, no events appear.
+Running this configuration, we expect to see our favorite ice cream logs appear
+in `stdout`. Unfortunately, we see nothing at all. The desired events don't look
+like they're ever reaching their destination.
 
-Are events flowing out of our transform at all? `vector tap --outputs-of
-"picky"` shows that they're not. Are all the events being dropped instead? A
-quick glance with `vector tap --outputs-of "picky.dropped"` confirms that
-suspicion: our logs are being dropped. On closer examination, it's clear that
-our events don't have the shape we expected.
+We can verify this by examing the inputs of the `store` sink with `vector tap
+--inputs-of "store"`: indeed, no events appear. We can also narrow in and
+inspect the output of relevant upstream components like our `remap` transform.
+`vector tap --outputs-of "picky"` (which, in this case, is effectively the same
+as inspecting the inputs of `store`) shows that events are not flowing.
+
+Are all the events being dropped instead? A quick glance with `vector tap
+--outputs-of "picky.dropped"` confirms that suspicion as `tap` starts displaying
+a stream of all our dropped logs. On closer examination, it's clear that our
+events don't have the shape we expected.
 
 ```jsonc
 {"message":"{ \"type\": \"icecream\", \"flavor\": \"strawberry\" } }
 ```
 
 There's no `.flavor` field for our conditional to run on. Instead, the entire
-payload is included in the default `message` field. Right, we forgot to
-correctly parse the output from our source into JSON. We need to add the
-following line into our VRL source code:
+payload from our source has been included in the default `message` field. Right,
+we forgot to parse the payload into JSON. We need to add the following line in
+our VRL source code:
 
 ```coffeescript
 . = parse_json!(.message)
