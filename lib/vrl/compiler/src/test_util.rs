@@ -125,9 +125,7 @@ macro_rules! __prep_bench_or_test {
         (
             $func.compile(
                 &$state,
-                &mut $crate::function::FunctionCompileContext {
-                    span: vrl::diagnostic::Span::new(0, 0),
-                },
+                &mut $crate::function::FunctionCompileContext::new(span: vrl::diagnostic::Span::new(0, 0)),
                 $args.into(),
             ),
             $want,

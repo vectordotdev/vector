@@ -15,6 +15,10 @@ use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
 pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
+// The implementation of `LimitedSender` uses a holding slot in order to accept an item before
+// trying to drive the send of the item, so we have to account for that here.
+pub const EXTRA_LIMITED_QUEUE_SEND_SLOT: usize = 1;
+
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
 #[tokio::test]
@@ -25,6 +29,7 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -63,6 +68,7 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -110,6 +116,7 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -162,6 +169,7 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 

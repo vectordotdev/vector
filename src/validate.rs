@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
+use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
-use structopt::StructOpt;
 
 use crate::{
     config::{self, Config, ConfigDiff},
@@ -11,42 +11,42 @@ use crate::{
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
-    #[structopt(long)]
+    #[clap(long)]
     no_environment: bool,
 
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     deny_warnings: bool,
 
     /// Vector config files in TOML format to validate.
-    #[structopt(
+    #[clap(
         name = "config-toml",
         long,
         env = "VECTOR_CONFIG_TOML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to validate.
-    #[structopt(
+    #[clap(
         name = "config-json",
         long,
         env = "VECTOR_CONFIG_JSON",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to validate.
-    #[structopt(
+    #[clap(
         name = "config-yaml",
         long,
         env = "VECTOR_CONFIG_YAML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     paths_yaml: Vec<PathBuf>,
 
@@ -54,19 +54,19 @@ pub struct Opts {
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
     /// will be targeted.
-    #[structopt(env = "VECTOR_CONFIG", use_delimiter(true))]
+    #[clap(env = "VECTOR_CONFIG", use_value_delimiter(true))]
     paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 }

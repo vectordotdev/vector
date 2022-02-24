@@ -6,6 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+core = { package = "vrl-core", path = "../core" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
