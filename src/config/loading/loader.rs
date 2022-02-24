@@ -258,11 +258,8 @@ where
             if path.exists() && path.is_dir() {
                 // Transforms are treated differently from other component types; they can be
                 // arbitrarily nested.
-                let (table, warns) = if matches!(hint, ComponentHint::Transform) {
-                    self.load_dir(&path, true)?
-                } else {
-                    self.load_dir(&path, false)?
-                };
+                let (table, warns) =
+                    self.load_dir(&path, matches!(hint, ComponentHint::Transform))?;
 
                 self.merge(table, Some(hint))?;
 
