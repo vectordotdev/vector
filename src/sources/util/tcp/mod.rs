@@ -153,10 +153,7 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            // TODO: REVERT THIS - THIS IS FOR TESTING ONLY
-            // let max_requests = num_cpus::get();
-            let max_requests = 1;
-            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, max_requests);
+            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
 
             listener
                 .accept_stream_limited(max_connections)
