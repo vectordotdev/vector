@@ -105,7 +105,7 @@ impl SinkConfig for SematextLogsConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 

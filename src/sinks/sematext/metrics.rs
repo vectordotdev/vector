@@ -124,7 +124,7 @@ impl SinkConfig for SematextMetricsConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
