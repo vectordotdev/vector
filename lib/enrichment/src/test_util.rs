@@ -4,7 +4,7 @@ use std::{
 };
 
 use vector_common::btreemap;
-use vrl_core::Value;
+use vrl::Value;
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 

@@ -1,47 +1,47 @@
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::Parser;
 
 use crate::config;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(
+    #[clap(
         name = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     paths: Vec<PathBuf>,
 
     /// Vector config files in TOML format.
-    #[structopt(name = "config-toml", long, use_delimiter(true))]
+    #[clap(name = "config-toml", long, use_value_delimiter(true))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format.
-    #[structopt(name = "config-json", long, use_delimiter(true))]
+    #[clap(name = "config-json", long, use_value_delimiter(true))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format.
-    #[structopt(name = "config-yaml", long, use_delimiter(true))]
+    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
     paths_yaml: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 }

@@ -1,0 +1,53 @@
+# Based on https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+# This workflow runs separately to have access to post PR comments for fork PRs
+# which only have read access
+
+name: Post soak analysis comment
+
+on:
+  workflow_run:
+    workflows: ["Soak"]
+    types:
+      - completed
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    if: >
+      ${{ github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: 'Download soak analysis'
+        uses: actions/github-script@v3.1.0
+        with:
+          script: |
+            var artifacts = await github.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: ${{github.event.workflow_run.id }},
+            });
+            var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "soak-analysis"
+            })[0];
+            var download = await github.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            var fs = require('fs');
+            fs.writeFileSync('/tmp/soak-analysis.zip', Buffer.from(download.data));
+      - run: unzip -d /tmp /tmp/soak-analysis.zip
+
+      - name: Read analysis file
+        id: read-analysis
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: /tmp/${{ github.workflow_run.event.number }}-${{ github.workflow_run.run_attempt }}-analysis
+
+      - name: Post Results To PR
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
+          edit-mode: replace
+          body: ${{ steps.read-analysis.outputs.content }}
