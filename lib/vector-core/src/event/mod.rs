@@ -515,9 +515,8 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
 impl<'a> EventDataEq<Event> for EventRef<'a> {
     fn event_data_eq(&self, that: &Event) -> bool {
         match (self, that) {
-            (Self::Log(a), Event::Log(b)) => a.event_data_eq(b),
+            (Self::Log(a), Event::Log(b)) | (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
             (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
-            (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
