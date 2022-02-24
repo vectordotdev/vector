@@ -79,7 +79,7 @@ prop_compose! {
 
 prop_compose! {
     fn string_literal()(val in "[^\"\\\\\\)\\}]*") -> Literal {
-        Literal::String(val.replace("\\", "\\\\").replace("\"", "\\\""))
+        Literal::String(val.replace('\\', "\\\\").replace('\"', "\\\""))
     }
 }
 

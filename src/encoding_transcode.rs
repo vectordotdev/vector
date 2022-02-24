@@ -198,28 +198,28 @@ mod tests {
 
     // test UTF_16LE data
     const fn test_data_utf16le_123() -> &'static [u8] {
-        b"1\02\03\0"
+        b"1\x002\x003\x00"
     }
 
     const fn test_data_utf16le_crlf() -> &'static [u8] {
-        b"\r\0\n\0"
+        b"\r\x00\n\x00"
     }
 
     const fn test_data_utf16le_vector_devanagari() -> &'static [u8] {
-        b"-\tG\t\x15\tM\t\x1f\t0\t"
+        b"-\tG\t\x15\tM\t\x1f\tx00\t"
     }
 
     // test UTF_16BE data
     const fn test_data_utf16be_123() -> &'static [u8] {
-        b"\01\02\03"
+        b"\x001\x002\x003"
     }
 
     const fn test_data_utf16be_crlf() -> &'static [u8] {
-        b"\0\r\0\n"
+        b"\x00\r\x00\n"
     }
 
     const fn test_data_utf16be_vector_devanagari() -> &'static [u8] {
-        b"\t-\tG\t\x15\tM\t\x1f\t0"
+        b"\t-\tG\t\x15\tM\t\x1f\tx00"
     }
 
     // test SHIFT_JIS data

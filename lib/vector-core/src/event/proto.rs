@@ -382,8 +382,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .into_iter()
             .map(|k| (k, k > 0))
             .map(|(k, pos)| {
-                k.try_into()
-                    .unwrap_or_else(|_| if pos { i16::MAX } else { i16::MIN })
+                k.try_into().unwrap_or(if pos { i16::MAX } else { i16::MIN })
             })
             .collect::<Vec<_>>();
         let counts = sketch

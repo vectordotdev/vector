@@ -201,12 +201,9 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
 mod tests {
     use super::*;
 
-    fn test_parse(input: &str, expected_uri: &str, expected_auth: Option<(&str, &str)>) {
+    fn test_parse(input: &str, expected_uri: &'static str, expected_auth: Option<(&str, &str)>) {
         let UriSerde { uri, auth } = input.parse().unwrap();
-        assert_eq!(
-            uri,
-            Uri::from_maybe_shared(expected_uri.to_owned()).unwrap()
-        );
+        assert_eq!(uri, Uri::from_static(expected_uri));
         assert_eq!(
             auth,
             expected_auth.map(|(user, password)| {
