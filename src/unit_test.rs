@@ -1,39 +1,39 @@
 use crate::config::{self, UnitTestResult};
 use std::path::PathBuf;
 
+use clap::Parser;
 use colored::*;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Vector config files in TOML format to test.
-    #[structopt(name = "config-toml", long, use_delimiter(true))]
+    #[clap(name = "config-toml", long, use_value_delimiter(true))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to test.
-    #[structopt(name = "config-json", long, use_delimiter(true))]
+    #[clap(name = "config-json", long, use_value_delimiter(true))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to test.
-    #[structopt(name = "config-yaml", long, use_delimiter(true))]
+    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
-    #[structopt(use_delimiter(true))]
+    #[clap(use_value_delimiter(true))]
     paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 }

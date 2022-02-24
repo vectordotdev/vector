@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 
+use clap::Parser;
 use serde::Serialize;
-use structopt::StructOpt;
 
 use crate::config::{SinkDescription, SourceDescription, TransformDescription};
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[structopt(long, default_value = "text", possible_values = &["text", "json", "avro"])]
+    #[clap(long, default_value = "text", possible_values = &["text", "json", "avro"])]
     format: Format,
 }
 
