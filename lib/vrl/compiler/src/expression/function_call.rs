@@ -170,7 +170,8 @@ impl FunctionCall {
         // an immutable reference, to ensure compiler state correctness.
         let external_context = state.swap_external_contexts(AnyMap::new());
 
-        let mut compile_ctx = FunctionCompileContext::new(call_span, external_context);
+        let mut compile_ctx =
+            FunctionCompileContext::new(call_span).with_external_context(external_context);
 
         let mut expr = function
             .compile(state, &mut compile_ctx, list)
@@ -391,9 +392,7 @@ impl Expression for FunctionCall {
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        // The VM also calls `Function::Compile`, so handling the `anymap` is handled there, and we
-        // can just pass in a no-op empty map here.
-        let compile_ctx = FunctionCompileContext::new(self.span, AnyMap::new());
+        let compile_ctx = FunctionCompileContext::new(self.span);
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
