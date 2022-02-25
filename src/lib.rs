@@ -1,4 +1,5 @@
 #![recursion_limit = "256"] // for async-stream
+#![deny(unreachable_pub)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::blocks_in_if_conditions)]
@@ -27,6 +28,7 @@ extern crate vrl_cli;
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
+#[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
 pub mod conditions;
@@ -36,14 +38,17 @@ pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[macro_use]
+#[allow(unreachable_pub)]
 pub mod internal_events;
 #[cfg(feature = "api")]
+#[allow(unreachable_pub)]
 pub mod api;
 pub mod app;
 pub mod async_read;
 #[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
 pub mod aws;
 #[cfg(feature = "codecs")]
+#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
@@ -53,9 +58,11 @@ pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) mod kafka;
+#[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+#[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
@@ -63,22 +70,30 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
+#[deny(unreachable_pub)]
 pub mod sink;
+#[allow(unreachable_pub)]
 pub mod sinks;
 pub mod source_sender;
+#[allow(unreachable_pub)]
 pub mod sources;
-pub(crate) mod stats;
+pub mod stats;
 pub mod stream;
 #[cfg(feature = "api-client")]
+#[allow(unreachable_pub)]
 mod tap;
 pub mod tcp;
 pub mod template;
 pub mod test_util;
+#[allow(unreachable_pub)]
 pub mod tls;
 #[cfg(feature = "api-client")]
+#[allow(unreachable_pub)]
 pub mod top;
+#[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
+#[allow(unreachable_pub)]
 pub mod transforms;
 pub mod trigger;
 pub mod types;
@@ -90,7 +105,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{event, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

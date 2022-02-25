@@ -14,7 +14,6 @@ components: sinks: kafka: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

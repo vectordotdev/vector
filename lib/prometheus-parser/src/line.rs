@@ -394,7 +394,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 
 #[cfg(test)]
 mod test {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

@@ -9,22 +9,23 @@ use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use vector_core::{
     buffers::{topology::channel::BufferReceiver, Acker},
-    event::Event,
+    event::EventArray,
 };
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
-pub enum TaskOutput {
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Utilization<BufferReceiver<Event>>, Acker),
+    Sink(Utilization<BufferReceiver<EventArray>>, Acker),
     Healthcheck,
 }
 
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
     key: ComponentKey,
@@ -42,10 +43,6 @@ impl Task {
             key,
             typetag: typetag.into(),
         }
-    }
-
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
     }
 
     pub fn id(&self) -> &str {

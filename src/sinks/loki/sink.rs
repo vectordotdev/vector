@@ -1,8 +1,9 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
+use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
-use shared::encode_logfmt;
 use snafu::Snafu;
+use vector_common::encode_logfmt;
 use vector_core::{
     buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},
@@ -22,7 +23,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
+        LokiOutOfOrderEventRewritten, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -49,7 +50,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -61,9 +62,9 @@ impl Partitioner for KeyPartitioner {
 }
 
 #[derive(Default)]
-struct RecordPartitionner;
+struct RecordPartitioner;
 
-impl Partitioner for RecordPartitionner {
+impl Partitioner for RecordPartitioner {
     type Item = LokiRecord;
     type Key = PartitionKey;
 
@@ -92,20 +93,11 @@ impl From<std::io::Error> for RequestBuildError {
     }
 }
 
-impl Default for LokiRequestBuilder {
-    fn default() -> Self {
-        Self {
-            compression: Compression::None,
-            encoder: LokiBatchEncoder::default(),
-        }
-    }
-}
-
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = LokiRequest;
     type Error = RequestBuildError;
 
@@ -142,8 +134,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         emit!(&LokiEventsProcessed {
             byte_size: payload.len(),
         });
+        let compression = self.compression();
 
         LokiRequest {
+            compression,
             batch_size,
             finalizers,
             payload,
@@ -220,8 +214,9 @@ impl EventEncoder {
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
 
-            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
-                .expect("Logfmt encoding should never fail."),
+            Encoding::Logfmt => {
+                encode_logfmt::to_string(log.as_map()).expect("Logfmt encoding should never fail.")
+            }
         };
 
         // If no labels are provided we set our own default
@@ -297,9 +292,14 @@ pub struct LokiSink {
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
+        let compression = config.compression;
+
         Ok(Self {
             acker: cx.acker(),
-            request_builder: LokiRequestBuilder::default(),
+            request_builder: LokiRequestBuilder {
+                compression,
+                encoder: Default::default(),
+            },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
                 encoding: config.encoding,
@@ -327,7 +327,7 @@ impl LokiSink {
                 let res = filter.filter_record(record);
                 async { res }
             })
-            .batched_partitioned(RecordPartitionner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encode_log, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
@@ -72,12 +72,16 @@ impl SinkConfig for SocketSinkConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "socket"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use azure_storage::blob::prelude::ContainerClient;
+use azure_storage_blobs::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use goauth::scopes::Scope;
@@ -32,9 +32,9 @@ use super::util::{
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         azure_common::{
             self,
@@ -93,7 +93,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }
@@ -196,10 +196,7 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                 )?;
                 let svc = self
-                    .build_azure_sink(
-                        Arc::<azure_storage::blob::prelude::ContainerClient>::clone(&client),
-                        cx,
-                    )
+                    .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
                     .map_err(|error| format!("{}", error))?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
@@ -695,12 +692,16 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Ok(sink_and_healthcheck)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

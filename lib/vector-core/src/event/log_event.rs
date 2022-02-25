@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
     iter::FromIterator,
@@ -11,22 +11,21 @@ use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize, Serializer};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
-    legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
+    util, EventFinalizers, Finalizable, PathComponent, Value,
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
-    fields: Value,
+    fields: Arc<Value>,
 
     #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
@@ -36,7 +35,7 @@ pub struct LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
-            fields: Value::Map(BTreeMap::new()),
+            fields: Arc::new(Value::Object(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }
     }
@@ -58,15 +57,18 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Value::Map(Default::default()),
+            fields: Arc::new(Value::Object(Default::default())),
             metadata,
         }
     }
 
     ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let fields = Value::Map(map);
-        Self { fields, metadata }
+        let fields = Value::Object(map);
+        Self {
+            fields: Arc::new(fields),
+            metadata,
+        }
     }
 
     /// Convert a `LogEvent` into a tuple of its components
@@ -74,10 +76,12 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+        Arc::make_mut(&mut self.fields);
         (
-            self.fields
-                .into_map()
+            Arc::try_unwrap(self.fields)
+                .expect("already cloned")
+                .into_object()
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
@@ -158,7 +162,10 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
+            if let Some(val) = Arc::make_mut(&mut self.fields)
+                .as_object_mut_unwrap()
+                .remove(from_key.as_ref())
+            {
                 self.insert_flat(to_key, val);
             }
         }
@@ -198,8 +205,8 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        match &self.fields {
-            Value::Map(map) => util::log::keys(map),
+        match self.fields.as_ref() {
+            Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
         }
     }
@@ -216,56 +223,18 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match &self.fields {
-            Value::Map(map) => map,
+        match self.fields.as_ref() {
+            Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self.fields {
-            Value::Map(ref mut map) => map,
+        match Arc::make_mut(&mut self.fields) {
+            Value::Object(ref mut map) => map,
             _ => unreachable!(),
         }
-    }
-
-    #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
-    fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
-        let mut walker = lookup.into_iter().enumerate();
-
-        let mut current_pointer = if let Some((_index, Segment::Field(segment))) = walker.next() {
-            self.as_map_mut().entry(segment)
-        } else {
-            // It should be noted that Remap can create a lookup without a contained segment.
-            // This is the root `.` path. That is handled explicitly by the Target implementation
-            // on Value so shouldn't reach here.
-            // However, we should probably handle this better.
-            unreachable!(
-                "It is an invariant to have a `Lookup` without a contained `Segment`.\
-                `Lookup::is_valid` should catch this during `Lookup` creation, maybe it was not \
-                called?."
-            );
-        };
-
-        for (_index, segment) in walker {
-            current_pointer = match (segment, current_pointer) {
-                (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
-                    Value::Map(map) => map.entry(field),
-                    v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
-                },
-                (Segment::Field(field), Entry::Vacant(entry)) => {
-                    return Err(format!(
-                        "Tried to step into `{}` of `{}`, but it did not exist.",
-                        field,
-                        entry.key()
-                    )
-                    .into());
-                }
-                _ => return Err("The entry API cannot yet descend into array indices.".into()),
-            };
-        }
-        Ok(current_pointer)
     }
 
     /// Merge all fields specified at `fields` from `incoming` to `current`.
@@ -324,16 +293,17 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Value::Map(map),
+            fields: Arc::new(Value::Object(map)),
             metadata: EventMetadata::default(),
         }
     }
 }
 
 impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        match event.fields {
-            Value::Map(map) => map,
+    fn from(mut event: LogEvent) -> BTreeMap<String, Value> {
+        Arc::make_mut(&mut event.fields);
+        match Arc::try_unwrap(event.fields).expect("already cloned") {
+            Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
@@ -342,7 +312,7 @@ impl From<LogEvent> for BTreeMap<String, Value> {
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            fields: map.into_iter().collect(),
+            fields: Arc::new(map.into_iter().collect()),
             metadata: EventMetadata::default(),
         }
     }
@@ -380,7 +350,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        Ok(serde_json::to_value(self.fields)?)
+        Ok(serde_json::to_value(self.fields.as_ref())?)
     }
 }
 
@@ -490,10 +460,6 @@ impl tracing::field::Visit for MakeLogEvent {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use serde_json::json;
-
     use super::*;
     use crate::test_util::open_fixture;
 
@@ -708,65 +674,6 @@ mod test {
             });
     }
 
-    // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
-    #[test]
-    fn entry() {
-        let fixture =
-            open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
-        let mut event = LogEvent::try_from(fixture).unwrap();
-
-        let lookup = Lookup::from_str("non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/non-existing"), Some(&fallback));
-
-        let lookup = Lookup::from_str("nulled").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/nulled"), Some(&serde_json::Value::Null));
-
-        let lookup = Lookup::from_str("map.basic").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/basic"),
-            Some(&serde_json::Value::Bool(true))
-        );
-
-        let lookup = Lookup::from_str("map.map.buddy").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/map/buddy"),
-            Some(&serde_json::Value::Number((-1).into()))
-        );
-
-        let lookup = Lookup::from_str("map.map.non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
-    }
-
     fn assert_merge_value(
         current: impl Into<Value>,
         incoming: impl Into<Value>,
@@ -852,6 +759,6 @@ mod test {
             log
         };
 
-        shared::assert_event_data_eq!(merged, expected);
+        vector_common::assert_event_data_eq!(merged, expected);
     }
 }

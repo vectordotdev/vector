@@ -6,7 +6,7 @@ weight: 2
 tags: ["admin", "logs", "metrics"]
 ---
 
-Although Vector is primarily used to handle observability data from from a wide variety of sources, we also strive to
+Although Vector is primarily used to handle observability data from a wide variety of sources, we also strive to
 make Vector highly observable itself. To that end, Vector provides two [sources], [`internal_logs`][internal_logs] and
 [`internal_metrics`][internal_metrics], that you can use to handle logs and metrics produced by Vector just like you
 would logs and metrics from any other source.

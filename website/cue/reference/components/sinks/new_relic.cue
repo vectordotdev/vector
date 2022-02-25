@@ -14,7 +14,6 @@ components: sinks: new_relic: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

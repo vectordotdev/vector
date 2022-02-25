@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, Program, Runtime, Value};
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
@@ -11,7 +11,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {
-    pub source: String,
+    pub(crate) source: String,
 }
 
 inventory::submit! {
@@ -22,10 +22,7 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -59,7 +56,7 @@ impl ConditionConfig for VrlConfig {
                 .to_string()
         })?;
 
-        Ok(Box::new(Vrl {
+        Ok(Condition::Vrl(Vrl {
             program,
             source: self.source.clone(),
         }))
@@ -68,7 +65,7 @@ impl ConditionConfig for VrlConfig {
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
@@ -87,7 +84,7 @@ impl Vrl {
         // more performance (one less clone), and boot-time errors when a
         // program wants to mutate its events.
         //
-        // see: https://github.com/timberio/vector/issues/4744
+        // see: https://github.com/vectordotdev/vector/issues/4744
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
@@ -95,15 +92,17 @@ impl Vrl {
     }
 }
 
-impl Condition for Vrl {
+impl Conditional for Vrl {
     fn check(&self, event: &Event) -> bool {
         self.run(event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
             })
-            .unwrap_or_else(|_| {
-                emit!(&VrlConditionExecutionError);
+            .unwrap_or_else(|err| {
+                emit!(&VrlConditionExecutionError {
+                    error: err.to_string().as_ref()
+                });
                 false
             })
     }

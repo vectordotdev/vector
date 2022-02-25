@@ -5,7 +5,7 @@ use std::{
     task::Poll,
 };
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -30,7 +30,6 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            sink,
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
@@ -43,7 +42,7 @@ use crate::{
 struct InfluxDbSvc {
     config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
+    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -108,12 +107,16 @@ impl SinkConfig for InfluxDbConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "influxdb_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -156,7 +159,6 @@ impl InfluxDbSvc {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -189,7 +191,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
             self.config.tags.as_ref(),
             &self.config.quantiles,
         );
-        let body: Vec<u8> = input.into_bytes();
+        let body = input.freeze();
 
         self.inner.call(body)
     }
@@ -198,7 +200,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 fn create_build_request(
     uri: http::Uri,
     token: String,
-) -> impl Fn(Vec<u8>) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send + 'static
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
     move |body| {
@@ -255,8 +257,8 @@ fn encode_events(
     default_namespace: Option<&str>,
     tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
-) -> String {
-    let mut output = String::new();
+) -> BytesMut {
+    let mut output = BytesMut::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
@@ -278,7 +280,9 @@ fn encode_events(
     }
 
     // remove last '\n'
-    output.pop();
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
     output
 }
 
@@ -513,6 +517,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -552,6 +558,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -591,6 +599,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -630,6 +640,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -700,6 +712,8 @@ mod tests {
         ];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -818,6 +832,8 @@ mod tests {
             None,
             &default_summary_quantiles(),
         );
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -880,6 +896,8 @@ mod tests {
             Some(tags).as_ref(),
             &[],
         );
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 2);
         assert_eq!(

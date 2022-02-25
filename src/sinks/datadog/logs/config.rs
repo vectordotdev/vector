@@ -11,7 +11,7 @@ use super::{
     sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
 };
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
@@ -48,7 +48,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogLogsConfig {
+pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
     region: Option<Region>,
@@ -162,12 +162,16 @@ impl SinkConfig for DatadogLogsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_logs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

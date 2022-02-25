@@ -14,7 +14,6 @@ components: sinks: prometheus_remote_write: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			batch: {

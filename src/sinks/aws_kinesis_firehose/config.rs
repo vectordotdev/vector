@@ -12,7 +12,7 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_firehose::{
             request_builder::KinesisRequestBuilder,
@@ -26,6 +26,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -55,6 +56,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -135,12 +137,16 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_firehose"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -169,8 +175,9 @@ impl KinesisFirehoseSinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
 
-        let client = rusoto::client(proxy)?;
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

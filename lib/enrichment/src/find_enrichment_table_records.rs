@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -129,7 +129,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Array,
+                    expected: Kind::array(Collection::any()),
                 }),
             })
             .transpose()?;
@@ -164,9 +164,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .array_mapped::<(), Kind>(map! { (): Kind::Object })
+        TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }
 
@@ -175,7 +173,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use chrono::{TimeZone as _, Utc};
-    use shared::{btreemap, TimeZone};
+    use vector_common::{btreemap, TimeZone};
 
     use super::*;
     use crate::test_util::{
@@ -198,7 +196,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_core::state::Runtime::default();
+        let mut runtime_state = vrl::state::Runtime::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
         registry.finish_load();

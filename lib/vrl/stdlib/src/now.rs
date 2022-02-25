@@ -25,6 +25,10 @@ impl Function for Now {
     ) -> Compiled {
         Ok(Box::new(NowFn))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+        Ok(Utc::now().into())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +40,6 @@ impl Expression for NowFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().timestamp()
+        TypeDef::timestamp()
     }
 }

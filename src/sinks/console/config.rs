@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         console::sink::WriterSink,
         util::encoding::{EncodingConfig, StandardEncodings},
@@ -60,12 +60,16 @@ impl SinkConfig for ConsoleSinkConfig {
         Ok((sink, future::ok(()).boxed()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {
         "console"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

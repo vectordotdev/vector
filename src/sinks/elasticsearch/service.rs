@@ -29,58 +29,58 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ElasticSearchRequest {
-    pub payload: Vec<u8>,
+pub struct ElasticsearchRequest {
+    pub payload: Bytes,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
     pub events_byte_size: usize,
 }
 
-impl ByteSizeOf for ElasticSearchRequest {
+impl ByteSizeOf for ElasticsearchRequest {
     fn allocated_bytes(&self) -> usize {
         self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
     }
 }
 
-impl ElementCount for ElasticSearchRequest {
+impl ElementCount for ElasticsearchRequest {
     fn element_count(&self) -> usize {
         self.batch_size
     }
 }
 
-impl Ackable for ElasticSearchRequest {
+impl Ackable for ElasticsearchRequest {
     fn ack_size(&self) -> usize {
         self.batch_size
     }
 }
 
-impl Finalizable for ElasticSearchRequest {
+impl Finalizable for ElasticsearchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
 }
 
 #[derive(Clone)]
-pub struct ElasticSearchService {
+pub struct ElasticsearchService {
     batch_service: HttpBatchService<
-        BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>>,
-        ElasticSearchRequest,
+        BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
+        ElasticsearchRequest,
     >,
 }
 
-impl ElasticSearchService {
+impl ElasticsearchService {
     pub fn new(
         http_client: HttpClient<Body>,
         http_request_builder: HttpRequestBuilder,
-    ) -> ElasticSearchService {
+    ) -> ElasticsearchService {
         let http_request_builder = Arc::new(http_request_builder);
         let batch_service = HttpBatchService::new(http_client, move |req| {
             let request_builder = Arc::clone(&http_request_builder);
-            let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+            let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
                 Box::pin(async move { request_builder.build_request(req).await });
             future
         });
-        ElasticSearchService { batch_service }
+        ElasticsearchService { batch_service }
     }
 }
 
@@ -97,8 +97,8 @@ pub struct HttpRequestBuilder {
 impl HttpRequestBuilder {
     pub async fn build_request(
         &self,
-        es_req: ElasticSearchRequest,
-    ) -> Result<Request<Vec<u8>>, crate::Error> {
+        es_req: ElasticsearchRequest,
+    ) -> Result<Request<Bytes>, crate::Error> {
         let mut builder = Request::post(&self.bulk_uri);
 
         let request = if let Some(credentials_provider) = &self.credentials_provider {
@@ -122,9 +122,9 @@ impl HttpRequestBuilder {
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder
-                    .body(body.to_vec())
-                    .expect("Invalid http request value used"),
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body).expect("Invalid http request value used")
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -181,14 +181,14 @@ fn sign_request(
     builder
 }
 
-pub struct ElasticSearchResponse {
+pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub batch_size: usize,
     pub events_byte_size: usize,
 }
 
-impl DriverResponse for ElasticSearchResponse {
+impl DriverResponse for ElasticsearchResponse {
     fn event_status(&self) -> EventStatus {
         self.event_status
     }
@@ -197,12 +197,13 @@ impl DriverResponse for ElasticSearchResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
 
-impl Service<ElasticSearchRequest> for ElasticSearchService {
-    type Response = ElasticSearchResponse;
+impl Service<ElasticsearchRequest> for ElasticsearchService {
+    type Response = ElasticsearchResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -210,7 +211,7 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: ElasticSearchRequest) -> Self::Future {
+    fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
@@ -218,7 +219,7 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
-            Ok(ElasticSearchResponse {
+            Ok(ElasticsearchResponse {
                 event_status,
                 http_response,
                 batch_size,

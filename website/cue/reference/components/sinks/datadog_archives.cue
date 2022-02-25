@@ -14,7 +14,6 @@ components: sinks: datadog_archives: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

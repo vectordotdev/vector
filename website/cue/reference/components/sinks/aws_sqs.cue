@@ -14,7 +14,6 @@ components: sinks: aws_sqs: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -35,7 +34,13 @@ components: sinks: aws_sqs: components._aws & {
 				timeout_secs:               30
 				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 			to: {
 				service: services.aws_sqs
 

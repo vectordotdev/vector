@@ -2,12 +2,13 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseDataError},
+    internal_events::{BytesReceived, DnstapEventsReceived, DnstapParseError},
     Result,
 };
 
@@ -24,10 +25,10 @@ pub struct DnstapConfig {
     pub max_frame_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
-    pub raw_data_only: Option<bool>,
+    raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<u32>,
-    pub socket_file_mode: Option<u32>,
+    pub(self) socket_file_mode: Option<u32>,
     pub socket_receive_buffer_size: Option<usize>,
     pub socket_send_buffer_size: Option<usize>,
 }
@@ -104,6 +105,10 @@ impl SourceConfig for DnstapConfig {
     fn source_type(&self) -> &'static str {
         "dnstap"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -172,11 +177,13 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        emit!(&BytesReceived {
+            byte_size: frame.len(),
+            protocol: "protobuf",
+        });
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
-
-        let frame_size = frame.len();
 
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
@@ -187,21 +194,21 @@ impl FrameHandler for DnstapFrameHandler {
                 &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventReceived {
-                byte_size: frame_size
+            emit!(&DnstapEventsReceived {
+                byte_size: event.size_of(),
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseDataError {
+                    emit!(&DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventReceived {
-                        byte_size: frame_size
+                    emit!(&DnstapEventsReceived {
+                        byte_size: event.size_of(),
                     });
                     Some(event)
                 }
@@ -275,7 +282,7 @@ mod integration_tests {
                 socket_receive_buffer_size: Some(10485760),
                 socket_send_buffer_size: Some(10485760),
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

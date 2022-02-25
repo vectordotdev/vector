@@ -401,7 +401,7 @@ where
         // checkpoint was only loaded for new files when Vector was started up, but the
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
-        // https://github.com/timberio/vector/issues/7139
+        // https://github.com/vectordotdev/vector/issues/7139
         let read_from = if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)

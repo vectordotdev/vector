@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use super::expander::ExpanderConfig;
 use crate::{
     conditions::{not::NotConfig, AnyCondition},
-    config::{DataType, ExpandType, Output, TransformConfig, TransformContext},
+    config::{ExpandType, Input, Output, TransformConfig, TransformContext},
+    schema,
     transforms::{filter::FilterConfig, Transform},
 };
 
@@ -60,12 +61,12 @@ impl TransformConfig for PipelineFilterConfig {
         Ok(Some((result, ExpandType::Parallel { aggregates: true })))
     }
 
-    fn input_type(&self) -> DataType {
-        self.inner.input_type()
+    fn input(&self) -> Input {
+        self.inner.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.inner.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.inner.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {

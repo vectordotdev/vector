@@ -1,8 +1,10 @@
-use super::DatadogAgentConfig;
+use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 use crate::event::EventStatus;
+use crate::schema;
 use crate::test_util::spawn_collect_n;
 use crate::SourceSender;
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::time::{Duration, SystemTime};
@@ -42,7 +44,11 @@ async fn wait_for_agent() {
 async fn wait_for_message() {
     wait_for_agent().await;
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-    let context = SourceContext::new_test(sender);
+    let schema_definitions = HashMap::from([
+        (Some(LOGS.to_owned()), schema::Definition::empty()),
+        (Some(METRICS.to_owned()), schema::Definition::empty()),
+    ]);
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
         let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
         config.build(context).await.unwrap().await.unwrap()
@@ -60,9 +66,9 @@ async fn wait_for_message() {
     .await;
     assert_eq!(events.len(), 2);
     let event = events.get(0).unwrap().as_log();
-    let msg = event.get("message").unwrap().as_bytes();
+    let msg = event.get("message").unwrap().coerce_to_bytes();
     assert_eq!(msg, "hello world");
     let event = events.get(1).unwrap().as_log();
-    let msg = event.get("message").unwrap().as_bytes();
+    let msg = event.get("message").unwrap().coerce_to_bytes();
     assert_eq!(msg, "it's vector speaking");
 }

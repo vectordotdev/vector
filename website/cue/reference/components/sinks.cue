@@ -6,6 +6,27 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
+		if features.acknowledgements != _|_ {
+			if features.acknowledgements.enabled {
+				acknowledgements: {
+					common: true
+					description: """
+						Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
+						"""
+					required: false
+					type: object: options: {
+						enabled: {
+							common:      true
+							description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
+							warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
+							required: false
+							type: bool: default: false
+						}
+					}
+				}
+			}
+		}
+
 		if features.send != _|_ && features.send.batch != _|_ {
 			if features.send.batch.enabled {
 				batch: {
@@ -15,37 +36,31 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != _|_ {
-								max_bytes: {
-									common:      true
-									description: "The maximum size of a batch, in bytes, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_bytes
-										unit:    "bytes"
-									}
+							max_bytes: {
+								common:      true
+								description: "The maximum size of a batch, in bytes, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_bytes | *null
+									unit:    "bytes"
 								}
 							}
-							if features.send.batch.max_events != _|_ {
-								max_events: {
-									common:      true
-									description: "The maximum size of a batch, in events, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_events
-										unit:    "events"
-									}
+							max_events: {
+								common:      true
+								description: "The maximum size of a batch, in events, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_events | *null
+									unit:    "events"
 								}
 							}
-							if features.send.batch.timeout_secs != null {
-								timeout_secs: {
-									common:      true
-									description: "The maximum age of a batch before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.timeout_secs
-										unit:    "seconds"
-									}
+							timeout_secs: {
+								common:      true
+								description: "The maximum age of a batch before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.timeout_secs
+									unit:    "seconds"
 								}
 							}
 						}
@@ -54,61 +69,59 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.buffer.enabled {
-			buffer: {
-				common:      false
-				description: "Configures the sink specific buffer behavior."
-				required:    false
-				type: object: {
-					examples: []
-					options: {
-						max_events: {
-							common:        true
-							description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
-							required:      false
-							relevant_when: "type = \"memory\""
-							type: uint: {
-								default: 500
-								unit:    "events"
-							}
+		buffer: {
+			common:      false
+			description: "Configures the sink specific buffer behavior."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					max_events: {
+						common:        true
+						description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
+						required:      false
+						relevant_when: "type = \"memory\""
+						type: uint: {
+							default: 500
+							unit:    "events"
 						}
-						max_size: {
-							description:   "The maximum size of the buffer on the disk."
-							required:      true
-							relevant_when: "type = \"disk\""
-							type: uint: {
-								examples: [104900000]
-								unit: "bytes"
-							}
+					}
+					max_size: {
+						description:   "The maximum size of the buffer on the disk."
+						required:      true
+						relevant_when: "type = \"disk\""
+						type: uint: {
+							examples: [104900000]
+							unit: "bytes"
 						}
-						type: {
-							common:      true
-							description: "The buffer's type and storage mechanism."
-							required:    false
-							type: string: {
-								default: "memory"
-								enum: {
-									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk: """
+					}
+					type: {
+						common:      true
+						description: "The buffer's type and storage mechanism."
+						required:    false
+						type: string: {
+							default: "memory"
+							enum: {
+								memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
+								disk: """
 									Stores the sink's buffer on disk. This is less performant, but durable.
 									Data will not be lost between restarts.
 									Will also hold data in memory to enhance performance.
 									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
 									For comparison, AWS gp2 volumes are usually too slow for common cases.
 									"""
-								}
 							}
 						}
-						when_full: {
-							common:      false
-							description: "The behavior when the buffer becomes full."
-							required:    false
-							type: string: {
-								default: "block"
-								enum: {
-									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
-									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
-								}
+					}
+					when_full: {
+						common:      false
+						description: "The behavior when the buffer becomes full."
+						required:    false
+						type: string: {
+							default: "block"
+							enum: {
+								block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
+								drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 							}
 						}
 					}
@@ -157,8 +170,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    false
-					common:      true
+					required:    features.send.encoding.codec.enabled
+					if !features.send.encoding.codec.enabled {common: true}
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {

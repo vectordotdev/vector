@@ -448,7 +448,10 @@ fn network_metrics(
     .collect()
 }
 
-pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, serde_json::Error> {
+pub(super) fn parse(
+    bytes: &[u8],
+    namespace: Option<String>,
+) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
 
@@ -488,7 +491,7 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

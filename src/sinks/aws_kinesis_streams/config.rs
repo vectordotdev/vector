@@ -13,7 +13,7 @@ use crate::{
         rusoto,
         rusoto::{AwsAuthentication, RegionOrEndpoint},
     },
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::{
             request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
@@ -25,6 +25,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -65,6 +66,7 @@ pub struct KinesisSinkConfig {
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -97,7 +99,8 @@ impl KinesisSinkConfig {
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -140,12 +143,16 @@ impl SinkConfig for KinesisSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_streams"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

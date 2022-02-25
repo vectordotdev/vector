@@ -7,9 +7,9 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -76,25 +76,29 @@ impl SinkConfig for NatsSinkConfig {
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
+    fn to_nats_options(&self) -> nats::asynk::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
+    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
         self.to_nats_options()
             .connect(&self.url)
             .map_err(|e| e.into())
@@ -135,9 +139,9 @@ impl NatsSink {
     }
 }
 
-impl From<NatsOptions> for async_nats::Options {
+impl From<NatsOptions> for nats::asynk::Options {
     fn from(options: NatsOptions) -> Self {
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&options.connection_name)
             .reconnect_buffer_size(0)
     }
@@ -154,7 +158,7 @@ impl From<&NatsSinkConfig> for NatsOptions {
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.into();
+        let nats_options: nats::asynk::Options = self.options.into();
 
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
@@ -162,7 +166,7 @@ impl StreamSink<Event> for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("subject"),
                         drop_event: true,

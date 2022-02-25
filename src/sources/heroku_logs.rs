@@ -31,16 +31,16 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexConfig {
+pub(crate) struct LogplexConfig {
     address: SocketAddr,
     #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -92,7 +92,7 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
@@ -119,6 +119,10 @@ impl SourceConfig for LogplexConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -142,6 +146,10 @@ impl SourceConfig for LogplexCompatConfig {
 
     fn resources(&self) -> Vec<Resource> {
         self.0.resources()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -306,7 +314,7 @@ mod tests {
         components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
                 address,

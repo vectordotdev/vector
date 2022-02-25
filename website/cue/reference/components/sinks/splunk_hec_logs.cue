@@ -15,7 +15,6 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

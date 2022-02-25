@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{
     header,
@@ -5,7 +6,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ use serde_json::Value as JsonValue;
 
 use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -39,7 +40,7 @@ pub struct AzureMonitorLogsConfig {
     pub log_type: String,
     pub azure_resource_id: Option<String>,
     #[serde(default = "default_host")]
-    pub host: String,
+    pub(super) host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -60,16 +61,15 @@ pub enum Encoding {
     Default,
 }
 
-lazy_static! {
-    static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
-    static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
-    static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
-    static ref X_MS_AZURE_RESOURCE_HEADER: HeaderName =
-        HeaderName::from_static("x-ms-azureresourceid");
-    static ref TIME_GENERATED_FIELD_HEADER: HeaderName =
-        HeaderName::from_static("time-generated-field");
-    static ref CONTENT_TYPE_VALUE: HeaderValue = HeaderValue::from_static(CONTENT_TYPE);
-}
+static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
+static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));
+static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("x-ms-azureresourceid"));
+static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
+    Lazy::new(|| HeaderName::from_static("time-generated-field"));
+static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
+
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
@@ -120,12 +120,16 @@ impl SinkConfig for AzureMonitorLogsConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "azure_monitor_logs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -167,7 +171,7 @@ impl HttpSink for AzureMonitorLogsSink {
         Some(entry)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         self.build_request_sync(events)
     }
 }
@@ -226,8 +230,8 @@ impl AzureMonitorLogsSink {
         })
     }
 
-    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Vec<u8>>> {
-        let body = serde_json::to_vec(&events)?;
+    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
+        let body = crate::serde::json::to_bytes(&events)?.freeze();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body)?;

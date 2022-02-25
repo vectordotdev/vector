@@ -14,7 +14,6 @@ components: sinks: pulsar: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

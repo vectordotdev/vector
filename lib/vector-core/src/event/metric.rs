@@ -11,7 +11,9 @@ use chrono::{DateTime, Utc};
 use float_eq::FloatEq;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
+#[cfg(feature = "vrl")]
+use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
@@ -126,10 +128,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<vrl_core::Value> for MetricKind {
+impl TryFrom<vrl_lib::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_lib::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -143,7 +145,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for vrl_core::Value {
+impl From<MetricKind> for vrl_lib::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -468,7 +470,7 @@ pub fn zip_quantiles(
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for vrl_core::Value {
+impl From<MetricValue> for vrl_lib::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -523,7 +525,7 @@ impl ByteSizeOf for MetricSketch {
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for vrl_core::Value {
+impl From<MetricSketch> for vrl_lib::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }
@@ -1242,13 +1244,13 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
     let mut sum = 0.0;
     let mut count = 0;
     for sample in samples {
-        buckets
+        if let Some((i, _)) = buckets
             .iter()
             .enumerate()
-            .skip_while(|&(_, b)| *b < sample.value)
-            .for_each(|(i, _)| {
-                counts[i] += sample.rate;
-            });
+            .find(|&(_, b)| *b >= sample.value)
+        {
+            counts[i] += sample.rate;
+        }
 
         sum += sample.value * f64::from(sample.rate);
         count += sample.rate;
@@ -1649,14 +1651,31 @@ mod test {
         assert_eq!(counter_value.distribution_to_sketch(), None);
 
         let distrib_value = MetricValue::Distribution {
-            samples: samples!(1.0 => 1),
+            samples: samples!(1.0 => 10, 2.0 => 5, 5.0 => 2),
             statistic: StatisticKind::Summary,
         };
-        let converted = distrib_value.distribution_to_agg_histogram(&[1.0]);
-        assert!(matches!(
+        let converted = distrib_value.distribution_to_agg_histogram(&[1.0, 5.0, 10.0]);
+        assert_eq!(
             converted,
-            Some(MetricValue::AggregatedHistogram { .. })
-        ));
+            Some(MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 10,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 7,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 0,
+                    },
+                ],
+                sum: 30.0,
+                count: 17,
+            })
+        );
 
         let distrib_value = MetricValue::Distribution {
             samples: samples!(1.0 => 1),

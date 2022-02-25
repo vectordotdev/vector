@@ -14,7 +14,6 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: false
 		send: {
 			batch: {

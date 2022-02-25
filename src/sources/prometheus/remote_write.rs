@@ -75,6 +75,10 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
     fn source_type(&self) -> &'static str {
         SOURCE_NAME
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone)]
@@ -165,7 +169,10 @@ mod test {
             tls: tls.clone(),
             acknowledgements: AcknowledgementsConfig::default(),
         };
-        let source = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
         let sink = RemoteWriteConfig {
@@ -194,7 +201,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        shared::assert_event_data_eq!(events, output);
+        vector_common::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -269,7 +276,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
         tokio::time::sleep(Duration::from_secs(2)).await;

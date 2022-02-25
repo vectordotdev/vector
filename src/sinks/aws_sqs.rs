@@ -20,17 +20,18 @@ use super::util::SinkBatchSettings;
 use crate::{
     aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
+    internal_events::{AwsSqsEventSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::{self, Response},
+        sink::Response,
         BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -79,6 +80,7 @@ pub struct SqsSinkConfig {
     pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -123,12 +125,16 @@ impl SinkConfig for SqsSinkConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -147,7 +153,9 @@ impl SqsSinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+
+        let client = rusoto::client(Some(tls_settings), proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -196,7 +204,6 @@ impl SqsSink {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
@@ -292,7 +299,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("message_group_id"),
                     drop_event: true
@@ -306,7 +313,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error,
                     field: Some("message_deduplication_id"),
                     drop_event: true
@@ -426,6 +433,7 @@ mod integration_tests {
             message_group_id: None,
             message_deduplication_id: None,
             request: Default::default(),
+            tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
         };

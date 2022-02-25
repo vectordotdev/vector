@@ -5,24 +5,21 @@ use std::{
     sync::Arc,
 };
 
-use bytes::{Buf, BufMut, Bytes};
-use chrono::{DateTime, SecondsFormat, Utc};
-use prost::{DecodeError, EncodeError, Message};
-use shared::EventDataEq;
-use vector_buffers::encoding::{DecodeBytes, EncodeBytes};
+use bytes::Bytes;
+use vector_buffers::EventCount;
+use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
+pub use ::value::Value;
 pub use array::{EventArray, EventContainer, LogArray, MetricArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
 };
-pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use util::log::{PathComponent, PathIter};
-pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
@@ -30,7 +27,6 @@ pub mod array;
 pub mod discriminant;
 pub mod error;
 mod finalization;
-mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -38,19 +34,23 @@ pub mod merge_state;
 mod metadata;
 pub mod metric;
 pub mod proto;
+mod ser;
 #[cfg(test)]
 mod test;
 pub mod util;
-mod value;
 #[cfg(feature = "vrl")]
 mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
+// Traces are `LogEvent`
+pub type TraceEvent = LogEvent;
+
 #[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
+    Trace(TraceEvent),
 }
 
 impl ByteSizeOf for Event {
@@ -58,15 +58,23 @@ impl ByteSizeOf for Event {
         match self {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
+            Event::Trace(trace_event) => trace_event.allocated_bytes(),
         }
+    }
+}
+
+impl EventCount for Event {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log) => log.take_finalizers(),
+            Event::Log(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
+            Event::Trace(trace_event) => trace_event.take_finalizers(),
         }
     }
 }
@@ -169,10 +177,57 @@ impl Event {
         }
     }
 
+    /// Return self as a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_trace(&self) -> &TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Return self as a mutable `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_mut_trace(&mut self) -> &mut TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Coerces self into a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn into_trace(self) -> TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Fallibly coerces self into a `TraceEvent`
+    ///
+    /// If the event is a `TraceEvent`, then `Some(trace)` is returned, otherwise `None`.
+    pub fn try_into_trace(self) -> Option<TraceEvent> {
+        match self {
+            Event::Trace(trace) => Some(trace),
+            _ => None,
+        }
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         match self {
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+            Self::Trace(trace) => trace.metadata(),
         }
     }
 
@@ -180,6 +235,7 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
+            Self::Trace(trace) => trace.metadata_mut(),
         }
     }
 
@@ -188,6 +244,7 @@ impl Event {
         match self {
             Self::Log(log) => log.into_parts().1,
             Self::Metric(metric) => metric.into_parts().2,
+            Self::Trace(trace) => trace.into_parts().1,
         }
     }
 
@@ -196,6 +253,7 @@ impl Event {
         match self {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
         }
     }
 
@@ -203,6 +261,7 @@ impl Event {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier(batch).into(),
         }
     }
 
@@ -210,6 +269,7 @@ impl Event {
         match self {
             Self::Log(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier_option(batch).into(),
         }
     }
 }
@@ -217,15 +277,11 @@ impl Event {
 impl EventDataEq for Event {
     fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Log(a), Self::Log(b)) | (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 impl From<BTreeMap<String, Value>> for Event {
@@ -263,7 +319,7 @@ impl TryInto<serde_json::Value> for Event {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Event::Log(fields) => serde_json::to_value(fields),
+            Event::Log(fields) | Event::Trace(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
         }
     }
@@ -370,24 +426,76 @@ impl MaybeAsLogMut for Event {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
         match self {
             Event::Log(log) => Some(log),
-            Event::Metric(_) => None,
+            _ => None,
         }
     }
 }
 
 /// A wrapper for references to inner event types, where reconstituting
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EventRef<'a> {
     Log(&'a LogEvent),
     Metric(&'a Metric),
+    Trace(&'a TraceEvent),
+}
+
+impl<'a> EventRef<'a> {
+    /// Extract the `LogEvent` reference in this.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `LogEvent` reference.
+    pub fn as_log(self) -> &'a LogEvent {
+        match self {
+            Self::Log(log) => log,
+            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+        }
+    }
+
+    /// Convert this reference into a new `LogEvent` by cloning.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `LogEvent` reference.
+    pub fn into_log(self) -> LogEvent {
+        match self {
+            Self::Log(log) => log.clone(),
+            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+        }
+    }
+
+    /// Extract the `Metric` reference in this.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `Metric` reference.
+    pub fn as_metric(self) -> &'a Metric {
+        match self {
+            Self::Metric(metric) => metric,
+            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+        }
+    }
+
+    /// Convert this reference into a new `Metric` by cloning.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `Metric` reference.
+    pub fn into_metric(self) -> Metric {
+        match self {
+            Self::Metric(metric) => metric.clone(),
+            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+        }
+    }
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {
     fn from(event: &'a Event) -> Self {
         match event {
-            Event::Log(log) => log.into(),
-            Event::Metric(metric) => metric.into(),
+            Event::Log(log) => EventRef::Log(log),
+            Event::Metric(metric) => EventRef::Metric(metric),
+            Event::Trace(trace) => EventRef::Trace(trace),
         }
     }
 }
@@ -404,24 +512,12 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-impl EncodeBytes for Event {
-    type Error = EncodeError;
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
-    where
-        B: BufMut,
-    {
-        proto::EventWrapper::from(self).encode(buffer)
-    }
-}
-
-impl DecodeBytes for Event {
-    type Error = DecodeError;
-
-    fn decode<B>(buffer: B) -> Result<Event, Self::Error>
-    where
-        B: Buf,
-    {
-        proto::EventWrapper::decode(buffer).map(Into::into)
+impl<'a> EventDataEq<Event> for EventRef<'a> {
+    fn event_data_eq(&self, that: &Event) -> bool {
+        match (self, that) {
+            (Self::Log(a), Event::Log(b)) | (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
+            _ => false,
+        }
     }
 }

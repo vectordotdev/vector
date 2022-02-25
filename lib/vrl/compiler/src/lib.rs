@@ -1,7 +1,6 @@
 mod compiler;
 mod context;
 mod program;
-mod target;
 mod test_util;
 
 pub mod expression;
@@ -9,17 +8,18 @@ pub mod function;
 pub mod state;
 pub mod type_def;
 pub mod value;
+pub mod vm;
 
+pub use crate::value::Value;
 pub use context::Context;
+pub use core::{value, ExpressionError, Resolved, Target};
 pub(crate) use diagnostic::Span;
-pub use expression::{Expression, ExpressionError, Resolved};
+pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::Program;
 pub(crate) use state::Compiler as State;
-pub use target::Target;
 pub use type_def::TypeDef;
-pub use value::Value;
 
 pub type Result = std::result::Result<Program, compiler::Errors>;
 

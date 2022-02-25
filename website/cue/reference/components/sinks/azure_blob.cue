@@ -14,7 +14,6 @@ components: sinks: azure_blob: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {

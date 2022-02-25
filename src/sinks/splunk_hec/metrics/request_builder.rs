@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bytes::Bytes;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
@@ -9,14 +10,14 @@ use crate::sinks::{
 };
 
 pub struct HecMetricsRequestBuilder {
-    pub compression: Compression,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
     type Metadata = (usize, usize, EventFinalizers, Option<Arc<str>>);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = HecRequest;
     type Error = std::io::Error;
 

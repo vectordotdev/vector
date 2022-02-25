@@ -59,7 +59,7 @@ cp "${TEMP}/cue" /usr/bin/cue
 # Grease is used for the `make release-github` task.
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
+    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
     -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
 tar \
     -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \

@@ -1,6 +1,6 @@
 use std::{convert::TryInto, io, sync::Arc};
 
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Finalizable},
     sinks::{
         azure_common::{
@@ -33,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     pub connection_string: String,
-    pub container_name: String,
+    pub(super) container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
     pub blob_append_uuid: Option<bool>,
@@ -79,12 +79,16 @@ impl SinkConfig for AzureBlobSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "azure_blob"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -693,7 +697,7 @@ mod integration_tests {
             let response = match request.await {
                 Ok(_) => Ok(()),
                 Err(reason) => match reason.downcast_ref::<HttpError>() {
-                    Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                    Some(HttpError::StatusCode { status, .. }) => match *status {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },

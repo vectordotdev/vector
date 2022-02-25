@@ -72,9 +72,9 @@ inputs = ["vector_agents"]
 source = '''
 . = parse_json!(.message)
 
-iot_remap = del(.iot_remap)
+code = del(.code)
 
-row = get_enrichment_table_record!("codes", { "iot_remap": iot_remap })
+row = get_enrichment_table_record!("iot_remap", { "code":  code })
 .message = row.message
 '''
 ```

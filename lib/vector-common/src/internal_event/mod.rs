@@ -4,7 +4,7 @@ mod events_sent;
 
 pub use bytes_sent::BytesSent;
 pub use events_received::EventsReceived;
-pub use events_sent::EventsSent;
+pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}

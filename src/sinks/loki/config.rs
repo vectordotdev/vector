@@ -4,8 +4,9 @@ use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::sinks::util::Compression;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
@@ -30,6 +31,8 @@ pub struct LokiConfig {
     pub remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
@@ -120,12 +123,16 @@ impl SinkConfig for LokiConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "loki"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

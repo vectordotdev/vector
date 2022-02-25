@@ -41,7 +41,7 @@ the `Object` will just return `Error`. At first, this will happen at runtime.
 The compiler will not be able to catch an invalid path at compile.
 
 There are future plans for introducing
-[schema metadata](https://github.com/timberio/vector/issues/4599). At this point
+[schema metadata](https://github.com/vectordotdev/vector/issues/4599). At this point
 we can introduce a schema for metadata events that will capture the usage of
 any invalid fields. This is out of scope for the current RFC, but should align
 with future work nicely.

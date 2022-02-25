@@ -16,10 +16,10 @@ use vector_core::{event::Finalizable, ByteSizeOf};
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         gcs_common::{
             config::{
@@ -124,12 +124,16 @@ impl SinkConfig for GcsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         NAME
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

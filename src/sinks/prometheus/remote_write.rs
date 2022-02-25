@@ -11,10 +11,10 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, SinkConfig, SinkDescription},
+    config::{self, Input, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{
@@ -117,7 +117,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingFailed {
+                                    emit!(&TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,
@@ -140,12 +140,16 @@ impl SinkConfig for RemoteWriteConfig {
         Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "prometheus_remote_write"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

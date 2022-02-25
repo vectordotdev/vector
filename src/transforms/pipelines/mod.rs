@@ -68,9 +68,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     conditions::AnyCondition,
     config::{
-        DataType, ExpandType, GenerateConfig, Output, TransformConfig, TransformContext,
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
+    schema,
     transforms::Transform,
 };
 
@@ -84,6 +85,7 @@ inventory::submit! {
 pub struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
+    #[serde(default)]
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
@@ -242,12 +244,12 @@ impl TransformConfig for PipelinesConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

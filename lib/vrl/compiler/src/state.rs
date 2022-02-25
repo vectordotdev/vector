@@ -1,20 +1,26 @@
 use std::{any::Any, collections::HashMap};
 
-use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
+use value::Kind;
+
+use crate::{expression::assignment, parser::ast::Ident, Value};
 
 /// The state held by the compiler.
 ///
 /// This state allows the compiler to track certain invariants during
 /// compilation, which in turn drives our progressive type checking system.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Compiler {
-    /// stored external target type definition
+    /// Stored external target type definitions.
+    //
+    // TODO(Jean): Change this to point to a `value::Collection<Field>` type, to ensure the target
+    // is always an object. Although we probably also need to support arrays, in which case we
+    // should wrap it in an enum to also support `value::Collection<Index>`.
     target: Option<assignment::Details>,
 
-    /// stored internal variable type definitions
+    /// Stored internal variable type definitions.
     variables: HashMap<Ident, assignment::Details>,
 
-    /// context passed between the client program and a VRL function.
+    /// Context passed between the client program and a VRL function.
     external_context: Option<Box<dyn Any>>,
 
     /// On request, the compiler can store its state in this field, which can
@@ -35,15 +41,22 @@ impl Compiler {
         Default::default()
     }
 
-    /// Creates a new compiler that starts with an initial given typedef.
-    pub fn new_with_type_def(type_def: TypeDef) -> Self {
+    /// Creates a new compiler that starts with an initial given [`Kind`].
+    pub fn new_with_kind(kind: Kind) -> Self {
         Self {
             target: Some(assignment::Details {
-                type_def,
+                type_def: kind.into(),
                 value: None,
             }),
             ..Default::default()
         }
+    }
+
+    /// Get the kind information of the program target (e.g. the type accessed through `.`).
+    pub fn target_kind(&self) -> Option<&Kind> {
+        self.target()
+            .as_ref()
+            .map(|details| details.type_def.kind())
     }
 
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
@@ -90,11 +103,6 @@ impl Compiler {
             *self = *snapshot;
             self.external_context = context;
         }
-    }
-
-    /// Returns the root typedef for the paths (not the variables) of the object.
-    pub fn target_type_def(&self) -> Option<&TypeDef> {
-        self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
     /// Sets the external context data for VRL functions to use.
