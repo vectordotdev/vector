@@ -152,10 +152,10 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = { version = "0.7.0", optional = true }
-aws-types = { version = "0.7.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-sqs = { version = "0.7.0", optional = true }
-aws-smithy-client = { version = "0.37.0", optional = true }
+aws-config = { version = "0.8.0", optional = true }
+aws-types = { version = "0.8.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-sqs = { version = "0.8.0", optional = true }
+aws-smithy-client = { version = "0.38.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
