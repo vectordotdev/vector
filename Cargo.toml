@@ -239,7 +239,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
 infer = { version = "0.7.0", default-features = false, optional = true}
-indoc = { version = "1.0.4", default-features = false, optional = true }
+indoc = { version = "1.0.4", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
@@ -573,7 +573,7 @@ transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["mlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
-transforms-pipelines = ["transforms-filter", "indoc"]
+transforms-pipelines = ["transforms-filter"]
 transforms-reduce = []
 transforms-regex_parser = []
 transforms-remap = []
@@ -651,16 +651,16 @@ sinks-blackhole = []
 sinks-clickhouse = []
 sinks-console = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
-sinks-datadog_events = ["indoc"]
-sinks-datadog_logs = ["indoc"]
+sinks-datadog_events = []
+sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
-sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "indoc"]
+sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
 sinks-honeycomb = []
 sinks-http = []
-sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log", "indoc"]
-sinks-influxdb = ["indoc"]
+sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
+sinks-influxdb = []
 sinks-kafka = ["rdkafka"]
 sinks-logdna = []
 sinks-loki = []
@@ -765,7 +765,7 @@ mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
-prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "indoc"]
+prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
