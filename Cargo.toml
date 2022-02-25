@@ -296,15 +296,6 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
-# Criterion is properly a dev-dependency but can't be optional there, but dings
-# the unused_crate_dependencies lint unless we're compiling with bench flags on.
-criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"], optional = true}
-
-# assert_cmd is properly a dev-dependency but can't be optional there, but dings
-# the unused_crate_dependencies lint unless we're compiling with specific flags
-# on.
-assert_cmd = { version = "2.0.4", default-features = false, optional = true }
-
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
 windows-service = "0.4.0"
@@ -322,10 +313,12 @@ tonic-build = { version = "0.6", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.1"
+assert_cmd = { version = "2.0.4", default-features = false }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
+criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.119"
 pretty_assertions = "1.1.0"
 proptest = "1.0"
@@ -740,7 +733,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es", "reqwest/json"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
@@ -797,7 +790,6 @@ vector-unit-test-tests = [
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = [
-  "criterion",
   "sinks-file",
   "sinks-http",
   "sinks-socket",
@@ -814,16 +806,16 @@ benches = [
   "transforms-sample",
   "transforms-split",
 ]
-dnstap-benches = ["criterion", "sources-dnstap"]
-language-benches = ["criterion", "sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap"]
+dnstap-benches = ["sources-dnstap"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
-statistic-benches = ["criterion"]
+statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
-remap-benches = ["criterion", "transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
-transform-benches = ["criterion", "transforms-filter", "transforms-dedupe", "transforms-reduce"]
-codecs-benches = ["criterion", "codecs"]
-loki-benches = ["criterion", "sinks-loki"]
-enrichment-tables-benches = ["criterion", "enrichment-tables-file"]
+remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
+transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+codecs-benches = ["codecs"]
+loki-benches = ["sinks-loki"]
+enrichment-tables-benches = ["enrichment-tables-file"]
 
 [[bench]]
 name = "default"
