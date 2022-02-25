@@ -413,7 +413,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(&"message").is_some());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]

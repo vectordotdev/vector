@@ -10,7 +10,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
-use lookup::lookup2::{BorrowedSegment, Path};
+use lookup::lookup2::Path;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -102,9 +102,9 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get2(key.as_ref())
+    #[instrument(level = "trace", skip(self, key))]
+    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
+        self.fields.get2(key)
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]

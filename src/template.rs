@@ -5,6 +5,7 @@ use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
+use lookup::lookup2::BorrowedSegment;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{
@@ -110,6 +111,7 @@ impl Template {
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
         let event = event.into();
+        println!("Render event {:?} with template {:?}", event, self);
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -154,9 +156,11 @@ fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateR
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Log(log) => log
+                    .get(&[BorrowedSegment::Field(key)])
+                    .map(|val| val.to_string_lossy()),
                 EventRef::Metric(metric) => render_metric_field(key, metric),
-                EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Trace(trace) => trace.get(key).map(|val| val.to_string_lossy()),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());

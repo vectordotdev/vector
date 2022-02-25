@@ -148,6 +148,8 @@ impl FunctionTransform for KeyValue {
                 .split(&self.separator)
                 .filter_map(|pair| self.parse_pair(pair));
 
+            // println!("pairs: {:#?}", pairs);
+
             if let Some(target_field) = &self.target_field {
                 if log.contains(target_field) {
                     if self.overwrite_target {
@@ -160,6 +162,7 @@ impl FunctionTransform for KeyValue {
             }
 
             for (mut key, val) in pairs {
+                println!("key={:?} value={:?}", key, val);
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
@@ -383,7 +386,7 @@ mod tests {
         .await;
         assert!(log.contains("foo"));
         assert!(log.contains("bop"));
-        assert!(log.contains(&"({score})".to_string()));
+        assert!(log.contains("\"({score})\""));
     }
 
     #[tokio::test]
