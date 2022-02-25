@@ -10,5 +10,5 @@ scrape_configs:
 remote_write:
   # sources::prometheus::remote_write::integration_tests
   - url: 'http://127.0.0.1:9102'
-    remote_timeout: 5s
+    remote_timeout: 1s
     name: 'integration-test-2'

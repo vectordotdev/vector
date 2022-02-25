@@ -113,9 +113,6 @@ jobs:
           - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
-      # - uses: lhotari/action-upterm@v1
-      #   with:
-      #     limit-access-to-actor: true
       - run: make test-integration-${{ matrix.test }}
         env:
           CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
