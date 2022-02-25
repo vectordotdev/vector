@@ -350,7 +350,7 @@ test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --user $(shell id -u):$(shell id -g) --rm runner
+	# RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
@@ -362,6 +362,10 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
 	make test-integration-shutdown
+	make test-shutdown-cleanup
+
+test-shutdown-cleanup:
+	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
