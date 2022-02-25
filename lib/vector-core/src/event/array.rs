@@ -2,9 +2,13 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, vec};
+use std::{iter, slice, vec};
 
-use super::{Event, LogEvent, Metric, TraceEvent};
+#[cfg(test)]
+use quickcheck::{Arbitrary, Gen};
+use vector_buffers::EventCount;
+
+use super::{Event, EventDataEq, EventRef, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
 /// The core trait to abstract over any type that may work as an array
@@ -109,7 +113,7 @@ impl EventContainer for MetricArray {
 }
 
 /// An array of one of the `Event` variants exclusively.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum EventArray {
     /// An array of type `LogEvent`
     Logs(LogArray),
@@ -138,6 +142,15 @@ impl EventArray {
     pub fn for_each_trace(&mut self, update: impl FnMut(&mut TraceEvent)) {
         if let Self::Traces(traces) = self {
             traces.iter_mut().for_each(update);
+        }
+    }
+
+    /// Iterate over this array's events.
+    pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
+        match self {
+            Self::Logs(array) => EventArrayIter::Logs(array.iter()),
+            Self::Metrics(array) => EventArrayIter::Metrics(array.iter()),
+            Self::Traces(array) => EventArrayIter::Traces(array.iter()),
         }
     }
 }
@@ -173,6 +186,15 @@ impl ByteSizeOf for EventArray {
     }
 }
 
+impl EventCount for EventArray {
+    fn event_count(&self) -> usize {
+        match self {
+            Self::Logs(a) | Self::Traces(a) => a.len(),
+            Self::Metrics(a) => a.len(),
+        }
+    }
+}
+
 impl EventContainer for EventArray {
     type IntoIter = EventArrayIntoIter;
 
@@ -192,7 +214,72 @@ impl EventContainer for EventArray {
     }
 }
 
-/// The iterator type for `EventArray`.
+impl EventDataEq for EventArray {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Logs(a), Self::Logs(b)) | (Self::Traces(a), Self::Traces(b)) => {
+                a.event_data_eq(b)
+            }
+            (Self::Metrics(a), Self::Metrics(b)) => a.event_data_eq(b),
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for EventArray {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let len = u8::arbitrary(g) as usize;
+        let choice: u8 = u8::arbitrary(g);
+        // Quickcheck can't derive Arbitrary for enums, see
+        // https://github.com/BurntSushi/quickcheck/issues/98
+        if choice % 2 == 0 {
+            let mut logs = Vec::new();
+            for _ in 0..len {
+                logs.push(LogEvent::arbitrary(g));
+            }
+            EventArray::Logs(logs)
+        } else {
+            let mut metrics = Vec::new();
+            for _ in 0..len {
+                metrics.push(Metric::arbitrary(g));
+            }
+            EventArray::Metrics(metrics)
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            EventArray::Logs(logs) => Box::new(logs.shrink().map(EventArray::Logs)),
+            EventArray::Metrics(metrics) => Box::new(metrics.shrink().map(EventArray::Metrics)),
+            EventArray::Traces(traces) => Box::new(traces.shrink().map(EventArray::Traces)),
+        }
+    }
+}
+
+/// The iterator type for `EventArray::iter_events`.
+#[derive(Debug)]
+pub enum EventArrayIter<'a> {
+    /// An iterator over type `LogEvent`.
+    Logs(slice::Iter<'a, LogEvent>),
+    /// An iterator over type `Metric`.
+    Metrics(slice::Iter<'a, Metric>),
+    /// An iterator over type `Trace`.
+    Traces(slice::Iter<'a, TraceEvent>),
+}
+
+impl<'a> Iterator for EventArrayIter<'a> {
+    type Item = EventRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Logs(i) | Self::Traces(i) => i.next().map(EventRef::from),
+            Self::Metrics(i) => i.next().map(EventRef::from),
+        }
+    }
+}
+
+/// The iterator type for `EventArray::into_events`.
 #[derive(Debug)]
 pub enum EventArrayIntoIter {
     /// An iterator over type `LogEvent`.

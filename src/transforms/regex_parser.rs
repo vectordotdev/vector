@@ -338,7 +338,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().map(|event| event.into_log());
+        let result = buf.into_events().next().map(|event| event.into_log());
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }
