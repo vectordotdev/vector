@@ -139,14 +139,27 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
     };
     map.insert("port", port.into());
     map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
-    map.insert(
-        "query",
-        url.query_pairs()
-            .into_owned()
-            .map(|(k, v)| (k, v.into()))
-            .collect::<BTreeMap<String, Value>>()
-            .into(),
-    );
+
+    let mut query = BTreeMap::new();
+
+    for (k, value) in url.query_pairs() {
+        let value = value.as_ref();
+        query
+            .entry(k.into_owned())
+            .and_modify(|v| {
+                match v {
+                    Value::Array(v) => {
+                        v.push(value.into());
+                    }
+                    v => {
+                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                    }
+                };
+            })
+            .or_insert_with(|| value.into());
+    }
+
+    map.insert("query", query.into());
 
     map.into_iter()
         .map(|(k, v)| (k.to_owned(), v))
@@ -215,6 +228,23 @@ mod tests {
                 path: "/",
                 port: 443_i64,
                 query: {},
+                scheme: "https",
+                username: "",
+            })),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
+        query_array {
+            args: func_args![value: value!("https://vector.dev/?test=a&test=b&test=c"), default_known_ports: true],
+            want: Ok(value!({
+                fragment: (),
+                host: "vector.dev",
+                password: "",
+                path: "/",
+                port: 443_i64,
+                query: {
+                    test: ["a", "b", "c"]
+                },
                 scheme: "https",
                 username: "",
             })),
