@@ -17,7 +17,7 @@ use vector_common::EventDataEq;
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Value,
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 

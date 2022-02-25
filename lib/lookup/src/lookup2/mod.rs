@@ -2,6 +2,7 @@
 //     segments: Vec<OwnedSegment>,
 // }
 
+use serde::{Deserialize, Serialize};
 use std::iter::Cloned;
 use std::slice::Iter;
 use std::str::CharIndices;
@@ -103,8 +104,7 @@ enum JitState {
     Start,
     Dot,
     IndexStart,
-    IndexNegative { value: isize },
-    Index { value: isize },
+    Index { value: usize },
     Field { start: usize },
     Quote { start: usize },
     End,
@@ -121,7 +121,6 @@ impl<'a> Iterator for JitLookup<'a> {
                         JitState::Start => None,
                         JitState::Dot => None,
                         JitState::IndexStart => Some(BorrowedSegment::Invalid),
-                        JitState::IndexNegative { .. } => Some(BorrowedSegment::Invalid),
                         JitState::Index { .. } => Some(BorrowedSegment::Invalid),
                         JitState::Field { start } => {
                             Some(BorrowedSegment::Field(&self.path[start..]))
@@ -175,32 +174,18 @@ impl<'a> Iterator for JitLookup<'a> {
                             '0'..='9' => (
                                 None,
                                 JitState::Index {
-                                    value: c as isize - '0' as isize,
+                                    value: c as usize - '0' as usize,
                                 },
                             ),
-                            '-' => (None, JitState::IndexNegative { value: 0 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::Index { value } => match c {
                             '0'..='9' => {
-                                let new_digit = c as isize - '0' as isize;
+                                let new_digit = c as usize - '0' as usize;
                                 (
                                     None,
                                     JitState::Index {
                                         value: value * 10 + new_digit,
-                                    },
-                                )
-                            }
-                            ']' => (Some(Some(BorrowedSegment::Index(value))), JitState::Start),
-                            _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
-                        },
-                        JitState::IndexNegative { value } => match c {
-                            '0'..='9' => {
-                                let new_digit = c as isize - '0' as isize;
-                                (
-                                    None,
-                                    JitState::IndexNegative {
-                                        value: value * 10 - new_digit,
                                     },
                                 )
                             }
@@ -219,31 +204,10 @@ impl<'a> Iterator for JitLookup<'a> {
     }
 }
 
-// /// This tracks the current position in a path during a lookup. This should
-// /// be very cheap to create and update. This is essentially an iterator over `BorrowedSegment`.
-// pub trait Lookup2 {
-//     // /// Returns the next segment, if there is one.
-//     // /// This MUST NOT be called again after either `None` is returned, or `Some(BorrowedSegment::Invalid)`
-//     // fn next<'a>(&'a mut self) -> Option<BorrowedSegment<'a>>;
-// }
-
-// pub struct LookupIter<'a, T> {
-//     lookup: &'a mut T,
-// }
-//
-// impl<'a, T: Lookup2> Iterator for LookupIter<'a, T> {
-//     type Item = BorrowedSegment<'a>;
-//
-//     fn next(&mut self) -> Option<BorrowedSegment<'a>> {
-//         self.lookup.next()
-//         // None
-//     }
-// }
-
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum OwnedSegment {
     Field(String),
-    Index(isize),
+    Index(usize),
     Invalid,
 }
 
@@ -260,7 +224,7 @@ impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BorrowedSegment<'a> {
     Field(&'a str),
-    Index(isize),
+    Index(usize),
     Invalid,
 }
 
@@ -325,17 +289,11 @@ mod test {
                 "[42]foo",
                 vec![BorrowedSegment::Index(42), BorrowedSegment::Field("foo")],
             ),
-            ("[-1]", vec![BorrowedSegment::Index(-1)]),
-            ("[-42]", vec![BorrowedSegment::Index(-42)]),
+            ("[-1]", vec![BorrowedSegment::Invalid]),
+            ("[-42]", vec![BorrowedSegment::Invalid]),
             (".[-42]", vec![BorrowedSegment::Invalid]),
-            (
-                "[-42].foo",
-                vec![BorrowedSegment::Index(-42), BorrowedSegment::Field("foo")],
-            ),
-            (
-                "[-42]foo",
-                vec![BorrowedSegment::Index(-42), BorrowedSegment::Field("foo")],
-            ),
+            ("[-42].foo", vec![BorrowedSegment::Invalid]),
+            ("[-42]foo", vec![BorrowedSegment::Invalid]),
             (
                 ".\"[42]. {}-_\"",
                 vec![BorrowedSegment::Field("[42]. {}-_")],

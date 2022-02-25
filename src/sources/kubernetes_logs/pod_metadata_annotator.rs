@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
+    event::{Event, LogEvent},
     kubernetes as k8s,
 };
 

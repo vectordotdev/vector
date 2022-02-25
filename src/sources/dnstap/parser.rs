@@ -16,7 +16,7 @@ use trust_dns_proto::{
 };
 
 use crate::{
-    event::{LogEvent, PathComponent, Value},
+    event::{LogEvent, Value},
     internal_events::DnstapParseError,
     Error, Result,
 };
@@ -635,7 +635,7 @@ impl<'a> DnstapParser<'a> {
             .push(OwnedSegment::Field(key_path.into()));
 
         for (i, query) in questions.iter().enumerate() {
-            self.parent_key_path.push(OwnedSegment::Index(i as isize));
+            self.parent_key_path.push(OwnedSegment::Index(i));
             self.log_dns_query_question(query);
             self.parent_key_path.pop();
         }
@@ -851,7 +851,7 @@ impl<'a> DnstapParser<'a> {
             .push(OwnedSegment::Field(key_path.into()));
 
         options.iter().enumerate().for_each(|(i, opt)| {
-            self.parent_key_path.push(OwnedSegment::Index(i as isize));
+            self.parent_key_path.push(OwnedSegment::Index(i));
             self.log_edns_opt(opt);
             self.parent_key_path.pop();
         });
@@ -879,7 +879,7 @@ impl<'a> DnstapParser<'a> {
             .push(OwnedSegment::Field(key_path.into()));
 
         for (i, record) in records.iter().enumerate() {
-            self.parent_key_path.push(OwnedSegment::Index(i as isize));
+            self.parent_key_path.push(OwnedSegment::Index(i));
             self.log_dns_record(record);
             self.parent_key_path.pop();
         }

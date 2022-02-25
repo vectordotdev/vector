@@ -1,13 +1,13 @@
 use std::{collections::HashMap, str};
 
 use bytes::Bytes;
-use lookup::lookup2::{parse_path, BorrowedSegment, OwnedSegment};
+use lookup::lookup2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},

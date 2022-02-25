@@ -8,7 +8,7 @@ use lookup::lookup2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
+    event::{Event, LogEvent},
     kubernetes as k8s,
 };
 

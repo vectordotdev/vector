@@ -12,7 +12,7 @@ use crate::{
         log_schema, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, Value},
     internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},

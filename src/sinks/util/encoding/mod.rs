@@ -69,7 +69,7 @@ use std::{fmt::Debug, io, sync::Arc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event::{Event, LogEvent, MaybeAsLogMut, PathComponent, PathIter, Value},
+    event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
 
@@ -78,6 +78,7 @@ pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
 pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
+use lookup::lookup2::{parse_path, OwnedSegment};
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
@@ -117,7 +118,7 @@ pub trait EncodingConfiguration {
     fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
+    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>>;
     fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -126,7 +127,7 @@ pub trait EncodingConfiguration {
             let mut to_remove = log
                 .keys()
                 .filter(|field| {
-                    let field_path = PathIter::new(field).collect::<Vec<_>>();
+                    let field_path = parse_path(field);
                     !only_fields.iter().any(|only| {
                         // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
                         field_path.starts_with(&only[..])
@@ -181,7 +182,7 @@ pub trait EncodingConfiguration {
             (&self.only_fields(), &self.except_fields())
         {
             if except_fields.iter().any(|f| {
-                let path_iter = PathIter::new(f).collect::<Vec<_>>();
+                let path_iter = parse_path(f);
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
                 return Err(
@@ -274,21 +275,12 @@ pub enum TimestampFormat {
 
 fn deserialize_path_components<'de, D>(
     deserializer: D,
-) -> std::result::Result<Option<Vec<Vec<PathComponent<'static>>>>, D::Error>
+) -> std::result::Result<Option<Vec<Vec<OwnedSegment>>>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
     let fields: Option<Vec<String>> = serde::de::Deserialize::deserialize(deserializer)?;
-    Ok(fields.map(|fields| {
-        fields
-            .iter()
-            .map(|only| {
-                PathIter::new(only)
-                    .map(|component| component.into_static())
-                    .collect()
-            })
-            .collect()
-    }))
+    Ok(fields.map(|fields| fields.iter().map(|only| parse_path(only)).collect()))
 }
 
 #[cfg(test)]
@@ -312,8 +304,8 @@ mod tests {
     }
 
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<PathComponent> {
-        PathIter::new(a).collect()
+    fn as_path_components(a: &str) -> Vec<OwnedSegment> {
+        parse_path(a)
     }
 
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;

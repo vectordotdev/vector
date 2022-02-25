@@ -2,14 +2,12 @@ mod all_fields;
 mod contains;
 mod insert;
 mod keys;
-mod path_iter;
 mod remove;
 
 pub use all_fields::all_fields;
 pub use contains::contains;
 pub use insert::insert;
 pub use keys::keys;
-pub use path_iter::{PathComponent, PathIter};
 pub use remove::remove;
 
 pub(self) use super::Value;

@@ -22,7 +22,6 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-pub use util::log::{PathComponent, PathIter};
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 

@@ -1,7 +1,7 @@
 use lookup::lookup2::{BorrowedSegment, Path};
 use std::{collections::BTreeMap, iter::Peekable};
 
-use super::{PathComponent, Value};
+use super::Value;
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
 pub fn insert<'a>(
@@ -98,81 +98,6 @@ fn array_insert2<'a>(
                     &mut values[current as usize],
                     Value::Array(array),
                 ))
-            }
-        }
-        _ => None,
-    }
-}
-
-fn map_insert<'a, I>(
-    fields: &mut BTreeMap<String, Value>,
-    mut path_iter: Peekable<I>,
-    value: Value,
-) -> Option<Value>
-where
-    I: Iterator<Item = PathComponent<'a>>,
-{
-    match (path_iter.next(), path_iter.peek()) {
-        (Some(PathComponent::Key(current)), None) => fields.insert(current.into_owned(), value),
-        (Some(PathComponent::Key(current)), Some(PathComponent::Key(_))) => {
-            if let Some(Value::Object(map)) = fields.get_mut(current.as_ref()) {
-                map_insert(map, path_iter, value)
-            } else {
-                let mut map = BTreeMap::new();
-                map_insert(&mut map, path_iter, value);
-                fields.insert(current.into_owned(), Value::Object(map))
-            }
-        }
-        (Some(PathComponent::Key(current)), Some(&PathComponent::Index(next))) => {
-            if let Some(Value::Array(array)) = fields.get_mut(current.as_ref()) {
-                array_insert(array, path_iter, value)
-            } else {
-                let mut array = Vec::with_capacity(next + 1);
-                array_insert(&mut array, path_iter, value);
-                fields.insert(current.into_owned(), Value::Array(array))
-            }
-        }
-        _ => None,
-    }
-}
-
-fn array_insert<'a, I>(
-    values: &mut Vec<Value>,
-    mut path_iter: Peekable<I>,
-    value: Value,
-) -> Option<Value>
-where
-    I: Iterator<Item = PathComponent<'a>>,
-{
-    match (path_iter.next(), path_iter.peek()) {
-        (Some(PathComponent::Index(current)), None) => {
-            while values.len() <= current {
-                values.push(Value::Null);
-            }
-            Some(std::mem::replace(&mut values[current], value))
-        }
-        (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
-            if let Some(Value::Object(map)) = values.get_mut(current) {
-                map_insert(map, path_iter, value)
-            } else {
-                let mut map = BTreeMap::new();
-                map_insert(&mut map, path_iter, value);
-                while values.len() <= current {
-                    values.push(Value::Null);
-                }
-                Some(std::mem::replace(&mut values[current], Value::Object(map)))
-            }
-        }
-        (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {
-            if let Some(Value::Array(array)) = values.get_mut(current) {
-                array_insert(array, path_iter, value)
-            } else {
-                let mut array = Vec::with_capacity(next + 1);
-                array_insert(&mut array, path_iter, value);
-                while values.len() <= current {
-                    values.push(Value::Null);
-                }
-                Some(std::mem::replace(&mut values[current], Value::Array(array)))
             }
         }
         _ => None,
