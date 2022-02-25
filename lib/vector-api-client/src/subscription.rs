@@ -60,6 +60,15 @@ impl Payload {
         }
     }
 
+    /// Returns a "stop" payload for terminating the subscription in the GraphQL server.
+    fn stop(id: Uuid) -> Self {
+        Self {
+            id,
+            payload_type: "stop".to_owned(),
+            payload: serde_json::Value::Null,
+        }
+    }
+
     /// Attempts to return a definitive ResponseData on the `payload` field, matched against
     /// a generated `GraphQLQuery`.
     fn response<T: GraphQLQuery + Send + Sync>(
@@ -90,12 +99,19 @@ impl SubscriptionClient {
 
         // Spawn a handler for shutdown, and relaying received `Payload`s back to the relevant
         // subscription.
+        let tx_clone = tx.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     // Break the loop if shutdown is triggered. This happens implicitly once
                     // the client goes out of scope
-                    _ = &mut shutdown_rx => break,
+                    _ = &mut shutdown_rx => {
+                        let subscriptions = subscriptions_clone.lock().unwrap();
+                        for id in subscriptions.keys() {
+                            let _ = tx_clone.send(Payload::stop(*id));
+                        }
+                        break
+                    },
 
                     // Handle receiving payloads back _from_ the server
                     message = rx.recv() => {
