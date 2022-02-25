@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     pin::Pin,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Mutex},
 };
 
 use futures::SinkExt;
@@ -16,7 +16,6 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;
-use weak_table::WeakValueHashMap;
 
 /// Subscription GraphQL response, returned from an active stream.
 pub type BoxedSubscription<T> = Pin<

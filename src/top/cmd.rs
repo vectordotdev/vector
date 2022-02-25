@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use futures_util::future::join_all;
 use url::Url;
 use vector_api_client::{connect_subscription_client, Client};
 
@@ -58,28 +61,41 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         })
         .expect("Couldn't build WebSocket URL. Please report.");
 
-    let subscription_client = match connect_subscription_client(ws_url).await {
-        Ok(c) => c,
-        Err(e) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
-            }
-            return exitcode::UNAVAILABLE;
-        }
-    };
+    let opts_clone = opts.clone();
+    let connection = tokio::spawn(async move {
+        loop {
+            let subscription_client = match connect_subscription_client(ws_url.clone()).await {
+                Ok(c) => c,
+                Err(_) => {
+                    // Pause before next retry
+                    tokio::time::sleep(Duration::from_millis(5000)).await;
+                    continue;
+                }
+            };
 
-    // Subscribe to updated metrics
-    metrics::subscribe(subscription_client, tx.clone(), opts.interval as i64);
+            // Subscribe to updated metrics
+            let closed =
+                metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
+            // Tasks spawned in subscribe finish when subscription streams have
+            // completed. Currently, subscription streams only complete when the
+            // underlying web socket connection to the GraphQL server drops.
+            let _ = join_all(closed).await;
+        }
+    });
 
     // Initialize the dashboard
+    // match init_dashboard(url.as_str(), opts, sender).await {
     match init_dashboard(url.as_str(), opts, sender).await {
-        Ok(_) => exitcode::OK,
+        Ok(_) => {
+            connection.abort();
+            exitcode::OK
+        }
         _ => {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
             }
+            connection.abort();
             exitcode::IOERR
         }
     }

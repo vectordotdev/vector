@@ -137,8 +137,6 @@ async fn run(
             return exitcode::TEMPFAIL;
         }
     }
-
-    exitcode::OK
 }
 
 #[derive(Clone)]

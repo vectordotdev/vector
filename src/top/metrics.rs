@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
@@ -210,41 +211,54 @@ async fn processed_bytes_throughputs(
 
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
-pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
+pub fn subscribe(
+    client: SubscriptionClient,
+    tx: state::EventTx,
+    interval: i64,
+) -> Vec<JoinHandle<()>> {
     let client = Arc::new(client);
+    let mut handles = Vec::new();
 
-    tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
-    tokio::spawn(component_removed(Arc::clone(&client), tx.clone()));
-    tokio::spawn(received_events_totals(
+    handles.push(tokio::spawn(component_added(
+        Arc::clone(&client),
+        tx.clone(),
+    )));
+    handles.push(tokio::spawn(component_removed(
+        Arc::clone(&client),
+        tx.clone(),
+    )));
+    handles.push(tokio::spawn(received_events_totals(
         Arc::clone(&client),
         tx.clone(),
         interval,
-    ));
-    tokio::spawn(received_events_throughputs(
+    )));
+    handles.push(tokio::spawn(received_events_throughputs(
         Arc::clone(&client),
         tx.clone(),
         interval,
-    ));
-    tokio::spawn(sent_events_totals(
+    )));
+    handles.push(tokio::spawn(sent_events_totals(
         Arc::clone(&client),
         tx.clone(),
         interval,
-    ));
-    tokio::spawn(sent_events_throughputs(
+    )));
+    handles.push(tokio::spawn(sent_events_throughputs(
         Arc::clone(&client),
         tx.clone(),
         interval,
-    ));
-    tokio::spawn(processed_bytes_totals(
+    )));
+    handles.push(tokio::spawn(processed_bytes_totals(
         Arc::clone(&client),
         tx.clone(),
         interval,
-    ));
-    tokio::spawn(processed_bytes_throughputs(
+    )));
+    handles.push(tokio::spawn(processed_bytes_throughputs(
         Arc::clone(&client),
         tx,
         interval,
-    ));
+    )));
+
+    handles
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
