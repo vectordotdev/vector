@@ -42,6 +42,21 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 ))]
 use criterion as _;
 
+// rusoto_es is properly a dev-dependency but can't be one as it's only used in
+// a single place, which would ding the unused_crates_dependency lint.
+#[cfg(any(
+    feature = "aws-kinesis-firehose-integration-tests",
+))]
+use rusoto_es as _;
+
+// assert_cmd is properly a dev-dependency but can't be one as those aren't
+// allowed to be optional. As is, this dings the unused_crates_dependency lint.
+#[cfg(any(
+    feature = "shutdown-tests",
+    feature = "cli-tests",
+))]
+use assert_cmd as _;
+
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod config;
