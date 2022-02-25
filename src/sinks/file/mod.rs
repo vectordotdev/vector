@@ -143,6 +143,10 @@ impl SinkConfig for FileSinkConfig {
     fn sink_type(&self) -> &'static str {
         "file"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug)]

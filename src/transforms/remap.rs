@@ -1185,10 +1185,10 @@ mod tests {
     }
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
-        let mut out = collect_outputs(ft, event);
+        let out = collect_outputs(ft, event);
         assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
         assert!(out.primary.len() <= 1);
-        out.primary.pop()
+        out.primary.into_events().next()
     }
 
     fn transform_one_fallible(

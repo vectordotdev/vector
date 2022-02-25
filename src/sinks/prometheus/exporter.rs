@@ -139,6 +139,10 @@ impl SinkConfig for PrometheusExporterConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -166,6 +170,10 @@ impl SinkConfig for PrometheusCompatConfig {
 
     fn resources(&self) -> Vec<Resource> {
         self.config.resources()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

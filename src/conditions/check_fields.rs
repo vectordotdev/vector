@@ -13,7 +13,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
 #[derivative(Debug)]
-pub enum CheckFieldsPredicateArg {
+pub(crate) enum CheckFieldsPredicateArg {
     #[derivative(Debug = "transparent")]
     String(String),
     #[derivative(Debug = "transparent")]
@@ -26,7 +26,9 @@ pub enum CheckFieldsPredicateArg {
     Boolean(bool),
 }
 
-pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+pub(crate) trait CheckFieldsPredicate:
+    std::fmt::Debug + Send + Sync + dyn_clone::DynClone
+{
     fn check(&self, e: &Event) -> bool;
 }
 
@@ -41,7 +43,7 @@ pub(crate) struct EqualsPredicate {
 }
 
 impl EqualsPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -97,7 +99,7 @@ struct ContainsPredicate {
 }
 
 impl ContainsPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -136,7 +138,7 @@ struct StartsWithPredicate {
 }
 
 impl StartsWithPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -177,7 +179,7 @@ struct EndsWithPredicate {
 }
 
 impl EndsWithPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -216,7 +218,7 @@ struct NotEqualsPredicate {
 }
 
 impl NotEqualsPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -262,7 +264,7 @@ struct RegexPredicate {
 }
 
 impl RegexPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -304,7 +306,7 @@ struct ExistsPredicate {
 }
 
 impl ExistsPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -333,7 +335,7 @@ struct IpCidrPredicate {
 }
 
 impl IpCidrPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -377,7 +379,7 @@ struct NegatePredicate {
 }
 
 impl NegatePredicate {
-    pub fn new(
+    pub(crate) fn new(
         predicate: &str,
         target: String,
         arg: &CheckFieldsPredicateArg,
@@ -402,7 +404,7 @@ struct LengthEqualsPredicate {
 }
 
 impl LengthEqualsPredicate {
-    pub fn new(
+    pub(crate) fn new(
         target: String,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
@@ -510,7 +512,7 @@ fn build_predicates(
 //------------------------------------------------------------------------------
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct CheckFieldsConfig {
+pub(crate) struct CheckFieldsConfig {
     #[serde(flatten, default)]
     predicates: IndexMap<String, CheckFieldsPredicateArg>,
 }
@@ -520,14 +522,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(CheckFieldsConfig);
-
-impl CheckFieldsConfig {
-    #[cfg(test)]
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
-        Self { predicates }
-    }
-}
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
