@@ -83,6 +83,10 @@ impl SinkConfig for NatsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSinkConfig {

@@ -79,6 +79,10 @@ impl SinkConfig for SocketSinkConfig {
     fn sink_type(&self) -> &'static str {
         "socket"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
