@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use lookup::LookupBuf;
 use value::{
-    kind::{merge, nest, Collection, Field, Unknown},
+    kind::{insert, merge, nest, Collection, Field, Unknown},
     Kind,
 };
 
@@ -29,7 +29,7 @@ pub struct Definition {
 }
 
 impl Definition {
-    /// Create an "empty" output schema.
+    /// Create an "empty" definition.
     ///
     /// This means no type information is known about the event.
     pub fn empty() -> Self {
@@ -178,6 +178,40 @@ impl Definition {
     /// Returns `true` if the provided field is marked as optional.
     fn is_optional_field(&self, path: &LookupBuf) -> bool {
         self.optional.contains(path)
+    }
+}
+
+impl From<Collection<Field>> for Definition {
+    fn from(collection: Collection<Field>) -> Self {
+        Self {
+            collection,
+            meaning: HashMap::default(),
+            optional: HashSet::default(),
+        }
+    }
+}
+
+impl From<Definition> for Kind {
+    fn from(definition: Definition) -> Self {
+        let mut kind: Self = definition.collection.into();
+
+        for optional in &definition.optional {
+            kind.insert_at_path(
+                &optional.to_lookup(),
+                Kind::null(),
+                insert::Strategy {
+                    inner_conflict: insert::InnerConflict::Reject,
+                    leaf_conflict: insert::LeafConflict::Merge(merge::Strategy {
+                        depth: merge::Depth::Deep,
+                        indices: merge::Indices::Keep,
+                    }),
+                    coalesced_path: insert::CoalescedPath::Reject,
+                },
+            )
+            .expect("api contract guarantees infallible operation");
+        }
+
+        kind
     }
 }
 

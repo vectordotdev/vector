@@ -115,6 +115,10 @@ impl SinkConfig for InfluxDbConfig {
     fn sink_type(&self) -> &'static str {
         "influxdb_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl InfluxDbSvc {
