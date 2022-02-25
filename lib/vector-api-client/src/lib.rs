@@ -9,7 +9,7 @@
 //! deserialized JSON responses
 //!
 
-#![deny(missing_copy_implementations)]
+#![deny(missing_debug_implementations, missing_copy_implementations)]
 
 mod client;
 /// GraphQL queries

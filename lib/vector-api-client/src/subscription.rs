@@ -71,6 +71,7 @@ impl Payload {
 }
 
 /// A single `SubscriptionClient` enables subscription multiplexing.
+#[derive(Debug)]
 pub struct SubscriptionClient {
     tx: mpsc::UnboundedSender<Payload>,
     subscriptions: Arc<Mutex<HashMap<Uuid, Sender<Payload>>>>,
@@ -100,8 +101,8 @@ impl SubscriptionClient {
                     message = rx.recv() => {
                         match message {
                             Some(p) => {
-                                let subs = subscriptions_clone.lock().unwrap();
-                                let s: Option<&Sender<Payload>> = subs.get::<Uuid>(&p.id);
+                                let subscriptions = subscriptions_clone.lock().unwrap();
+                                let s: Option<&Sender<Payload>> = subscriptions.get::<Uuid>(&p.id);
                                 if let Some(s) = s {
                                     let _ = s.send(p);
                                 }
