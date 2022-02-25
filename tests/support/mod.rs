@@ -407,6 +407,10 @@ impl SinkConfig for MockSinkConfig {
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 struct MockSink {

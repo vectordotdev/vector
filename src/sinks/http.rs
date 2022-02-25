@@ -169,6 +169,10 @@ impl SinkConfig for HttpSinkConfig {
     fn sink_type(&self) -> &'static str {
         "http"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]

@@ -117,6 +117,10 @@ impl SinkConfig for PulsarSinkConfig {
     fn sink_type(&self) -> &'static str {
         "pulsar"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl PulsarSinkConfig {

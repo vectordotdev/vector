@@ -148,6 +148,10 @@ impl SinkConfig for StatsdSinkConfig {
     fn sink_type(&self) -> &'static str {
         "statsd"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn encode_tags(tags: &MetricTags) -> String {
