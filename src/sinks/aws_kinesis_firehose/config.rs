@@ -144,6 +144,10 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_firehose"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl KinesisFirehoseSinkConfig {

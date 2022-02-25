@@ -11,7 +11,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {
-    pub source: String,
+    pub(crate) source: String,
 }
 
 inventory::submit! {

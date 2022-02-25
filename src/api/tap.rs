@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::try_join_all, FutureExt, Sink};
+use futures::{future::try_join_all, stream, FutureExt, Sink, SinkExt};
 use itertools::Itertools;
 use tokio::sync::{
     mpsc as tokio_mpsc,
@@ -17,7 +17,7 @@ use vector_core::event::Metric;
 use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
 use crate::{
     config::{ComponentKey, OutputId},
-    event::{Event, LogEvent, TraceEvent},
+    event::{Event, EventArray, EventContainer, LogEvent, TraceEvent},
     topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
 };
 
@@ -267,7 +267,8 @@ async fn tap_handler(
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), output_id.clone());
+                            let sink = TapSink::new(tx.clone(), output_id.clone())
+                                .with_flat_map(|events: EventArray| stream::iter(events.into_events().map(Ok)));
 
                             // Attempt to connect the sink.
                             match control_tx
@@ -347,10 +348,10 @@ async fn tap_handler(
 
 #[cfg(all(
     test,
+    feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-remap",
     feature = "transforms-log_to_metric",
-    feature = "sinks-blackhole"
+    feature = "transforms-remap",
 ))]
 mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};
@@ -439,15 +440,15 @@ mod tests {
 
         // Send some events down the wire. Waiting until the first notifications are in
         // to ensure the event handler has been initialized.
-        let log_event = Event::new_empty_log();
-        let metric_event = Event::from(Metric::new(
+        let log_event = LogEvent::default();
+        let metric_event = Metric::new(
             id.to_string(),
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
-        ));
+        );
 
-        let _ = fanout.send(metric_event).await.unwrap();
-        let _ = fanout.send(log_event).await.unwrap();
+        let _ = fanout.send(vec![metric_event].into()).await.unwrap();
+        let _ = fanout.send(vec![log_event].into()).await.unwrap();
 
         // 3rd payload should be the metric event
         assert!(matches!(

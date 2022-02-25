@@ -94,6 +94,10 @@ impl SinkConfig for HoneycombConfig {
     fn sink_type(&self) -> &'static str {
         "honeycomb"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]

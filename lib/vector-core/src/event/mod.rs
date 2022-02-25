@@ -5,11 +5,8 @@ use std::{
     sync::Arc,
 };
 
-use bytes::{Buf, BufMut, Bytes};
-use enumflags2::{bitflags, BitFlags, FromBitsError};
-use prost::Message;
-use snafu::Snafu;
-use vector_buffers::{encoding::AsMetadata, encoding::Encodable, EventCount};
+use bytes::Bytes;
+use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
@@ -37,6 +34,7 @@ pub mod merge_state;
 mod metadata;
 pub mod metric;
 pub mod proto;
+mod ser;
 #[cfg(test)]
 mod test;
 pub mod util;
@@ -435,11 +433,61 @@ impl MaybeAsLogMut for Event {
 
 /// A wrapper for references to inner event types, where reconstituting
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EventRef<'a> {
     Log(&'a LogEvent),
     Metric(&'a Metric),
     Trace(&'a TraceEvent),
+}
+
+impl<'a> EventRef<'a> {
+    /// Extract the `LogEvent` reference in this.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `LogEvent` reference.
+    pub fn as_log(self) -> &'a LogEvent {
+        match self {
+            Self::Log(log) => log,
+            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+        }
+    }
+
+    /// Convert this reference into a new `LogEvent` by cloning.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `LogEvent` reference.
+    pub fn into_log(self) -> LogEvent {
+        match self {
+            Self::Log(log) => log.clone(),
+            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+        }
+    }
+
+    /// Extract the `Metric` reference in this.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `Metric` reference.
+    pub fn as_metric(self) -> &'a Metric {
+        match self {
+            Self::Metric(metric) => metric,
+            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+        }
+    }
+
+    /// Convert this reference into a new `Metric` by cloning.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if this is not a `Metric` reference.
+    pub fn into_metric(self) -> Metric {
+        match self {
+            Self::Metric(metric) => metric.clone(),
+            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+        }
+    }
 }
 
 impl<'a> From<&'a Event> for EventRef<'a> {
@@ -464,109 +512,12 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-#[derive(Debug, Snafu)]
-pub enum EncodeError {
-    #[snafu(display("the provided buffer was too small to fully encode this item"))]
-    BufferTooSmall,
-}
-
-#[derive(Debug, Snafu)]
-pub enum DecodeError {
-    #[snafu(display(
-        "the provided buffer could not be decoded as a valid Protocol Buffers payload"
-    ))]
-    InvalidProtobufPayload,
-}
-
-#[bitflags]
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum EventEncodableMetadataFlags {
-    // Protocol Buffers-based encoding based on the `Event`
-    // definition used for Vector gRPC communication.
-    ProtocolBuffers = 0b1,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EventEncodableMetadata(BitFlags<EventEncodableMetadataFlags>);
-
-impl EventEncodableMetadata {
-    fn contains(self, flag: EventEncodableMetadataFlags) -> bool {
-        self.0.contains(flag)
+impl<'a> EventDataEq<Event> for EventRef<'a> {
+    fn event_data_eq(&self, that: &Event) -> bool {
+        match (self, that) {
+            (Self::Log(a), Event::Log(b)) | (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
+            _ => false,
+        }
     }
-}
-
-impl From<EventEncodableMetadataFlags> for EventEncodableMetadata {
-    fn from(flag: EventEncodableMetadataFlags) -> Self {
-        Self(BitFlags::from(flag))
-    }
-}
-
-impl From<BitFlags<EventEncodableMetadataFlags>> for EventEncodableMetadata {
-    fn from(flags: BitFlags<EventEncodableMetadataFlags>) -> Self {
-        Self(flags)
-    }
-}
-
-impl TryFrom<u32> for EventEncodableMetadata {
-    type Error = FromBitsError<EventEncodableMetadataFlags>;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        BitFlags::try_from(value).map(Self)
-    }
-}
-
-impl AsMetadata for EventEncodableMetadata {
-    fn into_u32(self) -> u32 {
-        self.0.bits()
-    }
-
-    fn from_u32(value: u32) -> Option<Self> {
-        EventEncodableMetadata::try_from(value).ok()
-    }
-}
-
-impl Encodable for Event {
-    type Metadata = EventEncodableMetadata;
-    type EncodeError = EncodeError;
-    type DecodeError = DecodeError;
-
-    fn get_metadata() -> Self::Metadata {
-        EventEncodableMetadataFlags::ProtocolBuffers.into()
-    }
-
-    fn can_decode(metadata: Self::Metadata) -> bool {
-        metadata.contains(EventEncodableMetadataFlags::ProtocolBuffers)
-    }
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
-    where
-        B: BufMut,
-    {
-        proto::EventWrapper::from(self)
-            .encode(buffer)
-            .map_err(|_| EncodeError::BufferTooSmall)
-    }
-
-    fn decode<B>(_metadata: Self::Metadata, buffer: B) -> Result<Event, Self::DecodeError>
-    where
-        B: Buf,
-    {
-        proto::EventWrapper::decode(buffer)
-            .map(Into::into)
-            .map_err(|_| DecodeError::InvalidProtobufPayload)
-    }
-}
-
-/// Gets the only valid metadata value that should be given by the `Encodable` implementation of `Event`.
-///
-/// This is specifically used within a unit test to enforce that if we changed the `Encodable`
-/// implementation prior to the LevelDB-based disk buffer being removed entirely, unit tests would
-/// fail indicating that a PR/change was making a breaking change that it shouldn't be making.
-///
-/// REVIEWERS: Be aware, if this is being removed or changed, the only acceptable context is
-/// LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be explained.
-#[allow(dead_code)]
-pub(crate) fn allowed_event_encodable_metadata() -> EventEncodableMetadata {
-    EventEncodableMetadataFlags::ProtocolBuffers.into()
 }

@@ -29,7 +29,6 @@ use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::num::NonZeroU16;
 use std::str;
 use value::Kind;
 
@@ -37,8 +36,21 @@ mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-const TEST_LOGS_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
-const TEST_METRICS_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(2) };
+fn test_logs_schema_definition() -> schema::Definition {
+    schema::Definition::empty().required_field(
+        "a log field",
+        Kind::integer().or_bytes(),
+        Some("log field"),
+    )
+}
+
+fn test_metrics_schema_definition() -> schema::Definition {
+    schema::Definition::empty().required_field(
+        "a schema tag",
+        Kind::boolean().or_null(),
+        Some("tag"),
+    )
+}
 
 impl Arbitrary for LogMsg {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -73,8 +85,8 @@ fn test_decode_log_body() {
             true,
             decoder,
             "http",
-            TEST_LOGS_SCHEMA_ID.into(),
-            TEST_METRICS_SCHEMA_ID.into(),
+            test_logs_schema_definition(),
+            test_metrics_schema_definition(),
         );
 
         let events = source.decode_log_body(body, api_key).unwrap();
@@ -89,7 +101,10 @@ fn test_decode_log_body() {
             assert_eq!(log["ddsource"], msg.ddsource.into());
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
-            assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_logs_schema_definition()
+            );
         }
 
         TestResult::passed()
@@ -122,11 +137,11 @@ async fn source(
         metrics_output = Some(sender.add_outputs(status, "metrics".to_string()));
     }
     let address = next_addr();
-    let schema_ids = HashMap::from([
-        (Some(LOGS.to_owned()), TEST_LOGS_SCHEMA_ID.into()),
-        (Some(METRICS.to_owned()), TEST_METRICS_SCHEMA_ID.into()),
+    let schema_definitions = HashMap::from([
+        (Some(LOGS.to_owned()), test_logs_schema_definition()),
+        (Some(METRICS.to_owned()), test_metrics_schema_definition()),
     ]);
-    let context = SourceContext::new_test(sender, Some(schema_ids));
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
         DatadogAgentConfig {
             address,
@@ -203,7 +218,10 @@ async fn full_payload_v1() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -251,7 +269,10 @@ async fn full_payload_v2() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -299,7 +320,10 @@ async fn no_api_key() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -350,7 +374,10 @@ async fn api_key_in_url() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -401,7 +428,10 @@ async fn api_key_in_query_params() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -458,7 +488,10 @@ async fn api_key_in_header() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -580,7 +613,10 @@ async fn ignores_api_key() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         assert!(event.metadata().datadog_api_key().is_none());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -729,7 +765,10 @@ async fn decode_series_endpoints() {
         );
 
         for event in events {
-            assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_metrics_schema_definition()
+            );
         }
     }
 }
@@ -820,7 +859,10 @@ async fn decode_sketches() {
         );
 
         for event in events {
-            assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_metrics_schema_definition()
+            );
         }
     }
 }
@@ -917,7 +959,10 @@ async fn split_outputs() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "abcdefgh12345678abcdefgh12345678"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_metrics_schema_definition()
+        );
     }
 
     {
@@ -935,7 +980,10 @@ async fn split_outputs() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 
     COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);

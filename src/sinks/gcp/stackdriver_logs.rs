@@ -156,6 +156,10 @@ impl SinkConfig for StackdriverConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]

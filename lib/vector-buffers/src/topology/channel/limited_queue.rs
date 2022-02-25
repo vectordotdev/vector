@@ -283,7 +283,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async move { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -315,7 +315,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv1 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send1.is_woken());
@@ -352,7 +352,7 @@ mod tests {
 
         assert_eq!(1, rx.available_capacity());
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_pending!(recv2.poll());
 
@@ -392,7 +392,7 @@ mod tests {
             Ok::<_, SendError<MultiEventRecord>>(())
         });
 
-        let mut recv1 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!small_sends.is_woken());
@@ -438,7 +438,7 @@ mod tests {
         assert!(!send2.is_woken());
 
         // Our second read should unlock enough available capacity for the second send once complete.
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv2.poll()));
         drop(recv2);
@@ -449,14 +449,14 @@ mod tests {
         assert_eq!(Ok(()), assert_ready!(send2.poll()));
 
         // And just make sure we see those last two sends.
-        let mut recv3 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv3 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv3.is_woken());
         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv3.poll()));
         drop(recv3);
 
         assert_eq!(3, rx.available_capacity());
 
-        let mut recv4 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv4 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv4.is_woken());
         assert_eq!(Some(MultiEventRecord(4)), assert_ready!(recv4.poll()));
         drop(recv4);
@@ -481,7 +481,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -506,7 +506,7 @@ mod tests {
         assert_eq!(Some(42), assert_ready!(recv.poll()));
         drop(recv);
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_eq!(None, assert_ready!(recv2.poll()));
     }
@@ -520,7 +520,7 @@ mod tests {
         let tx2 = tx.clone();
 
         // Create our receive future.
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!recv.is_woken());
@@ -553,7 +553,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -611,7 +611,7 @@ mod tests {
 
         // Now do a receive which should return the one consumed slot, essentially allowing all
         // permits to be acquired by the blocked send.
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv.is_woken());
         assert!(!send2.is_woken());
 
@@ -627,7 +627,7 @@ mod tests {
 
         assert_eq!(0, tx.available_capacity());
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv2.poll()));
 
         assert_eq!(2, tx.available_capacity());

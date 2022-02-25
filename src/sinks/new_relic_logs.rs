@@ -111,6 +111,10 @@ impl SinkConfig for NewRelicLogsConfig {
     fn sink_type(&self) -> &'static str {
         "new_relic_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl NewRelicLogsConfig {

@@ -10,6 +10,7 @@ use crate::{
     },
     event::Event,
     internal_events::RouteEventDiscarded,
+    schema,
     transforms::Transform,
 };
 
@@ -88,7 +89,7 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.route
             .keys()
             .map(|output_name| Output::from((output_name, DataType::all())))
@@ -115,8 +116,8 @@ impl TransformConfig for RouteCompatConfig {
         self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -222,7 +223,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
@@ -257,7 +258,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);

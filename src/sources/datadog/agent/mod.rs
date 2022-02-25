@@ -107,16 +107,18 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let logs_schema_id = *cx
-            .schema_ids
+        let logs_schema_definition = cx
+            .schema_definitions
             .get(&Some(LOGS.to_owned()))
-            .or_else(|| cx.schema_ids.get(&None))
-            .expect("registered log schema required");
-        let metrics_schema_id = *cx
-            .schema_ids
+            .or_else(|| cx.schema_definitions.get(&None))
+            .expect("registered log schema required")
+            .clone();
+        let metrics_schema_definition = cx
+            .schema_definitions
             .get(&Some(METRICS.to_owned()))
-            .or_else(|| cx.schema_ids.get(&None))
-            .expect("registered metrics schema required");
+            .or_else(|| cx.schema_definitions.get(&None))
+            .expect("registered metrics schema required")
+            .clone();
 
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -124,8 +126,8 @@ impl SourceConfig for DatadogAgentConfig {
             self.store_api_key,
             decoder,
             tls.http_protocol_name(),
-            logs_schema_id,
-            metrics_schema_id,
+            logs_schema_definition,
+            metrics_schema_definition,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
@@ -233,8 +235,8 @@ struct DatadogAgentSource {
     log_schema_source_type_key: &'static str,
     decoder: codecs::Decoder,
     protocol: &'static str,
-    logs_schema_id: schema::Id,
-    metrics_schema_id: schema::Id,
+    logs_schema_definition: Arc<schema::Definition>,
+    metrics_schema_definition: Arc<schema::Definition>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -247,8 +249,8 @@ impl DatadogAgentSource {
         store_api_key: bool,
         decoder: codecs::Decoder,
         protocol: &'static str,
-        logs_schema_id: schema::Id,
-        metrics_schema_id: schema::Id,
+        logs_schema_definition: schema::Definition,
+        metrics_schema_definition: schema::Definition,
     ) -> Self {
         Self {
             store_api_key,
@@ -258,8 +260,8 @@ impl DatadogAgentSource {
             log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
             protocol,
-            logs_schema_id,
-            metrics_schema_id,
+            logs_schema_definition: Arc::new(logs_schema_definition),
+            metrics_schema_definition: Arc::new(metrics_schema_definition),
         }
     }
 
@@ -473,12 +475,13 @@ impl DatadogAgentSource {
             return Ok(Vec::new());
         }
 
-        let metrics = decode_ddsketch(body, &api_key, self.metrics_schema_id).map_err(|error| {
-            ErrorMessage::new(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                format!("Error decoding Datadog sketch: {:?}", error),
-            )
-        })?;
+        let metrics =
+            decode_ddsketch(body, &api_key, &self.metrics_schema_definition).map_err(|error| {
+                ErrorMessage::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("Error decoding Datadog sketch: {:?}", error),
+                )
+            })?;
 
         emit!(&EventsReceived {
             byte_size: metrics.size_of(),
@@ -512,7 +515,7 @@ impl DatadogAgentSource {
         let decoded_metrics: Vec<Event> = metrics
             .series
             .into_iter()
-            .flat_map(|m| into_vector_metric(m, api_key.clone(), self.metrics_schema_id))
+            .flat_map(|m| into_vector_metric(m, api_key.clone(), &self.metrics_schema_definition))
             .collect();
 
         emit!(&EventsReceived {
@@ -571,7 +574,8 @@ impl DatadogAgentSource {
                                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                                 }
 
-                                log.metadata_mut().set_schema_id(self.logs_schema_id);
+                                log.metadata_mut()
+                                    .set_schema_definition(&self.logs_schema_definition);
                             }
 
                             decoded.push(event);
@@ -631,7 +635,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
 fn into_vector_metric(
     dd_metric: DatadogSeriesMetric,
     api_key: Option<Arc<str>>,
-    schema_id: schema::Id,
+    schema_definition: &Arc<schema::Definition>,
 ) -> Vec<Event> {
     let mut tags: BTreeMap<String, String> = dd_metric
         .tags
@@ -707,7 +711,9 @@ fn into_vector_metric(
                 .set_datadog_api_key(Some(Arc::clone(k)));
         }
 
-        metric.metadata_mut().set_schema_id(schema_id);
+        metric
+            .metadata_mut()
+            .set_schema_definition(schema_definition);
 
         metric.into()
     })

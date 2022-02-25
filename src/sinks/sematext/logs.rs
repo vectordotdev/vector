@@ -103,6 +103,10 @@ impl SinkConfig for SematextLogsConfig {
     fn sink_type(&self) -> &'static str {
         "sematext_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 struct MapTimestampStream {

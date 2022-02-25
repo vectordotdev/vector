@@ -34,6 +34,7 @@ use vector::{
         metric::{self, MetricData, MetricValue},
         Event, Value,
     },
+    schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     source_sender::{ReceiverStream, SourceSender},
     sources::Source,
@@ -314,7 +315,7 @@ impl TransformConfig for MockTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
@@ -405,6 +406,10 @@ impl SinkConfig for MockSinkConfig {
 
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

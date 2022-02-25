@@ -91,6 +91,10 @@ impl SinkConfig for HecMetricsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "splunk_hec_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl HecMetricsSinkConfig {
