@@ -13,7 +13,6 @@ lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 value = { path = "../../value" }
 
-bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"
 dyn-clone = "1.0.4"

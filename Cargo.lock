@@ -177,20 +177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "assert_cmd"
-version = "2.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93ae1ddd39efd67689deb1979d80bad3bf7f2b09c6e6117c8d1f2443b5e2f83e"
-dependencies = [
- "bstr",
- "doc-comment",
- "predicates",
- "predicates-core",
- "predicates-tree",
- "wait-timeout",
-]
-
-[[package]]
 name = "async-channel"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1889,7 +1875,6 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "once_cell",
- "ordered-float",
  "pest",
  "pest_derive",
  "regex",
@@ -1950,12 +1935,6 @@ name = "diff"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e25ea47919b1560c4e3b7fe0aaab9becf5b84a10325ddf7db0f0ba5e1026499"
-
-[[package]]
-name = "difflib"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
 name = "digest"
@@ -3802,7 +3781,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.31",
 ]
 
 [[package]]
@@ -5207,33 +5185,6 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
-
-[[package]]
-name = "predicates"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e5a7689e456ab905c22c2b48225bb921aba7c8dfa58440d68ba13f6222a715"
-dependencies = [
- "difflib",
- "itertools",
- "predicates-core",
-]
-
-[[package]]
-name = "predicates-core"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57e35a3326b75e49aa85f5dc6ec15b41108cf5aee58eabb1f274dd18b73c2451"
-
-[[package]]
-name = "predicates-tree"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "338c7be2905b732ae3984a2f40032b5e94fd8f52505b186c7d4d68d193445df7"
-dependencies = [
- "predicates-core",
- "termtree",
-]
 
 [[package]]
 name = "pretty_assertions"
@@ -7326,12 +7277,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "termtree"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13a4ec180a2de59b57434704ccfad967f789b12737738798fa08798cd5824c16"
-
-[[package]]
 name = "test-case"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8293,7 +8238,6 @@ dependencies = [
  "async-graphql",
  "bytes 1.1.0",
  "chrono",
- "indoc",
  "lookup",
  "mlua",
  "ordered-float",
@@ -8324,7 +8268,6 @@ version = "0.21.0"
 dependencies = [
  "approx",
  "arc-swap",
- "assert_cmd",
  "async-compression",
  "async-graphql",
  "async-graphql-warp",
@@ -8519,7 +8462,6 @@ name = "vector-api-client"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "async-stream",
  "async-trait",
  "chrono",
  "futures 0.3.21",
@@ -8582,7 +8524,6 @@ dependencies = [
  "temp-dir",
  "tempdir",
  "tokio",
- "tokio-stream",
  "tokio-test",
  "tokio-util 0.7.0",
  "tracing 0.1.31",
@@ -8667,7 +8608,6 @@ dependencies = [
  "tower",
  "tracing 0.1.31",
  "tracing-core 0.1.22",
- "tracing-log",
  "tracing-subscriber",
  "twox-hash",
  "typetag",
@@ -8729,7 +8669,6 @@ dependencies = [
 name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "bytes 1.1.0",
  "chrono",
  "criterion",

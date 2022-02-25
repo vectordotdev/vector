@@ -119,6 +119,41 @@ jobs:
       - name: Stop sccache
         run: sccache --stop-server
 
+  check-udeps:
+    name: Check for unused dependencies
+    runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v2.4.0
+      - run: make ci-sweep
+      - uses: actions/cache@v2.1.7
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      # We always make sure to stop any previous sccache process before starting it fresh, that
+      # way we can be sure we're using the right credentials for storage, etc.
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --stop-server || true
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      - run: cargo install cargo-udeps --locked
+      - run: make check-unused-dependencies
+      - name: Stop sccache
+        run: sccache --stop-server
+
   test-misc:
     name: Miscellaneous - Linux
     runs-on: [self-hosted, linux, x64, general]
@@ -307,7 +342,7 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: cargo install cargo-hack
+      - run: cargo install cargo-hack --locked
       - run: make check-stdlib-features
       - name: Stop sccache
         run: sccache --stop-server
@@ -333,7 +368,7 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: cargo install cargo-hack
+      - run: cargo install cargo-hack --locked
       - run: make check-component-features
       - name: Stop sccache
         run: sccache --stop-server
