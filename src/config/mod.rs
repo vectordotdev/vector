@@ -285,7 +285,7 @@ pub struct SourceContext {
     ///
     /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
-    pub schema_ids: HashMap<Option<String>, schema::Id>,
+    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 }
 
 impl SourceContext {
@@ -304,7 +304,7 @@ impl SourceContext {
                 out,
                 proxy: Default::default(),
                 acknowledgements: false,
-                schema_ids: HashMap::default(),
+                schema_definitions: HashMap::default(),
             },
             shutdown,
         )
@@ -313,7 +313,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(
         out: SourceSender,
-        schema_ids: Option<HashMap<Option<String>, schema::Id>>,
+        schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
     ) -> Self {
         Self {
             key: ComponentKey::from("default"),
@@ -322,7 +322,7 @@ impl SourceContext {
             out,
             proxy: Default::default(),
             acknowledgements: false,
-            schema_ids: schema_ids.unwrap_or_default(),
+            schema_definitions: schema_definitions.unwrap_or_default(),
         }
     }
 

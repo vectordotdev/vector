@@ -15,7 +15,6 @@ use vrl::{
     Program, Runtime, Terminate,
 };
 
-#[cfg(feature = "vrl-vm")]
 use std::sync::Arc;
 #[cfg(feature = "vrl-vm")]
 use vrl::Vm;
@@ -174,8 +173,8 @@ pub struct Remap {
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    default_schema_id: schema::Id,
-    dropped_schema_id: schema::Id,
+    default_schema_definition: Arc<schema::Definition>,
+    dropped_schema_definition: Arc<schema::Definition>,
 }
 
 impl Remap {
@@ -191,16 +190,18 @@ impl Remap {
         #[cfg(feature = "vrl-vm")]
         let vm = Arc::new(runtime.compile(functions, &program)?);
 
-        let default_schema_id = *context
-            .schema_ids
+        let default_schema_definition = context
+            .schema_definitions
             .get(&None)
-            .expect("default schema required");
+            .expect("default schema required")
+            .clone();
 
-        let dropped_schema_id = *context
-            .schema_ids
+        let dropped_schema_definition = context
+            .schema_definitions
             .get(&Some(DROPPED.to_owned()))
-            .or_else(|| context.schema_ids.get(&None))
-            .expect("dropped schema required");
+            .or_else(|| context.schema_definitions.get(&None))
+            .expect("dropped schema required")
+            .clone();
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -212,8 +213,8 @@ impl Remap {
             reroute_dropped: config.reroute_dropped,
             #[cfg(feature = "vrl-vm")]
             vm,
-            default_schema_id,
-            dropped_schema_id,
+            default_schema_definition: Arc::new(default_schema_definition),
+            dropped_schema_definition: Arc::new(dropped_schema_definition),
         })
     }
 
@@ -286,8 +287,8 @@ impl Clone for Remap {
             reroute_dropped: self.reroute_dropped,
             #[cfg(feature = "vrl-vm")]
             vm: Arc::clone(&self.vm),
-            default_schema_id: self.default_schema_id,
-            dropped_schema_id: self.dropped_schema_id,
+            default_schema_definition: Arc::clone(&self.default_schema_definition),
+            dropped_schema_definition: Arc::clone(&self.dropped_schema_definition),
         }
     }
 }
@@ -320,7 +321,7 @@ impl SyncTransform for Remap {
         match result {
             Ok(_) => {
                 for event in target.into_events() {
-                    push_default(event, output, self.default_schema_id);
+                    push_default(event, output, &self.default_schema_definition);
                 }
             }
             Err(reason) => {
@@ -345,12 +346,12 @@ impl SyncTransform for Remap {
                 if !drop {
                     let event = original_event.expect("event will be set");
 
-                    push_default(event, output, self.default_schema_id);
+                    push_default(event, output, &self.default_schema_definition);
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
                     self.annotate_dropped(&mut event, reason, error);
-                    push_dropped(event, output, self.dropped_schema_id);
+                    push_dropped(event, output, &self.dropped_schema_definition);
                 }
             }
         }
@@ -358,14 +359,28 @@ impl SyncTransform for Remap {
 }
 
 #[inline]
-fn push_default(mut event: Event, output: &mut TransformOutputsBuf, schema_id: schema::Id) {
-    event.metadata_mut().set_schema_id(schema_id);
+fn push_default(
+    mut event: Event,
+    output: &mut TransformOutputsBuf,
+    schema_definition: &Arc<schema::Definition>,
+) {
+    event
+        .metadata_mut()
+        .set_schema_definition(schema_definition);
+
     output.push(event)
 }
 
 #[inline]
-fn push_dropped(mut event: Event, output: &mut TransformOutputsBuf, schema_id: schema::Id) {
-    event.metadata_mut().set_schema_id(schema_id);
+fn push_dropped(
+    mut event: Event,
+    output: &mut TransformOutputsBuf,
+    schema_definition: &Arc<schema::Definition>,
+) {
+    event
+        .metadata_mut()
+        .set_schema_definition(schema_definition);
+
     output.push_named(DROPPED, event)
 }
 
@@ -382,10 +397,7 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        num::NonZeroU16,
-    };
+    use std::collections::{BTreeMap, HashMap};
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
@@ -403,16 +415,29 @@ mod tests {
         transforms::OutputBuffer,
     };
 
-    const TEST_DEFAULT_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
-    const TEST_DROPPED_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(2) };
+    fn test_default_schema_definition() -> schema::Definition {
+        schema::Definition::empty().required_field(
+            "a default field",
+            Kind::integer().or_bytes(),
+            Some("default"),
+        )
+    }
+
+    fn test_dropped_schema_definition() -> schema::Definition {
+        schema::Definition::empty().required_field(
+            "a dropped field",
+            Kind::boolean().or_null(),
+            Some("dropped"),
+        )
+    }
 
     fn remap(config: RemapConfig) -> Result<Remap> {
-        let schema_ids = HashMap::from([
-            (None, TEST_DEFAULT_SCHEMA_ID.into()),
-            (Some(DROPPED.to_owned()), TEST_DROPPED_SCHEMA_ID.into()),
+        let schema_definitions = HashMap::from([
+            (None, test_default_schema_definition()),
+            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
         ]);
 
-        Remap::new(config, &TransformContext::new_test(schema_ids))
+        Remap::new(config, &TransformContext::new_test(schema_definitions))
     }
 
     #[test]
@@ -476,8 +501,8 @@ mod tests {
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
         assert_eq!(
-            result1.metadata().schema_id(),
-            TEST_DEFAULT_SCHEMA_ID.into()
+            result1.metadata().schema_definition(),
+            &test_default_schema_definition()
         );
         assert!(tform.runtime().is_empty());
 
@@ -489,8 +514,8 @@ mod tests {
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
         assert_eq!(
-            result2.metadata().schema_id(),
-            TEST_DEFAULT_SCHEMA_ID.into()
+            result2.metadata().schema_definition(),
+            &test_default_schema_definition()
         );
         assert!(tform.runtime().is_empty());
     }
@@ -525,7 +550,10 @@ mod tests {
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
 
-        assert_eq!(result.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
+        assert_eq!(
+            result.metadata().schema_definition(),
+            &test_default_schema_definition()
+        );
     }
 
     #[test]
@@ -560,11 +588,17 @@ mod tests {
 
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "foo");
-        assert_eq!(r.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
+        assert_eq!(
+            r.metadata().schema_definition(),
+            &test_default_schema_definition()
+        );
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "bar");
 
-        assert_eq!(r.metadata().schema_id(), TEST_DEFAULT_SCHEMA_ID.into());
+        assert_eq!(
+            r.metadata().schema_definition(),
+            &test_default_schema_definition()
+        );
     }
 
     #[test]
@@ -736,7 +770,7 @@ mod tests {
                     "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
-                    metadata.with_schema_id(TEST_DEFAULT_SCHEMA_ID.into()),
+                    metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some({
@@ -805,13 +839,13 @@ mod tests {
             reroute_dropped: true,
             ..Default::default()
         };
-        let schema_ids = HashMap::from([
-            (None, TEST_DEFAULT_SCHEMA_ID.into()),
-            (Some(DROPPED.to_owned()), TEST_DROPPED_SCHEMA_ID.into()),
+        let schema_definitions = HashMap::from([
+            (None, test_default_schema_definition()),
+            (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
         ]);
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
-            schema_ids,
+            schema_definitions,
             merged_schema_definition: schema::Definition::empty().required_field(
                 "hello",
                 Kind::bytes(),
@@ -873,7 +907,8 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default().with_schema_id(TEST_DEFAULT_SCHEMA_ID.into()),
+                    EventMetadata::default()
+                        .with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
@@ -892,7 +927,8 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default().with_schema_id(TEST_DROPPED_SCHEMA_ID.into()),
+                    EventMetadata::default()
+                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
@@ -914,7 +950,8 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default().with_schema_id(TEST_DROPPED_SCHEMA_ID.into()),
+                    EventMetadata::default()
+                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();

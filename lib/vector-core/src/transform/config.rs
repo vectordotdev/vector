@@ -36,7 +36,7 @@ pub struct TransformContext {
     ///
     /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
-    pub schema_ids: HashMap<Option<String>, schema::Id>,
+    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 
     /// The schema definition created by merging all inputs of the transform.
     ///
@@ -53,7 +53,7 @@ impl Default for TransformContext {
             globals: Default::default(),
             #[cfg(feature = "vrl")]
             enrichment_tables: Default::default(),
-            schema_ids: HashMap::from([(None, schema::Id::empty())]),
+            schema_definitions: HashMap::from([(None, schema::Definition::empty())]),
             merged_schema_definition: schema::Definition::empty(),
         }
     }
@@ -71,9 +71,9 @@ impl TransformContext {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test(schema_ids: HashMap<Option<String>, schema::Id>) -> Self {
+    pub fn new_test(schema_definitions: HashMap<Option<String>, schema::Definition>) -> Self {
         Self {
-            schema_ids,
+            schema_definitions,
             ..Default::default()
         }
     }
