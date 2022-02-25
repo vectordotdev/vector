@@ -20,6 +20,9 @@ use crate::{
     signal::{SignalRx, SignalTo},
 };
 
+/// Delay (in milliseconds) before attempting to reconnect to the Vector API
+const RECONNECT_DELAY: u64 = 5000;
+
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
 pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
@@ -66,11 +69,12 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
             biased;
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             status = run(url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
-                if status == exitcode::OK {
+                if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL {
+                    eprintln!("[tap] Connection failed. Reconnecting in {:?} seconds.", RECONNECT_DELAY / 1000);
+                    tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                } else {
                     break;
                 }
-                eprintln!("[tap] Connection dropped. Reconnecting in 5 seconds.");
-                tokio::time::sleep(Duration::from_millis(5000)).await;
             }
         }
     }
@@ -89,7 +93,10 @@ async fn run(
         Err(e) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
+                eprintln!(
+                    "[tap] Couldn't connect to Vector API via WebSockets: {:?}",
+                    e
+                );
             }
             return exitcode::UNAVAILABLE;
         }
