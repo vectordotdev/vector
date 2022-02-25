@@ -1,4 +1,4 @@
-pub(crate) use crate::schema::{Definition, Id};
+pub(crate) use crate::schema::Definition;
 
 use serde::{Deserialize, Serialize};
 

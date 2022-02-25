@@ -19,7 +19,7 @@ use dd_proto::SketchPayload;
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
-    schema_id: schema::Id,
+    schema_definition: &Arc<schema::Definition>,
 ) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
@@ -66,7 +66,9 @@ pub(crate) fn decode_ddsketch(
                         .set_datadog_api_key(Some(Arc::clone(k)));
                 }
 
-                metric.metadata_mut().set_schema_id(schema_id);
+                metric
+                    .metadata_mut()
+                    .set_schema_definition(schema_definition);
 
                 metric.into()
             })
