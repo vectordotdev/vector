@@ -65,7 +65,7 @@ impl InternalEvent for NatsEventSendError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "failed_sending_event",
+            "error_code" => "sending_event",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
