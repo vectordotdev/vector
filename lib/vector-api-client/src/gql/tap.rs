@@ -72,7 +72,6 @@ pub trait TapSubscriptionExt {
     //     limit: i64,
     //     interval: i64,
     // ) -> crate::StreamResponse<OutputEventsByComponentIdPatternsSubscription>;
-
 }
 
 impl TapSubscriptionExt for crate::SubscriptionClient {

@@ -1,13 +1,17 @@
 use std::{
+    collections::HashMap,
     pin::Pin,
-    sync::{Arc, Mutex, Weak}, collections::HashMap,
+    sync::{Arc, Mutex, Weak},
 };
 
 use futures::SinkExt;
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::{broadcast::{self, Sender}, mpsc, oneshot};
+use tokio::sync::{
+    broadcast::{self, Sender},
+    mpsc, oneshot,
+};
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
@@ -22,7 +26,6 @@ pub type BoxedSubscription<T> = Pin<
             + Sync,
     >,
 >;
-
 
 /// Payload contains the raw data received back from a GraphQL subscription. At the point
 /// of receiving data, the only known fields are { id, type }; what's contained inside the
@@ -95,11 +98,19 @@ impl SubscriptionClient {
                     _ = &mut shutdown_rx => break,
 
                     // Handle receiving payloads back _from_ the server
-                    Some(p) = rx.recv() => {
-                        let subs = subscriptions_clone.lock().unwrap();
-                        let s: Option<&Sender<Payload>> = subs.get::<Uuid>(&p.id);
-                        if let Some(s) = s {
-                            let _ = s.send(p);
+                    message = rx.recv() => {
+                        match message {
+                            Some(p) => {
+                                let subs = subscriptions_clone.lock().unwrap();
+                                let s: Option<&Sender<Payload>> = subs.get::<Uuid>(&p.id);
+                                if let Some(s) = s {
+                                    let _ = s.send(p);
+                                }
+                            }
+                            None => {
+                                subscriptions_clone.lock().unwrap().clear();
+                                break;
+                            },
                         }
                     }
                 }
@@ -129,10 +140,7 @@ impl SubscriptionClient {
 
         let (tx, rx) = broadcast::channel::<Payload>(100);
 
-        self.subscriptions
-            .lock()
-            .unwrap()
-            .insert(id, tx);
+        self.subscriptions.lock().unwrap().insert(id, tx);
 
         // Initialize the connection with the relevant control messages.
         let _ = self.tx.send(Payload::init(id));
