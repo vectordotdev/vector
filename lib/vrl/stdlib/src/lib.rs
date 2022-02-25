@@ -172,7 +172,7 @@ mod parse_syslog;
 mod parse_timestamp;
 #[cfg(feature = "parse_tokens")]
 mod parse_tokens;
-#[cfg(feature = "parse_url")]
+#[cfg(all(feature = "parse_url", feature = "parse_query_string"))]
 mod parse_url;
 #[cfg(feature = "parse_user_agent")]
 mod parse_user_agent;

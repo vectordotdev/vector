@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use super::parse_query_string;
 use url::Url;
 use vrl::prelude::*;
 
@@ -9,21 +10,6 @@ pub struct ParseUrl;
 impl Function for ParseUrl {
     fn identifier(&self) -> &'static str {
         "parse_url"
-    }
-
-    fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "default_known_ports",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -63,19 +49,6 @@ impl Function for ParseUrl {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let string = value.try_bytes_utf8_lossy()?;
-        let default_known_ports = arguments
-            .optional("default_known_ports")
-            .map(|val| val.as_boolean().unwrap_or(false))
-            .unwrap_or(false);
-
-        Url::parse(&string)
-            .map_err(|e| format!("unable to parse url: {}", e).into())
-            .map(|url| url_to_value(url, default_known_ports))
-    }
-
     fn compile(
         &self,
         _state: &state::Compiler,
@@ -91,6 +64,34 @@ impl Function for ParseUrl {
             value,
             default_known_ports,
         }))
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::BYTES,
+                required: true,
+            },
+            Parameter {
+                keyword: "default_known_ports",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+        ]
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        let string = value.try_bytes_utf8_lossy()?;
+        let default_known_ports = arguments
+            .optional("default_known_ports")
+            .map(|val| val.as_boolean().unwrap_or(false))
+            .unwrap_or(false);
+
+        Url::parse(&string)
+            .map_err(|e| format!("unable to parse url: {}", e).into())
+            .map(|url| url_to_value(url, default_known_ports))
     }
 }
 
@@ -140,25 +141,7 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
     map.insert("port", port.into());
     map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
 
-    let mut query = BTreeMap::new();
-
-    for (k, value) in url.query_pairs() {
-        let value = value.as_ref();
-        query
-            .entry(k.into_owned())
-            .and_modify(|v| {
-                match v {
-                    Value::Array(v) => {
-                        v.push(value.into());
-                    }
-                    v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
-                    }
-                };
-            })
-            .or_insert_with(|| value.into());
-    }
-
+    let query = parse_query_string::parse(url.query_pairs());
     map.insert("query", query.into());
 
     map.into_iter()
@@ -177,7 +160,7 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         ("fragment".into(), Kind::bytes().or_null()),
         (
             "query".into(),
-            Kind::object(Collection::from_unknown(Kind::bytes())),
+            Kind::object(parse_query_string::inner_kind()),
         ),
     ])
 }
