@@ -19,7 +19,7 @@ use crate::{
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
-pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
+pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
     // Use the provided URL as the Vector GraphQL API server, or default to the local port
     // provided by the API config. This will work despite `api` and `api-client` being distinct
     // features; the config is available even if `api` is disabled.

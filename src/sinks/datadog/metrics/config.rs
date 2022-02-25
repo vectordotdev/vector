@@ -133,6 +133,10 @@ impl SinkConfig for DatadogMetricsConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl DatadogMetricsConfig {

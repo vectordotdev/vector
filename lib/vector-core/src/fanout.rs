@@ -357,13 +357,13 @@ mod tests {
         let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
-        let mut first_send = spawn(async { fanout.send(events[0].clone().into()).await });
+        let mut first_send = spawn(fanout.send(events[0].clone().into()));
         let first_send_result = assert_ready!(first_send.poll());
         assert!(first_send_result.is_ok());
         drop(first_send);
 
         // Second send should return pending because sender B is now full:
-        let mut second_send = spawn(async { fanout.send(events[1].clone().into()).await });
+        let mut second_send = spawn(fanout.send(events[1].clone().into()));
         assert_pending!(second_send.poll());
 
         // Now read an item from each receiver to free up capacity for the second sender:
@@ -456,13 +456,13 @@ mod tests {
             let events = make_events(2);
 
             // First send should immediately complete because all senders have capacity:
-            let mut first_send = spawn(async { fanout.send(events[0].clone().into()).await });
+            let mut first_send = spawn(fanout.send(events[0].clone().into()));
             let first_send_result = assert_ready!(first_send.poll());
             assert!(first_send_result.is_ok());
             drop(first_send);
 
             // Second send should return pending because sender B is now full:
-            let mut second_send = spawn(async { fanout.send(events[1].clone().into()).await });
+            let mut second_send = spawn(fanout.send(events[1].clone().into()));
             assert_pending!(second_send.poll());
 
             // Now read an item from each receiver to free up capacity:
@@ -564,7 +564,7 @@ mod tests {
             start_sender_replace(&control, &mut receivers, 0, 4).await;
 
         // Third send should return pending because now we have an in-flight replacement:
-        let mut third_send = spawn(async { fanout.send(events[2].clone().into()).await });
+        let mut third_send = spawn(fanout.send(events[2].clone().into()));
         assert_pending!(third_send.poll());
 
         // Finish our sender replacement, which should wake up the third send and allow it to

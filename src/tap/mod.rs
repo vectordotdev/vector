@@ -1,7 +1,7 @@
 mod cmd;
 
 use clap::Parser;
-pub use cmd::cmd;
+pub(crate) use cmd::cmd;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
 

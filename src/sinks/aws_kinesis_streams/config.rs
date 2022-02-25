@@ -150,6 +150,10 @@ impl SinkConfig for KinesisSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_streams"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl GenerateConfig for KinesisSinkConfig {

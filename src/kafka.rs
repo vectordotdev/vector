@@ -15,7 +15,7 @@ enum KafkaError {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum KafkaCompression {
+pub(crate) enum KafkaCompression {
     #[derivative(Default)]
     None,
     Gzip,
@@ -25,28 +25,28 @@ pub enum KafkaCompression {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaAuthConfig {
-    pub sasl: Option<KafkaSaslConfig>,
-    pub tls: Option<KafkaTlsConfig>,
+pub(crate) struct KafkaAuthConfig {
+    pub(crate) sasl: Option<KafkaSaslConfig>,
+    pub(crate) tls: Option<KafkaTlsConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaSaslConfig {
-    pub enabled: Option<bool>,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub mechanism: Option<String>,
+pub(crate) struct KafkaSaslConfig {
+    pub(crate) enabled: Option<bool>,
+    pub(crate) username: Option<String>,
+    pub(crate) password: Option<String>,
+    pub(crate) mechanism: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaTlsConfig {
-    pub enabled: Option<bool>,
+pub(crate) struct KafkaTlsConfig {
+    pub(crate) enabled: Option<bool>,
     #[serde(flatten)]
-    pub options: TlsOptions,
+    pub(crate) options: TlsOptions,
 }
 
 impl KafkaAuthConfig {
-    pub fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
+    pub(crate) fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
         let sasl_enabled = self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false);
         let tls_enabled = self.tls.as_ref().and_then(|s| s.enabled).unwrap_or(false);
 
@@ -96,7 +96,7 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-pub struct KafkaStatisticsContext;
+pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
