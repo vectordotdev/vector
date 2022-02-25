@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
+    schema,
     serde::Fields,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -53,7 +54,7 @@ impl TransformConfig for RenameFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

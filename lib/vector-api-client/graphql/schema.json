@@ -5566,7 +5566,7 @@
               "description": "A stream of events emitted from matched component ID patterns",
               "args": [
                 {
-                  "name": "patterns",
+                  "name": "outputsPatterns",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
@@ -5582,6 +5582,24 @@
                           "name": "String",
                           "ofType": null
                         }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "inputsPatterns",
+                  "description": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "String",
+                        "ofType": null
                       }
                     }
                   },

@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -14,7 +14,7 @@ impl InternalEvent for KeyValueParserError {
             message = "Event failed to parse as key/value.",
             key = %self.key,
             error = %self.error,
-            error_type = "parser_failed",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         )
@@ -24,7 +24,7 @@ impl InternalEvent for KeyValueParserError {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
-            "error_type" => "parser_failed",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "key" => self.key.clone(),
         );

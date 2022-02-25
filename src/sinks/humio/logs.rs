@@ -88,6 +88,10 @@ impl SinkConfig for HumioLogsConfig {
     fn sink_type(&self) -> &'static str {
         "humio_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl HumioLogsConfig {

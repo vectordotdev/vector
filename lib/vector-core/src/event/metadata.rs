@@ -26,8 +26,10 @@ pub struct EventMetadata {
 
     /// An identifier for a globaly registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
-    #[serde(default = "schema::Id::empty", skip)]
-    schema_id: schema::Id,
+    ///
+    /// TODO(Jean): must not skip serialization to track schemas across restarts.
+    #[serde(default = "default_schema_definition", skip)]
+    schema_definition: Arc<schema::Definition>,
 }
 
 impl Default for EventMetadata {
@@ -36,9 +38,13 @@ impl Default for EventMetadata {
             datadog_api_key: Default::default(),
             splunk_hec_token: Default::default(),
             finalizers: Default::default(),
-            schema_id: schema::Id::empty(),
+            schema_definition: default_schema_definition(),
         }
     }
+}
+
+fn default_schema_definition() -> Arc<schema::Definition> {
+    Arc::new(schema::Definition::empty())
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -70,9 +76,9 @@ impl EventMetadata {
         }
     }
 
-    /// Replace the schema ID with the given one.
-    pub fn with_schema_id(mut self, schema_id: schema::Id) -> Self {
-        self.schema_id = schema_id;
+    /// Replace the schema definition with the given one.
+    pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
+        self.schema_definition = Arc::clone(schema_definition);
         self
     }
 
@@ -114,14 +120,14 @@ impl EventMetadata {
         self.finalizers.merge(finalizers);
     }
 
-    /// Get the schema ID.
-    pub fn schema_id(&self) -> schema::Id {
-        self.schema_id
+    /// Get the schema definition.
+    pub fn schema_definition(&self) -> &schema::Definition {
+        self.schema_definition.as_ref()
     }
 
-    /// Set the schema ID.
-    pub fn set_schema_id(&mut self, id: schema::Id) {
-        self.schema_id = id;
+    /// Set the schema definition.
+    pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
+        self.schema_definition = Arc::clone(definition);
     }
 }
 

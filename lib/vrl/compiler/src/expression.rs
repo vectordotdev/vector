@@ -32,6 +32,7 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
+pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -45,8 +46,6 @@ pub use predicate::Predicate;
 pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
-
-pub type Resolved = Result<Value, ExpressionError>;
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
@@ -361,83 +360,5 @@ impl DiagnosticError for Error {
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ExpressionError {
-    Abort {
-        span: Span,
-        message: Option<String>,
-    },
-    Error {
-        message: String,
-        labels: Vec<Label>,
-        notes: Vec<Note>,
-    },
-}
-
-impl std::fmt::Display for ExpressionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message().fmt(f)
-    }
-}
-
-impl std::error::Error for ExpressionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl DiagnosticError for ExpressionError {
-    fn code(&self) -> usize {
-        0
-    }
-
-    fn message(&self) -> String {
-        use ExpressionError::*;
-
-        match self {
-            Abort { message, .. } => message.clone().unwrap_or_else(|| "aborted".to_owned()),
-            Error { message, .. } => message.clone(),
-        }
-    }
-
-    fn labels(&self) -> Vec<Label> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { span, .. } => {
-                vec![Label::primary("aborted", span)]
-            }
-            Error { labels, .. } => labels.clone(),
-        }
-    }
-
-    fn notes(&self) -> Vec<Note> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { .. } => vec![],
-            Error { notes, .. } => notes.clone(),
-        }
-    }
-}
-
-impl From<String> for ExpressionError {
-    fn from(message: String) -> Self {
-        ExpressionError::Error {
-            message,
-            labels: vec![],
-            notes: vec![],
-        }
-    }
-}
-
-impl From<&str> for ExpressionError {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
     }
 }

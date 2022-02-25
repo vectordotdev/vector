@@ -110,7 +110,8 @@ pub(crate) fn decode_log_body(
                                 log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                             }
 
-                            log.metadata_mut().set_schema_id(source.logs_schema_id);
+                            log.metadata_mut()
+                                .set_schema_definition(&source.logs_schema_definition);
                         }
 
                         decoded.push(event);

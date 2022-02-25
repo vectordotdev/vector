@@ -19,9 +19,7 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(feature = "sources-aws_s3")]
-pub(crate) mod aws_s3;
-#[cfg(feature = "sinks-aws_sqs")]
+#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
@@ -178,7 +176,7 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(feature = "sinks-aws_sqs")]
+#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sinks-blackhole")]
 pub(crate) use self::blackhole::*;

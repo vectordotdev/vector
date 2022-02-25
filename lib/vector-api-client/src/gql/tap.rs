@@ -53,23 +53,12 @@ impl From<TapEncodingFormat>
     }
 }
 
-impl output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns {
-    pub fn as_string(
-        &self,
-    ) -> Option<&str>{
-        match self {
-            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev.string.as_ref()),
-            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => Some(ev.string.as_ref()),
-            _ => None,
-        }
-    }
-}
-
 pub trait TapSubscriptionExt {
     /// Executes an output events subscription.
     fn output_events_by_component_id_patterns_subscription(
         &self,
-        component_patterns: Vec<String>,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
@@ -80,14 +69,16 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
     /// Executes an output events subscription.
     fn output_events_by_component_id_patterns_subscription(
         &self,
-        patterns: Vec<String>,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
     ) -> BoxedSubscription<OutputEventsByComponentIdPatternsSubscription> {
         let request_body = OutputEventsByComponentIdPatternsSubscription::build_query(
             output_events_by_component_id_patterns_subscription::Variables {
-                patterns,
+                outputs_patterns,
+                inputs_patterns: Some(inputs_patterns),
                 limit,
                 interval,
                 encoding: encoding.into(),

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
@@ -188,7 +188,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_core::state::Runtime::default();
+        let mut runtime_state = vrl::state::Runtime::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
         registry.finish_load();

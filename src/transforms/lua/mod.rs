@@ -7,6 +7,7 @@ use crate::{
     config::{
         GenerateConfig, Input, Output, TransformConfig, TransformContext, TransformDescription,
     },
+    schema,
     transforms::Transform,
 };
 
@@ -76,10 +77,10 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         match self {
-            LuaConfig::V1(v1) => v1.config.outputs(),
-            LuaConfig::V2(v2) => v2.config.outputs(),
+            LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
+            LuaConfig::V2(v2) => v2.config.outputs(merged_definition),
         }
     }
 
