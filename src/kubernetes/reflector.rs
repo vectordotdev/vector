@@ -112,7 +112,7 @@ where
                 let val = select! {
                     // If we got a maintenance request - perform the
                     // maintenance.
-                    _ = maintenance_request.unwrap(), if maintenance_request.is_some() => {
+                    _ = async { maintenance_request.unwrap().await }, if maintenance_request.is_some() => {
                         self.state_writer.perform_maintenance().await;
                         continue;
                     }
