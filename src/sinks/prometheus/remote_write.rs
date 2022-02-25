@@ -147,6 +147,10 @@ impl SinkConfig for RemoteWriteConfig {
     fn sink_type(&self) -> &'static str {
         "prometheus_remote_write"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]

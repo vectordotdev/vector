@@ -25,10 +25,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 {{< tab title="Docker" >}}
 
 ```shell
-docker pull timberio/vector:{{< version >}}-distroless
+docker pull timberio/vector:{{< version >}}-distroless-libc
 ```
 
-In addition to `distroless`, `alpine` and `debian` distributions are also available.
+In addition to `distroless-libc`, `distroless-static`, `alpine` and `debian` distributions are also available.
 
 If you install Vector using Docker, we recommend using an alias to run the commands throughout this tutorial:
 

@@ -186,6 +186,10 @@ impl SinkConfig for KafkaSinkConfig {
     fn sink_type(&self) -> &'static str {
         "kafka"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

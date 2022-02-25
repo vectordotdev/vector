@@ -106,6 +106,10 @@ impl SinkConfig for DatadogEventsConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_events"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

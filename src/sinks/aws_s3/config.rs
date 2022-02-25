@@ -96,6 +96,10 @@ impl SinkConfig for S3SinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_s3"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl S3SinkConfig {

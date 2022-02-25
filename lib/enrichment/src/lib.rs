@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use vrl_core::Value;
+use vrl::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -46,7 +46,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
+    ) -> Result<BTreeMap<String, vrl::Value>, String>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -57,7 +57,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
+    ) -> Result<Vec<BTreeMap<String, vrl::Value>>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
@@ -75,7 +75,7 @@ pub trait Table: DynClone {
 
 dyn_clone::clone_trait_object!(Table);
 
-pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
+pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
     vec![
         Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
         Box::new(find_enrichment_table_records::FindEnrichmentTableRecords) as _,

@@ -99,6 +99,10 @@ impl SinkConfig for HecLogsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "splunk_hec_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl HecLogsSinkConfig {
@@ -178,6 +182,10 @@ impl SinkConfig for HecSinkCompatConfig {
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

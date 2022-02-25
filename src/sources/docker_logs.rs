@@ -480,7 +480,13 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(&DockerLogsCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => {
+                            emit!(&DockerLogsCommunicationError {
+                                error,
+                                container_id: None,
+                            });
+                            return;
+                        },
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");
@@ -556,7 +562,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(async move { this.run_event_stream(info).await });
+            tokio::spawn(this.run_event_stream(info));
         }
     }
 
