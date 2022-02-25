@@ -316,6 +316,7 @@ tonic-build = { version = "0.6", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.1"
+assert_cmd = "2.0.4"
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
