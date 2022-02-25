@@ -386,7 +386,7 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
         let count = events.len();
         emit!(&ExecEventsReceived {
             count,
@@ -399,7 +399,7 @@ async fn run_command(
         }
         if let Err(error) = out.send_batch(events).await {
             emit!(&StreamClosedError { count, error });
-            break 'send;
+            break;
         }
     }
 
