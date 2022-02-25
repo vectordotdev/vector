@@ -10,6 +10,7 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
+use tokio::sync::oneshot;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -308,6 +309,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     opts: &'a super::Opts,
     mut state_rx: state::StateRx,
+    mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
     let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
@@ -340,6 +342,10 @@ pub async fn init_dashboard<'a>(
                     let _ = key_press_kill_tx.send(());
                     break
                 }
+            }
+            _ = &mut shutdown_rx => {
+                let _ = key_press_kill_tx.send(());
+                break
             }
         }
     }

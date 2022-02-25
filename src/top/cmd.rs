@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use futures_util::future::join_all;
+use tokio::sync::oneshot;
 use url::Url;
 use vector_api_client::{connect_subscription_client, Client};
 
@@ -66,6 +67,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         .expect("Couldn't build WebSocket URL. Please report.");
 
     let opts_clone = opts.clone();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     // This task handles reconnecting the subscription client and all
     // subscriptions in the case of a web socket disconnect
     let connection = tokio::spawn(async move {
@@ -79,7 +81,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             };
 
             // Subscribe to updated metrics
-            let closed =
+            let finished =
                 metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
 
             let _ = tx
@@ -89,18 +91,21 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             // streams have completed. Currently, subscription streams only
             // complete when the underlying web socket connection to the GraphQL
             // server drops.
-            let _ = join_all(closed).await;
+            let _ = join_all(finished).await;
             let _ = tx
                 .send(EventType::ConnectionUpdated(
                     ConnectionStatus::Disconnected(RECONNECT_DELAY),
                 ))
                 .await;
+            if !opts_clone.reconnect {
+                let _ = shutdown_tx.send(());
+                break;
+            }
         }
     });
 
     // Initialize the dashboard
-    // match init_dashboard(url.as_str(), opts, sender).await {
-    match init_dashboard(url.as_str(), opts, sender).await {
+    match init_dashboard(url.as_str(), opts, sender, shutdown_rx).await {
         Ok(_) => {
             connection.abort();
             exitcode::OK

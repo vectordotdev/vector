@@ -349,6 +349,10 @@ cli: {
 						1,000,000 = 1.00 M
 						"""
 				}
+				"reconnect": {
+					_short:      "r"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, top will exit if the connection drops."
+				}
 			}
 
 			options: {
