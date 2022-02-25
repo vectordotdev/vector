@@ -155,7 +155,7 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Re
 }
 
 #[cfg(not(feature = "repl"))]
-fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
+fn repl(_objects: Vec<Value>, _timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 

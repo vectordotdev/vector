@@ -176,7 +176,6 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
         let (program, functions, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
@@ -260,7 +259,7 @@ impl Remap {
 
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
         match &self.vm {
-            Some(vm) => self.runtime.run_vm(&vm, target, &self.timezone),
+            Some(vm) => self.runtime.run_vm(vm, target, &self.timezone),
             None => {
                 let result = self.runtime.resolve(target, &self.program, &self.timezone);
                 self.runtime.clear();
