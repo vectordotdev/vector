@@ -1,6 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
+};
 
 use tokio::sync::mpsc;
+use tui::style::{Color, Style};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;
@@ -28,9 +32,59 @@ pub enum EventType {
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
+    ConnectionUpdated(ConnectionStatus),
 }
 
-pub type State = BTreeMap<ComponentKey, ComponentRow>;
+#[derive(Debug, Copy, Clone)]
+pub enum ConnectionStatus {
+    // Initial state
+    Pending,
+    // Underlying web socket connection has dropped. Includes the delay between
+    // reconnect attempts
+    Disconnected(u64),
+    // Connection is working
+    Connected,
+}
+
+impl ConnectionStatus {
+    /// Color styling to apply depending on the connection status
+    pub fn style(&self) -> Style {
+        match self {
+            ConnectionStatus::Pending => Style::default().fg(Color::Yellow),
+            ConnectionStatus::Disconnected(_) => Style::default().fg(Color::Red),
+            ConnectionStatus::Connected => Style::default().fg(Color::Green),
+        }
+    }
+}
+
+impl Display for ConnectionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConnectionStatus::Pending => write!(f, "Initializing connection"),
+            ConnectionStatus::Disconnected(delay) => write!(
+                f,
+                "Disconnected: reconnecting every {} seconds",
+                delay / 1000
+            ),
+            ConnectionStatus::Connected => write!(f, "Connected"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct State {
+    pub connection_status: ConnectionStatus,
+    pub components: BTreeMap<ComponentKey, ComponentRow>,
+}
+
+impl State {
+    pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
+        Self {
+            connection_status: ConnectionStatus::Pending,
+            components,
+        }
+    }
+}
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
@@ -88,14 +142,14 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
             match event_type {
                 EventType::ReceivedEventsTotals(rows) => {
                     for (key, v) in rows {
-                        if let Some(r) = state.get_mut(&key) {
+                        if let Some(r) = state.components.get_mut(&key) {
                             r.received_events_total = v;
                         }
                     }
                 }
                 EventType::ReceivedEventsThroughputs(interval, rows) => {
                     for (key, v) in rows {
-                        if let Some(r) = state.get_mut(&key) {
+                        if let Some(r) = state.components.get_mut(&key) {
                             r.received_events_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
@@ -103,7 +157,7 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                 }
                 EventType::SentEventsTotals(rows) => {
                     for m in rows {
-                        if let Some(r) = state.get_mut(&m.key) {
+                        if let Some(r) = state.components.get_mut(&m.key) {
                             r.sent_events_total = m.total;
                             for (id, v) in m.outputs {
                                 r.outputs
@@ -116,7 +170,7 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                 }
                 EventType::SentEventsThroughputs(interval, rows) => {
                     for m in rows {
-                        if let Some(r) = state.get_mut(&m.key) {
+                        if let Some(r) = state.components.get_mut(&m.key) {
                             r.sent_events_throughput_sec =
                                 (m.total as f64 * (1000.0 / interval as f64)) as i64;
                             for (id, v) in m.outputs {
@@ -131,24 +185,27 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                 }
                 EventType::ProcessedBytesTotals(rows) => {
                     for (key, v) in rows {
-                        if let Some(r) = state.get_mut(&key) {
+                        if let Some(r) = state.components.get_mut(&key) {
                             r.processed_bytes_total = v;
                         }
                     }
                 }
                 EventType::ProcessedBytesThroughputs(interval, rows) => {
                     for (key, v) in rows {
-                        if let Some(r) = state.get_mut(&key) {
+                        if let Some(r) = state.components.get_mut(&key) {
                             r.processed_bytes_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }
                 }
                 EventType::ComponentAdded(c) => {
-                    let _ = state.insert(c.key.clone(), c);
+                    let _ = state.components.insert(c.key.clone(), c);
                 }
                 EventType::ComponentRemoved(key) => {
-                    let _ = state.remove(&key);
+                    let _ = state.components.remove(&key);
+                }
+                EventType::ConnectionUpdated(status) => {
+                    state.connection_status = status;
                 }
             }
 

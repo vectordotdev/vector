@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
@@ -306,7 +309,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                 ))
             })
         })
-        .collect::<state::State>();
+        .collect::<BTreeMap<_, _>>();
 
-    Ok(rows)
+    Ok(state::State::new(rows))
 }

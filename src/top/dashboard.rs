@@ -19,7 +19,10 @@ use tui::{
     Frame, Terminal,
 };
 
-use super::{events::capture_key_press, state};
+use super::{
+    events::capture_key_press,
+    state::{self, ConnectionStatus},
+};
 
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {
@@ -135,13 +138,20 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
+    fn title<B: Backend>(
+        &'a self,
+        f: &mut Frame<B>,
+        area: Rect,
+        connection_status: &ConnectionStatus,
+    ) {
         let text = vec![Spans::from(vec![
             Span::from(self.url_string),
             Span::styled(
                 format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
+            Span::from(" | "),
+            Span::styled(format!("{}", connection_status), connection_status.style()),
         ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
@@ -166,7 +176,7 @@ impl<'a> Widgets<'a> {
 
         // Data columns
         let mut items = Vec::new();
-        for (_, r) in state.iter() {
+        for (_, r) in state.components.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
                 (!r.has_displayable_outputs())
@@ -272,7 +282,7 @@ impl<'a> Widgets<'a> {
             .constraints(self.constraints.as_ref())
             .split(size);
 
-        self.title(f, rects[0]);
+        self.title(f, rects[0], &state.connection_status);
 
         // Require a minimum of 80 chars of line width to display the table
         if size.width >= 80 {

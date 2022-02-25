@@ -6,9 +6,13 @@ use vector_api_client::{connect_subscription_client, Client};
 
 use super::{
     dashboard::{init_dashboard, is_tty},
-    metrics, state,
+    metrics,
+    state::{self, ConnectionStatus, EventType},
 };
 use crate::config;
+
+/// Delay (in milliseconds) before attempting to reconnect to the Vector API
+const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -62,13 +66,14 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         .expect("Couldn't build WebSocket URL. Please report.");
 
     let opts_clone = opts.clone();
+    // This task handles reconnecting the subscription client and all
+    // subscriptions in the case of a web socket disconnect
     let connection = tokio::spawn(async move {
         loop {
             let subscription_client = match connect_subscription_client(ws_url.clone()).await {
                 Ok(c) => c,
                 Err(_) => {
-                    // Pause before next retry
-                    tokio::time::sleep(Duration::from_millis(5000)).await;
+                    tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
                     continue;
                 }
             };
@@ -76,10 +81,20 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             // Subscribe to updated metrics
             let closed =
                 metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
-            // Tasks spawned in subscribe finish when subscription streams have
-            // completed. Currently, subscription streams only complete when the
-            // underlying web socket connection to the GraphQL server drops.
+
+            let _ = tx
+                .send(EventType::ConnectionUpdated(ConnectionStatus::Connected))
+                .await;
+            // Tasks spawned in metrics::subscribe finish when the subscription
+            // streams have completed. Currently, subscription streams only
+            // complete when the underlying web socket connection to the GraphQL
+            // server drops.
             let _ = join_all(closed).await;
+            let _ = tx
+                .send(EventType::ConnectionUpdated(
+                    ConnectionStatus::Disconnected(RECONNECT_DELAY),
+                ))
+                .await;
         }
     });
 
