@@ -664,7 +664,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTimestamp),
         #[cfg(feature = "parse_tokens")]
         Box::new(ParseTokens),
-        #[cfg(feature = "parse_url")]
+        #[cfg(all(feature = "parse_url", feature = "parse_query_string"))]
         Box::new(ParseUrl),
         #[cfg(feature = "parse_user_agent")]
         Box::new(ParseUserAgent),
