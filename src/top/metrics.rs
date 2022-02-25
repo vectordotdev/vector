@@ -11,10 +11,14 @@ use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
 /// Components that have been added
 async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
-    let res = client.component_added();
+    // let res = client.component_added();
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_added();
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -42,10 +46,14 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
 
 /// Components that have been removed
 async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
-    let res = client.component_removed();
+    // let res = client.component_removed();
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_removed();
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -62,10 +70,14 @@ async fn received_events_totals(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_received_events_totals_subscription(interval);
+    // let res = client.component_received_events_totals_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_received_events_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -92,10 +104,14 @@ async fn received_events_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_received_events_throughputs_subscription(interval);
+    // let res = client.component_received_events_throughputs_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_received_events_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -114,10 +130,14 @@ async fn received_events_throughputs(
 }
 
 async fn sent_events_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
-    let res = client.component_sent_events_totals_subscription(interval);
+    // let res = client.component_sent_events_totals_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_sent_events_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -143,10 +163,14 @@ async fn sent_events_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_sent_events_throughputs_subscription(interval);
+    // let res = client.component_sent_events_throughputs_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_sent_events_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -173,10 +197,14 @@ async fn processed_bytes_totals(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_processed_bytes_totals_subscription(interval);
+    // let res = client.component_processed_bytes_totals_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_processed_bytes_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -203,10 +231,14 @@ async fn processed_bytes_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_processed_bytes_throughputs_subscription(interval);
+    // let res = client.component_processed_bytes_throughputs_subscription(interval);
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_processed_bytes_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {

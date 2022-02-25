@@ -71,16 +71,26 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     };
 
     // Issue the 'tap' request, printing to stdout.
-    let res = subscription_client.output_events_by_component_id_patterns_subscription(
-        outputs_patterns,
-        opts.inputs_of.clone(),
-        opts.format,
-        opts.limit as i64,
-        opts.interval as i64,
-    );
+    // let res = subscription_client.output_events_by_component_id_patterns_subscription(
+    //     outputs_patterns,
+    //     opts.inputs_of.clone(),
+    //     opts.format,
+    //     opts.limit as i64,
+    //     opts.interval as i64,
+    // );
+
+    // tokio::pin! {
+    //     let stream = res.stream();
+    // };
 
     tokio::pin! {
-        let stream = res.stream();
+        let stream = subscription_client.output_events_by_component_id_patterns_subscription(
+            outputs_patterns,
+            opts.inputs_of.clone(),
+            opts.format,
+            opts.limit as i64,
+            opts.interval as i64,
+        );
     };
 
     let formatter = EventFormatter::new(opts.meta, opts.format);
