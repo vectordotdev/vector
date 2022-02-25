@@ -350,7 +350,7 @@ test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --user $(shell id -u):$(shell id -g) --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
