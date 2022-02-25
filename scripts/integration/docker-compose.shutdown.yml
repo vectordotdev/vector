@@ -58,4 +58,5 @@ services:
       - KAFKA_HOST=kafka
     volumes:
       - ${PWD}:/code
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
