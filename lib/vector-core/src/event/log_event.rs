@@ -10,6 +10,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
+use lookup::lookup2::{BorrowedSegment, Path};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -121,13 +122,24 @@ impl LogEvent {
         util::log::contains(self.as_map(), key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    // This is deprecated - use `insert_path` instead.
+    #[instrument(level = "trace", skip(self, path))]
     pub fn insert(
         &mut self,
-        key: impl AsRef<str>,
+        path: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), path.as_ref(), value.into())
+    }
+
+    // This will be renamed to `insert` once the current `insert` is fully removed
+    #[instrument(level = "trace", skip(self, path))]
+    pub fn insert_path<'a>(
+        &mut self,
+        path: impl Path<'a>,
+        value: impl Into<Value> + Debug,
+    ) -> Option<Value> {
+        util::log::insert(self.as_map_mut(), path, value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -138,13 +150,14 @@ impl LogEvent {
         }
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value> + Debug,
-    {
-        util::log::insert_path(self.as_map_mut(), key, value.into())
-    }
+    // /// This is deprecated -- use `insert` instead
+    // #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
+    // pub fn insert_path<V>(&mut self, key: Vec<BorrowedSegment>, value: V) -> Option<Value>
+    // where
+    //     V: Into<Value> + Debug,
+    // {
+    //     util::log::insert_path2(self.as_map_mut(), key, value.into())
+    // }
 
     /// Rename a key in place without reference to pathing
     ///
@@ -246,7 +259,7 @@ impl LogEvent {
             };
             match self.get_mut(&field) {
                 None => {
-                    self.insert(field, incoming_val);
+                    self.insert(field.as_ref(), incoming_val);
                 }
                 Some(current_val) => current_val.merge(incoming_val),
             }
@@ -361,6 +374,7 @@ where
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
+        println!("event: {:?}", self);
         self.get(key.as_ref())
             .expect(&*format!("Key is not found: {:?}", key.as_ref()))
     }

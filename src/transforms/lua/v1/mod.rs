@@ -526,7 +526,7 @@ mod tests {
               local M = {{}}
 
               local function modify(event2)
-                event2["new field"] = "new value"
+                event2["\"new field\""] = "new value"
               end
               M.modify = modify
 
@@ -545,8 +545,7 @@ mod tests {
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
         let event = Event::new_empty_log();
         let event = transform.transform_one(event).unwrap();
-
-        assert_eq!(event.as_log()["new field"], "new value".into());
+        assert_eq!(event.as_log()["\"new field\""], "new value".into());
     }
 
     #[test]

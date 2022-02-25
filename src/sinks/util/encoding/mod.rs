@@ -415,8 +415,8 @@ mod tests {
             log.insert("d.z", 1);
             log.insert("e[0]", 1);
             log.insert("e[1]", 1);
-            log.insert("f\\.z", 1);
-            log.insert("g\\.z", 1);
+            log.insert("\"f.z\"", 1);
+            log.insert("\"g.z\"", 1);
             log.insert("h", btreemap! {});
             log.insert("i", Vec::<Value>::new());
         }

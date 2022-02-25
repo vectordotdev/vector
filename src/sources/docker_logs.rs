@@ -12,6 +12,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
+use lookup::lookup2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -897,11 +898,11 @@ impl ContainerLogInfo {
 
             // Labels.
             if !self.metadata.labels.is_empty() {
-                let prefix_path = PathIter::new("label").collect::<Vec<_>>();
+                let prefix_path = parse_path("label");
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone();
-                    path.push(PathComponent::Key(key.clone().into()));
-                    log_event.insert_path(path, value.clone());
+                    path.push(OwnedSegment::Field(key.clone().into()));
+                    log_event.insert_path(&path, value.clone());
                 }
             }
 

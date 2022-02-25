@@ -2,6 +2,7 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use grok::Pattern;
+use lookup::lookup2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -95,7 +96,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent<'static>>>,
+    paths: HashMap<String, Vec<OwnedSegment>>,
 }
 
 impl Clone for GrokParser {
@@ -125,13 +126,11 @@ impl FunctionTransform for GrokParser {
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
-                            } else {
-                                let path = PathIter::new(name)
-                                    .map(|component| component.into_static())
-                                    .collect::<Vec<_>>();
-                                self.paths.insert(name.to_string(), path.clone());
                                 event.insert_path(path, value);
+                            } else {
+                                let path = parse_path(name);
+                                self.paths.insert(name.to_string(), path.clone());
+                                event.insert_path(&path, value);
                             }
                         }
                         Err(error) => emit!(&ParserConversionError { name, error }),

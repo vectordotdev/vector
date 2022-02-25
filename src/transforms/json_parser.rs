@@ -446,8 +446,8 @@ mod test {
         assert_eq!(event.as_log()["null"], crate::event::Value::Null);
         assert_eq!(event.as_log()["float"], 12.34.into());
         assert_eq!(event.as_log()["int"], 56.into());
-        assert_eq!(event.as_log()["bool true"], true.into());
-        assert_eq!(event.as_log()["bool false"], false.into());
+        assert_eq!(event.as_log()["\"bool true\""], true.into());
+        assert_eq!(event.as_log()["\"bool false\""], false.into());
         assert_eq!(event.as_log()["array[0]"], "z".into());
         assert_eq!(event.as_log()["array[1]"], 7.into());
         assert_eq!(event.as_log()["object.nested"], "data".into());

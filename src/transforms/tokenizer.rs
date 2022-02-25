@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str};
 
 use bytes::Bytes;
+use lookup::lookup2::{parse_path, BorrowedSegment, OwnedSegment};
 use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 
@@ -70,7 +71,7 @@ impl TransformConfig for TokenizerConfig {
 
 #[derive(Clone, Debug)]
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent<'static>>, Conversion)>,
+    field_names: Vec<(String, Vec<OwnedSegment>, Conversion)>,
     field: String,
     drop_field: bool,
 }
@@ -86,9 +87,7 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path: Vec<PathComponent<'static>> = PathIter::new(name.as_str())
-                    .map(|component| component.into_static())
-                    .collect();
+                let path = parse_path(&name);
                 (name, path, conversion)
             })
             .collect();
@@ -111,7 +110,7 @@ impl FunctionTransform for Tokenizer {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert_path(path.clone(), value);
+                        event.as_mut_log().insert_path(path, value);
                     }
                     Err(error) => {
                         emit!(&ParserConversionError { name, error });

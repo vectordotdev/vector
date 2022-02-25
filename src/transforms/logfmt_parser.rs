@@ -222,11 +222,11 @@ mod tests {
             log["dyno"],
             "heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456".into()
         );
-        assert_eq!(log["sample#memory_total"], "21.00MB".into());
-        assert_eq!(log["sample#memory_rss"], "21.22MB".into());
-        assert_eq!(log["sample#memory_cache"], "0.00MB".into());
-        assert_eq!(log["sample#memory_swap"], "0.00MB".into());
-        assert_eq!(log["sample#memory_pgpgin"], "348836pages".into());
-        assert_eq!(log["sample#memory_pgpgout"], "343403pages".into());
+        assert_eq!(log["\"sample#memory_total\""], "21.00MB".into());
+        assert_eq!(log["\"sample#memory_rss\""], "21.22MB".into());
+        assert_eq!(log["\"sample#memory_cache\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_swap\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_pgpgin\""], "348836pages".into());
+        assert_eq!(log["\"sample#memory_pgpgout\""], "343403pages".into());
     }
 }

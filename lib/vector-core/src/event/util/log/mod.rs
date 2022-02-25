@@ -7,7 +7,7 @@ mod remove;
 
 pub use all_fields::all_fields;
 pub use contains::contains;
-pub use insert::{insert, insert_path};
+pub use insert::insert;
 pub use keys::keys;
 pub use path_iter::{PathComponent, PathIter};
 pub use remove::remove;

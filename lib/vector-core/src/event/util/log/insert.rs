@@ -13,13 +13,21 @@ pub fn insert<'a>(
     map_insert2(fields, path_iter, value)
 }
 
-pub fn insert_path(
-    fields: &mut BTreeMap<String, Value>,
-    path: Vec<PathComponent>,
-    value: Value,
-) -> Option<Value> {
-    map_insert(fields, path.into_iter().peekable(), value)
-}
+// pub fn insert_path(
+//     fields: &mut BTreeMap<String, Value>,
+//     path: Vec<PathComponent>,
+//     value: Value,
+// ) -> Option<Value> {
+//     map_insert(fields, path.into_iter().peekable(), value)
+// }
+
+// pub fn insert_path2(
+//     fields: &mut BTreeMap<String, Value>,
+//     path: Vec<BorrowedSegment>,
+//     value: Value,
+// ) -> Option<Value> {
+//     map_insert2(fields, path.into_iter().peekable(), value)
+// }
 
 fn map_insert2<'a>(
     fields: &mut BTreeMap<String, Value>,
