@@ -444,7 +444,7 @@ async fn bad_s3_region() {
         key_prefix = "logs/"
         endpoint = "this shouldnt work"
 
-        [sinks.out4.batch]
+        [sinks.out3.batch]
         max_bytes = 100000
         "#,
         Format::Toml,
