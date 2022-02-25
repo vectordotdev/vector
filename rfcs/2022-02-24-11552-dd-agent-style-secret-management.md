@@ -77,7 +77,8 @@ secret provider that may see other implementation like: `executable` (the one do
 ## Rationale
 
 - Some users just can't put sensitive information inside their configuration.
-- Using environment variable violates security requirements for sensitive environments since environment variables can be leaked by an attacker.
+- Using environment variable violates security requirements for sensitive environments since environment variables can
+  be leaked by an attacker and access to those variables is complex to audit.
 
 ## Drawbacks
 
@@ -94,8 +95,9 @@ secret provider that may see other implementation like: `executable` (the one do
 ## Alternatives
 
 - Integrate with other third party tools: Vault and CSP APIs for secret management to start with.
-- Use the env var interpolation as a secret backend and leverate [K8s ability to expose
-  secret][k8s-env-var-from-secrets] as environment variables, still this would be a good idea to document that as this is a convenient solution avoiding the need to inject a custom binary inside container images. Note that the Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
+- Stick to environment variables interpolation and leverage [K8s ability to expose secret][k8s-env-var-from-secrets] as
+  environment variables, this is already documented in the [Vector helm char][env-var-from-k8s-secrets]. Note that the
+  Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
 
 Note: doing nothing is not really an alternative here, as plain text secret in config is a strong blocker for some
 users.
@@ -128,3 +130,4 @@ users.
 [dd-agent-secret-helper]: https://github.com/DataDog/datadog-agent/tree/331a3fc2c6f4f49f9bcc06c4f0675f6a8b65a523/cmd/secrets
 [vector-config-schema-work]: https://github.com/vectordotdev/vector/issues/9115
 [dd-secret-backend-exec-api]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#the-executable-api
+[env-var-from-k8s-secrets]: https://github.com/vectordotdev/helm-charts/blob/5a92272/charts/vector/values.yaml#L131-L143
