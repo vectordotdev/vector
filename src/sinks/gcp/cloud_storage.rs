@@ -131,6 +131,10 @@ impl SinkConfig for GcsSinkConfig {
     fn sink_type(&self) -> &'static str {
         NAME
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl GcsSinkConfig {

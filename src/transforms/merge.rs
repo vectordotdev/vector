@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -63,7 +64,7 @@ impl TransformConfig for MergeConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

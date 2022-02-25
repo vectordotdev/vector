@@ -99,6 +99,10 @@ impl SinkConfig for ClickhouseConfig {
     fn sink_type(&self) -> &'static str {
         "clickhouse"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]

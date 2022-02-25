@@ -115,7 +115,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
                 .with_parent_name("reader_exits_cleanly_when_writer_done_and_in_flight_acks")
                 .was_entered_at_least(2)
                 .finalize();
-            let mut blocked_read = spawn(async move { reader.next().await });
+            let mut blocked_read = spawn(reader.next());
             while !waiting_for_writer.try_assert() {
                 assert_pending!(blocked_read.poll());
             }

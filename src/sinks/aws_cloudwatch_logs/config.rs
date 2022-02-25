@@ -94,6 +94,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_cloudwatch_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {

@@ -39,6 +39,10 @@ impl SinkConfig for PanicSink {
     fn sink_type(&self) -> &'static str {
         "panic"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl Sink<Event> for PanicSink {
@@ -124,6 +128,10 @@ impl SinkConfig for ErrorSink {
 
     fn sink_type(&self) -> &'static str {
         "panic"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

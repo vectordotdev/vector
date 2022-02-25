@@ -107,6 +107,10 @@ impl SinkConfig for LogdnaConfig {
     fn sink_type(&self) -> &'static str {
         "logdna"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
