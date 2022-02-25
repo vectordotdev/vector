@@ -132,6 +132,10 @@ impl SinkConfig for SqsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl SqsSinkConfig {

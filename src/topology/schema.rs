@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-pub(super) use crate::schema::{Definition, Registry};
+pub(super) use crate::schema::Definition;
+
 use crate::{config::OutputId, topology};
 
 /// Create a new [`Definition`] by recursively merging all provided inputs into a given component.

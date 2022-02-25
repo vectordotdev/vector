@@ -86,6 +86,10 @@ impl SinkConfig for AzureBlobSinkConfig {
     fn sink_type(&self) -> &'static str {
         "azure_blob"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =

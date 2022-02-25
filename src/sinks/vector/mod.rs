@@ -75,6 +75,10 @@ impl SinkConfig for VectorConfig {
     fn sink_type(&self) -> &'static str {
         "vector"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
