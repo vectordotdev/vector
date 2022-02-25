@@ -1,7 +1,6 @@
 #![recursion_limit = "256"] // for async-stream
 #![deny(unreachable_pub)]
 #![deny(unused_extern_crates)]
-#![deny(unused_crate_dependencies)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::blocks_in_if_conditions)]
