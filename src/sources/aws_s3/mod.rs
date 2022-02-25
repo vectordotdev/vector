@@ -310,7 +310,9 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::io::BufRead;
+    use std::fs::File;
+    use std::io::{self, BufRead};
+    use std::path::Path;
 
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
@@ -329,9 +331,8 @@ mod integration_tests {
     };
 
     fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
-        trace!(message = "Reading zst file.", path = %path.as_ref().display());
-        let mut file = File::open(path).unwrap();
-        file.lines().collect()
+        let file = io::BufReader::new(File::open(path).unwrap());
+        file.lines().map(|x| x.unwrap()).collect()
     }
 
     #[tokio::test]

@@ -6108,6 +6108,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_es"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10c0918d84befe989cdbdffc0cf7742887eaf777655d45b767e4603d39245ff3"
+dependencies = [
+ "async-trait",
+ "bytes 1.1.0",
+ "futures 0.3.21",
+ "rusoto_core",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "rusoto_firehose"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8417,6 +8432,7 @@ dependencies = [
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
+ "rusoto_es",
  "rusoto_firehose",
  "rusoto_kinesis",
  "rusoto_logs",

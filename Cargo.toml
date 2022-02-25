@@ -140,6 +140,7 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
+rusoto_es = { version = "0.47.0", optional = true }
 rusoto_firehose = { version = "0.47.0", optional = true }
 rusoto_kinesis = { version = "0.47.0", optional = true }
 rusoto_logs = { version = "0.47.0", optional = true }
@@ -735,7 +736,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
