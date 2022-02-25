@@ -1,7 +1,7 @@
 # RFC <issue#> - 2022-02-xx - Datadog Agent style secret management
 
 The Datadog Agent has a straighforward secret resolution facility to avoid having sensitive information stored directly
-in its config, it relies on a user-provided external program that is run to retrieve sensitive value from a thirs party
+in its config, it relies on a user-provided external program that is run to retrieve sensitive value from a third party
 system. This RFC aims to propose a similar mechanism for Vector.
 
 ## Context
@@ -19,7 +19,7 @@ and the syntax to retrieve encrypted config value.
 
 ### In scope
 
-- User shall be able to user the same kind of executable to load/decrypt secrets for Vector.
+- User shall be able to use the same kind of executable to load/decrypt secrets for Vector.
 - This new feature will have a deterministic behaviour when used in conjunction with templates.
 - Situations like topology reload and load/decryption failure will be accounted for.
 
@@ -30,7 +30,7 @@ and the syntax to retrieve encrypted config value.
 
 ## Pain
 
-- As of today secret like authentication tokens and passwords should be provided inside the topology configuration in
+- As of today, secrets like authentication tokens and passwords should be provided inside the topology configuration in
   plain text and that may not be acceptable in some circumstances.
 - Decoupling secret management and key rotation from configuration management.
 
@@ -77,6 +77,7 @@ secret provider that may see other implementation like: `executable` (the one do
 ## Rationale
 
 - Some users just can't put sensitive information inside their configuration.
+- Using environment variable violates security requirements for sensitive environments since environment variables can be leaked by an attacker.
 
 ## Drawbacks
 
