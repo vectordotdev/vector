@@ -275,6 +275,10 @@ cli: {
 					_short:      "m"
 					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
 				}
+				"reconnect": {
+					_short:      "r"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will exit if the connection drops."
+				}
 			}
 
 			options: {

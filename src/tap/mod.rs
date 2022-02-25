@@ -43,4 +43,8 @@ pub struct Opts {
     /// Include metadata such as the event's associated component ID
     #[clap(short, long)]
     meta: bool,
+
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will exit if the connection drops.
+    #[clap(short, long)]
+    reconnect: bool,
 }
