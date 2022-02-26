@@ -52,10 +52,10 @@ impl ConditionConfig for DatadogSearchConfig {
 //------------------------------------------------------------------------------
 
 #[derive(Default, Clone)]
-pub struct EventFilter;
+pub(crate) struct EventFilter;
 
 impl EventFilter {
-    pub fn run(matcher: &fast_matcher::FastMatcher, log: &LogEvent) -> bool {
+    pub(crate) fn run(matcher: &fast_matcher::FastMatcher, log: &LogEvent) -> bool {
         match &matcher.mode {
             Mode::One(op) => exec(op, log),
             Mode::Any(ops) => ops.iter().any(|op| exec(op, log)),
