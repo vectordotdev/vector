@@ -3592,12 +3592,11 @@ dependencies = [
 
 [[package]]
 name = "krb5-src"
-version = "0.3.0+1.19.2"
+version = "0.3.2+1.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05a015d6ce61bfe539c715eb5dd67e851927f4ada5fecfd83d6c719a72eac9b5"
+checksum = "44cd3b7e7735d48bc3793837041294f2eb747bd0f63bbc081e89972abb9e48fb"
 dependencies = [
  "duct",
- "openssl-sys",
 ]
 
 [[package]]
@@ -5210,9 +5209,9 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "predicates"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e5a7689e456ab905c22c2b48225bb921aba7c8dfa58440d68ba13f6222a715"
+checksum = "a5aab5be6e4732b473071984b3164dbbfb7a3674d30ea5ff44410b6bcd960c3c"
 dependencies = [
  "difflib",
  "itertools",
@@ -5221,15 +5220,15 @@ dependencies = [
 
 [[package]]
 name = "predicates-core"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57e35a3326b75e49aa85f5dc6ec15b41108cf5aee58eabb1f274dd18b73c2451"
+checksum = "da1c2388b1513e1b605fcec39a95e0a9e8ef088f71443ef37099fa9ae6673fcb"
 
 [[package]]
 name = "predicates-tree"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "338c7be2905b732ae3984a2f40032b5e94fd8f52505b186c7d4d68d193445df7"
+checksum = "4d86de6de25020a36c6d3643a86d9a6a9f552107c0559c60ea03551b5e16c032"
 dependencies = [
  "predicates-core",
  "termtree",
@@ -6391,9 +6390,9 @@ dependencies = [
 
 [[package]]
 name = "sasl2-sys"
-version = "0.1.16"
+version = "0.1.19+2.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c50936b766924ec8f5118bcd3d6e5dc7ac25263df4f2ea450fe7919281a4544"
+checksum = "21d3579e03127aee0792cc0e2d739fe05b1652f396ee92127d15b2748be9adf7"
 dependencies = [
  "cc",
  "duct",
@@ -7327,9 +7326,9 @@ dependencies = [
 
 [[package]]
 name = "termtree"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13a4ec180a2de59b57434704ccfad967f789b12737738798fa08798cd5824c16"
+checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
 
 [[package]]
 name = "test-case"
@@ -8340,7 +8339,6 @@ dependencies = [
  "azure_storage",
  "azure_storage_blobs",
  "base64 0.13.0",
- "bitmask-enum",
  "bloom",
  "bollard",
  "bytes 1.1.0",
@@ -8353,8 +8351,6 @@ dependencies = [
  "criterion",
  "crossterm 0.23.0",
  "csv",
- "dashmap 5.1.0",
- "data-encoding",
  "datadog-filter",
  "datadog-search-syntax",
  "derivative",
@@ -8392,18 +8388,14 @@ dependencies = [
  "itertools",
  "k8s-openapi",
  "libc",
- "libz-sys",
  "listenfd",
  "logfmt",
- "lookup",
  "lru",
- "matches",
  "maxminddb",
  "md-5 0.10.1",
  "memchr",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
  "mlua",
  "mongodb",
  "nats",
@@ -8426,7 +8418,6 @@ dependencies = [
  "proptest",
  "prost 0.9.0",
  "prost-build 0.9.0",
- "prost-types 0.9.0",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -8483,7 +8474,6 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tower",
- "tower-layer",
  "tower-test",
  "tracing 0.1.31",
  "tracing-core 0.1.22",
@@ -8494,7 +8484,6 @@ dependencies = [
  "tracing-tower",
  "trust-dns-proto",
  "tui",
- "twox-hash",
  "typetag",
  "url",
  "uuid",
@@ -8507,11 +8496,9 @@ dependencies = [
  "vrl",
  "vrl-cli",
  "vrl-stdlib",
- "walkdir",
  "warp",
  "windows-service",
  "wiremock",
- "zstd",
 ]
 
 [[package]]
