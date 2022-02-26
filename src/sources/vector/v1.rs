@@ -37,6 +37,8 @@ const fn default_shutdown_timeout_secs() -> u64 {
 
 impl VectorConfig {
     #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our cargo-hack run
     pub fn set_tls(&mut self, config: Option<TlsConfig>) {
         self.tls = config;
     }
