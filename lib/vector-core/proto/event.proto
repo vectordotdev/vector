@@ -3,6 +3,26 @@ package event;
 
 import "google/protobuf/timestamp.proto";
 
+message EventArray {
+  oneof events {
+    LogArray logs = 1;
+    MetricArray metrics = 2;
+    TraceArray traces = 3;
+  }
+}
+
+message LogArray {
+  repeated Log logs = 1;
+}
+
+message MetricArray {
+  repeated Metric metrics = 1;
+}
+
+message TraceArray {
+  repeated Trace traces = 1;
+}
+
 message EventWrapper {
   oneof event {
     Log log = 1;

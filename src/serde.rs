@@ -64,7 +64,9 @@ pub mod json {
     where
         T: ?Sized + Serialize,
     {
-        let mut bytes = BytesMut::new();
+        // Allocate same capacity as `serde_json::to_vec`:
+        // https://github.com/serde-rs/json/blob/5fe9bdd3562bf29d02d1ab798bbcff069173306b/src/ser.rs#L2195.
+        let mut bytes = BytesMut::with_capacity(128);
         serde_json::to_writer((&mut bytes).writer(), value)?;
         Ok(bytes)
     }
