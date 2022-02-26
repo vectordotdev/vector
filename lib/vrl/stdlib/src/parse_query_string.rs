@@ -1,7 +1,6 @@
-use std::collections::BTreeMap;
+use super::url_util::{parse_query, query_inner_kind};
 
 use url::form_urlencoded;
-use url::form_urlencoded::Parse;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -59,43 +58,14 @@ impl Expression for ParseQueryStringFn {
         }
 
         let query = form_urlencoded::parse(query_string);
-        let result = parse(query);
+        let result = parse_query(query);
 
         Ok(result.into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::object(inner_kind())
+        TypeDef::object(query_inner_kind())
     }
-}
-
-/// Inner kind for a parsed query string. Public for interop with `parse_url`.
-pub(super) fn inner_kind() -> Collection<Field> {
-    Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
-}
-
-/// Parse a query string into a map of String -> Value. Public for interop with `parse_url`.
-pub(super) fn parse(query: Parse) -> BTreeMap<String, Value> {
-    let mut result = BTreeMap::new();
-
-    for (k, value) in query {
-        let value = value.as_ref();
-        result
-            .entry(k.into_owned())
-            .and_modify(|v| {
-                match v {
-                    Value::Array(v) => {
-                        v.push(value.into());
-                    }
-                    v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
-                    }
-                };
-            })
-            .or_insert_with(|| value.into());
-    }
-
-    result
 }
 
 #[cfg(test)]
@@ -113,7 +83,7 @@ mod tests {
                 xyz: "",
                 abc: "",
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         multiple_values {
@@ -121,7 +91,7 @@ mod tests {
             want: Ok(value!({
                 foo: ["bar", "xyz"],
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         ruby_on_rails_multiple_values {
@@ -129,7 +99,7 @@ mod tests {
             want: Ok(value!({
                 "foo[]": ["bar", "xyz"],
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         empty_key {
@@ -137,7 +107,7 @@ mod tests {
             want: Ok(value!({
                 "": ["", ""],
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         single_key {
@@ -145,13 +115,13 @@ mod tests {
             want: Ok(value!({
                 foo: "",
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         empty {
             args: func_args![value: value!("")],
             want: Ok(value!({})),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
 
         starts_with_question_mark {
@@ -159,7 +129,7 @@ mod tests {
             want: Ok(value!({
                 foo: "bar",
             })),
-            tdef: TypeDef::object(inner_kind()),
+            tdef: TypeDef::object(query_inner_kind()),
         }
     ];
 }

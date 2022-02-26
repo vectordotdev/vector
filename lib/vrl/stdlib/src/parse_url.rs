@@ -1,6 +1,6 @@
+use super::url_util::{parse_query, query_inner_kind};
 use std::collections::BTreeMap;
 
-use super::parse_query_string;
 use url::Url;
 use vrl::prelude::*;
 
@@ -141,7 +141,7 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
     map.insert("port", port.into());
     map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
 
-    let query = parse_query_string::parse(url.query_pairs());
+    let query = parse_query(url.query_pairs());
     map.insert("query", query.into());
 
     map.into_iter()
@@ -158,10 +158,7 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         ("host".into(), Kind::bytes()),
         ("port".into(), Kind::integer().or_null()),
         ("fragment".into(), Kind::bytes().or_null()),
-        (
-            "query".into(),
-            Kind::object(parse_query_string::inner_kind()),
-        ),
+        ("query".into(), Kind::object(query_inner_kind())),
     ])
 }
 

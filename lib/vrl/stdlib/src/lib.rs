@@ -172,7 +172,7 @@ mod parse_syslog;
 mod parse_timestamp;
 #[cfg(feature = "parse_tokens")]
 mod parse_tokens;
-#[cfg(all(feature = "parse_url", feature = "parse_query_string"))]
+#[cfg(feature = "parse_url")]
 mod parse_url;
 #[cfg(feature = "parse_user_agent")]
 mod parse_user_agent;
@@ -246,6 +246,8 @@ mod unique;
 mod unnest;
 #[cfg(feature = "upcase")]
 mod upcase;
+#[cfg(any(feature = "parse_url", feature = "parse_query_string"))]
+mod url_util;
 #[cfg(feature = "uuid_v4")]
 mod uuid_v4;
 
@@ -664,7 +666,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTimestamp),
         #[cfg(feature = "parse_tokens")]
         Box::new(ParseTokens),
-        #[cfg(all(feature = "parse_url", feature = "parse_query_string"))]
+        #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
         #[cfg(feature = "parse_user_agent")]
         Box::new(ParseUserAgent),
