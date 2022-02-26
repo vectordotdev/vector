@@ -149,6 +149,7 @@ impl LogEvent {
     /// `to_key` already exists in the structure its value will be overwritten
     /// silently.
     #[inline]
+    #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
     pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
     where
         K: AsRef<str> + Into<String> + PartialEq + Display,
@@ -191,7 +192,7 @@ impl LogEvent {
         util::log::remove(self.as_map_mut(), key.as_ref(), prune)
     }
 
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
+    pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
         match self.fields.as_ref() {
             Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
