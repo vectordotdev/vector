@@ -8617,7 +8617,6 @@ dependencies = [
  "float_eq",
  "futures 0.3.21",
  "futures-util",
- "getset",
  "http",
  "hyper-proxy",
  "indexmap",

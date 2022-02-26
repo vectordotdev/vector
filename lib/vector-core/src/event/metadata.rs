@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 
@@ -11,14 +10,12 @@ use crate::{schema, ByteSizeOf};
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters)]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
     /// Used to store the datadog API from sources to sinks
-    #[getset(get = "pub", set = "pub")]
     #[serde(default, skip)]
     datadog_api_key: Option<Arc<str>>,
     /// Used to store the Splunk HEC auth token from sources to sinks
-    #[getset(get = "pub", set = "pub")]
     #[serde(default, skip)]
     splunk_hec_token: Option<Arc<str>>,
     #[serde(default, skip)]
@@ -30,6 +27,28 @@ pub struct EventMetadata {
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
     schema_definition: Arc<schema::Definition>,
+}
+
+impl EventMetadata {
+    /// Return the datadog API key, if it exists
+    pub fn datadog_api_key(&self) -> &Option<Arc<str>> {
+        &self.datadog_api_key
+    }
+
+    /// Set the datadog API key to passed value
+    pub fn set_datadog_api_key(&mut self, key: Option<Arc<str>>) {
+        self.datadog_api_key = key;
+    }
+
+    /// Return the splunk hec token, if it exists
+    pub fn splunk_hec_token(&self) -> &Option<Arc<str>> {
+        &self.splunk_hec_token
+    }
+
+    /// Set the splunk hec token to passed value
+    pub fn set_splunk_hec_token(&mut self, token: Option<Arc<str>>) {
+        self.splunk_hec_token = token;
+    }
 }
 
 impl Default for EventMetadata {
