@@ -97,7 +97,7 @@ impl Function for Set {
 }
 
 #[derive(Debug, Clone)]
-pub struct SetFn {
+pub(crate) struct SetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     data: Box<dyn Expression>,
