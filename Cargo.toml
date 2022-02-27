@@ -206,7 +206,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
 arc-swap = { version = "1.5", default-features = false, optional = true }
-async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
