@@ -19,6 +19,7 @@ use std::{
 use vector_core::buffers::Acker;
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
+use vector_core::event::MaybeAsLogMut;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -47,7 +48,7 @@ pub struct AuthConfig {
 pub struct OAuth2Config {
     issuer_url: String,
     credentials_url: String,
-    audience: String,
+    audience: Option<String>,
     scope: Option<String>,
 }
 
@@ -236,11 +237,24 @@ impl Sink<Event> for PulsarSink {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, mut item: Event) -> Result<(), Self::Error> {
         assert!(
             matches!(self.state, PulsarSinkState::Ready(_)),
             "Expected `poll_ready` to be called first."
         );
+
+        let event_time = if let Some(log) = &item.maybe_as_log_mut() {
+            log.get(log_schema().timestamp_key())
+                .map(|v| {
+                    v.as_timestamp()
+                        .map(|dt| {
+                            dt.timestamp_millis()
+                        })
+                })
+                .unwrap_or(None)
+        } else {
+            None
+        };
 
         let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
             emit!(&PulsarEncodeEventFailed {
@@ -256,7 +270,12 @@ impl Sink<Event> for PulsarSink {
         let _ = std::mem::replace(
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
-                let result = producer.send(message).await;
+                let mut builder = producer.create_message()
+                    .with_content(message);
+                if let Some(et) = event_time {
+                    builder = builder.event_time(et as u64);
+                }
+                let result = builder.send().await;
                 (producer, result)
             })),
         );
