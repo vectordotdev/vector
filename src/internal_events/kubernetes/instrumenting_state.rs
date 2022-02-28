@@ -10,7 +10,7 @@ pub struct StateItemAdded;
 pub struct StateItemUpdated;
 
 #[derive(Debug)]
-pub struct StateItemDeleted;
+pub(crate) struct StateItemDeleted;
 
 #[derive(Debug)]
 pub struct StateResynced;
