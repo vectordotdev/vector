@@ -7,7 +7,7 @@ use k8s_openapi::{
 
 /// Resource version state in the context of a chain of watch requests.
 #[derive(Debug, Clone, Default)]
-pub struct State(Option<String>);
+pub(crate) struct State(Option<String>);
 
 impl State {
     /// Create a new resource version [`State`].

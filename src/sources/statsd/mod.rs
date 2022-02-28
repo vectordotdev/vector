@@ -30,7 +30,7 @@ use crate::{
     udp, SourceSender,
 };
 
-pub mod parser;
+pub(crate) mod parser;
 #[cfg(unix)]
 mod unix;
 
