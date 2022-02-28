@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DecoderFramingFailed<'a> {
+pub(crate) struct DecoderFramingFailed<'a> {
     pub error: &'a crate::codecs::decoding::BoxedFramingError,
 }
 

@@ -17,7 +17,7 @@ pub struct BlackholeConfig {
     #[derivative(Default(value = "1"))]
     #[serde(default = "default_print_interval_secs")]
     pub(crate) print_interval_secs: u64,
-    pub rate: Option<usize>,
+    pub(crate) rate: Option<usize>,
 }
 
 #[async_trait::async_trait]
