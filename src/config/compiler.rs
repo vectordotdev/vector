@@ -115,7 +115,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             expansions,
         };
 
-        config.propagate_acknowledgements();
+        config.propagate_acknowledgements()?;
 
         let warnings = validation::warnings(&config);
 
@@ -304,6 +304,10 @@ mod test {
 
         fn input(&self) -> Input {
             Input::all()
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
         }
     }
 

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::LookupBuf;
 use value::{
@@ -10,7 +10,7 @@ use value::{
 ///
 /// This struct contains all the information needed to inspect the schema of an event emitted by
 /// a source/transform.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Definition {
     /// The collection of fields and their types stored in the event.
     collection: Collection<Field>,
@@ -19,13 +19,13 @@ pub struct Definition {
     ///
     /// The value within this map points to a path inside the `collection`. It is an invalid state
     /// for there to be a meaning pointing to a non-existing path in the collection.
-    meaning: HashMap<String, LookupBuf>,
+    meaning: BTreeMap<String, LookupBuf>,
 
     /// A list of paths that are allowed to be missing.
     ///
     /// The key in this set points to a path inside the `collection`. It is an invalid state for
     /// there to be a key pointing to a non-existing path in the collection.
-    optional: HashSet<LookupBuf>,
+    optional: BTreeSet<LookupBuf>,
 }
 
 impl Definition {
@@ -35,8 +35,8 @@ impl Definition {
     pub fn empty() -> Self {
         Self {
             collection: Collection::empty(),
-            meaning: HashMap::default(),
-            optional: HashSet::default(),
+            meaning: BTreeMap::default(),
+            optional: BTreeSet::default(),
         }
     }
 
@@ -56,6 +56,7 @@ impl Definition {
     /// - Provided path is a root path (e.g. `.`).
     /// - Provided path points to a root-level array (e.g. `.[0]`).
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
+    #[must_use]
     pub fn required_field(
         mut self,
         path: impl Into<LookupBuf>,
@@ -102,6 +103,7 @@ impl Definition {
     /// # Panics
     ///
     /// See `Definition::require_field`.
+    #[must_use]
     pub fn optional_field(
         mut self,
         path: impl Into<LookupBuf>,
@@ -115,6 +117,7 @@ impl Definition {
     }
 
     /// Set the kind for all unknown fields.
+    #[must_use]
     pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
         self.collection.set_unknown(unknown);
         self
@@ -134,8 +137,9 @@ impl Definition {
     /// example, `.foo` might be set as optional, but `.foo.bar` as required. In this case, it
     /// means that the object at `.foo` is allowed to be missing, but if it's present, then it's
     /// required to have a `bar` field.
+    #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
-        let mut optional = HashSet::default();
+        let mut optional = BTreeSet::default();
 
         for path in &self.optional {
             if other.is_optional_field(path)
@@ -185,8 +189,8 @@ impl From<Collection<Field>> for Definition {
     fn from(collection: Collection<Field>) -> Self {
         Self {
             collection,
-            meaning: HashMap::default(),
-            optional: HashSet::default(),
+            meaning: BTreeMap::default(),
+            optional: BTreeSet::default(),
         }
     }
 }
@@ -217,7 +221,7 @@ impl From<Definition> for Kind {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::*;
 
@@ -248,8 +252,8 @@ mod tests {
                     want: {
                         let collection =
                             Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = HashMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = HashSet::default();
+                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
+                        let optional = BTreeSet::default();
 
                         Definition {
                             collection,
@@ -270,11 +274,11 @@ mod tests {
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
                         )]));
-                        let meaning = HashMap::from([(
+                        let meaning = BTreeMap::from([(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap(),
                         )]);
-                        let optional = HashSet::default();
+                        let optional = BTreeSet::default();
 
                         Definition {
                             collection,
@@ -293,8 +297,8 @@ mod tests {
                     want: {
                         let collection =
                             Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = HashMap::default();
-                        let optional = HashSet::default();
+                        let meaning = BTreeMap::default();
+                        let optional = BTreeSet::default();
 
                         Definition {
                             collection,
@@ -339,8 +343,8 @@ mod tests {
                     want: {
                         let collection =
                             Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = HashMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = HashSet::from(["foo".into()]);
+                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
+                        let optional = BTreeSet::from(["foo".into()]);
 
                         Definition {
                             collection,
@@ -361,11 +365,11 @@ mod tests {
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
                         )]));
-                        let meaning = HashMap::from([(
+                        let meaning = BTreeMap::from([(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap(),
                         )]);
-                        let optional = HashSet::from([LookupBuf::from_str(".foo.bar").unwrap()]);
+                        let optional = BTreeSet::from([LookupBuf::from_str(".foo.bar").unwrap()]);
 
                         Definition {
                             collection,
@@ -384,8 +388,8 @@ mod tests {
                     want: {
                         let collection =
                             Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = HashMap::default();
-                        let optional = HashSet::from(["foo".into()]);
+                        let meaning = BTreeMap::default();
+                        let optional = BTreeSet::from(["foo".into()]);
 
                         Definition {
                             collection,
@@ -407,8 +411,8 @@ mod tests {
     fn test_unknown_fields() {
         let want = Definition {
             collection: Collection::from_unknown(Kind::bytes().or_integer()),
-            meaning: HashMap::default(),
-            optional: HashSet::default(),
+            meaning: BTreeMap::default(),
+            optional: BTreeSet::default(),
         };
 
         let mut got = Definition::empty();
@@ -436,24 +440,24 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::from(["foo".into()]),
-                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        optional: BTreeSet::from(["foo".into()]),
+                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::from(["foo".into()]),
-                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        optional: BTreeSet::from(["foo".into()]),
+                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::from(["foo".into()]),
-                        meaning: HashMap::from([("foo_meaning".to_owned(), "foo".into())]),
+                        optional: BTreeSet::from(["foo".into()]),
+                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                 },
             ),
@@ -465,24 +469,24 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::from(["foo".into()]),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::from(["foo".into()]),
+                        meaning: BTreeMap::default(),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                 },
             ),
@@ -494,24 +498,24 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::from(["foo".into()]),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::from(["foo".into()]),
+                        meaning: BTreeMap::default(),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                 },
             ),
@@ -523,24 +527,24 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: HashSet::default(),
-                        meaning: HashMap::default(),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::default(),
                     },
                 },
             ),

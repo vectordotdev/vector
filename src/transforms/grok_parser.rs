@@ -197,7 +197,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

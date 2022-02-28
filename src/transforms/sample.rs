@@ -184,7 +184,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 2.0f64;
@@ -202,7 +202,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 25.0f64;
@@ -225,7 +225,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
         let second_run = events
@@ -233,7 +233,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
 

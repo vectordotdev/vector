@@ -146,7 +146,7 @@ impl Expression for UnnestFn {
 ///    { "nonk" => { "shnoog" => { "noog" => 3 } } },
 ///  ]`
 ///
-pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
     use self::value::kind::insert;
 
     let type_def = typedef.at_path(&path.to_lookup());

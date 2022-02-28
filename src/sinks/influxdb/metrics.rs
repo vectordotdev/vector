@@ -30,7 +30,6 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            sink,
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
@@ -115,6 +114,10 @@ impl SinkConfig for InfluxDbConfig {
     fn sink_type(&self) -> &'static str {
         "influxdb_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl InfluxDbSvc {
@@ -156,7 +159,6 @@ impl InfluxDbSvc {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({

@@ -562,7 +562,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(async move { this.run_event_stream(info).await });
+            tokio::spawn(this.run_event_stream(info));
         }
     }
 

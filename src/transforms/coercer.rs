@@ -148,7 +148,7 @@ mod tests {
         let coercer = coercer.as_function();
         let mut buf = OutputBuffer::with_capacity(1);
         coercer.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(&metadata, result.metadata());
         result
     }

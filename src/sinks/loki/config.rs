@@ -130,6 +130,10 @@ impl SinkConfig for LokiConfig {
     fn sink_type(&self) -> &'static str {
         "loki"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 pub fn valid_label_name(label: &Template) -> bool {

@@ -14,7 +14,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        sink, BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -83,7 +83,6 @@ impl SinkConfig for ClickhouseConfig {
             batch.timeout,
             client.clone(),
             cx.acker(),
-            sink::StdServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
@@ -98,6 +97,10 @@ impl SinkConfig for ClickhouseConfig {
 
     fn sink_type(&self) -> &'static str {
         "clickhouse"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -171,7 +174,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
             format!(
                 "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
                 database,
-                table.replace("\"", "\\\"")
+                table.replace('\"', "\\\"")
             )
             .as_str(),
         )

@@ -165,7 +165,7 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
 }
 
 fn sanitize_key(key: &str) -> String {
-    let s = key.replace("/", "-");
+    let s = key.replace('/', "'-");
     let s = WHITESPACE.replace_all(&s, "_");
     let s = NONALPHANUM.replace_all(&s, "");
     s.into()

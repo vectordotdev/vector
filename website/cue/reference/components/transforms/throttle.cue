@@ -50,7 +50,7 @@ components: transforms: throttle: {
 		}
 		threshold: {
 			description: """
-				The number of events allowed for a given bucket per configured `window`.
+				The number of events allowed for a given bucket per configured `window_secs`.
 
 				Each unique key will have its own `threshold`.
 				"""
@@ -102,8 +102,8 @@ components: transforms: throttle: {
 			]
 
 			configuration: {
-				threshold: 1
-				window:    60
+				threshold:   1
+				window_secs: 60
 			}
 
 			output: [
@@ -122,8 +122,8 @@ components: transforms: throttle: {
 		rate_limiting: {
 			title: "Rate Limiting"
 			body:  """
-				The `throttle` transform will spread load across the configured `window`, ensuring that each bucket's
-				throughput averages out to the `threshold` per `window`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
+				The `throttle` transform will spread load across the configured `window_secs`, ensuring that each bucket's
+				throughput averages out to the `threshold` per `window_secs`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
 				rate limit the event stream.
 				"""
 			sub_sections: [
@@ -142,7 +142,7 @@ components: transforms: throttle: {
 						if there is no available cell the event will be rate limited.
 
 						A rate limiter is created with a maximum number of cells equal to the `threshold`, and cells replenish
-						at a rate of `window` divided by `threshold`. For example, a `window` of 60 with a `threshold` of 10
+						at a rate of `window_secs` divided by `threshold`. For example, a `window_secs` of 60 with a `threshold` of 10
 						replenishes a cell every 6 seconds and allows a burst of up to 10 events.
 						"""
 				},
