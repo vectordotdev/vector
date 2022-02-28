@@ -135,7 +135,7 @@ impl Compiler {
 
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
-    pub(crate) fn swap_external_contexts(&mut self, ctx: AnyMap) -> AnyMap {
+    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
         std::mem::replace(&mut self.external_context, ctx)
     }
 }
