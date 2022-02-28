@@ -1,3 +1,4 @@
-pub mod config;
+
+pub(crate) mod config;
 pub mod service;
 pub mod sink;
