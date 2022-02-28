@@ -62,4 +62,4 @@ pub use self::http::ErrorMessage;
 #[cfg(feature = "sources-utils-http-prelude")]
 pub(crate) use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
-pub use self::http::HttpSourceAuthConfig;
+pub(crate) use self::http::HttpSourceAuthConfig;
