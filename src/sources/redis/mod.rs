@@ -83,6 +83,10 @@ impl SourceConfig for RedisSourceConfig {
     fn source_type(&self) -> &'static str {
         "redis"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn redis_source(
