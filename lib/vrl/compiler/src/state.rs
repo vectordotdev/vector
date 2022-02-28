@@ -111,7 +111,9 @@ impl Compiler {
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
         if let Some(snapshot) = self.snapshot.take() {
+            let external_context = self.swap_external_context(AnyMap::new());
             *self = *snapshot;
+            self.external_context = external_context;
         }
     }
 
