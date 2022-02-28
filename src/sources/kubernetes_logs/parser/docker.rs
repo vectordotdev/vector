@@ -10,7 +10,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-pub const TIME: &str = "time";
+pub(crate) const TIME: &str = "time";
 pub(crate) const LOG: &str = "log";
 
 /// Parser for the docker log format.
