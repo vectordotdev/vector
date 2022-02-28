@@ -194,7 +194,7 @@ fn convert_to_statistic(unit: &str) -> StatisticKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ParseError {
+pub(crate) enum ParseError {
     InvalidUtf8(Utf8Error),
     Malformed(&'static str),
     UnknownMetricType(String),
