@@ -1,6 +1,6 @@
 use crate::config::SinkDescription;
 
-pub mod common;
+pub(crate) mod common;
 pub mod logs;
 pub(crate) mod metrics;
 
