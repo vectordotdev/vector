@@ -5,7 +5,7 @@ use std::path::Path;
 use bytes::Bytes;
 
 #[derive(Debug, Clone)]
-pub struct BytesPath {
+pub(crate) struct BytesPath {
     #[cfg(unix)]
     path: Bytes,
     #[cfg(windows)]
