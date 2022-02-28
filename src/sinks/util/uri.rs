@@ -14,7 +14,7 @@ use crate::http::Auth;
 /// For example: `http://user:password@example.com`.
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
-    pub uri: Uri,
+    pub(crate) uri: Uri,
     pub(crate) auth: Option<Auth>,
 }
 

@@ -17,7 +17,7 @@ pub struct DistributionStatistic {
     pub median: f64,
     pub(crate) avg: f64,
     pub sum: f64,
-    pub count: u64,
+    pub(crate) count: u64,
     /// (quantile, value)
     pub quantiles: Vec<(f64, f64)>,
 }
