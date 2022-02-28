@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
-    pub host_tag: Option<String>,
+    pub(crate) host_tag: Option<String>,
     pub timezone: Option<TimeZone>,
 }
 
