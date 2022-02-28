@@ -53,7 +53,7 @@ enum BuildError {
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
     #[serde(alias = "namespace")]
-    pub default_namespace: Option<String>,
+    pub(crate) default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     pub tls: Option<TlsConfig>,

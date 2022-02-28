@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[derive(Debug, Snafu)]
-pub enum UnixError {
+pub(crate) enum UnixError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: tokio::io::Error },
 }
