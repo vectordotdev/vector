@@ -67,7 +67,7 @@ impl TransformConfig for FilterConfig {
 
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
-pub struct Filter {
+pub(crate) struct Filter {
     #[derivative(Debug = "ignore")]
     condition: Condition,
     last_emission: Instant,
