@@ -77,7 +77,7 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(
+pub(crate) fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
