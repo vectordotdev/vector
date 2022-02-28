@@ -74,7 +74,7 @@ pub mod redis;
 #[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
-pub mod sematext;
+pub(crate) mod sematext;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]
