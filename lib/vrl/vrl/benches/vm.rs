@@ -1,61 +1,70 @@
 use std::collections::BTreeMap;
 
 use compiler::state;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
 use vector_common::TimeZone;
 use vrl::{Runtime, Value};
 
-static SOURCE: [(&str, &str); 2] = [
-    (
-        "parse_json",
-        indoc! {r#"
+struct Source {
+    name: &'static str,
+    code: &'static str,
+}
+
+static SOURCES: [Source; 2] = [
+    Source {
+        name: "parse_json",
+        code: indoc! {r#"
             x = parse_json!(s'{"noog": "nork"}')
             x.noog
         "#},
-    ),
-    (
-        "simple",
-        indoc! {r#"
+    },
+    Source {
+        name: "simple",
+        code: indoc! {r#"
             .hostname = "vector"
 
             if .status == "warning" {
-            .thing = upcase(.hostname)
+                .thing = upcase(.hostname)
             } else if .status == "notice" {
-            .thung = downcase(.hostname)
+                .thung = downcase(.hostname)
             } else {
-            .nong = upcase(.hostname)
+                .nong = upcase(.hostname)
             }
 
             .matches = { "name": .message, "num": "2" }
             .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
         "#},
-    ),
+    },
 ];
 
 fn benchmark_kind_display(c: &mut Criterion) {
     let mut group = c.benchmark_group("vrl_compiler/value::kind::display");
-    for (name, source) in &SOURCE {
+    for source in &SOURCES {
         let state = state::Runtime::default();
         let runtime = Runtime::new(state);
         let tz = TimeZone::default();
         let functions = vrl_stdlib::all();
-        let program = vrl::compile(source, &functions, None).unwrap();
+        let program = vrl::compile(source.code, &functions, None).unwrap();
         let vm = runtime.compile(functions, &program).unwrap();
 
-        group.bench_with_input(BenchmarkId::new("Vm", name), &vm, |b, vm| {
+        group.bench_with_input(BenchmarkId::new("Vm", source.name), &vm, |b, vm| {
+            let state = state::Runtime::default();
+            let mut runtime = Runtime::new(state);
+            let mut obj = Value::Object(BTreeMap::default());
             b.iter(|| {
-                let state = state::Runtime::default();
-                let mut runtime = Runtime::new(state);
-                runtime.run_vm(vm, &mut Value::Object(BTreeMap::default()), &tz)
+                let _ = black_box(runtime.run_vm(vm, &mut obj, &tz));
+                runtime.clear();
             })
         });
 
-        group.bench_with_input(BenchmarkId::new("Ast", name), &(), |b, _| {
+        group.bench_with_input(BenchmarkId::new("Ast", source.name), &(), |b, _| {
+            let state = state::Runtime::default();
+            let mut runtime = Runtime::new(state);
+            let mut obj = Value::Object(BTreeMap::default());
             b.iter(|| {
-                let state = state::Runtime::default();
-                let mut runtime = Runtime::new(state);
-                runtime.resolve(&mut Value::Object(BTreeMap::default()), &program, &tz)
+                let _ = black_box(runtime.resolve(&mut obj, &program, &tz));
+                runtime.clear();
             })
         });
     }
