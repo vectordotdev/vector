@@ -226,7 +226,7 @@ async fn processed_bytes_throughputs(
 
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
-pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
+pub(crate) fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
     let client = Arc::new(client);
 
     tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
