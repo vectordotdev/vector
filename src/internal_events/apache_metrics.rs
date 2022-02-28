@@ -56,7 +56,7 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsParseError<'a> {
+pub(crate) struct ApacheMetricsParseError<'a> {
     pub error: apache_metrics::ParseError,
     pub endpoint: &'a str,
 }
