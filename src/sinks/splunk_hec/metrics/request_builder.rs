@@ -9,7 +9,7 @@ use crate::sinks::{
     util::{Compression, RequestBuilder},
 };
 
-pub struct HecMetricsRequestBuilder {
+pub(crate) struct HecMetricsRequestBuilder {
     pub(super) compression: Compression,
 }
 

@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct AddTagsConfig {
+pub(crate) struct AddTagsConfig {
     tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
     pub(super) overwrite: bool,
