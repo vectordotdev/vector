@@ -14,7 +14,7 @@ pub struct FirehoseRequest {
     #[serde(with = "ts_milliseconds")]
     pub timestamp: DateTime<Utc>,
 
-    pub records: Vec<EncodedFirehoseRecord>,
+    pub(crate) records: Vec<EncodedFirehoseRecord>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
