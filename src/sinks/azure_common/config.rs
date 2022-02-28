@@ -81,7 +81,7 @@ impl DriverResponse for AzureBlobResponse {
 }
 
 #[derive(Debug, Snafu)]
-pub enum HealthcheckError {
+pub(crate) enum HealthcheckError {
     #[snafu(display("Invalid connection string specified"))]
     InvalidCredentials,
     #[snafu(display("Container: {:?} not found", container))]
