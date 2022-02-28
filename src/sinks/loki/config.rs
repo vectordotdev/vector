@@ -32,7 +32,7 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
     #[serde(default)]
-    pub compression: Compression,
+    pub(crate) compression: Compression,
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
