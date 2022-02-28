@@ -280,7 +280,7 @@ impl RecordFilter {
 }
 
 #[derive(Clone)]
-pub struct LokiSink {
+pub(crate) struct LokiSink {
     acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
