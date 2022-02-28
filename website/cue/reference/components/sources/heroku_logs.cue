@@ -12,9 +12,8 @@ components: sources: heroku_logs: {
 	alias: "logplex"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
@@ -22,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

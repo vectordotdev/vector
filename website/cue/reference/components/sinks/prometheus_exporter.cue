@@ -7,17 +7,17 @@ components: sinks: prometheus_exporter: {
 	alias: "prometheus"
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    true
-		delivery:         "best_effort"
-		development:      "stable"
-		egress_method:    "expose"
+		commonly_used: true
+		delivery:      "best_effort"
+		development:   "stable"
+		egress_method: "expose"
 		service_providers: []
 		stateful: true
 	}
 
 	features: {
-		healthcheck: enabled: false
+		acknowledgements: enabled: false
+		healthcheck: enabled:      false
 		exposes: {
 			tls: {
 				enabled:                true

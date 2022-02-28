@@ -4,17 +4,17 @@ components: sinks: blackhole: {
 	title: "Blackhole"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "stable"
-		egress_method:    "stream"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "stream"
 		service_providers: []
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: false
+		acknowledgements: enabled: true
+		healthcheck: enabled:      false
 		send: {
 			compression: enabled: false
 			encoding: enabled:    false

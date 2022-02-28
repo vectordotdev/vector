@@ -4,17 +4,17 @@ components: sinks: aws_sqs: components._aws & {
 	title: "Amazon Simple Queue Service (SQS)"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "beta"
-		egress_method:    "stream"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "stream"
 		service_providers: ["AWS"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			compression: enabled: false
 			encoding: {

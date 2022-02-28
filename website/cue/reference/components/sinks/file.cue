@@ -4,9 +4,8 @@ components: sinks: file: {
 	title: "File"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 
 		development:   "beta"
 		egress_method: "stream"
@@ -15,7 +14,8 @@ components: sinks: file: {
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			compression: {
 				enabled: true

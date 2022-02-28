@@ -10,9 +10,8 @@ components: sources: vector: {
 		"""
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
@@ -20,6 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

@@ -4,17 +4,17 @@ components: sinks: gcp_stackdriver_metrics: {
 	title: "GCP Cloud Monitoring (formerly Stackdrive) Metrics"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "at_least_once"
-		development:      "beta"
-		egress_method:    "batch"
+		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
 		service_providers: ["GCP"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: false
+		acknowledgements: enabled: true
+		healthcheck: enabled:      false
 		send: {
 			batch: {
 				enabled:      true

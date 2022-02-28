@@ -4,6 +4,7 @@ components: sources: aws_sqs: components._aws_new_sdk & {
 	title: "AWS SQS"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
@@ -18,8 +19,7 @@ components: sources: aws_sqs: components._aws_new_sdk & {
 	}
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
+		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
 		development:   "beta"

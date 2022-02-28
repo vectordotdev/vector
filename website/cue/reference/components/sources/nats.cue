@@ -4,6 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: components._nats.features.collect.from
@@ -16,8 +17,7 @@ components: sources: nats: {
 	}
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    true
+		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
 		development:   "beta"

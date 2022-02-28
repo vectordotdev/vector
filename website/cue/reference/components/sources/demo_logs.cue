@@ -10,9 +10,8 @@ components: sources: demo_logs: {
 		"""
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
@@ -20,6 +19,7 @@ components: sources: demo_logs: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

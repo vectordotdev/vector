@@ -6,9 +6,8 @@ components: sources: splunk_hec: {
 	title: "Splunk HTTP Event Collector (HEC)"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"
@@ -16,6 +15,7 @@ components: sources: splunk_hec: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

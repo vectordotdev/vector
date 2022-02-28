@@ -4,17 +4,17 @@ components: sinks: datadog_archives: {
 	title: "Datadog Log Archives"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "at_least_once"
-		development:      "beta"
-		egress_method:    "batch"
+		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
 		service_providers: ["AWS", "GCP"] // GCP, Azure is coming
 		stateful:                         false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      false

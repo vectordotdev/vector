@@ -4,17 +4,17 @@ components: sinks: sematext_metrics: {
 	title: "Sematext Metrics"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "beta"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
 		stateful:      false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

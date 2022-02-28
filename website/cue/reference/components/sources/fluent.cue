@@ -6,9 +6,8 @@ components: sources: fluent: {
 	title: "Fluent"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "best_effort"
+		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "stream"
@@ -16,6 +15,7 @@ components: sources: fluent: {
 	}
 
 	features: {
+		acknowledgements: true
 		receive: {
 			from: {
 				service: services.fluent

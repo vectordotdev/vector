@@ -9,9 +9,8 @@ components: sources: aws_ecs_metrics: {
 		"""
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "beta"
 		egress_method: "batch"
@@ -19,6 +18,7 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

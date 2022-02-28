@@ -2,11 +2,10 @@ package metadata
 
 components: sinks: _humio: {
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "beta"
-		egress_method:    "batch"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
 		service_providers: ["Humio"]
 		stateful: false
 	}
@@ -18,7 +17,8 @@ components: sinks: _humio: {
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

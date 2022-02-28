@@ -5,9 +5,8 @@ components: sources: docker_logs: {
 	alias: "docker"
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    false
-		delivery:         "best_effort"
+		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
@@ -47,6 +46,7 @@ components: sources: docker_logs: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

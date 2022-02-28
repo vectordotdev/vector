@@ -4,17 +4,17 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	title: "AWS Kinesis Data Streams"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "stable"
-		egress_method:    "batch"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "batch"
 		service_providers: ["AWS"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

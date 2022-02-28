@@ -4,17 +4,17 @@ components: sinks: influxdb_logs: {
 	title: "InfluxDB Logs"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
-		development:      "stable"
-		egress_method:    "batch"
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "batch"
 		service_providers: ["InfluxData"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

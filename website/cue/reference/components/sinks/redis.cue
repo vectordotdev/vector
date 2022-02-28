@@ -3,16 +3,16 @@ package metadata
 components: sinks: redis: {
 	title: "Redis"
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "best_effort"
-		development:      "beta"
-		egress_method:    "batch"
+		commonly_used: false
+		delivery:      "best_effort"
+		development:   "beta"
+		egress_method: "batch"
 		service_providers: []
 		stateful: false
 	}
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			compression: enabled: false
 			batch: {

@@ -4,6 +4,7 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: true
 		collect: {
 			tls: enabled:        false
@@ -14,8 +15,7 @@ components: sources: aws_s3: components._aws & {
 	}
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
+		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
 		development:   "beta"

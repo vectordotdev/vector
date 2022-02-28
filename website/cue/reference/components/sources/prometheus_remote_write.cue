@@ -4,9 +4,8 @@ components: sources: prometheus_remote_write: {
 	title: "Prometheus Remote Write"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
@@ -14,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

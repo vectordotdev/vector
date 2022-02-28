@@ -4,6 +4,7 @@ components: sources: kafka: {
 	title: "Kafka"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
 			tls: {
@@ -23,8 +24,7 @@ components: sources: kafka: {
 	}
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
+		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
 		development:   "stable"

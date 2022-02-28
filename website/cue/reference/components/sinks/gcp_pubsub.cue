@@ -4,17 +4,17 @@ components: sinks: gcp_pubsub: {
 	title: "GCP PubSub"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "at_least_once"
-		development:      "beta"
-		egress_method:    "batch"
+		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
 		service_providers: ["GCP"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

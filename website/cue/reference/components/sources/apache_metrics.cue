@@ -4,9 +4,8 @@ components: sources: apache_metrics: {
 	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
@@ -14,6 +13,7 @@ components: sources: apache_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		collect: {
 			checkpoint: enabled: false

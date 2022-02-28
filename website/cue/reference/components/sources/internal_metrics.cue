@@ -9,9 +9,8 @@ components: sources: internal_metrics: {
 		"""
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    true
-		delivery:         "at_least_once"
+		commonly_used: true
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
@@ -19,6 +18,7 @@ components: sources: internal_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.vector

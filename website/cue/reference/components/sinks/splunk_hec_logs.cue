@@ -5,17 +5,17 @@ components: sinks: splunk_hec_logs: {
 	alias: "splunk_hec"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "at_least_once"
-		development:      "stable"
-		egress_method:    "batch"
+		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "batch"
 		service_providers: ["Splunk"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

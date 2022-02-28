@@ -6,9 +6,8 @@ components: sources: aws_kinesis_firehose: {
 	title: "AWS Kinesis Firehose"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    false
-		delivery:         "at_least_once"
+		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
@@ -16,6 +15,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

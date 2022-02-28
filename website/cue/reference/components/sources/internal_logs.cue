@@ -5,9 +5,8 @@ components: sources: internal_logs: {
 	description: "The internal logs source exposes all log and trace messages emitted by the running Vector instance."
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    true
-		delivery:         "at_least_once"
+		commonly_used: true
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "stream"
@@ -15,6 +14,7 @@ components: sources: internal_logs: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service: {

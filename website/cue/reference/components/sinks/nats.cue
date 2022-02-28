@@ -4,17 +4,17 @@ components: sinks: nats: {
 	title: "NATS"
 
 	classes: {
-		acknowledgements: false
-		commonly_used:    false
-		delivery:         "best_effort"
-		development:      "beta"
-		egress_method:    "stream"
+		commonly_used: false
+		delivery:      "best_effort"
+		development:   "beta"
+		egress_method: "stream"
 		service_providers: []
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: false
+		healthcheck: enabled:      true
 		send: {
 			compression: enabled: false
 			encoding: {

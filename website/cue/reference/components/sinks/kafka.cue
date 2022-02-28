@@ -4,17 +4,17 @@ components: sinks: kafka: {
 	title: "Kafka"
 
 	classes: {
-		acknowledgements: true
-		commonly_used:    true
-		delivery:         "at_least_once"
-		development:      "stable"
-		egress_method:    "dynamic"
+		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
 		stateful: false
 	}
 
 	features: {
-		healthcheck: enabled: true
+		acknowledgements: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true
