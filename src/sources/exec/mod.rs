@@ -84,7 +84,7 @@ pub struct StreamingConfig {
 }
 
 #[derive(Debug, PartialEq, Snafu)]
-pub enum ExecConfigError {
+pub(crate) enum ExecConfigError {
     #[snafu(display("A non-empty list for command must be provided"))]
     CommandEmpty,
     #[snafu(display("The maximum buffer size must be greater than zero"))]

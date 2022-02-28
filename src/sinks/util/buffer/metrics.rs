@@ -89,7 +89,7 @@ impl Batch for MetricsBuffer {
 /// This is a simple wrapper for using `MetricNormalize` with a
 /// persistent `MetricSet` state, to be used in sinks in `with_flat_map`
 /// before sending the events to the `MetricsBuffer`
-pub struct MetricNormalizer<N> {
+pub(crate) struct MetricNormalizer<N> {
     state: MetricSet,
     normalizer: N,
 }
