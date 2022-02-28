@@ -119,7 +119,7 @@ pub(crate) fn stop_buffering() {
     *early_buffer() = None;
 }
 
-pub fn current_span() -> Span {
+pub(crate) fn current_span() -> Span {
     Span::current()
 }
 
