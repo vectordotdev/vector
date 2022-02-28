@@ -64,7 +64,7 @@ pub struct RemoteWriteConfig {
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
-    pub tls: Option<TlsOptions>,
+    pub(crate) tls: Option<TlsOptions>,
 
     pub auth: Option<Auth>,
 }
