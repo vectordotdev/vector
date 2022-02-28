@@ -181,7 +181,7 @@ impl TowerRequestConfig {
 
 #[derive(Debug, Clone)]
 pub struct TowerRequestSettings {
-    pub concurrency: Option<usize>,
+    pub(crate) concurrency: Option<usize>,
     pub timeout: Duration,
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
