@@ -84,7 +84,7 @@ pub enum GcsHealthcheckError {
     KeyPrefixTemplate { source: TemplateParseError },
 }
 
-pub fn build_healthcheck(
+pub(crate) fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: String,
