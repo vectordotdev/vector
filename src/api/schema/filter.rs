@@ -22,7 +22,7 @@ pub struct StringFilter {
     pub not_equals: Option<String>,
     pub contains: Option<String>,
     pub not_contains: Option<String>,
-    pub starts_with: Option<String>,
+    pub(crate) starts_with: Option<String>,
     pub ends_with: Option<String>,
 }
 
