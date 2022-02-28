@@ -22,7 +22,7 @@ impl InternalEvent for AwsSqsBytesReceived {
 }
 
 #[derive(Debug)]
-pub struct SqsMessageDeleteError<'a> {
+pub(crate) struct SqsMessageDeleteError<'a> {
     pub error: &'a SdkError<DeleteMessageBatchError>,
 }
 
