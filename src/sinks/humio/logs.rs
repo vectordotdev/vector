@@ -20,7 +20,7 @@ use crate::{
 const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HumioLogsConfig {
+pub(crate) struct HumioLogsConfig {
     pub(in crate::sinks::humio) token: String,
     // Deprecated name
     #[serde(alias = "host")]

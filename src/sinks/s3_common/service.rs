@@ -40,7 +40,7 @@ impl Finalizable for S3Request {
 
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
-    pub partition_key: String,
+    pub(crate) partition_key: String,
     pub count: usize,
     pub byte_size: usize,
     pub finalizers: EventFinalizers,
