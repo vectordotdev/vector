@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{host_key, Encoding};
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     sinks::{
         splunk_hec::{
             common::{
@@ -21,28 +23,34 @@ const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioLogsConfig {
-    pub(in crate::sinks::humio) token: String,
+    pub(super) token: String,
     // Deprecated name
     #[serde(alias = "host")]
-    pub(in crate::sinks::humio) endpoint: Option<String>,
-    pub(in crate::sinks::humio) source: Option<Template>,
-    pub(in crate::sinks::humio) encoding: EncodingConfig<Encoding>,
-    pub(in crate::sinks::humio) event_type: Option<Template>,
+    pub(super) endpoint: Option<String>,
+    pub(super) source: Option<Template>,
+    pub(super) encoding: EncodingConfig<Encoding>,
+    pub(super) event_type: Option<Template>,
     #[serde(default = "host_key")]
-    pub(in crate::sinks::humio) host_key: String,
+    pub(super) host_key: String,
     #[serde(default)]
-    pub(in crate::sinks::humio) indexed_fields: Vec<String>,
+    pub(super) indexed_fields: Vec<String>,
     #[serde(default)]
-    pub(in crate::sinks::humio) index: Option<Template>,
+    pub(super) index: Option<Template>,
     #[serde(default)]
-    pub(in crate::sinks::humio) compression: Compression,
+    pub(super) compression: Compression,
     #[serde(default)]
-    pub(in crate::sinks::humio) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig,
     #[serde(default)]
-    pub(in crate::sinks::humio) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
-    pub(in crate::sinks::humio) tls: Option<TlsOptions>,
+    pub(super) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+    pub(super) tls: Option<TlsOptions>,
     #[serde(default = "timestamp_nanos_key")]
-    pub(in crate::sinks::humio) timestamp_nanos_key: Option<String>,
+    pub(super) timestamp_nanos_key: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -69,6 +77,7 @@ impl GenerateConfig for HumioLogsConfig {
             batch: BatchConfig::default(),
             tls: None,
             timestamp_nanos_key: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -89,8 +98,8 @@ impl SinkConfig for HumioLogsConfig {
         "humio_logs"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -296,6 +305,7 @@ mod integration_tests {
             batch,
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
+            acknowledgements: Default::default(),
         }
     }
 
