@@ -50,7 +50,7 @@ pub fn default_endpoint() -> String {
         .unwrap_or_else(|_| "http://169.254.170.2/v2".into())
 }
 
-pub fn default_version() -> Version {
+pub(crate) fn default_version() -> Version {
     if env::var(METADATA_URI_V4).is_ok() {
         Version::V4
     } else if env::var(METADATA_URI_V3).is_ok() {

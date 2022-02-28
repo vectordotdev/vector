@@ -27,7 +27,7 @@ pub struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
-    pub sourcetype: Option<Template>,
+    pub(crate) sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
     pub indexed_fields: Vec<String>,
