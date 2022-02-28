@@ -42,7 +42,7 @@ pub(crate) struct StackdriverConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
 }
 
