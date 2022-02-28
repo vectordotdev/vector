@@ -30,7 +30,7 @@ impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
 }
 
 #[derive(Debug)]
-pub struct WatchStreamFailed<E> {
+pub(crate) struct WatchStreamFailed<E> {
     pub(crate) error: E,
 }
 
