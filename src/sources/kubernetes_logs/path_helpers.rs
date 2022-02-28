@@ -60,7 +60,7 @@ pub struct LogFileInfo<'a> {
     pub pod_namespace: &'a str,
     pub pod_name: &'a str,
     pub pod_uid: &'a str,
-    pub container_name: &'a str,
+    pub(crate) container_name: &'a str,
 }
 
 #[cfg(test)]
