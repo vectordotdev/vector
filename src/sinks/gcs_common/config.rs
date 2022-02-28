@@ -34,7 +34,7 @@ pub enum GcsPredefinedAcl {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum GcsStorageClass {
+pub(crate) enum GcsStorageClass {
     #[derivative(Default)]
     Standard,
     Nearline,

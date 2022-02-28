@@ -86,7 +86,7 @@ pub struct DatadogArchivesSinkConfig {
     pub bucket: String,
     pub key_prefix: Option<String>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) request: TowerRequestConfig,
     #[serde(default)]
     pub aws_s3: Option<S3Config>,
     #[serde(default)]
