@@ -131,7 +131,7 @@ pub struct CommandServerStatusLockModes {
 pub struct CommandServerStatusMetrics {
     pub cursor: CommandServerStatusMetricsCursor,
     pub document: CommandServerStatusMetricsDocument,
-    pub get_last_error: CommandServerStatusMetricsGetLastError,
+    pub(crate) get_last_error: CommandServerStatusMetricsGetLastError,
     pub operation: CommandServerStatusMetricsOperation,
     pub query_executor: CommandServerStatusMetricsQueryExecutor,
     pub record: CommandServerStatusMetricsRecord,
