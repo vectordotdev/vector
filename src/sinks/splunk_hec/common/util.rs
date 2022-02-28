@@ -354,7 +354,7 @@ mod integration_tests {
 }
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]
-pub mod integration_test_helpers {
+pub(crate) mod integration_test_helpers {
     use serde_json::Value as JsonValue;
     use tokio::time::Duration;
 
