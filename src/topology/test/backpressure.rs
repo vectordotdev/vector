@@ -17,7 +17,7 @@ pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
 // The implementation of `LimitedSender` uses a holding slot in order to accept an item before
 // trying to drive the send of the item, so we have to account for that here.
-pub const EXTRA_LIMITED_QUEUE_SEND_SLOT: usize = 1;
+pub(crate) const EXTRA_LIMITED_QUEUE_SEND_SLOT: usize = 1;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
