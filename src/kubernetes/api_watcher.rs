@@ -18,7 +18,7 @@ use super::{
 use crate::internal_events::kubernetes::api_watcher as internal_events;
 
 /// A simple watcher atop of the Kubernetes API [`Client`].
-pub struct ApiWatcher<B>
+pub(crate) struct ApiWatcher<B>
 where
     B: 'static,
 {
