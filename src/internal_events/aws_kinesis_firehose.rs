@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug)]
-pub struct AwsKinesisFirehoseRequestReceived<'a> {
+pub(crate) struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,
 }
