@@ -17,7 +17,7 @@ use crate::{
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
-pub struct GcsSink<Svc, RB> {
+pub(crate) struct GcsSink<Svc, RB> {
     acker: Acker,
     service: Svc,
     request_builder: RB,

@@ -68,7 +68,7 @@ pub struct Opts {
         env = "VECTOR_CONFIG_DIR",
         use_value_delimiter(true)
     )]
-    pub config_dirs: Vec<PathBuf>,
+    pub(crate) config_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
