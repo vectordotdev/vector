@@ -95,7 +95,7 @@ enum NormalizationError {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(crate) mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};

@@ -18,7 +18,7 @@ use crate::{
     tls::TlsSettings,
 };
 
-pub mod types;
+pub(crate) mod types;
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 struct EventStoreDbConfig {
