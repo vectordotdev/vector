@@ -79,7 +79,7 @@ pub struct TransformOuter {
 pub struct Config {
     pub sources: Option<IndexMap<String, Value>>,
     pub transforms: Option<IndexMap<String, TransformOuter>>,
-    pub sinks: Option<IndexMap<String, SinkOuter>>,
+    pub(crate) sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
 fn generate_example(
