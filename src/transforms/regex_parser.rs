@@ -188,8 +188,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
-            .flatten()
+            .flat_map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         let types =
@@ -228,8 +227,7 @@ impl RegexParser {
         drop_field = drop_field
             && !patterns
                 .iter()
-                .map(|p| &p.capture_names)
-                .flatten()
+                .flat_map(|p| &p.capture_names)
                 .any(|(_, f, _)| *f == field);
 
         Self {

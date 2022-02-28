@@ -647,7 +647,7 @@ mod integration_tests {
 
         let metric = make_metric();
         let mut expected_metric = metric.clone();
-        for (k, v) in TEST_METADATA.iter().cloned() {
+        for (k, v) in TEST_METADATA.iter() {
             expected_metric.insert_tag(k.to_string(), v.to_string());
         }
 
