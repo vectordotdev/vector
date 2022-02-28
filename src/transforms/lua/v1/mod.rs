@@ -263,7 +263,7 @@ impl mlua::UserData for LuaEvent {
     }
 }
 
-pub fn format_error(error: &mlua::Error) -> String {
+pub(crate) fn format_error(error: &mlua::Error) -> String {
     match error {
         mlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
         err => err.to_string(),
