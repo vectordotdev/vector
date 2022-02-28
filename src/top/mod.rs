@@ -20,6 +20,6 @@ pub struct Opts {
     url: Option<Url>,
 
     /// Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k, 1,000,000 = 1.00 M
-    #[clap(short, long)]
+    #[clap(short = 'H', long)]
     human_metrics: bool,
 }

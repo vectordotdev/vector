@@ -104,7 +104,7 @@ impl From<Trace> for event::TraceEvent {
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
             .collect::<BTreeMap<_, _>>();
 
-        Self::from(fields)
+        Self::from(event::LogEvent::from(fields))
     }
 }
 

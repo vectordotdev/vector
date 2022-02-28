@@ -397,7 +397,7 @@ mod tests {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_precision_loss)]
     impl DelayService {
-        pub fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
+        pub(crate) fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
             assert!(upper_bound > lower_bound);
             Self {
                 semaphore: PollSemaphore::new(Arc::new(Semaphore::new(permits))),
@@ -412,7 +412,7 @@ mod tests {
             }
         }
 
-        pub fn get_sleep_dur(&mut self) -> Duration {
+        pub(crate) fn get_sleep_dur(&mut self) -> Duration {
             let lower = self.lower_bound_us;
             let upper = self.upper_bound_us;
 

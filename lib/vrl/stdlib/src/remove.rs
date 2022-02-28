@@ -121,7 +121,7 @@ impl Function for Remove {
 }
 
 #[derive(Debug, Clone)]
-pub struct RemoveFn {
+pub(crate) struct RemoveFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     compact: Box<dyn Expression>,
