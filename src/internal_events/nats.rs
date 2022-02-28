@@ -8,7 +8,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub(crate) struct NatsEventsReceived {
     pub byte_size: usize,
-    pub count: usize,
+    pub(crate) count: usize,
 }
 
 impl InternalEvent for NatsEventsReceived {
