@@ -206,7 +206,7 @@ mod tests {
     }
 
     const fn test_data_utf16le_vector_devanagari() -> &'static [u8] {
-        b"-\tG\t\x15\tM\t\x1f\tx00\t"
+        b"-\tG\t\x15\tM\t\x1f\t0\t"
     }
 
     // test UTF_16BE data
@@ -219,7 +219,7 @@ mod tests {
     }
 
     const fn test_data_utf16be_vector_devanagari() -> &'static [u8] {
-        b"\t-\tG\t\x15\tM\t\x1f\tx00"
+        b"\t-\tG\t\x15\tM\t\x1f\t0"
     }
 
     // test SHIFT_JIS data
