@@ -8,7 +8,7 @@ use vector_core::internal_event::InternalEvent;
 use crate::tls::TlsError;
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionEstablished {
+pub(crate) struct TcpSocketConnectionEstablished {
     pub peer_addr: Option<std::net::SocketAddr>,
 }
 
