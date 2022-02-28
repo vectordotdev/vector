@@ -33,7 +33,7 @@ use vector::{
     event::{
         into_event_stream,
         metric::{self, MetricData, MetricValue},
-        Event, EventArray, Value,
+        Event, EventArray, EventContainer, Value,
     },
     schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
@@ -194,9 +194,9 @@ impl SourceConfig for MockSourceConfig {
 
                 recv.poll_next_unpin(cx)
             })
-            .inspect(move |_| {
+            .inspect(move |array| {
                 if let Some(counter) = &event_counter {
-                    counter.fetch_add(1, Ordering::Relaxed);
+                    counter.fetch_add(array.len(), Ordering::Relaxed);
                 }
             })
             .flat_map(into_event_stream);
