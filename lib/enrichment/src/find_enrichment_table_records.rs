@@ -53,12 +53,12 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        state: &state::Compiler,
-        _ctx: &mut FunctionCompileContext,
+        _state: &state::Compiler,
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let registry = state
-            .get_external_context::<TableRegistry>()
+        let registry = ctx
+            .get_external_context_mut::<TableRegistry>()
             .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
 
         let tables = registry
@@ -90,10 +90,15 @@ impl Function for FindEnrichmentTableRecords {
             })
             .unwrap_or(Case::Sensitive);
 
+        let index = Some(
+            add_index(registry, &table, case_sensitive, &condition)
+                .map_err(|err| Box::new(err) as Box<_>)?,
+        );
+
         Ok(Box::new(FindEnrichmentTableRecordsFn {
             table,
             condition,
-            index: None,
+            index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
@@ -148,19 +153,6 @@ impl Expression for FindEnrichmentTableRecordsFn {
             .collect();
 
         Ok(Value::Array(data))
-    }
-
-    fn update_state(
-        &mut self,
-        state: &mut state::Compiler,
-    ) -> std::result::Result<(), ExpressionError> {
-        self.index = Some(add_index(
-            state,
-            &self.table,
-            self.case_sensitive,
-            &self.condition,
-        )?);
-        Ok(())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
