@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DedupeEventDiscarded {
+pub(crate) struct DedupeEventDiscarded {
     pub(crate) event: crate::event::Event,
 }
 
