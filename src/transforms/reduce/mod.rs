@@ -34,7 +34,7 @@ pub struct ReduceConfig {
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
     #[serde(default)]
-    pub group_by: Vec<String>,
+    pub(crate) group_by: Vec<String>,
 
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
