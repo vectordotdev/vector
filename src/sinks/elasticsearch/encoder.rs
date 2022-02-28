@@ -14,7 +14,7 @@ use crate::{
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
-    pub log: LogEvent,
+    pub(crate) log: LogEvent,
     pub id: Option<String>,
 }
 

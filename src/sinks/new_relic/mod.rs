@@ -13,7 +13,7 @@ pub(crate) use model::*;
 pub use service::*;
 pub use sink::*;
 
-pub use super::{Healthcheck, VectorSink};
+pub(crate) use super::{Healthcheck, VectorSink};
 
 #[cfg(test)]
 pub(crate) mod tests;
