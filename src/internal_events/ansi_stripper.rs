@@ -68,7 +68,7 @@ const COULDNT_STRIP: &str = "could_not_strip";
 
 #[derive(Debug)]
 pub struct AnsiStripperError<'a> {
-    pub field: &'a str,
+    pub(crate) field: &'a str,
     pub error: std::io::Error,
 }
 

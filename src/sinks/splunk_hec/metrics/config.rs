@@ -28,7 +28,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
-    pub default_namespace: Option<String>,
+    pub(crate) default_namespace: Option<String>,
     // Deprecated name
     #[serde(alias = "token")]
     pub default_token: String,
