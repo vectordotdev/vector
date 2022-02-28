@@ -31,7 +31,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<StandardEncodings>,
-    pub create_missing_group: Option<bool>,
+    pub(crate) create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
     pub compression: Compression,

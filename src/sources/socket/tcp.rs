@@ -29,7 +29,7 @@ pub struct TcpConfig {
     framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
-    pub connection_limit: Option<u32>,
+    pub(crate) connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
