@@ -223,27 +223,31 @@ impl Remap {
         &self.runtime
     }
 
+    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+        let message = error
+            .notes()
+            .iter()
+            .filter(|note| matches!(note, Note::UserErrorMessage(_)))
+            .last()
+            .map(|note| note.to_string())
+            .unwrap_or_else(|| error.to_string());
+        serde_json::json!({
+            "dropped": {
+                "reason": reason,
+                "message": message,
+                "component_id": self.component_key,
+                "component_type": "remap",
+                "component_kind": "transform",
+            }
+        })
+    }
+
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) | Event::Trace(ref mut log) => {
-                let message = error
-                    .notes()
-                    .iter()
-                    .filter(|note| matches!(note, Note::UserErrorMessage(_)))
-                    .last()
-                    .map(|note| note.to_string())
-                    .unwrap_or_else(|| error.to_string());
+            Event::Log(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
-                    serde_json::json!({
-                        "dropped": {
-                            "reason": reason,
-                            "message": message,
-                            "component_id": self.component_key,
-                            "component_type": "remap",
-                            "component_kind": "transform",
-                        }
-                    }),
+                    self.anotate_data(reason, error),
                 );
             }
             Event::Metric(ref mut metric) => {
@@ -258,6 +262,12 @@ impl Remap {
                 );
                 metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
                 metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+            }
+            Event::Trace(ref mut trace) => {
+                trace.insert(
+                    log_schema().metadata_key(),
+                    self.anotate_data(reason, error),
+                );
             }
         }
     }

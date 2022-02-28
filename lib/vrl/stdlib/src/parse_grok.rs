@@ -6,7 +6,7 @@ use vrl::{
 };
 
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(grok::Error),
 }
 
