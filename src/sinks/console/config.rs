@@ -25,7 +25,7 @@ pub enum Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
 }
 
 impl GenerateConfig for ConsoleSinkConfig {
