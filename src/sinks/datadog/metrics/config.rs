@@ -110,7 +110,7 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) request: TowerRequestConfig,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
