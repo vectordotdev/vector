@@ -22,7 +22,7 @@ impl<E: std::fmt::Debug> InternalEvent for InvocationDesyncReceived<E> {
 #[derive(Debug)]
 pub struct StreamDesyncReceived<E> {
     /// The underlying error.
-    pub error: E,
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Debug> InternalEvent for StreamDesyncReceived<E> {
