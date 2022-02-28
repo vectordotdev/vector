@@ -62,7 +62,7 @@ pub struct EwmaVar {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeanVariance {
     pub mean: f64,
-    pub variance: f64,
+    pub(crate) variance: f64,
 }
 
 impl EwmaVar {
