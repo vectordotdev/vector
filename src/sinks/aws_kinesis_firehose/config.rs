@@ -58,7 +58,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
+    pub(crate) assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
