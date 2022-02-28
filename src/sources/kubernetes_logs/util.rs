@@ -40,7 +40,7 @@ where
 /// the `signal` completes.
 /// If `signal` is sent or cancelled, the `future` is dropped (and not polled
 /// anymore).
-pub async fn cancel_on_signal<E, F, S>(future: F, signal: S) -> Result<(), E>
+pub(crate) async fn cancel_on_signal<E, F, S>(future: F, signal: S) -> Result<(), E>
 where
     F: Future<Output = Result<Infallible, E>>,
     S: Future<Output = ()>,
