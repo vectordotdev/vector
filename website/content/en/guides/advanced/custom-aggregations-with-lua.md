@@ -4,7 +4,7 @@ description: Write a custom transform for aggregating log events into metrics us
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 2
+weight: 1
 tags: ["lua", "aggregation", "transform", "advanced", "guides", "guide"]
 ---
 

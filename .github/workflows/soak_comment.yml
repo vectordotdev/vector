@@ -21,12 +21,12 @@ jobs:
         uses: actions/github-script@v3.1.0
         with:
           script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
+            var artifacts = await github.paginate(github.actions.listWorkflowRunArtifacts, {
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
-            var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+            var matchArtifact = artifacts.filter((artifact) => {
               return artifact.name == "soak-analysis"
             })[0];
             var download = await github.actions.downloadArtifact({
