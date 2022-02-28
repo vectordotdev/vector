@@ -64,7 +64,7 @@ enum SinkBuildError {
 pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
 }
 
 impl<I> EncodedEvent<I> {
