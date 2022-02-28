@@ -15,7 +15,7 @@ pub struct DistributionStatistic {
     pub min: f64,
     pub max: f64,
     pub median: f64,
-    pub avg: f64,
+    pub(crate) avg: f64,
     pub sum: f64,
     pub count: u64,
     /// (quantile, value)
