@@ -11,7 +11,7 @@ fn main() {
 }
 
 #[cfg(windows)]
-pub fn main() {
+pub(crate) fn main() {
     // We need to be able to run vector in User Interactive mode. We first try
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See
