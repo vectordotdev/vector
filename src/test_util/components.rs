@@ -96,7 +96,7 @@ impl ComponentTests {
 }
 
 /// Initialize the necessary bits needed to run a component test specification.
-pub fn init_test() {
+pub(crate) fn init_test() {
     super::trace_init();
     event_test_util::clear_recorded_events();
 

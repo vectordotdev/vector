@@ -14,7 +14,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    pub namespace_labels: String,
+    pub(crate) namespace_labels: String,
 }
 
 impl Default for FieldsSpec {
