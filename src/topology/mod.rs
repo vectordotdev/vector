@@ -55,7 +55,7 @@ pub struct TapResource {
     // Outputs and their corresponding Fanout control
     pub outputs: HashMap<OutputId, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
-    pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    pub(crate) inputs: HashMap<ComponentKey, Vec<OutputId>>,
 }
 
 // Watcher types for topology changes.
