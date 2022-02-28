@@ -19,7 +19,7 @@ pub struct KinesisRequestBuilder {
 
 pub struct Metadata {
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
+    pub(crate) event_byte_size: usize,
 }
 
 #[derive(Clone)]
