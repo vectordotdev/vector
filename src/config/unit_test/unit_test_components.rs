@@ -123,7 +123,7 @@ pub struct UnitTestSink {
     pub transform_id: String,
     // None for NoOp test sinks
     pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
-    pub check: UnitTestSinkCheck,
+    pub(crate) check: UnitTestSinkCheck,
 }
 
 #[async_trait::async_trait]
