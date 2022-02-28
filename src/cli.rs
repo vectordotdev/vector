@@ -214,7 +214,7 @@ pub enum Color {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum LogFormat {
+pub(crate) enum LogFormat {
     Text,
     Json,
 }
