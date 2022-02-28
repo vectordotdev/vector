@@ -18,7 +18,7 @@ pub enum HecEvent {
 }
 
 #[derive(Serialize, Debug)]
-pub struct HecData {
+pub(crate) struct HecData {
     #[serde(flatten)]
     pub event: HecEvent,
     pub fields: LogEvent,
