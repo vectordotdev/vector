@@ -27,7 +27,7 @@ pub struct StdinConfig {
     pub max_length: usize,
     pub host_key: Option<String>,
     #[serde(default = "default_framing_stream_based")]
-    pub framing: FramingConfig,
+    pub(crate) framing: FramingConfig,
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }

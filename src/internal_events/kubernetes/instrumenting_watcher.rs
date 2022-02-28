@@ -31,7 +31,7 @@ impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
 
 #[derive(Debug)]
 pub struct WatchStreamFailed<E> {
-    pub error: E,
+    pub(crate) error: E,
 }
 
 impl<E: Debug> InternalEvent for WatchStreamFailed<E> {
