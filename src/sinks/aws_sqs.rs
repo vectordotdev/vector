@@ -76,7 +76,7 @@ pub struct SqsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
-    pub message_group_id: Option<String>,
+    pub(crate) message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
