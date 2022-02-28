@@ -61,7 +61,7 @@ impl DedupeConfig {
     }
 }
 
-pub struct Dedupe {
+pub(crate) struct Dedupe {
     fields: FieldMatchConfig,
     cache: LruCache<CacheEntry, bool>,
 }
