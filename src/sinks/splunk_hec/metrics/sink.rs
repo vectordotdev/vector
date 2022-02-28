@@ -26,7 +26,7 @@ pub struct HecMetricsSink<S> {
     pub context: SinkContext,
     pub service: S,
     pub(crate) batch_settings: BatcherSettings,
-    pub request_builder: HecMetricsRequestBuilder,
+    pub(crate) request_builder: HecMetricsRequestBuilder,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
