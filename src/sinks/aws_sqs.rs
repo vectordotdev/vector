@@ -72,7 +72,7 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
-    pub queue_url: String,
+    pub(crate) queue_url: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
