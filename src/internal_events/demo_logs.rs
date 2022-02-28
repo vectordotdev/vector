@@ -1,7 +1,7 @@
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DemoLogsEventProcessed;
+pub(crate) struct DemoLogsEventProcessed;
 
 impl InternalEvent for DemoLogsEventProcessed {
     fn emit_logs(&self) {
