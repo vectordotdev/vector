@@ -33,7 +33,7 @@ impl InternalEvent for VectorEventReceived {
 
 #[derive(Debug)]
 pub(crate) struct VectorProtoDecodeError<'a> {
-    pub error: &'a DecodeError,
+    pub(crate) error: &'a DecodeError,
 }
 
 impl<'a> InternalEvent for VectorProtoDecodeError<'a> {
