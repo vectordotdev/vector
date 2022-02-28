@@ -46,7 +46,7 @@ const NAME: &str = "gcp_cloud_storage";
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct GcsSinkConfig {
+pub(crate) struct GcsSinkConfig {
     bucket: String,
     acl: Option<GcsPredefinedAcl>,
     storage_class: Option<GcsStorageClass>,

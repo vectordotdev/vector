@@ -364,7 +364,7 @@ pub trait FrameHandler {
  * Functions similarly, but uses the FrameStreamReader to deal with
  * framestream control packets, and responds appropriately.
  **/
-pub fn build_framestream_unix_source(
+pub(crate) fn build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
