@@ -1,4 +1,5 @@
-pub mod acknowledgements;
+
+pub(crate) mod acknowledgements;
 pub(crate) mod request;
 pub(crate) mod response;
 pub mod service;
