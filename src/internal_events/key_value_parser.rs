@@ -37,6 +37,6 @@ impl InternalEvent for KeyValueParserError {
 }
 
 #[derive(Debug)]
-pub struct KeyValueMultipleSplitResults {
+pub(crate) struct KeyValueMultipleSplitResults {
     pub pair: String,
 }

@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
-pub async fn firehose(
+pub(crate) async fn firehose(
     request_id: String,
     source_arn: String,
     request: FirehoseRequest,
