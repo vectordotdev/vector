@@ -117,7 +117,7 @@ impl TcpSource for FluentSource {
 }
 
 #[derive(Debug)]
-pub enum DecodeError {
+pub(crate) enum DecodeError {
     IO(io::Error),
     Decode(decode::Error),
     UnknownCompression(String),
