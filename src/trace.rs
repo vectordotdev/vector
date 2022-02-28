@@ -115,7 +115,7 @@ fn early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
-pub fn stop_buffering() {
+pub(crate) fn stop_buffering() {
     *early_buffer() = None;
 }
 
