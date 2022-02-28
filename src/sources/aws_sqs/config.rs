@@ -19,7 +19,7 @@ pub struct AwsSqsConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    pub queue_url: String,
+    pub(crate) queue_url: String,
 
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
